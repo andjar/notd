@@ -1,0 +1,9 @@
+{to:: }
+{from:: }
+{subject:: }
+
+```text
+
+```
+
+{tag::mail}
