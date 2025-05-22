@@ -1277,29 +1277,58 @@ function editNote(id, currentContent) {
 
 // Add back the deleteNote function
 async function deleteNote(id) {
-    if (!confirm('Are you sure you want to delete this note and all its children?')) return;
-
-    try {
-        const response = await fetch(`api/note.php?id=${id}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'delete'
-            })
-        });
-
-        const data = await response.json();
-        if (data.error) {
-            console.error(data.error);
-            return;
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="delete-confirmation-modal">
+            <h3>Delete Note</h3>
+            <p>Are you sure you want to delete this note and all its children?</p>
+            <div class="button-group">
+                <button class="btn-secondary cancel-delete">Cancel</button>
+                <button class="btn-primary confirm-delete">Delete</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
         }
+    });
+    
+    // Handle cancel
+    modal.querySelector('.cancel-delete').onclick = () => {
+        document.body.removeChild(modal);
+    };
+    
+    // Handle confirm
+    modal.querySelector('.confirm-delete').onclick = async () => {
+        try {
+            const response = await fetch(`api/note.php?id=${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'delete'
+                })
+            });
 
-        loadPage(currentPage.id);
-    } catch (error) {
-        console.error('Error deleting note:', error);
-    }
+            const data = await response.json();
+            if (data.error) {
+                console.error(data.error);
+                return;
+            }
+
+            document.body.removeChild(modal);
+            loadPage(currentPage.id);
+        } catch (error) {
+            console.error('Error deleting note:', error);
+        }
+    };
 }
 
 async function showSearchResults() {

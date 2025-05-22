@@ -17,6 +17,12 @@
     --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.05);
     --radius-sm: 4px;
     --radius-md: 6px;
+
+    /* --- Threading Variables --- */
+    --indentation-guide-width: 1.5rem; /* How much space each level of indentation takes for lines */
+    --thread-line-left-offset: 0.5rem; /* Position of the vertical thread line from the left of its indentation block */
+    --thread-connector-top: 1.2em;  /* Vertical position of the horizontal T-bar (align with text/bullet) */
+    --base-content-padding: 0.5em; /* Base padding for all content, including level 0 */
 }
 
 * {
@@ -708,7 +714,6 @@ body {
     font-size: 0.9em;
     background: var(--bg-color);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
     color: var(--text-color);
     cursor: pointer;
     transition: all 0.2s ease;
@@ -801,6 +806,7 @@ body {
     padding: 6px;
     border-radius: var(--radius-sm);
     transition: all 0.2s;
+    text-align: center;
 }
 
 .calendar-day:hover {
@@ -1159,4 +1165,101 @@ async function renderFocusedView(page, originalNote) {
 
 .home-link:hover {
     text-decoration: underline;
+}
+
+/* Page editor styling */
+.page-editor {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin: 8px 0;
+}
+
+.page-editor-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.page-id-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 1em;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-color);
+    color: var(--text-color);
+}
+
+.page-editor-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Button styling */
+.btn-primary {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--hover-color);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+/* Delete confirmation modal */
+.delete-confirmation-modal {
+    background: white;
+    padding: 20px;
+    border-radius: var(--radius-md);
+    width: 80%;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.delete-confirmation-modal h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
+
+.delete-confirmation-modal p {
+    margin-bottom: 20px;
+    color: var(--text-color);
+}
+
+.delete-confirmation-modal .button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.delete-confirmation-modal .btn-primary {
+    background: #e74c3c;
+}
+
+.delete-confirmation-modal .btn-primary:hover {
+    background: #c0392b;
 }
