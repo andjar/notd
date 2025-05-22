@@ -328,11 +328,14 @@ async function renderNoteContent(note) {
         return `<a href="#" class="search-link" onclick="event.preventDefault(); executeSearchLink('${query.replace(/'/g, "\\'")}')"><<${displayQuery}>></a>`;
     });
     
-    // Extract properties before markdown parsing
+    // Extract properties but keep them in the content
     const properties = {};
     content = content.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
         properties[key.trim()] = value.trim();
-        return ''; // Remove properties from content before markdown parsing
+        if (key.trim() === 'tag') {
+            return `<a href="#${value.trim()}" class="property-tag" onclick="event.preventDefault(); loadPage('${value.trim()}');">#${value.trim()}</a>`;
+        }
+        return `<span class="property-tag">${key.trim()}: ${value.trim()}</span>`;
     });
     
     // Now process markdown
@@ -385,15 +388,6 @@ async function renderNoteContent(note) {
         return `<a href="#${p1}" class="internal-link" onclick="event.preventDefault(); loadPage('${p1}');">${p1}</a>`;
     });
     
-    // Add properties back as spans
-    Object.entries(properties).forEach(([key, value]) => {
-        if (key === 'tag') {
-            content += `<a href="#${value}" class="property-tag" onclick="event.preventDefault(); loadPage('${value}');">#${value}</a>`;
-        } else {
-            content += `<span class="property-tag">${key}: ${value}</span>`;
-        }
-    });
-    
     // Add attachments section
     if (note.attachments && note.attachments.length > 0) {
         content += '<div class="attachments">';
@@ -411,7 +405,7 @@ async function renderNoteContent(note) {
     return content;
 }
 
-// Update renderOutline to handle async content
+// Update renderOutline to add focus button
 async function renderOutline(notes, level = 0) {
     if (!notes) return '';
     
@@ -419,7 +413,9 @@ async function renderOutline(notes, level = 0) {
         // Ensure block_id is available
         const blockId = note.block_id;
         const content = await renderNoteContent(note);
-        return `
+        
+        // Create the note HTML
+        const noteHtml = `
             <div class="outline-item" 
                  data-note-id="${note.id}"
                  data-level="${level}"
@@ -429,6 +425,7 @@ async function renderOutline(notes, level = 0) {
                     ${note.properties ? renderProperties(note.properties) : ''}
                     <div class="note-actions">
                         <button data-action="add-child" title="Add child note">+</button>
+                        <button data-action="focus" title="Focus on this thread"></button>
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
                         <button data-action="edit" title="Edit note">✎</button>
                         <button data-action="delete" title="Delete note">×</button>
@@ -436,10 +433,15 @@ async function renderOutline(notes, level = 0) {
                             ${new Date(note.created_at).toLocaleDateString()}
                         </span>
                     </div>
-                    ${note.children ? await renderOutline(note.children, level + 1) : ''}
                 </div>
             </div>
         `;
+
+        // If there are children, render them recursively
+        const childrenHtml = note.children ? await renderOutline(note.children, level + 1) : '';
+        
+        // Return both the note and its children
+        return noteHtml + childrenHtml;
     }));
     
     return renderedNotes.join('');
@@ -927,6 +929,9 @@ function handleOutlineClick(event) {
     const action = target.dataset.action;
 
     switch (action) {
+        case 'focus':
+            toggleFocus(noteElement);
+            break;
         case 'copy-block-id':
             const blockId = noteElement.querySelector('.outline-content').dataset.blockId;
             if (blockId) {
@@ -1417,4 +1422,71 @@ async function toggleTodo(noteId, isDone, text) {
     } catch (error) {
         console.error('Error updating todo status:', error);
     }
+}
+
+// Add focus toggle functionality
+function toggleFocus(noteElement) {
+    const isFocused = noteElement.classList.contains('focused');
+    
+    if (isFocused) {
+        // If already focused, unfocus and reload the page
+        loadPage(currentPage.id);
+        return;
+    }
+    
+    // Get the note's data
+    const noteId = noteElement.dataset.noteId;
+    const level = parseInt(noteElement.dataset.level);
+    const content = noteElement.dataset.content;
+    
+    // Find all child notes
+    let childNotes = [];
+    let currentLevel = level;
+    let nextElement = noteElement.nextElementSibling;
+    
+    while (nextElement && parseInt(nextElement.dataset.level) > currentLevel) {
+        childNotes.push({
+            id: nextElement.dataset.noteId,
+            level: parseInt(nextElement.dataset.level) - level, // Adjust levels relative to parent
+            content: nextElement.dataset.content,
+            children: [] // Will be populated recursively
+        });
+        nextElement = nextElement.nextElementSibling;
+    }
+    
+    // Create a new page structure with the focused note as root
+    const focusedPage = {
+        id: currentPage.id,
+        title: currentPage.title,
+        notes: [{
+            id: noteId,
+            level: 0, // Make it a top-level note
+            content: content,
+            children: childNotes
+        }]
+    };
+    
+    // Render the focused view
+    renderFocusedView(focusedPage, noteElement);
+}
+
+// Add function to render focused view
+async function renderFocusedView(page, originalNote) {
+    // Add a back button to the page title
+    pageTitle.innerHTML = `
+        <button class="btn-secondary unfocus-button" onclick="loadPage(currentPage.id)">Back</button>
+        <span class="page-title-text">${page.title}</span>
+        <button class="edit-properties-button" title="Edit page properties"></button>
+    `;
+    
+    // Clear the outline container
+    outlineContainer.innerHTML = '';
+    
+    // Render the focused note and its children
+    const renderedNotes = await renderOutline(page.notes);
+    outlineContainer.innerHTML = renderedNotes;
+    
+    // Scroll the focused note into view
+    const focusedNote = outlineContainer.querySelector('.outline-item');
+    focusedNote?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 } 

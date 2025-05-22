@@ -3,6 +3,8 @@
     --secondary-color: #34495e;
     --accent-color: #3498db;
     --text-color: #2c3e50;
+    --note-text-color: #1a1a1a;
+    --note-bg-color: #ffffff;
     --bg-color: #f8fafc;
     --bg-secondary: rgba(0, 0, 0, 0.02);
     --sidebar-width: 280px;
@@ -55,6 +57,10 @@ body {
     padding: 30px;
     max-width: calc(100vw - var(--sidebar-width));
     overflow-y: auto;
+    background: var(--bg-color);
+    padding: 2rem;
+    width: 100%;
+    max-width: 100%;
 }
 
 .calendar-panel {
@@ -335,10 +341,12 @@ body {
 #page-properties {
     background: var(--sidebar-bg);
     padding: 12px 16px;
-    border-radius: var(--radius-md);
     margin-bottom: 24px;
     transition: all 0.2s;
     border: 1px solid var(--border-color);
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: 0;
 }
 
 .page-properties-content {
@@ -348,21 +356,78 @@ body {
     align-items: center;
 }
 
-.page-property {
-    background: var(--bg-color);
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    font-size: 0.9em;
-    color: var(--text-color);
+.property-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.85em;
+    color: var(--text-color);
+    margin: 2px;
+    white-space: nowrap;
 }
 
+.property-tag a {
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.property-tag a:hover {
+    text-decoration: underline;
+}
+
+/* Properties editor styling */
+.properties-editor {
+    width: 100%;
+}
+
+.properties-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 0.9em;
+    margin-bottom: 8px;
+    resize: vertical;
+}
+
+.properties-editor-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* Property key-value styling */
 .property-key {
     color: var(--text-muted);
     margin-right: 4px;
 }
 
 .property-value {
+    color: var(--text-color);
+}
+
+/* Page properties specific styling */
+.page-property {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    font-size: 0.9em;
+    margin: 2px;
+}
+
+.page-property .property-key {
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+
+.page-property .property-value {
     color: var(--text-color);
 }
 
@@ -373,48 +438,153 @@ body {
 }
 
 .outline-item {
-    margin: var(--note-margin) 0;
     position: relative;
+    margin-bottom: 1rem;
+    transition: opacity 0.2s ease;
+    animation: none;
 }
 
-.outline-item::before {
+.outline-content::before {
     display: none;
 }
 
+.outline-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.outline-item::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 1.5rem;
+    width: 1rem;
+    height: 2px;
+    background: var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+/* Adjust indentation to account for thread lines */
+.outline-item[data-level="1"] {
+    padding-left: 1.5rem;
+}
+
+.outline-item[data-level="2"] {
+    padding-left: 3rem;
+}
+
+.outline-item[data-level="3"] {
+    padding-left: 4.5rem;
+}
+
+.outline-item[data-level="4"] {
+    padding-left: 6rem;
+}
+
+.outline-item[data-level="5"] {
+    padding-left: 7.5rem;
+}
+
+/* Only show thread lines for indented items */
+.outline-item[data-level="0"]::before,
+.outline-item[data-level="0"]::after {
+    display: none;
+}
+
+/* Adjust content margin to align with thread */
+.outline-content {  
+    margin-left: 0;
+}
+
 .outline-content {
-    background: var(--sidebar-bg);
+    background: var(--note-bg-color);
     padding: var(--note-padding);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    position: relative;
-    margin-bottom: var(--note-margin);
     border: 1px solid var(--border-color);
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    position: relative;
+    max-width: 100%;
+    color: var(--note-text-color);
 }
 
-.outline-content:hover {
-    box-shadow: var(--shadow-md);
+/* Make top-level notes wider */
+.outline-item[data-level="0"] .outline-content {
+    background: var(--note-bg-color);
+    max-width: 100%;
 }
 
+/* Adjust width for each level */
+.outline-item[data-level="1"] .outline-content {
+    background: var(--note-bg-color);
+    max-width: 100%;
+}
+
+.outline-item[data-level="2"] .outline-content {
+    background: var(--note-bg-color);
+    max-width: 100%;
+}
+
+.outline-item[data-level="3"] .outline-content {
+    background: var(--note-bg-color);
+    max-width: 100%;
+}
+
+.outline-item[data-level="4"] .outline-content {
+    background: var(--note-bg-color);
+    max-width: 100%;
+}
+
+.outline-item[data-level="5"] .outline-content {
+    background: var(--note-bg-color);
+    max-width: 100%;
+}
+
+/* Add a subtle indicator for the current level */
+.outline-content::before {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent-color);
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+/* Adjust note actions for the new layout */
 .note-actions {
     display: flex;
-    gap: 4px;
-    align-items: center;
-    margin-top: 8px;
-    padding-top: 8px;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
     border-top: 1px solid var(--border-color);
+    justify-content: flex-end;
+    align-items: center;
 }
 
 .note-actions button {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 6px;
+    padding: 4px 8px;
     border-radius: var(--radius-sm);
     font-size: 0.9em;
     color: var(--text-color);
     opacity: 0.6;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
 }
 
 .note-actions button:hover {
@@ -422,349 +592,178 @@ body {
     background: var(--hover-color);
 }
 
+.note-actions button[data-action="add-child"] {
+    color: var(--accent-color);
+}
+
+.note-actions button[data-action="edit"] {
+    color: var(--accent-color);
+}
+
+.note-actions button[data-action="delete"] {
+    color: #e74c3c;
+}
+
+.note-actions button[data-action="copy-block-id"] {
+    font-family: monospace;
+    font-weight: bold;
+}
+
 .note-date {
     margin-left: auto;
     font-size: 0.8em;
-    color: #666;
-}
-
-/* Todo item styling */
-.todo-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin: 8px 0;
-    padding: 4px 0;
-}
-
-.todo-checkbox {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    cursor: pointer;
-    flex: 1;
-}
-
-.todo-checkbox input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    margin-top: 2px;
-}
-
-.todo-checkbox span {
-    flex: 1;
-    line-height: 1.4;
-}
-
-.status-todo {
-    color: var(--text-color);
-}
-
-.status-done {
     color: var(--text-muted);
-    text-decoration: line-through;
-}
-
-/* List styling */
-.outline-content ul {
-    list-style-position: inside;
-    margin: 8px 0;
-    padding-left: 20px;
-}
-
-.outline-content li {
-    margin: 4px 0;
-    line-height: 1.4;
-}
-
-.outline-content li::marker {
-    color: var(--accent-color);
-}
-
-/* Code block styling */
-.outline-content pre {
-    margin: 8px 0;
-    background: var(--bg-color);
-    padding: 12px;
-    border-radius: 4px;
-    overflow-x: auto;
-}
-
-.outline-content code {
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 0.9em;
-}
-
-/* Template selector styling */
-.template-selector {
-    margin-left: 8px;
-}
-
-.template-selector select {
-    padding: 4px 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-color);
-    color: var(--text-color);
-    font-size: 0.9em;
-}
-
-/* Backlinks styling */
-.backlinks-container {
-    margin-top: 24px;
-    padding: 24px 0;
-    border-top: 1px solid var(--border-color);
-}
-
-.backlinks-container h3 {
-    margin-bottom: 16px;
-    color: var(--text-color);
-    font-size: 1em;
-    font-weight: 500;
     opacity: 0.7;
 }
 
-.backlinks-list {
-    margin-top: 16px;
-    padding: 0 16px;
+/* Adjust the outline container to be full width */
+#outline-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
 }
 
-.backlink-item {
-    margin-bottom: 12px;
-    padding: 12px;
-    background: var(--sidebar-bg);
+/* Add a subtle hover effect for the thread line */
+.outline-item:hover::before {
+    background: var(--accent-color);
+    opacity: 0.5;
+}
+
+/* Add a subtle hover effect for the horizontal connector */
+.outline-item:hover::after {
+    background: var(--accent-color);
+    opacity: 0.5;
+}
+
+/* Adjust spacing for nested items */
+.outline-item .outline-item {
+    margin-top: 1rem;
+}
+
+/* Add a subtle transition for all hover effects */
+.outline-item::before,
+.outline-item::after,
+.outline-content::before {
+    transition: all 0.2s ease;
+}
+
+/* Make the content area more readable */
+.outline-content p {
+    margin-bottom: 0.5rem;
+}
+
+.outline-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Add a subtle background to the main container */
+.main-content {
+    background: var(--bg-color);
+    padding: 2rem;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Add styles for future focus mode */
+.outline-item.focused {
+    background: rgba(52, 152, 219, 0.05);
     border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-    transition: all 0.2s;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
 }
 
-.backlink-item:hover {
-    box-shadow: var(--shadow-sm);
+.outline-item.focused .outline-content {
+    border-color: var(--accent-color);
+    box-shadow: var(--shadow-md);
+    background: var(--note-bg-color);
 }
 
-.backlink-item a {
-    color: var(--text-color);
-    text-decoration: none;
-    font-weight: bold;
-}
-
-.backlink-context {
-    margin-top: 8px;
-    font-size: 0.9em;
-    color: var(--text-color);
+.outline-item.focused::before,
+.outline-item.focused::after {
+    background: var(--accent-color);
     opacity: 0.8;
 }
 
-/* Property tags styling */
-.property-tag {
-    display: inline-block;
-    background: var(--bg-secondary);
-    color: var(--text-muted);
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin: 0 4px;
-    font-size: 0.9em;
+.outline-item.focused .outline-content::before {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.2);
 }
 
-.property-tag:hover {
-    background: var(--accent-color);
-    color: white;
+/* Remove opacity changes for non-focused notes */
+.outline-item:not(.focused) {
+    opacity: 1;
 }
 
-/* File attachment styling */
-.file-attachment {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
-    background: var(--sidebar-bg);
-    border-radius: 4px;
-    margin-bottom: 4px;
+.outline-item:not(.focused):hover {
+    opacity: 1;
 }
 
-.file-attachment a {
-    color: var(--text-color);
-    text-decoration: none;
-    flex: 1;
-}
-
-.delete-attachment {
-    cursor: pointer;
-    color: var(--accent-color);
-    font-weight: bold;
-}
-
-.delete-attachment:hover {
-    color: var(--primary-color);
-}
-
-/* Search results styling */
-.search-results {
-    position: fixed;
-    top: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80%;
-    max-width: 800px;
-    max-height: 80vh;
-    overflow-y: auto;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    z-index: 1000;
-    padding: 15px;
-}
-
-.search-result {
-    padding: 15px;
-    border-bottom: 1px solid #eee;
-    cursor: pointer;
-}
-
-.search-result:hover {
-    background: #f8f9fa;
-}
-
-.search-result h4 {
-    color: var(--accent-color);
-    margin-bottom: 8px;
-}
-
-.result-content {
-    margin-bottom: 8px;
-}
-
-.result-context {
-    font-size: 0.9em;
-    color: #666;
-    padding-left: 15px;
-    border-left: 2px solid #eee;
-}
-
-.context-item {
-    margin: 5px 0;
-}
-
-/* Internal link styling */
-.internal-link {
-    color: var(--accent-color);
-    text-decoration: none;
-    border-bottom: 1px dashed var(--accent-color);
-}
-
-.internal-link:hover {
-    border-bottom-style: solid;
-}
-
-/* File upload styling */
-.file-upload {
+/* Improved back button */
+.unfocus-button {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    margin: 5px 0;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.9em;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 12px;
 }
 
-.file-upload input[type="file"] {
-    display: none;
+.unfocus-button:hover {
+    background: var(--hover-color);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
 }
 
-.file-upload label {
+.unfocus-button::before {
+    content: "←";
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+/* Update focus button to match other icons */
+.note-actions button[data-action="focus"] {
+    color: var(--text-color);
+    opacity: 0.6;
+    transition: all 0.2s;
+    font-size: 1em;
+}
+
+.note-actions button[data-action="focus"]::before {
+    content: "○";
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+.note-actions button[data-action="focus"]:hover {
+    opacity: 1;
+    background: var(--hover-color);
+    color: var(--accent-color);
+}
+
+.outline-item.focused .note-actions button[data-action="focus"] {
+    opacity: 1;
     background: var(--accent-color);
     color: white;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
 }
 
-.file-upload label:hover {
-    background: #2980b9;
+/* Adjust the outline container for focused view */
+#outline-container.focused {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 1rem;
 }
 
-.file-attachment .delete-attachment {
-    margin-left: 5px;
-    color: #e74c3c;
-    cursor: pointer;
-}
-
-.file-attachment .delete-attachment:hover {
-    color: #c0392b;
-}
-
-/* Note editor styling */
-.note-editor {
-    margin: 10px 0;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-}
-
-.note-textarea {
-    width: 100%;
-    min-height: 150px;
-    padding: 15px;
-    border: none;
-    background: transparent;
-    color: var(--text-color);
-    font-family: inherit;
-    font-size: 1em;
-    line-height: 1.6;
-    resize: vertical;
-}
-
-.note-editor-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    border-top: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-}
-
-.btn-secondary {
-    background: var(--bg-color);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-    padding: 8px 16px;
-    border-radius: 0;
-    cursor: pointer;
-    font-size: 0.9em;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-    background: var(--hover-color);
-    transform: translateY(-1px);
-}
-
-.attachments {
-    margin-top: 8px;
-    padding: 8px;
-    background: var(--bg-color);
-    border-radius: 4px;
-}
-
-.header-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.home-link {
-    color: var(--accent-color);
-    text-decoration: none;
-    font-size: 2.5em;
-    display: block;
-    text-align: center;
-    margin-bottom: -20px;
-    padding: 20px 0;
-}
-
-.home-link:hover {
-    text-decoration: underline;
+/* Make the focused note more prominent */
+.outline-item[data-level="0"] .outline-content {
+    background: var(--note-bg-color);
+    max-width: 100%;
 }
 
 /* Calendar styling */
@@ -818,117 +817,135 @@ body {
     cursor: default;
 }
 
-/* Properties editor styling */
-.properties-editor {
-    margin: 10px 0;
-    width: 100%;
+/* Backlinks styling */
+#backlinks-container {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
 }
 
-.properties-textarea {
-    width: 100%;
-    min-height: 100px;
-    padding: 12px;
-    margin-bottom: 10px;
+.backlink-item {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--note-bg-color);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 1em;
-    line-height: 1.4;
-    resize: vertical;
-    max-height: 300px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
 }
 
-.properties-editor-actions {
-    display: flex;
-    gap: 10px;
-}
-
-/* Image styles */
-.note-image {
-    max-width: 300px;
-    max-height: 200px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: transform 0.2s;
-}
-
-.note-image:hover {
-    transform: scale(1.02);
-}
-
-/* Image modal */
-.image-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.9);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.image-modal-content {
-    position: relative;
-    max-width: 90%;
-    max-height: 90%;
-}
-
-.image-modal-content img {
-    max-width: 100%;
-    max-height: 90vh;
-    object-fit: contain;
-}
-
-.image-modal .close-modal {
-    position: absolute;
-    top: -40px;
-    right: 0;
-    background: none;
-    border: none;
-    color: white;
-    font-size: 30px;
-    cursor: pointer;
-    padding: 5px;
-}
-
-.image-modal .close-modal:hover {
-    color: #ccc;
-}
-
-/* Block ID button styling */
-.block-id-button {
-    font-family: monospace;
-    font-weight: bold;
+.backlink-item a {
     color: var(--accent-color);
-    background: none;
-    border: none;
+    text-decoration: none;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.backlink-item a:hover {
+    text-decoration: underline;
+}
+
+.backlink-context {
+    font-size: 0.9em;
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+/* All Pages modal styling */
+.page-list-modal {
+    background: white;
+    padding: 20px;
+    border-radius: var(--radius-md);
+    width: 80%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.page-list-modal h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
+
+.page-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.page-list-item {
+    padding: 8px 12px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 14px;
     transition: all 0.2s;
 }
 
-.block-id-button:hover {
-    background: var(--accent-color);
-    color: white;
+.page-list-item:hover {
+    background: var(--hover-color);
+    border-color: var(--accent-color);
+    transform: translateX(4px);
 }
 
-.block-id-button.copied {
-    background: #27ae60;
-    color: white;
+/* Recent pages styling */
+.recent-pages-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
 }
 
-/* Transcluded block styling */
+.recent-pages-header h3 {
+    margin: 0;
+    font-size: 1em;
+    color: var(--text-color);
+}
+
+.all-pages-link {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 0.9em;
+}
+
+.all-pages-link:hover {
+    text-decoration: underline;
+}
+
+.recent-pages ul {
+    list-style: none;
+    padding: 0;
+}
+
+.recent-pages li {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.recent-pages li:hover {
+    background: var(--hover-color);
+    transform: translateX(4px);
+}
+
+.recent-pages li small {
+    color: var(--text-muted);
+    font-size: 0.8em;
+}
+
+/* Transclusion styling */
 .transcluded-block {
-    margin: 10px 0;
-    padding: 15px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin: 1rem 0;
     position: relative;
 }
 
@@ -940,14 +957,14 @@ body {
     bottom: 0;
     width: 3px;
     background: var(--accent-color);
-    border-radius: 3px 0 0 3px;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 
 .transclusion-source {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
     border-top: 1px solid var(--border-color);
-    font-size: 0.9em;
+    font-size: 0.85em;
     color: var(--text-muted);
 }
 
@@ -963,136 +980,183 @@ body {
 .broken-transclusion {
     color: #e74c3c;
     font-family: monospace;
-    background: #fdf3f2;
+    background: var(--bg-secondary);
     padding: 2px 4px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
+    border: 1px solid #e74c3c;
 }
 
-.recent-pages h3 {
-    margin-top: 0;
-    display: inline-block;
+/* Note editor styling */
+.note-editor {
+    background: var(--note-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin: 1rem 0;
+    box-shadow: var(--shadow-sm);
 }
 
-.all-pages-link {
-    font-size: 0.8em;
+.note-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 1rem;
+    border: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    font-family: inherit;
+    font-size: 1em;
+    line-height: 1.6;
+    resize: vertical;
+    background: var(--note-bg-color);
+}
+
+.note-textarea:focus {
+    outline: none;
+}
+
+.note-editor-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    align-items: center;
+}
+
+.template-selector {
+    margin-left: auto;
+}
+
+.template-selector select {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--note-bg-color);
+    font-size: 0.9em;
     color: var(--text-color);
-    opacity: 0.7;
-    margin-left: 8px;
+}
+
+.template-selector select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+/* Button styling in note editor */
+.note-editor-actions .btn-primary,
+.note-editor-actions .btn-secondary {
+    padding: 4px 12px;
+    font-size: 0.9em;
+    border-radius: var(--radius-sm);
+}
+
+.note-editor-actions .btn-primary {
+    background: var(--accent-color);
+    color: white;
+    border: none;
+}
+
+.note-editor-actions .btn-primary:hover {
+    background: #2980b9;
+}
+
+.note-editor-actions .btn-secondary {
+    background: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.note-editor-actions .btn-secondary:hover {
+    background: var(--hover-color);
+    border-color: var(--accent-color);
+}
+
+/* Remove the animation from renderFocusedView in app.js */
+async function renderFocusedView(page, originalNote) {
+    // Add a back button to the page title
+    pageTitle.innerHTML = `
+        <button class="btn-secondary unfocus-button" onclick="loadPage(currentPage.id)">Back</button>
+        <span class="page-title-text">${page.title}</span>
+        <button class="edit-properties-button" title="Edit page properties"></button>
+    `;
+    
+    // Clear the outline container
+    outlineContainer.innerHTML = '';
+    
+    // Render the focused note and its children
+    const renderedNotes = await renderOutline(page.notes);
+    outlineContainer.innerHTML = renderedNotes;
+    
+    // Scroll the focused note into view
+    const focusedNote = outlineContainer.querySelector('.outline-item');
+    focusedNote?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* Remove the focusZoom animation */
+@keyframes focusZoom {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Style properties */
+.outline-content .property-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.85em;
+    color: var(--text-color);
+    margin: 2px;
+    white-space: nowrap;
+}
+
+/* Special styling for tags */
+.outline-content .property-tag[href] {
+    color: var(--accent-color);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.outline-content .property-tag[href]:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
     text-decoration: none;
 }
 
-.all-pages-link:hover {
-    opacity: 1;
+/* Improve link styling */
+.outline-content a {
+    color: var(--accent-color);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.outline-content a:hover {
+    border-bottom-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+/* Keep paragraphs normal */
+.outline-content p {
+    margin: 0;
+    display: block;
+}
+
+.home-link {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-size: 2.5em;
+    display: block;
+    text-align: center;
+    margin-bottom: -20px;
+    padding: 20px 0;
+}
+
+.home-link:hover {
     text-decoration: underline;
 }
-
-/* Block ID display */
-.block-id {
-    font-family: monospace;
-    font-size: 0.8em;
-    color: var(--text-color);
-    opacity: 0.7;
-    margin-bottom: 4px;
-    padding: 2px 4px;
-    background: var(--bg-color);
-    border-radius: var(--radius-sm);
-    display: inline-block;
-    border: 1px solid var(--border-color);
-    margin-right: 8px;
-}
-
-/* All pages modal */
-.page-list-modal {
-    background: white;
-    padding: 20px;
-    border-radius: var(--radius-md);
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
-.page-list-modal h3 {
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.page-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 8px;
-}
-
-.page-list-item {
-    padding: 8px 12px;
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.page-list-item:hover {
-    background: var(--hover-color);
-    transform: translateY(-1px);
-}
-
-.recent-pages-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.recent-pages-header h3 {
-    margin: 0;
-    font-size: 1em;
-    font-weight: 500;
-}
-
-.note-actions button[data-action="copy-block-id"] {
-    font-family: monospace;
-    font-weight: bold;
-    color: var(--text-color);
-    opacity: 0.6;
-    transition: all 0.2s;
-}
-
-.note-actions button[data-action="copy-block-id"]:hover {
-    opacity: 1;
-    background: var(--hover-color);
-}
-
-.error-message {
-    background-color: #ffebee;
-    border: 1px solid #ffcdd2;
-    border-radius: 4px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    color: #c62828;
-}
-
-.error-message h3 {
-    margin: 0 0 0.5rem 0;
-    color: #b71c1c;
-}
-
-.error-message p {
-    margin: 0 0 1rem 0;
-}
-
-.error-message button {
-    background-color: #c62828;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.error-message button:hover {
-    background-color: #b71c1c;
-} 
