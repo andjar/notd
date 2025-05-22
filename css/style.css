@@ -516,6 +516,64 @@ body {
     position: relative;
     max-width: 100%;
     color: var(--note-text-color);
+    overflow: hidden; /* Ensure content stays within */
+}
+
+/* Ensure lists stay within the note box */
+.outline-content ul,
+.outline-content ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+    list-style-position: inside;
+}
+
+.outline-content li {
+    margin: 0.25em 0;
+}
+
+/* Ensure blockquotes stay within */
+.outline-content blockquote {
+    margin: 0.5em 0;
+    padding: 0.5em 1em;
+    border-left: 3px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+/* Ensure code blocks stay within */
+.outline-content pre {
+    margin: 0.5em 0;
+    padding: 0.5em;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+}
+
+/* Ensure tables stay within */
+.outline-content table {
+    width: 100%;
+    margin: 0.5em 0;
+    border-collapse: collapse;
+}
+
+.outline-content th,
+.outline-content td {
+    padding: 0.5em;
+    border: 1px solid var(--border-color);
+}
+
+/* Ensure images stay within */
+.outline-content img {
+    max-width: 100%;
+    height: auto;
+    margin: 0.5em 0;
+    border-radius: var(--radius-sm);
+}
+
+/* Ensure horizontal rules stay within */
+.outline-content hr {
+    margin: 0.5em 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
 }
 
 /* Make top-level notes wider */
@@ -837,6 +895,7 @@ body {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
+    overflow: hidden; /* Ensure content stays within */
 }
 
 .backlink-item a {
@@ -855,6 +914,96 @@ body {
     font-size: 0.9em;
     color: var(--text-color);
     line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+}
+
+/* Ensure lists stay within backlink boxes */
+.backlink-context ul,
+.backlink-context ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+    list-style-position: inside;
+}
+
+.backlink-context li {
+    margin: 0.25em 0;
+}
+
+/* Ensure blockquotes stay within */
+.backlink-context blockquote {
+    margin: 0.5em 0;
+    padding: 0.5em 1em;
+    border-left: 3px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+/* Ensure code blocks stay within */
+.backlink-context pre {
+    margin: 0.5em 0;
+    padding: 0.5em;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Ensure tables stay within */
+.backlink-context table {
+    width: 100%;
+    margin: 0.5em 0;
+    border-collapse: collapse;
+}
+
+.backlink-context th,
+.backlink-context td {
+    padding: 0.5em;
+    border: 1px solid var(--border-color);
+}
+
+/* Ensure images stay within */
+.backlink-context img {
+    max-width: 100%;
+    height: auto;
+    margin: 0.5em 0;
+    border-radius: var(--radius-sm);
+}
+
+/* Ensure horizontal rules stay within */
+.backlink-context hr {
+    margin: 0.5em 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Prevent unnecessary line breaks in headings and links */
+.backlink-context h2,
+.backlink-context h3,
+.backlink-context h4,
+.backlink-context h5,
+.backlink-context h6 {
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+.backlink-context .internal-link,
+.backlink-context .property-tag {
+    display: inline;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+/* Only break words when absolutely necessary */
+.backlink-context * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    word-break: normal;
 }
 
 /* All Pages modal styling */

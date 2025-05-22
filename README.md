@@ -10,3 +10,17 @@ There are lots of notetaking systems out there, yet none of them fitted my workf
 - Properties. I don't use properties a lot, but it is useful (e.g., to note when the TODOs were done, or to add a deadline, or add tags)
 
 This small project is also a test of so called "vibe coding" - using LLMs to quickly iterate. So far, it looks promising. But one of the biggest challenges in notetaking business remain to be tested: *will I stick to it long term?*
+
+## Screenshots
+
+TODO elements are rendered as checkboxes, and the done property added when the checkbox is toggled.
+
+![](frontpage.png)
+
+There is support for transclusions using the syntax `{{block-is}}`, where the block-id is copied with the `#` button for each note. There is also support for searching for notes using SQL directly, e.g. for properties, and one can make links to the specific search directly.
+
+![](transclusion.png)
+
+There is also support for backlinks. Notes are formatted with markdown.
+
+![](backlinks.png)

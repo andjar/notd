@@ -369,15 +369,19 @@ async function renderNoteContent(note) {
     });
     
     // Process TODO/DONE status with improved regex
-    content = content.replace(/<p>(TODO|DONE)\s*(.*?)<\/p>/g, (match, status, text) => {
+    content = content.replace(/<p>(TODO|DONE)\s*(.*?)<\/p>/g, (match, status, textContentHtml) => {
         const isDone = status === 'DONE';
-        const escapedText = text.replace(/['"\\]/g, '\\$&');
+        // ... (processedTextForDisplay logic remains the same)
+        const processedTextForDisplay = textContentHtml.replace(/\[\[(.*?)\]\]/g, (linkMatch, p1) => {
+            return `<a href="#${p1}" class="internal-link" onclick="event.stopPropagation(); loadPage('${p1}');">${p1}</a>`;
+        });
+        
         return `
             <div class="todo-item">
                 <label class="todo-checkbox">
                     <input type="checkbox" ${isDone ? 'checked' : ''} 
-                           onchange="toggleTodo(${note.id}, this.checked, '${escapedText}')">
-                    <span class="status-${status.toLowerCase()}">${text}</span>
+                        onchange="event.stopPropagation(); toggleTodo('${note.block_id}', this.checked)"> 
+                    <span class="status-${status.toLowerCase()}">${processedTextForDisplay}</span>
                 </label>
             </div>
         `;
@@ -1415,41 +1419,93 @@ async function executeSearchLink(query) {
     }
 }
 
-async function toggleTodo(noteId, isDone, text) {
+async function toggleTodo(blockId, isDone) { // Changed noteId to blockId
     try {
-        const timestamp = new Date().toISOString();
-        const newContent = isDone ? `DONE ${text} {done-at:: ${timestamp}}` : `TODO ${text}`;
-        const response = await fetch(`api/note.php?id=${noteId}`, {
+        // Fetch the current note data using the blockId (UUID)
+        const currentNote = await findBlockById(blockId); // This now uses the UUID
+        if (!currentNote) {
+            // Updated error message for clarity
+            console.error('Note not found for toggling TODO (by block_id):', blockId);
+            alert('Error: Could not find the note to update.');
+            return;
+        }
+
+        let rawContent = currentNote.content; 
+
+        // Determine existing status and task text
+        let taskTextWithProperties = "";
+        if (rawContent.startsWith('TODO ')) {
+            taskTextWithProperties = rawContent.substring(5);
+        } else if (rawContent.startsWith('DONE ')) {
+            taskTextWithProperties = rawContent.substring(5);
+        } else {
+            taskTextWithProperties = rawContent;
+            console.warn('Toggling a note that does not start with TODO/DONE:', rawContent);
+        }
+
+        const taskSpecificProperties = {};
+        let cleanTaskDescription = taskTextWithProperties.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
+            taskSpecificProperties[key.trim()] = value.trim();
+            return ''; 
+        }).trim();
+
+        let newContentString;
+        const updatedNoteProperties = { ...(currentNote.properties || {}) }; 
+
+        if (isDone) {
+            newContentString = `DONE ${cleanTaskDescription}`;
+            taskSpecificProperties['done-at'] = new Date().toISOString();
+        } else {
+            newContentString = `TODO ${cleanTaskDescription}`;
+            delete taskSpecificProperties['done-at']; 
+        }
+
+        for (const [key, value] of Object.entries(taskSpecificProperties)) {
+            newContentString += ` {${key}::${value}}`;
+            updatedNoteProperties[key] = value; 
+        }
+        if (!isDone) {
+            delete updatedNoteProperties['done-at'];
+        }
+
+        const response = await fetch(`api/note.php?id=${currentNote.id}`, { // Uses currentNote.id (PK)
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 action: 'update',
-                content: newContent,
-                level: 0,
-                parent_id: null
+                content: newContentString.trim(),
+                properties: updatedNoteProperties, 
+                level: currentNote.level,          
+                parent_id: currentNote.parent_id   
             })
         });
 
         const data = await response.json();
         if (data.error) {
-            console.error(data.error);
+            console.error('Error updating todo status (API):', data.error);
+            alert('Error updating task: ' + data.error);
+            const checkbox = document.querySelector(`[data-block-id="${blockId}"] input[type="checkbox"], [data-note-id="${currentNote.id}"] input[type="checkbox"]`); // Try both selectors
+            if (checkbox) checkbox.checked = !isDone;
             return;
         }
 
-        // Add visual feedback
-        const checkbox = document.querySelector(`[data-note-id="${noteId}"] input[type="checkbox"]`);
+        const checkbox = document.querySelector(`[data-block-id="${blockId}"] input[type="checkbox"], [data-note-id="${currentNote.id}"] input[type="checkbox"]`); // Try both selectors
         if (checkbox) {
+            checkbox.checked = isDone; 
             checkbox.style.transform = 'scale(1.2)';
             setTimeout(() => {
                 checkbox.style.transform = 'scale(1)';
             }, 200);
         }
-
         loadPage(currentPage.id);
+
     } catch (error) {
-        console.error('Error updating todo status:', error);
+        console.error('Error updating todo status (JS):', error);
+        alert('Error updating task: ' + error.message);
+        const checkbox = document.querySelector(`[data-block-id="${blockId}"] input[type="checkbox"], [data-note-id="${currentNote.id}"] input[type="checkbox"]`); // Try both selectors
+        if (checkbox) checkbox.checked = !isDone; 
     }
 }
 
