@@ -33,6 +33,8 @@ try {
         if (!$page) {
             error_log("Page not found, creating new page: " . $id);
             // If page doesn't exist, create it
+            $db->exec('BEGIN TRANSACTION');
+            
             $stmt = $db->prepare('
                 INSERT INTO pages (id, title, type)
                 VALUES (:id, :title, :type)
@@ -47,8 +49,31 @@ try {
             $stmt->bindValue(':type', 'journal', SQLITE3_TEXT);
             
             if (!$stmt->execute()) {
+                $db->exec('ROLLBACK');
                 throw new Exception('Failed to create page: ' . $db->lastErrorMsg());
             }
+            
+            // Add type::journal property
+            $stmt = $db->prepare('
+                INSERT INTO properties (page_id, property_key, property_value)
+                VALUES (:page_id, :key, :value)
+            ');
+            
+            if (!$stmt) {
+                $db->exec('ROLLBACK');
+                throw new Exception('Failed to prepare property insert: ' . $db->lastErrorMsg());
+            }
+            
+            $stmt->bindValue(':page_id', $id, SQLITE3_TEXT);
+            $stmt->bindValue(':key', 'type', SQLITE3_TEXT);
+            $stmt->bindValue(':value', 'journal', SQLITE3_TEXT);
+            
+            if (!$stmt->execute()) {
+                $db->exec('ROLLBACK');
+                throw new Exception('Failed to insert property: ' . $db->lastErrorMsg());
+            }
+            
+            $db->exec('COMMIT');
             
             // Fetch the newly created page
             $stmt = $db->prepare('SELECT * FROM pages WHERE id = :id');
@@ -175,6 +200,11 @@ try {
         global $db;
         
         try {
+            error_log("Creating page with data: " . json_encode($data));
+            
+            $db->exec('BEGIN TRANSACTION');
+            
+            // Insert the page
             $stmt = $db->prepare('
                 INSERT INTO pages (id, title, type)
                 VALUES (:id, :title, :type)
@@ -184,12 +214,46 @@ try {
             $stmt->bindValue(':title', $data['title'], SQLITE3_TEXT);
             $stmt->bindValue(':type', $data['type'], SQLITE3_TEXT);
             
-            if ($stmt->execute()) {
-                return getPage($data['id']);
+            if (!$stmt->execute()) {
+                throw new Exception('Failed to create page: ' . $db->lastErrorMsg());
             }
             
-            return ['error' => 'Failed to create page'];
+            error_log("Page created successfully");
+            
+            // Insert properties if any
+            if (isset($data['properties']) && !empty($data['properties'])) {
+                error_log("Properties to insert: " . json_encode($data['properties']));
+                
+                $stmt = $db->prepare('
+                    INSERT INTO properties (page_id, property_key, property_value)
+                    VALUES (:page_id, :key, :value)
+                ');
+                
+                foreach ($data['properties'] as $key => $value) {
+                    error_log("Inserting property - page_id: {$data['id']}, key: $key, value: $value");
+                    
+                    $stmt->bindValue(':page_id', $data['id'], SQLITE3_TEXT);
+                    $stmt->bindValue(':key', $key, SQLITE3_TEXT);
+                    $stmt->bindValue(':value', $value, SQLITE3_TEXT);
+                    
+                    if (!$stmt->execute()) {
+                        throw new Exception('Failed to insert property ' . $key . ': ' . $db->lastErrorMsg());
+                    }
+                    error_log("Property inserted successfully");
+                }
+            } else {
+                error_log("No properties to insert");
+            }
+            
+            $db->exec('COMMIT');
+            error_log("Transaction committed successfully");
+            
+            $result = getPage($data['id']);
+            error_log("Final page data: " . json_encode($result));
+            return $result;
         } catch (Exception $e) {
+            $db->exec('ROLLBACK');
+            error_log("Error in createPage: " . $e->getMessage());
             return ['error' => $e->getMessage()];
         }
     }

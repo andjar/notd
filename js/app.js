@@ -248,20 +248,36 @@ async function createNewPage() {
             return;
         }
 
+        // Determine type based on pageId (date-like) or add a dropdown for type if needed
+        let type = 'note';
+        let properties = {};
+        // Simple date-like check (YYYY-MM-DD)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(pageId)) {
+            type = 'journal';
+            properties = { 'type::journal': '' };  // Changed to match the expected format
+        }
+
+        const requestData = {
+            id: encodeURIComponent(pageId),
+            title: pageId, // Use the ID as the title initially
+            type,
+            properties
+        };
+        
+        console.log('Creating page with data:', requestData);
+
         try {
             const response = await fetch('api/page.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    id: encodeURIComponent(pageId),
-                    title: pageId, // Use the ID as the title initially
-                    type: 'note'
-                })
+                body: JSON.stringify(requestData)
             });
 
             const data = await response.json();
+            console.log('Server response:', data);
+            
             if (data.error) {
                 console.error(data.error);
                 return;
