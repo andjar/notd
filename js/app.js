@@ -320,6 +320,27 @@ async function renderNoteContent(note) {
     // First process search links before markdown parsing
     let content = note.content;
     
+    // Check if content is just a single page link
+    const singleLinkMatch = content.match(/^\[\[(.*?)\]\]$/);
+    if (singleLinkMatch) {
+        const linkedPageId = singleLinkMatch[1];
+        try {
+            const response = await fetch(`api/page.php?id=${linkedPageId}`);
+            if (response.ok) {
+                const linkedPage = await response.json();
+                if (linkedPage.type) {
+                    // Add the linked page type as a class to the note element
+                    const noteElement = document.querySelector(`[data-note-id="${note.id}"]`);
+                    if (noteElement) {
+                        noteElement.classList.add(`linked-page-${linkedPage.type}`);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching linked page type:', error);
+        }
+    }
+    
     // Process search links <<query>> - store them temporarily
     const searchLinks = [];
     content = content.replace(/<<([^>]+)>>/g, (match, query) => {
@@ -419,9 +440,38 @@ async function renderOutline(notes, level = 0) {
         const blockId = note.block_id;
         const content = await renderNoteContent(note);
         
+        // Check if content is just a single page link
+        const singleLinkMatch = note.content.match(/^\[\[(.*?)\]\]$/);
+        let linkedPageType = null;
+        if (singleLinkMatch) {
+            const linkedPageId = singleLinkMatch[1];
+            try {
+                console.log('Fetching page type for:', linkedPageId);
+                const response = await fetch(`api/page.php?id=${linkedPageId}`);
+                if (response.ok) {
+                    const linkedPage = await response.json();
+                    console.log('Linked page data:', linkedPage);
+                    // Check properties.type first, then fall back to root type
+                    if (linkedPage.properties && linkedPage.properties.type) {
+                        linkedPageType = linkedPage.properties.type;
+                        console.log('Setting linked page type from properties:', linkedPageType);
+                    } else if (linkedPage.type) {
+                        linkedPageType = linkedPage.type;
+                        console.log('Setting linked page type from root:', linkedPageType);
+                    } else {
+                        console.log('No type found in linked page data');
+                    }
+                } else {
+                    console.log('Failed to fetch page:', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching linked page type:', error);
+            }
+        }
+        
         // Create the note HTML
         const noteHtml = `
-            <div class="outline-item" 
+            <div class="outline-item ${linkedPageType ? `linked-page-${linkedPageType}` : ''}" 
                  data-note-id="${note.id}"
                  data-level="${level}"
                  data-content="${note.content.replace(/"/g, '&quot;')}">

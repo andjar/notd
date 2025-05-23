@@ -44,9 +44,13 @@ try {
                 throw new Exception('Failed to prepare page insert: ' . $db->lastErrorMsg());
             }
             
+            // Check if pageId is a date (YYYY-MM-DD)
+            $isJournal = preg_match('/^\d{4}-\d{2}-\d{2}$/', $id);
+            $type = $isJournal ? 'journal' : 'note';
+            
             $stmt->bindValue(':id', $id, SQLITE3_TEXT);
             $stmt->bindValue(':title', $id, SQLITE3_TEXT);
-            $stmt->bindValue(':type', $data['type'] ?? 'note', SQLITE3_TEXT);
+            $stmt->bindValue(':type', $type, SQLITE3_TEXT);
             
             if (!$stmt->execute()) {
                 $db->exec('ROLLBACK');
@@ -54,7 +58,7 @@ try {
             }
             
             // Add type property if it's a journal page
-            if (($data['type'] ?? 'note') === 'journal') {
+            if ($isJournal) {
                 $stmt = $db->prepare('
                     INSERT INTO properties (page_id, property_key, property_value)
                     VALUES (:page_id, :key, :value)

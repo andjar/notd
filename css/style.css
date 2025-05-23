@@ -1279,8 +1279,6 @@ async function renderFocusedView(page, originalNote) {
 .outline-content .property-tag[href]:hover {
     background: var(--accent-color);
     color: white;
-    border-color: var(--accent-color);
-    text-decoration: none;
 }
 
 /* Improve link styling */
@@ -1411,4 +1409,62 @@ async function renderFocusedView(page, originalNote) {
 
 .delete-confirmation-modal .btn-primary:hover {
     background: #c0392b;
+}
+
+/* Project link styling */
+.outline-item.linked-page-project {
+    background: none;
+    border: none;
+    box-shadow: none;
+    margin: 1.5em 0 0.5em 0;
+}
+
+.outline-item.linked-page-project .outline-content {
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    font-size: 1.6em;
+    font-weight: 500;
+    color: var(--primary-color);
+}
+
+.outline-item.linked-page-project .outline-content a {
+    color: var(--primary-color);
+}
+
+.outline-item.linked-page-project .note-actions {
+    opacity: 0.5;
+}
+
+.outline-item.linked-page-project .note-actions button {
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.7em;
+}
+
+.outline-item.linked-page-project .note-date {
+    font-size: 0.7em;
+    opacity: 0.7;
+}
+
+.outline-item.linked-page-project:hover .note-actions {
+    opacity: 1;
+}
+
+.outline-item.linked-page-project::before,
+.outline-item.linked-page-project::after {
+    display: none;
+}
+
+.outline-content a {
+    color: var(--accent-color);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.outline-content a:hover {
+    border-bottom-color: var(--accent-color);
+    color: var(--accent-color);
 }
