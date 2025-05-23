@@ -643,34 +643,84 @@ function renderProperties(properties) {
 
 async function renderBacklinks(pageId) {
     try {
-        const response = await fetch(`api/search.php?q=[[${pageId}]]`);
-        const results = await response.json();
-        
-        if (!results || results.length === 0) {
-            return '<p>No backlinks found</p>';
+        const response = await fetch(`api/backlinks.php?page_id=${pageId}`);
+        if (!response.ok) {
+            throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
         }
-        
-        const renderedResults = await Promise.all(results.map(async result => {
-            const content = await renderNoteContent(result);
-            return `
-                <div class="backlink-item">
-                    <a href="#${result.page_id}" onclick="event.preventDefault(); loadPage('${result.page_id}');">
-                        ${result.page_title || result.page_id}
+        const threads = await response.json();
+
+        if (threads.error) {
+            console.error('Error from backlinks API:', threads.error);
+            return `<h3>Backlinks</h3><p>Error loading backlinks: ${threads.error}</p>`;
+        }
+
+        if (!threads || threads.length === 0) {
+            return '<h3>Backlinks</h3><p>No backlinks found</p>';
+        }
+
+        let html = '<h3>Backlinks</h3><div class="backlinks-list">';
+
+        for (const thread of threads) {
+            // Helper function to build tree structure for notes in a thread
+            const buildNoteTree = (notesList) => {
+                if (!notesList || notesList.length === 0) {
+                    return [];
+                }
+                const noteMap = {};
+                // Initialize each note with a children array and add to map
+                notesList.forEach(note => {
+                    noteMap[note.id] = { ...note, children: [] };
+                });
+
+                const rootNotes = []; // This will store the actual root notes for the thread
+                notesList.forEach(noteData => {
+                    const currentMappedNote = noteMap[noteData.id]; // Get the note object that has the .children array
+                    if (noteData.parent_id && noteMap[noteData.parent_id]) {
+                        // If it's a child and its parent is in the current list (noteMap),
+                        // add it to its parent's children array.
+                        noteMap[noteData.parent_id].children.push(currentMappedNote);
+                    } else {
+                        // If its parent_id is null, or its parent is not in the current list of notes for this thread,
+                        // then it's a root note for this specific thread.
+                        rootNotes.push(currentMappedNote);
+                    }
+                });
+                return rootNotes; // Return the array of root notes, each potentially with children.
+            };
+            
+            const hierarchicalNotes = buildNoteTree(thread.notes);
+            
+            let threadContentHtml = '';
+            if (hierarchicalNotes.length > 0) {
+                 threadContentHtml = await renderOutline(hierarchicalNotes, 0);
+            } else if (thread.notes && thread.notes.length > 0) {
+                // This case might happen if notes exist but buildNoteTree fails to make a tree (e.g. all notes are children of parents not in the list)
+                // For backlinks, the first note(s) in thread.notes should be roots in that context.
+                console.warn("Backlink thread notes were present, but hierarchicalNotes is empty. Thread:", thread, "Hierarchical Notes:", hierarchicalNotes);
+                // As a fallback, could try rendering the raw notes if renderOutline could handle it,
+                // but given it expects a tree, this might be incorrect.
+                // threadContentHtml = '<!-- Could not render note hierarchy for this thread -->';
+            }
+
+
+            html += `
+                <div class="backlink-thread-item">
+                    <a href="#${thread.linking_page_id}" onclick="event.preventDefault(); loadPage('${thread.linking_page_id}');">
+                        ${thread.linking_page_title || thread.linking_page_id}
                     </a>
-                    <div class="backlink-context">${content}</div>
+                    <div class="backlink-thread-content">
+                        ${threadContentHtml}
+                    </div>
                 </div>
             `;
-        }));
-        
-        return `
-            <h3>Backlinks</h3>
-            <div class="backlinks-list">
-                ${renderedResults.join('')}
-            </div>
-        `;
-    } catch (error) {
+        }
+
+        html += '</div>'; // Close backlinks-list
+        return html;
+
+    } catch (error) { // Catches network errors and errors thrown from response.ok check
         console.error('Error loading backlinks:', error);
-        return '<p>Error loading backlinks</p>';
+        return '<h3>Backlinks</h3><p>Error loading backlinks: ' + error.message + '</p>';
     }
 }
 
@@ -1561,69 +1611,135 @@ async function toggleTodo(blockId, isDone) { // Changed noteId to blockId
     }
 }
 
+// Helper function to find a note by ID in a tree structure
+function findNoteInTree(noteId, notesArray) {
+    if (!notesArray) return null;
+    for (const note of notesArray) {
+        if (note.id.toString() === noteId.toString()) { // Ensure ID comparison is robust
+            return note;
+        }
+        if (note.children) {
+            const foundInChildren = findNoteInTree(noteId, note.children);
+            if (foundInChildren) {
+                return foundInChildren;
+            }
+        }
+    }
+    return null;
+}
+
+// Helper function to adjust levels of notes and their children
+function adjustLevels(notesArray, currentLevel) {
+    if (!notesArray) return;
+    notesArray.forEach(note => {
+        note.level = currentLevel;
+        if (note.children && note.children.length > 0) {
+            adjustLevels(note.children, currentLevel + 1);
+        }
+    });
+}
+
+// Function to handle exiting focus mode
+function exitFocusMode() {
+    document.body.classList.remove('focus-mode-active');
+    // Remove 'focused' class from any outline items
+    document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
+    if (currentPage && currentPage.id) {
+        loadPage(currentPage.id); // Reload the original page
+    } else {
+        // Fallback if currentPage is not set, maybe load a default page or clear view
+        const today = new Date().toISOString().split('T')[0];
+        loadPage(today);
+    }
+}
+
 // Add focus toggle functionality
-function toggleFocus(noteElement) {
-    const isFocused = noteElement.classList.contains('focused');
-    
-    if (isFocused) {
-        // If already focused, unfocus and reload the page
-        loadPage(currentPage.id);
+async function toggleFocus(noteElement) { // Made async as renderFocusedView is async
+    if (document.body.classList.contains('focus-mode-active')) {
+        // If already in focus mode, exit focus mode
+        exitFocusMode();
+        return;
+    }
+
+    if (!currentPage || !currentPage.notes) {
+        console.error("Current page data or notes are not available for focusing.");
         return;
     }
     
-    // Get the note's data
     const noteId = noteElement.dataset.noteId;
-    const level = parseInt(noteElement.dataset.level);
-    const content = noteElement.dataset.content;
-    
-    // Find all child notes
-    let childNotes = [];
-    let currentLevel = level;
-    let nextElement = noteElement.nextElementSibling;
-    
-    while (nextElement && parseInt(nextElement.dataset.level) > currentLevel) {
-        childNotes.push({
-            id: nextElement.dataset.noteId,
-            level: parseInt(nextElement.dataset.level) - level, // Adjust levels relative to parent
-            content: nextElement.dataset.content,
-            children: [] // Will be populated recursively
-        });
-        nextElement = nextElement.nextElementSibling;
+    if (!noteId) {
+        console.error("Note ID not found on element for focusing.");
+        return;
     }
-    
-    // Create a new page structure with the focused note as root
-    const focusedPage = {
-        id: currentPage.id,
-        title: currentPage.title,
-        notes: [{
-            id: noteId,
-            level: 0, // Make it a top-level note
-            content: content,
-            children: childNotes
-        }]
+
+    const noteInFullTree = findNoteInTree(noteId, currentPage.notes);
+
+    if (!noteInFullTree) {
+        console.error(`Note with ID ${noteId} not found in currentPage.notes.`);
+        return;
+    }
+
+    // Deep clone the note to avoid modifying the original data structure
+    const clonedNote = JSON.parse(JSON.stringify(noteInFullTree));
+
+    // Set the cloned note's level to 0 and adjust children levels
+    clonedNote.level = 0;
+    if (clonedNote.children && clonedNote.children.length > 0) {
+        adjustLevels(clonedNote.children, 1);
+    }
+
+    // Create the page data for the focused view
+    const focusedPageData = {
+        ...currentPage, // Spread current page properties (id, title, etc.)
+        notes: [clonedNote] // The single, re-leveled note tree
     };
     
     // Render the focused view
-    renderFocusedView(focusedPage, noteElement);
+    await renderFocusedView(focusedPageData, noteElement); // Pass original element for potential styling
 }
 
 // Add function to render focused view
-async function renderFocusedView(page, originalNote) {
-    // Add a back button to the page title
+async function renderFocusedView(pageData, originalNoteElement) {
+    document.body.classList.add('focus-mode-active');
+    
+    // Add 'focused' class to the specific element that was clicked to enter focus mode.
+    // This is useful if CSS targets .outline-item.focused to highlight the origin.
+    if (originalNoteElement) {
+         // First, remove 'focused' from any other elements to ensure only one is marked.
+        document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
+        originalNoteElement.classList.add('focused');
+    }
+
+    // Update page title with an unfocus button
+    // Ensure currentPage.id is available for the unfocus button, or use pageData.id
+    const originalPageId = currentPage ? currentPage.id : pageData.id; // Fallback if needed
     pageTitle.innerHTML = `
-        <button class="btn-secondary unfocus-button" onclick="loadPage(currentPage.id)">Back</button>
-        <span class="page-title-text">${page.title}</span>
+        <button class="btn-secondary unfocus-button" onclick="exitFocusMode()">Back</button>
+        <span class="page-title-text">${pageData.title} (Focused)</span>
         <button class="edit-properties-button" title="Edit page properties"></button>
     `;
+     // Re-attach edit properties button handler if needed for focused view
+    const editButton = pageTitle.querySelector('.edit-properties-button');
+    if (editButton) {
+        editButton.onclick = editPageProperties; // Assumes editPageProperties can work with focusedPageData
+    }
     
     // Clear the outline container
-    outlineContainer.innerHTML = '';
+    outlineContainer.innerHTML = ''; // Or some loading indicator
     
     // Render the focused note and its children
-    const renderedNotes = await renderOutline(page.notes);
+    // pageData.notes should be an array with the single focused note tree
+    const renderedNotes = await renderOutline(pageData.notes, 0); // Start rendering at level 0
     outlineContainer.innerHTML = renderedNotes;
     
-    // Scroll the focused note into view
-    const focusedNote = outlineContainer.querySelector('.outline-item');
-    focusedNote?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Scroll the focused note (which is the first and only top-level item) into view
+    const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
+    focusedDomNote?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 } 
+
+// In loadPage, ensure focus mode is cleared
+async function loadPage(pageId) {
+    document.body.classList.remove('focus-mode-active');
+    document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
+    try {
+// ... (rest of loadPage function)

@@ -48,6 +48,18 @@ if (!file_exists($dbPath)) {
             throw new Exception('Failed to create notes table: ' . $db->lastErrorMsg());
         }
 
+        // Create indexes for notes table
+        echo "Creating indexes for notes table...\n";
+        $result = $db->exec('CREATE INDEX IF NOT EXISTS idx_notes_page_id ON notes(page_id);');
+        if (!$result) {
+            throw new Exception('Failed to create index idx_notes_page_id: ' . $db->lastErrorMsg());
+        }
+
+        $result = $db->exec('CREATE INDEX IF NOT EXISTS idx_notes_parent_id ON notes(parent_id);');
+        if (!$result) {
+            throw new Exception('Failed to create index idx_notes_parent_id: ' . $db->lastErrorMsg());
+        }
+
         // Create attachments table
         echo "Creating attachments table...\n";
         $result = $db->exec('CREATE TABLE IF NOT EXISTS attachments (
