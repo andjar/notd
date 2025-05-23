@@ -147,6 +147,8 @@ function debounce(func, wait) {
 
 // API Functions
 async function loadPage(pageId) {
+    document.body.classList.remove('focus-mode-active');
+    document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
     try {
         // Show new note button and backlinks
         document.getElementById('new-note').style.display = 'block';
@@ -1737,10 +1739,3 @@ async function renderFocusedView(pageData, originalNoteElement) {
     const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
     focusedDomNote?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 } 
-
-// In loadPage, ensure focus mode is cleared
-async function loadPage(pageId) {
-    document.body.classList.remove('focus-mode-active');
-    document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
-    try {
-// ... (rest of loadPage function)
