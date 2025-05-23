@@ -420,10 +420,41 @@ async function renderNoteContent(note) {
     if (note.attachments && note.attachments.length > 0) {
         content += '<div class="attachments">';
         note.attachments.forEach(attachment => {
+            const fileExtension = attachment.filename.split('.').pop().toLowerCase();
+            let icon = '📄'; // Default icon
+            let preview = '';
+            
+            // Determine icon and preview based on file type
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+                icon = '🖼️';
+                preview = `<img src="uploads/${attachment.filename}" class="attachment-image" alt="${attachment.original_name}">`;
+            } else if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
+                icon = '🎥';
+                preview = `<video src="uploads/${attachment.filename}" controls class="attachment-preview"></video>`;
+            } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
+                icon = '🎵';
+                preview = `<audio src="uploads/${attachment.filename}" controls class="attachment-preview"></audio>`;
+            } else if (['pdf'].includes(fileExtension)) {
+                icon = '📑';
+            } else if (['doc', 'docx'].includes(fileExtension)) {
+                icon = '📝';
+            } else if (['xls', 'xlsx'].includes(fileExtension)) {
+                icon = '📊';
+            } else if (['zip', 'rar', '7z'].includes(fileExtension)) {
+                icon = '📦';
+            } else if (['js', 'py', 'java', 'cpp', 'html', 'css'].includes(fileExtension)) {
+                icon = '💻';
+            }
+            
             content += `
-                <div class="file-attachment">
-                    <a href="uploads/${attachment.filename}" target="_blank">${attachment.original_name}</a>
-                    <span class="delete-attachment" onclick="deleteAttachment(${attachment.id})">×</span>
+                <div class="attachment">
+                    <span class="attachment-icon">${icon}</span>
+                    <a href="uploads/${attachment.filename}" target="_blank" class="attachment-name">${attachment.original_name}</a>
+                    <span class="attachment-size">${formatFileSize(attachment.size)}</span>
+                    <div class="attachment-actions">
+                        <button onclick="deleteAttachment(${attachment.id})" title="Delete attachment">×</button>
+                    </div>
+                    ${preview}
                 </div>
             `;
         });
@@ -431,6 +462,15 @@ async function renderNoteContent(note) {
     }
     
     return content;
+}
+
+// Helper function to format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 // Update renderOutline to add focus button

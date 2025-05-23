@@ -491,7 +491,7 @@ body {
     display: block; /* Make it a block to ensure it's always there */
     position: absolute;
     left: var(--bullet-left-offset); 
-    top: calc(var(--note-content-compact-padding-y) + 0.15em); /* Empirically adjust for v-align with text */
+    top: 0.15em; /* Align with first line of text */
     font-size: var(--bullet-size);
     color: var(--bullet-color);
     line-height: 1; 
@@ -506,7 +506,7 @@ body {
     position: absolute;
     /* Position it relative to the bullet of the current item */
     left: calc(var(--bullet-left-offset) + (var(--bullet-size) / 2) - (1px / 2)); /* Center of the bullet */
-    top: calc(var(--note-content-compact-padding-y) + var(--bullet-size) + 1px); /* Start just below the bullet */
+    top: calc(var(--bullet-size) + 1px); /* Start just below the bullet */
     bottom: calc(var(--note-content-compact-padding-y) * -1 - 2px); /* Extend to roughly bottom of item, adjust as needed */
     width: 1px;
     background-color: var(--thread-line-color);
@@ -573,33 +573,33 @@ body {
 
 /* Make top-level notes wider */
 .outline-item[data-level="0"] .outline-content {
-    background: var(--note-bg-color);
+    background: transparent;
     max-width: 100%;
 }
 
 /* Adjust width for each level */
 .outline-item[data-level="1"] .outline-content {
-    background: var(--note-bg-color);
+    background: transparent;
     max-width: 100%;
 }
 
 .outline-item[data-level="2"] .outline-content {
-    background: var(--note-bg-color);
+    background: transparent;
     max-width: 100%;
 }
 
 .outline-item[data-level="3"] .outline-content {
-    background: var(--note-bg-color);
+    background: transparent;
     max-width: 100%;
 }
 
 .outline-item[data-level="4"] .outline-content {
-    background: var(--note-bg-color);
+    background: transparent;
     max-width: 100%;
 }
 
 .outline-item[data-level="5"] .outline-content {
-    background: var(--note-bg-color);
+    background: transparent;
     max-width: 100%;
 }
 
@@ -847,7 +847,7 @@ body {
 
 /* Make the focused note more prominent */
 .outline-item[data-level="0"] .outline-content {
-    background: var(--note-bg-color);
+    background: transparent;
     max-width: 100%;
 }
 
@@ -1490,4 +1490,146 @@ async function renderFocusedView(page, originalNote) {
 .outline-content a:hover {
     border-bottom-color: var(--accent-color);
     color: var(--accent-color);
+}
+
+/* Attachment styling */
+.outline-content .attachment {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    margin: 2px 2px 2px 0;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: var(--text-color);
+    font-size: 0.75em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.outline-content .attachment:hover {
+    background: var(--hover-color);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.outline-content .attachment-icon {
+    font-size: 1em;
+    color: var(--accent-color);
+    opacity: 0.8;
+}
+
+.outline-content .attachment-name {
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.outline-content .attachment-size {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+/* Image attachment specific styling */
+.outline-content .attachment-image {
+    max-width: 200px;
+    max-height: 150px;
+    border-radius: var(--radius-sm);
+    margin: 4px 0;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.outline-content .attachment-image:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-md);
+}
+
+/* Attachment actions */
+.attachment-actions {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 4px;
+}
+
+.attachment-actions button {
+    padding: 0 4px;
+    font-size: 0.8em;
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.attachment-actions button:hover {
+    opacity: 1;
+    color: var(--accent-color);
+}
+
+/* Attachment preview container */
+.attachment-preview {
+    margin: 4px 0;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.attachment-preview img {
+    max-width: 200px;
+    max-height: 150px;
+    border-radius: var(--radius-sm);
+}
+
+.attachment-preview video {
+    max-width: 200px;
+    border-radius: var(--radius-sm);
+}
+
+.attachment-preview audio {
+    width: 200px;
+}
+
+/* Remove specific file type backgrounds since we're using a consistent style */
+.outline-content .attachment[href$=".pdf"],
+.outline-content .attachment[href$=".doc"],
+.outline-content .attachment[href$=".docx"],
+.outline-content .attachment[href$=".mp3"],
+.outline-content .attachment[href$=".wav"],
+.outline-content .attachment[href$=".mp4"],
+.outline-content .attachment[href$=".mov"],
+.outline-content .attachment[href$=".js"],
+.outline-content .attachment[href$=".py"],
+.outline-content .attachment[href$=".java"],
+.outline-content .attachment[href$=".cpp"],
+.outline-content .attachment[href$=".html"],
+.outline-content .attachment[href$=".css"],
+.outline-content .attachment[href$=".zip"],
+.outline-content .attachment[href$=".rar"],
+.outline-content .attachment[href$=".7z"] {
+    background: var(--bg-secondary);
+}
+
+/* Broken attachment styling */
+.outline-content .attachment.broken {
+    background: #fff0f0;
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
+.outline-content .attachment.broken:hover {
+    background: #ffe0e0;
+    border-color: #c0392b;
+    color: #c0392b;
 }
