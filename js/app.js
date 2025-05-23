@@ -248,13 +248,14 @@ async function createNewPage() {
             return;
         }
 
-        // Determine type based on pageId (date-like) or add a dropdown for type if needed
+        // Determine type based on pageId (date-like)
         let type = 'note';
         let properties = {};
-        // Simple date-like check (YYYY-MM-DD)
+        
+        // Check if pageId is a date (YYYY-MM-DD)
         if (/^\d{4}-\d{2}-\d{2}$/.test(pageId)) {
             type = 'journal';
-            properties = { 'type::journal': '' };  // Changed to match the expected format
+            properties = { 'type': 'journal' };  // Set type property correctly
         }
 
         const requestData = {
@@ -432,6 +433,7 @@ async function renderOutline(notes, level = 0) {
                         <button data-action="focus" title="Focus on this thread"></button>
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
                         <button data-action="edit" title="Edit note">✎</button>
+                        <button data-action="upload" title="Upload file">↑</button>
                         <button data-action="delete" title="Delete note">×</button>
                         <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">
                             ${new Date(note.created_at).toLocaleDateString()}
@@ -902,7 +904,7 @@ function renderNote(note) {
     actionsDiv.innerHTML = `
         <button data-action="add-child" title="Add child note">+</button>
         <button data-action="edit" title="Edit note">✎</button>
-        <button data-action="upload" title="Upload file">📎</button>
+        <button data-action="upload" title="Upload file">↑</button>
         <button data-action="delete" title="Delete note">×</button>
         <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">
             ${new Date(note.created_at).toLocaleDateString()}

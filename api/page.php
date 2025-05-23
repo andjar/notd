@@ -46,31 +46,33 @@ try {
             
             $stmt->bindValue(':id', $id, SQLITE3_TEXT);
             $stmt->bindValue(':title', $id, SQLITE3_TEXT);
-            $stmt->bindValue(':type', 'journal', SQLITE3_TEXT);
+            $stmt->bindValue(':type', $data['type'] ?? 'note', SQLITE3_TEXT);
             
             if (!$stmt->execute()) {
                 $db->exec('ROLLBACK');
                 throw new Exception('Failed to create page: ' . $db->lastErrorMsg());
             }
             
-            // Add type::journal property
-            $stmt = $db->prepare('
-                INSERT INTO properties (page_id, property_key, property_value)
-                VALUES (:page_id, :key, :value)
-            ');
-            
-            if (!$stmt) {
-                $db->exec('ROLLBACK');
-                throw new Exception('Failed to prepare property insert: ' . $db->lastErrorMsg());
-            }
-            
-            $stmt->bindValue(':page_id', $id, SQLITE3_TEXT);
-            $stmt->bindValue(':key', 'type', SQLITE3_TEXT);
-            $stmt->bindValue(':value', 'journal', SQLITE3_TEXT);
-            
-            if (!$stmt->execute()) {
-                $db->exec('ROLLBACK');
-                throw new Exception('Failed to insert property: ' . $db->lastErrorMsg());
+            // Add type property if it's a journal page
+            if (($data['type'] ?? 'note') === 'journal') {
+                $stmt = $db->prepare('
+                    INSERT INTO properties (page_id, property_key, property_value)
+                    VALUES (:page_id, :key, :value)
+                ');
+                
+                if (!$stmt) {
+                    $db->exec('ROLLBACK');
+                    throw new Exception('Failed to prepare property insert: ' . $db->lastErrorMsg());
+                }
+                
+                $stmt->bindValue(':page_id', $id, SQLITE3_TEXT);
+                $stmt->bindValue(':key', 'type', SQLITE3_TEXT);
+                $stmt->bindValue(':value', 'journal', SQLITE3_TEXT);
+                
+                if (!$stmt->execute()) {
+                    $db->exec('ROLLBACK');
+                    throw new Exception('Failed to insert property: ' . $db->lastErrorMsg());
+                }
             }
             
             $db->exec('COMMIT');
@@ -212,7 +214,7 @@ try {
             
             $stmt->bindValue(':id', $data['id'], SQLITE3_TEXT);
             $stmt->bindValue(':title', $data['title'], SQLITE3_TEXT);
-            $stmt->bindValue(':type', $data['type'], SQLITE3_TEXT);
+            $stmt->bindValue(':type', $data['type'] ?? 'note', SQLITE3_TEXT);
             
             if (!$stmt->execute()) {
                 throw new Exception('Failed to create page: ' . $db->lastErrorMsg());
