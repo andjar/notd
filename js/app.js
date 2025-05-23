@@ -469,9 +469,10 @@ async function renderOutline(notes, level = 0) {
             }
         }
         
+        const hasChildrenClass = (note.children && note.children.length > 0) ? 'has-children' : '';
         // Create the note HTML
         const noteHtml = `
-            <div class="outline-item ${linkedPageType ? `linked-page-${linkedPageType}` : ''}" 
+            <div class="outline-item ${linkedPageType ? `linked-page-${linkedPageType}` : ''} ${hasChildrenClass}" 
                  data-note-id="${note.id}"
                  data-level="${level}"
                  data-content="${note.content.replace(/"/g, '&quot;')}">

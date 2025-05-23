@@ -8,8 +8,8 @@
     --bg-color: #f8fafc;
     --bg-secondary: rgba(0, 0, 0, 0.02);
     --sidebar-width: 280px;
-    --note-padding: 12px;
-    --note-margin: 8px;
+    --note-padding: 12px; /* Original, will be overridden */
+    --note-margin: 8px; /* Original, will be overridden */
     --sidebar-bg: #ffffff;
     --border-color: #e2e8f0;
     --hover-color: #f1f5f9;
@@ -18,11 +18,16 @@
     --radius-sm: 4px;
     --radius-md: 6px;
 
-    /* --- Threading Variables --- */
-    --indentation-guide-width: 1.5rem; /* How much space each level of indentation takes for lines */
-    --thread-line-left-offset: 0.5rem; /* Position of the vertical thread line from the left of its indentation block */
-    --thread-connector-top: 1.2em;  /* Vertical position of the horizontal T-bar (align with text/bullet) */
-    --base-content-padding: 0.5em; /* Base padding for all content, including level 0 */
+    /* --- Compact UI & Threading Variables --- */
+    --indentation-unit: 1.8em; /* Base unit for indentation, bullet positioning */
+    --bullet-size: 0.8em;
+    --bullet-color: var(--text-color);
+    --bullet-left-offset: -1.1em; /* How much the bullet is pulled left into padding */
+    --thread-line-color: var(--border-color);
+    --note-compact-margin-bottom: 0.2rem;
+    --note-content-compact-padding-y: 2px; /* Vertical padding for content */
+    --note-actions-icon-size: 0.9em;
+    --note-actions-button-padding: 3px;
 }
 
 * {
@@ -445,81 +450,71 @@ body {
 
 .outline-item {
     position: relative;
-    margin-bottom: 1rem;
-    transition: opacity 0.2s ease;
+    margin-bottom: var(--note-compact-margin-bottom); /* Reduced margin */
+    /* Remove old transitions if any, new ones will be added */
+    transition: none; 
     animation: none;
+    /* padding-left for indentation is set by [data-level] rules below */
 }
 
-.outline-content::before {
-    display: none;
+/* Remove old pseudo-elements for thread lines/connectors and general accents */
+.outline-item::before, /* Old vertical thread line */
+.outline-item::after,  /* Old horizontal connector */
+.outline-content::before { /* Old accent dot */
+    display: none; 
 }
 
-.outline-item::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: var(--border-color);
-    transition: background-color 0.2s ease;
-}
+/* Indentation using new variable */
+.outline-item[data-level="0"] { padding-left: 0; } /* No padding for top level */
+.outline-item[data-level="1"] { padding-left: var(--indentation-unit); }
+.outline-item[data-level="2"] { padding-left: calc(var(--indentation-unit) * 2); }
+.outline-item[data-level="3"] { padding-left: calc(var(--indentation-unit) * 3); }
+.outline-item[data-level="4"] { padding-left: calc(var(--indentation-unit) * 4); }
+.outline-item[data-level="5"] { padding-left: calc(var(--indentation-unit) * 5); }
+/* Add more levels if necessary */
 
-.outline-item::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 1.5rem;
-    width: 1rem;
-    height: 2px;
-    background: var(--border-color);
-    transition: background-color 0.2s ease;
-}
 
-/* Adjust indentation to account for thread lines */
-.outline-item[data-level="1"] {
-    padding-left: 1.5rem;
-}
-
-.outline-item[data-level="2"] {
-    padding-left: 3rem;
-}
-
-.outline-item[data-level="3"] {
-    padding-left: 4.5rem;
-}
-
-.outline-item[data-level="4"] {
-    padding-left: 6rem;
-}
-
-.outline-item[data-level="5"] {
-    padding-left: 7.5rem;
-}
-
-/* Only show thread lines for indented items */
-.outline-item[data-level="0"]::before,
-.outline-item[data-level="0"]::after {
-    display: none;
-}
-
-/* Adjust content margin to align with thread */
 .outline-content {  
-    margin-left: 0;
-}
-
-.outline-content {
-    background: var(--note-bg-color);
-    padding: var(--note-padding);
-    border: 1px solid var(--border-color);
-    transition: all 0.2s ease;
-    position: relative;
-    max-width: 100%;
+    margin-left: 0; /* Content aligns with padding start */
+    background: transparent; /* No background */
+    padding: var(--note-content-compact-padding-y) 0 var(--note-content-compact-padding-y) 0.5em; /* Minimal vertical padding, small left padding for text after bullet */
+    border: none; /* No border */
+    transition: none; /* Remove old transitions */
+    position: relative; /* For bullet and thread line positioning */
     color: var(--note-text-color);
-    overflow: hidden; /* Ensure content stays within */
+    overflow: visible; 
 }
 
-/* Ensure lists stay within the note box */
+/* Bullet Point */
+.outline-content::before {
+    content: '•';
+    display: block; /* Make it a block to ensure it's always there */
+    position: absolute;
+    left: var(--bullet-left-offset); 
+    top: calc(var(--note-content-compact-padding-y) + 0.15em); /* Empirically adjust for v-align with text */
+    font-size: var(--bullet-size);
+    color: var(--bullet-color);
+    line-height: 1; 
+    z-index: 2; /* Bullet above thread line */
+    transition: color 0.15s ease, transform 0.15s ease; /* For hover/focus effects */
+}
+
+/* Vertical Thread Line - from current bullet downwards */
+/* Only drawn for items that have children, indicated by .has-children class from JS */
+.outline-item.has-children > .outline-content::after {
+    content: "";
+    position: absolute;
+    /* Position it relative to the bullet of the current item */
+    left: calc(var(--bullet-left-offset) + (var(--bullet-size) / 2) - (1px / 2)); /* Center of the bullet */
+    top: calc(var(--note-content-compact-padding-y) + var(--bullet-size) + 1px); /* Start just below the bullet */
+    bottom: calc(var(--note-content-compact-padding-y) * -1 - 2px); /* Extend to roughly bottom of item, adjust as needed */
+    width: 1px;
+    background-color: var(--thread-line-color);
+    z-index: 1; /* Thread line behind bullet */
+    transition: background-color 0.15s ease;
+}
+
+/* Ensure lists stay within the note box (now transparent) */
 .outline-content ul,
 .outline-content ol {
     margin: 0.5em 0;
@@ -623,62 +618,92 @@ body {
     transition: all 0.2s ease;
 }
 
-/* Adjust note actions for the new layout */
+/* Note Actions Redesign for Compact UI */
 .note-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border-color);
-    justify-content: flex-end;
+    display: none; /* Hidden by default */
+    position: absolute;
+    top: -3px; /* Align slightly above the text line, adjust as needed */
+    right: 5px;
+    background-color: var(--note-bg-color); /* Usually white, for pop */
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    padding: 2px;
+    z-index: 10; /* Ensure it's above content and bullets */
+    gap: 2px; /* Small gap between buttons */
+}
+
+/* Show actions when hovering over the outline-item or its content */
+.outline-item:hover > .outline-content .note-actions, /* If actions are moved inside .outline-content */
+.outline-item:hover > .note-actions { /* If .note-actions is a direct child of .outline-item */
+    display: flex; 
     align-items: center;
 }
+/* Assuming .note-actions is inside .outline-content as per original structure */
+.outline-content:hover .note-actions {
+    display: flex;
+    align-items: center;
+}
+
 
 .note-actions button {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: var(--note-actions-button-padding); 
     border-radius: var(--radius-sm);
-    font-size: 0.9em;
+    font-size: var(--note-actions-icon-size); 
     color: var(--text-color);
-    opacity: 0.6;
-    transition: all 0.2s;
-    display: flex;
+    opacity: 0.6; /* Slightly transparent by default */
+    transition: all 0.15s ease;
+    min-width: auto; 
+    height: auto; 
+    line-height: 1; 
+    display: flex; /* For centering icon if needed */
     align-items: center;
     justify-content: center;
-    min-width: 28px;
-    height: 28px;
 }
 
 .note-actions button:hover {
     opacity: 1;
     background: var(--hover-color);
+    color: var(--accent-color); 
 }
 
-.note-actions button[data-action="add-child"] {
-    color: var(--accent-color);
+.note-actions button[data-action="delete"]:hover {
+    color: #e74c3c; /* Keep delete distinct on hover */
+    background-color: #fff0f0;
 }
 
+/* Default colors for add/edit, hover provides accent */
+.note-actions button[data-action="add-child"],
 .note-actions button[data-action="edit"] {
-    color: var(--accent-color);
+    color: var(--text-color); 
+}
+.note-actions button[data-action="add-child"]:hover,
+.note-actions button[data-action="edit"]:hover {
+    color: var(--accent-color); 
 }
 
-.note-actions button[data-action="delete"] {
-    color: #e74c3c;
-}
 
 .note-actions button[data-action="copy-block-id"] {
     font-family: monospace;
     font-weight: bold;
+    font-size: calc(var(--note-actions-icon-size) + 0.1em); 
 }
 
 .note-date {
-    margin-left: auto;
-    font-size: 0.8em;
-    color: var(--text-muted);
-    opacity: 0.7;
+    display: none; /* Hidden by default in compact view */
 }
+.outline-item:hover .note-date { /* Show date on hover of the whole item */
+    display: inline; 
+    font-size: 0.7em;
+    color: var(--text-muted);
+    margin-left: 6px; /* Space from the buttons if they are also visible */
+    /* position: absolute; right: calc(100% + 10px); top: 2px; white-space: nowrap; */
+    /* Or, simpler: just let it flow with actions */
+}
+
 
 /* Adjust the outline container to be full width */
 #outline-container {
@@ -688,33 +713,25 @@ body {
     padding: 0;
 }
 
-/* Add a subtle hover effect for the thread line */
-.outline-item:hover::before {
-    background: var(--accent-color);
-    opacity: 0.5;
+/* Hover effects for new bullet and thread line */
+.outline-item:hover > .outline-content::before { /* Bullet */
+    color: var(--accent-color);
+}
+.outline-item:hover > .outline-content::after { /* Thread line */
+    background-color: var(--accent-color);
 }
 
-/* Add a subtle hover effect for the horizontal connector */
-.outline-item:hover::after {
-    background: var(--accent-color);
-    opacity: 0.5;
-}
 
-/* Adjust spacing for nested items */
+/* Adjust spacing for nested items - already handled by outline-item margin */
 .outline-item .outline-item {
-    margin-top: 1rem;
+    /* margin-top: 0.2rem; */ /* Keep small margin from parent item */
 }
 
-/* Add a subtle transition for all hover effects */
-.outline-item::before,
-.outline-item::after,
-.outline-content::before {
-    transition: all 0.2s ease;
-}
+/* Transitions for bullet/line are on their definitions now */
 
 /* Make the content area more readable */
 .outline-content p {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem; /* Reduced paragraph margin */
 }
 
 .outline-content p:last-child {
@@ -749,12 +766,17 @@ body {
     opacity: 0.8;
 }
 
-.outline-item.focused .outline-content::before {
-    opacity: 1;
-    transform: translateY(-50%) scale(1.2);
+.outline-item.focused .outline-content::before { /* Focused Bullet */
+    color: var(--accent-color);
+    transform: scale(1.2); /* Make bullet slightly larger */
+}
+.outline-item.focused > .outline-content::after { /* Focused Thread line */
+    background-color: var(--accent-color);
+    width: 2px; /* Make thread line thicker */
 }
 
-/* Remove opacity changes for non-focused notes */
+
+/* Remove opacity changes for non-focused notes - this rule is fine */
 .outline-item:not(.focused) {
     opacity: 1;
 }
@@ -1255,18 +1277,19 @@ async function renderFocusedView(page, originalNote) {
     }
 }
 
-/* Style properties */
+/* Style properties for Compact UI */
 .outline-content .property-tag {
     display: inline-flex;
     align-items: center;
-    padding: 2px 8px;
+    padding: 1px 5px; /* Reduced padding */
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 0.85em;
+    font-size: 0.75em; /* Reduced font size */
     color: var(--text-color);
-    margin: 2px;
+    margin: 2px 2px 2px 0; /* Reduced margin, ensure some space */
     white-space: nowrap;
+    line-height: 1.3; /* Adjust line height for smaller font */
 }
 
 /* Special styling for tags */
