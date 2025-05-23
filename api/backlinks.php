@@ -39,7 +39,7 @@ try {
             FROM
                 notes n
             JOIN
-                pages p ON n.page_id = p.page_id
+                pages p ON n.page_id = p.id
             WHERE
                 n.content LIKE :searchTerm
 
