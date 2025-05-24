@@ -1,8 +1,30 @@
 <?php
+// CLI SAPI specific adaptations
+if (php_sapi_name() == 'cli') {
+    $_SERVER['REQUEST_METHOD'] = 'GET'; // backlinks.php is always GET
+
+    // Populate $_GET from command line arguments (e.g., for page_id=value)
+    if (isset($argv) && is_array($argv)) {
+        foreach ($argv as $arg_idx => $arg_val) {
+            if ($arg_idx == 0) continue; // skip script name itself
+            if (strpos($arg_val, '=') !== false) {
+                list($key, $value) = explode('=', $arg_val, 2);
+                $_GET[$key] = $value;
+            }
+        }
+    }
+}
+
 header('Content-Type: application/json');
 
+// Set error handling for this script
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Errors should be logged, not displayed for API
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Consistent error logging
+
 // Database connection details
-$db_path = '../db/notes.db';
+$db_path = __DIR__ . '/../db/notes.db'; // Make path robust
 
 // Get page_id from query parameters
 $page_id = $_GET['page_id'] ?? null;
@@ -17,73 +39,116 @@ try {
     // Connect to SQLite database
     $pdo = new PDO('sqlite:' . $db_path);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Enable foreign key constraints for this connection
+    if (!$pdo->exec('PRAGMA foreign_keys = ON;')) {
+        // Log or handle error if PRAGMA command fails.
+        // For PDO, exec() returns the number of rows affected. For PRAGMA, this might be 0 or 1.
+        // A failure here is unlikely to throw an exception unless ATTR_ERRMODE is set to ERRMODE_EXCEPTION and the PRAGMA itself is malformed.
+        // If it returns false, it indicates failure.
+        error_log("Notice: Attempted to enable foreign_keys for backlinks.php. Check SQLite logs if issues persist with FKs.");
+        // Depending on strictness, one might throw an exception here if exec returns false.
+    }
 
-    // Construct the search term for backlinks
-    $searchTerm = '%[[' . $page_id . ']]%';
+    // SQL query using page_links table and recursive CTEs
+    // Using Nowdoc for safety with SQL containing quotes or special characters
+    $sql = <<<'SQL'
+WITH
+-- 1. Get the notes that directly link to the target_page_id
+DirectLinkingNotes AS (
+    SELECT DISTINCT
+        pl.source_page_id,
+        pl.source_note_id
+    FROM page_links pl
+    WHERE pl.target_page_id = :page_id AND pl.source_note_id IS NOT NULL
+),
 
-    // SQL query with recursive CTE
-    $sql = "
-        WITH RECURSIVE NoteHierarchy AS (
-            -- Anchor member: Select initial linking notes and their page titles
-            SELECT
-                n.id,
-                n.page_id,
-                p.title AS page_title,
-                n.content,
-                n.level,
-                n.parent_id,
-                n.block_id,
-                n.created_at,
-                n.updated_at,
-                n.id AS root_note_id -- Keep track of the root linking note for grouping
-            FROM
-                notes n
-            JOIN
-                pages p ON n.page_id = p.id
-            WHERE
-                n.content LIKE :searchTerm
+-- 2. For each linking note, trace its ancestry up to the root note on its page
+NoteAncestry AS (
+    SELECT
+        dln.source_page_id,
+        dln.source_note_id AS linking_note_id, -- The specific note that contains the link
+        n.id AS current_ancestor_id,
+        n.parent_id
+    FROM DirectLinkingNotes dln
+    JOIN notes n ON dln.source_note_id = n.id -- Start with the linking note itself
 
-            UNION ALL
+    UNION ALL
 
-            -- Recursive member: Select descendant notes
-            SELECT
-                child.id,
-                child.page_id,
-                nh.page_title, -- Carry over the page_title from the anchor
-                child.content,
-                child.level,
-                child.parent_id,
-                child.block_id,
-                child.created_at,
-                child.updated_at,
-                nh.root_note_id -- Carry over the root_note_id
-            FROM
-                notes child
-            JOIN
-                NoteHierarchy nh ON child.parent_id = nh.id
-            WHERE child.page_id = nh.page_id -- Ensure descendants are within the same page as the linking note
-        )
-        SELECT
-            nh.page_id AS linking_page_id,
-            nh.page_title AS linking_page_title,
-            nh.id,
-            nh.content,
-            nh.level,
-            nh.parent_id,
-            nh.block_id,
-            nh.created_at,
-            nh.updated_at,
-            nh.root_note_id
-        FROM
-            NoteHierarchy nh
-        ORDER BY
-            nh.root_note_id, -- Group by the original linking note
-            nh.level,        -- Order by level within each hierarchy
-            nh.id            -- Consistent ordering for notes at the same level
-    ";
+    SELECT
+        na.source_page_id,
+        na.linking_note_id,
+        p.id AS current_ancestor_id,
+        p.parent_id
+    FROM NoteAncestry na
+    JOIN notes p ON na.parent_id = p.id -- Go to the parent (recursion stops when parent_id is NULL)
+),
+
+-- 3. Identify the root of each linking note's hierarchy
+LinkingNoteHierarchyRoots AS (
+    SELECT DISTINCT -- A single linking_note_id will trace to one root
+        na.source_page_id,
+        na.linking_note_id, 
+        na.current_ancestor_id AS root_note_id
+    FROM NoteAncestry na
+    WHERE (na.parent_id IS NULL OR na.parent_id = 0) -- This is the top-most parent (0 also considered root-like)
+),
+
+-- 4. Fetch all notes belonging to these identified root hierarchies (the full "threads")
+-- This means all descendants of each root_note_id on its specific source_page_id
+FullThreads AS (
+    SELECT
+        r.source_page_id,
+        r.root_note_id, -- This is the key for grouping in PHP
+        n.id,
+        n.page_id AS note_actual_page_id, 
+        n.content,
+        n.level,
+        n.parent_id AS actual_parent_id, -- Select actual parent_id from notes table
+        n.block_id,
+        n.created_at,
+        n.updated_at
+    FROM LinkingNoteHierarchyRoots r
+    JOIN notes n ON r.root_note_id = n.id AND r.source_page_id = n.page_id -- Start with the root notes themselves
+
+    UNION ALL
+
+    SELECT
+        ft.source_page_id,
+        ft.root_note_id, -- Carry over the root_note_id
+        child.id,
+        child.page_id AS note_actual_page_id,
+        child.content,
+        child.level,
+        child.parent_id AS actual_parent_id, -- Select actual parent_id from notes table (aliased as child)
+        child.block_id,
+        child.created_at,
+        child.updated_at
+    FROM FullThreads ft
+    JOIN notes child ON ft.id = child.parent_id -- Correct join condition using actual column name
+    WHERE child.page_id = ft.source_page_id -- Crucial: Ensure children are on the same page
+)
+SELECT
+    ft.source_page_id AS linking_page_id,
+    p.title AS linking_page_title,
+    ft.id,
+    ft.content,
+    ft.level,
+    ft.actual_parent_id AS parent_id, -- Use the correctly aliased parent_id
+    ft.block_id,
+    ft.created_at,
+    ft.updated_at,
+    ft.root_note_id -- This is critical for the PHP grouping logic
+FROM FullThreads ft
+JOIN pages p ON ft.source_page_id = p.id
+ORDER BY
+    ft.source_page_id, 
+    ft.root_note_id,   
+    ft.level,          
+    ft.id;
+SQL;
 
     $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':searchTerm', $searchTerm, PDO::PARAM_STR);
+    $stmt->bindParam(':page_id', $page_id, PDO::PARAM_STR);
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
