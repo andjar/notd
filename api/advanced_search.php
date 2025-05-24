@@ -3,12 +3,16 @@ header('Content-Type: application/json');
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
-ini_set('error_log', '../logs/php_errors.log');
+ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Use absolute path for log
 
 try {
-    $db = new SQLite3('../db/notes.db');
+    $db = new SQLite3(__DIR__ . '/../db/notes.db'); // Use absolute path for database
     if (!$db) {
         throw new Exception('Failed to connect to database: ' . SQLite3::lastErrorMsg());
+    }
+    // Enable foreign key constraints for this connection
+    if (!$db->exec('PRAGMA foreign_keys = ON;')) {
+        error_log("Notice: Attempted to enable foreign_keys for advanced_search.php. Check SQLite logs if issues persist with FKs.");
     }
 
     // Get the query from POST data

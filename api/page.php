@@ -1,14 +1,32 @@
 <?php
+// Simulate GET request for CLI execution
+if (php_sapi_name() == 'cli') {
+    $_SERVER['REQUEST_METHOD'] = 'GET'; // Force request method for CLI
+    // Parse command line arguments into $_GET
+    if (isset($argv) && is_array($argv)) {
+        foreach ($argv as $arg) {
+            if (strpos($arg, '=') !== false) {
+                list($key, $value) = explode('=', $arg, 2);
+                $_GET[$key] = $value;
+            }
+        }
+    }
+}
+
 header('Content-Type: application/json');
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
-ini_set('error_log', '../logs/php_errors.log');
+error_log(__DIR__ . '/../logs/php_errors.log');
 
 try {
-    $db = new SQLite3('../db/notes.db');
+    $db = new SQLite3(__DIR__ . '/../db/notes.db');
     if (!$db) {
         throw new Exception('Failed to connect to database: ' . SQLite3::lastErrorMsg());
+    }
+    // Enable foreign key constraints for this connection
+    if (!$db->exec('PRAGMA foreign_keys = ON;')) {
+        error_log("Notice: Attempted to enable foreign_keys for page.php. Check SQLite logs if issues persist with FKs.");
     }
 
     function getPage($id) {
@@ -126,7 +144,8 @@ try {
         error_log("Properties retrieved: " . json_encode($properties));
         
         // Get notes for the page with properties and attachments
-        $stmt = $db->prepare('
+        // Using Nowdoc for SQL clarity and safety
+        $sql = <<<'SQL'
             SELECT 
                 n.id,
                 n.page_id,
@@ -136,15 +155,22 @@ try {
                 n.block_id,
                 n.created_at,
                 n.updated_at,
-                GROUP_CONCAT(DISTINCT p.property_key || ":" || p.property_value) as properties,
-                GROUP_CONCAT(DISTINCT a.id || ":" || a.filename || ":" || a.original_name) as attachments
+                (
+                    SELECT IFNULL(json_group_array(json_object('key', p.property_key, 'value', p.property_value)), '[]')
+                    FROM properties p
+                    WHERE p.note_id = n.id
+                ) as properties_json,
+                (
+                    SELECT IFNULL(json_group_array(json_object('id', a.id, 'filename', a.filename, 'original_name', a.original_name)), '[]')
+                    FROM attachments a
+                    WHERE a.note_id = n.id
+                ) as attachments_json
             FROM notes n
-            LEFT JOIN properties p ON n.id = p.note_id
-            LEFT JOIN attachments a ON n.id = a.note_id
             WHERE n.page_id = :page_id
-            GROUP BY n.id
+            GROUP BY n.id -- Group by note ID as subqueries handle aggregation per note
             ORDER BY n.level, n.id
-        ');
+SQL;
+        $stmt = $db->prepare($sql);
         if (!$stmt) {
             throw new Exception('Failed to prepare notes query: ' . $db->lastErrorMsg());
         }
@@ -159,40 +185,33 @@ try {
         $noteMap = [];
         
         while ($note = $result->fetchArray(SQLITE3_ASSOC)) {
-            // Parse properties
-            $properties = [];
-            if ($note['properties']) {
-                foreach (explode(',', $note['properties']) as $prop) {
-                    list($key, $value) = explode(':', $prop, 2);
-                    $properties[$key] = $value;
-                }
-            }
-            $note['properties'] = $properties;
+            // Parse properties from JSON string
+            $note['properties'] = json_decode($note['properties_json'], true) ?: [];
+            unset($note['properties_json']);
             
-            // Parse attachments
-            $attachments = [];
-            if ($note['attachments']) {
-                foreach (explode(',', $note['attachments']) as $att) {
-                    list($id, $filename, $original_name) = explode(':', $att, 3);
-                    $attachments[] = [
-                        'id' => $id,
-                        'filename' => $filename,
-                        'original_name' => $original_name
-                    ];
-                }
-            }
-            $note['attachments'] = $attachments;
+            // Parse attachments from JSON string
+            $note['attachments'] = json_decode($note['attachments_json'], true) ?: [];
+            unset($note['attachments_json']);
             
             // Build note tree
             if ($note['parent_id'] === null) {
                 $notes[] = $note;
                 $noteMap[$note['id']] = &$notes[count($notes) - 1];
             } else {
-                if (!isset($noteMap[$note['parent_id']]['children'])) {
-                    $noteMap[$note['parent_id']]['children'] = [];
+                // Ensure parent exists in the map before trying to attach child
+                if (isset($noteMap[$note['parent_id']])) {
+                    if (!isset($noteMap[$note['parent_id']]['children'])) {
+                        $noteMap[$note['parent_id']]['children'] = [];
+                    }
+                    $noteMap[$note['parent_id']]['children'][] = $note;
+                    $noteMap[$note['id']] = &$noteMap[$note['parent_id']]['children'][count($noteMap[$note['parent_id']]['children']) - 1];
+                } else {
+                    // Log orphaned note if parent_id is set but not found in map (e.g. due to data integrity or if parent is not yet processed)
+                    // Adding to root as a fallback, though ORDER BY should make this rare for valid data.
+                    error_log("Orphaned note detected: ID {$note['id']} with parent_id {$note['parent_id']} not found in map. Adding to root.");
+                    $notes[] = $note;
+                    $noteMap[$note['id']] = &$notes[count($notes) - 1];
                 }
-                $noteMap[$note['parent_id']]['children'][] = $note;
-                $noteMap[$note['id']] = &$noteMap[$note['parent_id']]['children'][count($noteMap[$note['parent_id']]['children']) - 1];
             }
         }
         

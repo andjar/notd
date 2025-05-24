@@ -1,10 +1,22 @@
 <?php
 header('Content-Type: application/json');
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+ini_set('display_errors', 0); // Errors should be logged, not displayed for API
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Consistent error logging
 
 try {
-    $db = new SQLite3('../db/notes.db');
+    $db = new SQLite3(__DIR__ . '/../db/notes.db'); // Use absolute path
+    if (!$db) {
+        // Handle error immediately if connection fails
+        error_log("recent_pages.php: Failed to connect to database: " . SQLite3::lastErrorMsg());
+        echo json_encode(['error' => 'Failed to connect to database.']);
+        exit;
+    }
+    // Enable foreign key constraints for this connection
+    if (!$db->exec('PRAGMA foreign_keys = ON;')) {
+        error_log("Notice: Attempted to enable foreign_keys for recent_pages.php. Check SQLite logs if issues persist with FKs.");
+    }
 
     function getRecentPages() {
         global $db;

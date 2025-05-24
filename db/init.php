@@ -103,9 +103,40 @@ if (!file_exists($dbPath)) {
             throw new Exception('Failed to create recent_pages table: ' . $db->lastErrorMsg());
         }
 
+        // Create page_links table
+        echo "Creating page_links table...\n";
+        $result = $db->exec('CREATE TABLE IF NOT EXISTS page_links (
+            source_page_id TEXT NOT NULL,
+            target_page_id TEXT NOT NULL,
+            source_note_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (source_page_id) REFERENCES pages(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_page_id) REFERENCES pages(id) ON DELETE CASCADE,
+            FOREIGN KEY (source_note_id) REFERENCES notes(id) ON DELETE CASCADE,
+            PRIMARY KEY (source_page_id, target_page_id, source_note_id)
+        )');
+        if (!$result) {
+            throw new Exception('Failed to create page_links table: ' . $db->lastErrorMsg());
+        }
+
+        // Create indexes for page_links table
+        echo "Creating indexes for page_links table...\n";
+        $result = $db->exec('CREATE INDEX IF NOT EXISTS idx_page_links_target_page_id ON page_links(target_page_id);');
+        if (!$result) {
+            throw new Exception('Failed to create index idx_page_links_target_page_id: ' . $db->lastErrorMsg());
+        }
+        $result = $db->exec('CREATE INDEX IF NOT EXISTS idx_page_links_source_page_id ON page_links(source_page_id);');
+        if (!$result) {
+            throw new Exception('Failed to create index idx_page_links_source_page_id: ' . $db->lastErrorMsg());
+        }
+        $result = $db->exec('CREATE INDEX IF NOT EXISTS idx_page_links_source_note_id ON page_links(source_note_id);');
+        if (!$result) {
+            throw new Exception('Failed to create index idx_page_links_source_note_id: ' . $db->lastErrorMsg());
+        }
+
         // Verify tables were created
         echo "Verifying tables...\n";
-        $tables = ['pages', 'notes', 'attachments', 'properties', 'recent_pages'];
+        $tables = ['pages', 'notes', 'attachments', 'properties', 'recent_pages', 'page_links'];
         foreach ($tables as $table) {
             $result = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='$table'");
             if (!$result || !$result->fetchArray()) {
@@ -126,7 +157,7 @@ if (!file_exists($dbPath)) {
 // If the database exists, verify tables
 try {
     $db = new SQLite3($dbPath);
-    $tables = ['pages', 'notes', 'attachments', 'properties', 'recent_pages'];
+    $tables = ['pages', 'notes', 'attachments', 'properties', 'recent_pages', 'page_links'];
     $missing = [];
     
     foreach ($tables as $table) {
