@@ -918,7 +918,7 @@ function copySearchLink() {
     const query = sessionStorage.getItem('searchQuery') || '';
     navigator.clipboard.writeText(`<<${query}>>`).then(() => alert('Search link copied!')).catch(err => alert('Failed to copy: ' + err));
 }
-async function executeSearchLink(query) {
+async function executeSearchLink(query) { // Renamed from executeSearchLink
     try {
         const response = await fetch('api/advanced_search.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -959,6 +959,97 @@ async function toggleTodo(blockId, isDone) {
         console.error('Error updating todo status:', error); alert('Error updating task: ' + error.message);
         const checkbox = document.querySelector(`input[type="checkbox"][onchange*="'${blockId}'"]`);
         if (checkbox) checkbox.checked = !isDone; 
+    }
+}
+
+function showAdvancedSearch() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="advanced-search-content">
+            <h3>Advanced Search</h3>
+            <div class="help-text">
+                Enter a SQL query to search based on block properties. Example:<br>
+                <code>SELECT * FROM notes WHERE id IN (SELECT note_id FROM properties WHERE property_key = 'status' AND property_value = 'done')</code>
+            </div>
+            <textarea id="advanced-search-query" placeholder="Enter your SQL query..."></textarea>
+            <div class="button-group">
+                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                <button class="btn-primary" onclick="executeAdvancedSearch()">Search</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Focus the textarea
+    const textarea = modal.querySelector('#advanced-search-query');
+    if (textarea) {
+        textarea.focus();
+    }
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+async function executeAdvancedSearch() {
+    const queryInput = document.getElementById('advanced-search-query');
+    if (!queryInput) {
+        console.error('Advanced search query input not found.');
+        return;
+    }
+    const query = queryInput.value.trim();
+    
+    if (!query) {
+        // Optionally, provide feedback to the user that a query is required
+        // For now, just return if query is empty, matching original behavior
+        return;
+    }
+
+    try {
+        const response = await fetch('api/advanced_search.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query })
+        });
+
+        if (!response.ok) {
+            // Attempt to get error message from response body
+            let errorMsg = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                if (errorData && errorData.error) {
+                    errorMsg = errorData.error;
+                }
+            } catch (e) {
+                // Ignore if response is not JSON or doesn't have error field
+            }
+            throw new Error(errorMsg);
+        }
+
+        const results = await response.json();
+        if (results.error) {
+            throw new Error(results.error);
+        }
+
+        sessionStorage.setItem('searchResults', JSON.stringify(results));
+        sessionStorage.setItem('searchQuery', query);
+
+        const modal = document.querySelector('.advanced-search-content');
+        if (modal && modal.closest('.modal')) {
+            modal.closest('.modal').remove();
+        }
+
+        window.location.hash = 'search-results';
+    } catch (error) {
+        console.error('Error executing advanced search:', error);
+        alert('Error executing search: ' + error.message);
     }
 }
 
