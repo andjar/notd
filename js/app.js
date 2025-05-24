@@ -35,100 +35,54 @@ const outlineContainer = document.getElementById('outline-container');
 // Event Listeners
 searchInput.addEventListener('input', debounce(handleSearch, 300));
 newPageButton.addEventListener('click', createNewPage);
-outlineContainer.addEventListener('click', handleOutlineClick);
+outlineContainer.addEventListener('click', handleOutlineClick); // Handles clicks within outline, including breadcrumbs now
 
-// Add advanced search functionality
 document.getElementById('advanced-search-link').addEventListener('click', (e) => {
     e.preventDefault();
     showAdvancedSearch();
 });
 
-function showAdvancedSearch() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="advanced-search-content">
-            <h3>Advanced Search</h3>
-            <div class="help-text">
-                Enter a SQL query to search based on block properties. Example:<br>
-                <code>SELECT * FROM notes WHERE block_id IN (SELECT block_id FROM properties WHERE property_key = 'status' AND property_value = 'done')</code>
-            </div>
-            <textarea id="advanced-search-query" placeholder="Enter your SQL query..."></textarea>
-            <div class="button-group">
-                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
-                <button class="btn-primary" onclick="executeAdvancedSearch()">Search</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Close modal when clicking outside
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
+document.getElementById('home-button').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const today = new Date().toISOString().split('T')[0];
+    if (document.body.classList.contains('logseq-focus-active')) {
+        await zoomOut(); 
+        if (window.location.hash.substring(1) !== today) {
+            window.location.hash = today;
         }
-    });
-}
-
-async function executeAdvancedSearch() {
-    const query = document.getElementById('advanced-search-query').value.trim();
-    if (!query) return;
-    
-    try {
-        const response = await fetch('api/advanced_search.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+    } else {
+        if (window.location.hash.substring(1) !== today) {
+            window.location.hash = today;
+        } else {
+            await loadPage(today);
         }
-        
-        const results = await response.json();
-        if (results.error) {
-            throw new Error(results.error);
-        }
-        
-        // Store results in sessionStorage
-        sessionStorage.setItem('searchResults', JSON.stringify(results));
-        sessionStorage.setItem('searchQuery', query);
-        
-        // Close the modal
-        document.querySelector('.modal').remove();
-        
-        // Navigate to search results page
-        window.location.hash = 'search-results';
-    } catch (error) {
-        console.error('Error executing advanced search:', error);
-        alert('Error executing search: ' + error.message);
     }
-}
+});
 
-// Add this to the hash change listener
+
 window.addEventListener('hashchange', () => {
     const pageId = window.location.hash.substring(1);
     if (pageId === 'search-results') {
         showSearchResults();
     } else if (pageId) {
-        loadPage(pageId);
+        loadPage(pageId); // This will also clear zoom state if navigating away via hash
     }
 });
 
-// Initialize the app
 document.addEventListener('DOMContentLoaded', async () => {
     await loadTemplates();
     loadRecentPages();
     initCalendar();
-    // If no page is specified in URL, create today's journal page
     if (!window.location.hash) {
         const today = new Date().toISOString().split('T')[0];
         window.location.hash = today;
     } else {
-        loadPage(window.location.hash.substring(1));
+        const pageId = window.location.hash.substring(1);
+        if (pageId === 'search-results') {
+            showSearchResults();
+        } else {
+            loadPage(pageId);
+        }
     }
 });
 
@@ -145,47 +99,43 @@ function debounce(func, wait) {
     };
 }
 
-// API Functions
+// API Functions & Page Rendering
 async function loadPage(pageId) {
-    document.body.classList.remove('focus-mode-active');
-    document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
+    document.body.classList.remove('logseq-focus-active');
+    outlineContainer.classList.remove('focused');
+    // Page title will be reset by renderPage, no need to explicitly handle unzoom button here
+
     try {
-        // Show new note button and backlinks
         document.getElementById('new-note').style.display = 'block';
         document.getElementById('backlinks-container').style.display = 'block';
         
         const response = await fetch(`api/page.php?id=${pageId}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const text = await response.text();
-        if (!text) {
-            throw new Error('Empty response from server');
-        }
+        if (!text) throw new Error('Empty response from server');
         const data = JSON.parse(text);
         
         if (data.error) {
             console.error('Server error:', data.error);
+            outlineContainer.innerHTML = `<div class="error-message"><h3>Error loading page</h3><p>${data.error}</p></div>`;
             return;
         }
 
-        // Check for alias property
         if (data.properties && data.properties.alias) {
             window.location.hash = data.properties.alias;
             return;
         }
 
         currentPage = data;
-        await renderPage(data);
+        await renderPage(data); // This will set the correct page title
         updateRecentPages(pageId);
     } catch (error) {
         console.error('Error loading page:', error);
-        // Show error to user
         outlineContainer.innerHTML = `
             <div class="error-message">
                 <h3>Error loading page</h3>
                 <p>${error.message}</p>
-                <button onclick="loadPage('${pageId}')">Retry</button>
+                <button onclick="loadPage('${pageId.replace(/'/g, "\\'")}')">Retry</button>
             </div>
         `;
     }
@@ -195,28 +145,24 @@ async function loadRecentPages() {
     try {
         const response = await fetch('api/recent_pages.php');
         const data = await response.json();
-        if (data.error) {
-            console.error(data.error);
-            return;
-        }
+        if (data.error) { console.error(data.error); return; }
         recentPages = data;
         renderRecentPages();
-    } catch (error) {
-        console.error('Error loading recent pages:', error);
-    }
+    } catch (error) { console.error('Error loading recent pages:', error); }
 }
 
 async function handleSearch(event) {
     const query = event.target.value;
-    if (query.length < 2) return;
-
+    if (query.length < 2) {
+        const searchResultsContainer = document.getElementById('search-results-container');
+        if (searchResultsContainer) searchResultsContainer.remove();
+        return;
+    }
     try {
         const response = await fetch(`api/search.php?q=${encodeURIComponent(query)}`);
         const results = await response.json();
         renderSearchResults(results);
-    } catch (error) {
-        console.error('Error searching:', error);
-    }
+    } catch (error) { console.error('Error searching:', error); }
 }
 
 async function createNewPage() {
@@ -231,144 +177,62 @@ async function createNewPage() {
             </div>
         </div>
     `;
-
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.appendChild(pageEditor);
     document.body.appendChild(modal);
-
     const pageIdInput = pageEditor.querySelector('.page-id-input');
     const saveButton = pageEditor.querySelector('.save-page');
     const cancelButton = pageEditor.querySelector('.cancel-page');
-
     pageIdInput.focus();
-
     saveButton.onclick = async () => {
         const pageId = pageIdInput.value.trim();
-        if (!pageId) {
-            alert('Please enter a page ID');
-            return;
-        }
-
-        // Determine type based on pageId (date-like)
-        let type = 'note';
-        let properties = {};
-        
-        // Check if pageId is a date (YYYY-MM-DD)
-        if (/^\d{4}-\d{2}-\d{2}$/.test(pageId)) {
-            type = 'journal';
-            properties = { 'type': 'journal' };  // Set type property correctly
-        }
-
-        const requestData = {
-            id: encodeURIComponent(pageId),
-            title: pageId, // Use the ID as the title initially
-            type,
-            properties
-        };
-        
-        console.log('Creating page with data:', requestData);
-
+        if (!pageId) { alert('Please enter a page ID'); return; }
+        let type = 'note'; let properties = {};
+        if (/^\d{4}-\d{2}-\d{2}$/.test(pageId)) { type = 'journal'; properties = { 'type': 'journal' }; }
         try {
             const response = await fetch('api/page.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestData)
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: encodeURIComponent(pageId), title: pageId, type, properties })
             });
-
             const data = await response.json();
-            console.log('Server response:', data);
-            
-            if (data.error) {
-                console.error(data.error);
-                return;
-            }
-
+            if (data.error) throw new Error(data.error);
             document.body.removeChild(modal);
             window.location.hash = encodeURIComponent(pageId);
-            loadPage(encodeURIComponent(pageId));
-        } catch (error) {
-            console.error('Error creating page:', error);
-        }
+        } catch (error) { console.error('Error creating page:', error); alert('Error creating page: ' + error.message); }
     };
-
-    cancelButton.onclick = () => {
-        document.body.removeChild(modal);
-    };
+    cancelButton.onclick = () => document.body.removeChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
-// Add this function before renderNoteContent
 async function findBlockById(blockId) {
     try {
         const response = await fetch(`api/block.php?id=${blockId}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        if (data.error) {
-            throw new Error(data.error);
-        }
+        if (data.error) throw new Error(data.error);
         return data;
-    } catch (error) {
-        console.error('Error finding block:', error);
-        return null;
-    }
+    } catch (error) { console.error('Error finding block:', error); return null; }
 }
 
-// Update renderNoteContent to handle search links
 async function renderNoteContent(note) {
-    // First process search links before markdown parsing
     let content = note.content;
-    
-    // Check if content is just a single page link
-    const singleLinkMatch = content.match(/^\[\[(.*?)\]\]$/);
-    if (singleLinkMatch) {
-        const linkedPageId = singleLinkMatch[1];
-        try {
-            const response = await fetch(`api/page.php?id=${linkedPageId}`);
-            if (response.ok) {
-                const linkedPage = await response.json();
-                if (linkedPage.type) {
-                    // Add the linked page type as a class to the note element
-                    const noteElement = document.querySelector(`[data-note-id="${note.id}"]`);
-                    if (noteElement) {
-                        noteElement.classList.add(`linked-page-${linkedPage.type}`);
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching linked page type:', error);
-        }
-    }
-    
-    // Process search links <<query>> - store them temporarily
-    const searchLinks = [];
     content = content.replace(/<<([^>]+)>>/g, (match, query) => {
         const displayQuery = query.length > 30 ? query.substring(0, 27) + '...' : query;
-        const id = `search-link-${searchLinks.length}`;
-        searchLinks.push({ id, query, displayQuery });
-        return `<a href="#" class="search-link" onclick="event.preventDefault(); executeSearchLink('${query.replace(/'/g, "\\'")}')"><<${displayQuery}>></a>`;
+        return `<a href="#" class="search-link" onclick="event.preventDefault(); event.stopPropagation(); executeSearchLink('${query.replace(/'/g, "\\'")}')"><<${displayQuery}>></a>`;
     });
-    
-    // Extract properties but keep them in the content
-    const properties = {};
     content = content.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
-        properties[key.trim()] = value.trim();
-        if (key.trim() === 'tag') {
-            return `<a href="#${value.trim()}" class="property-tag" onclick="event.preventDefault(); loadPage('${value.trim()}');">#${value.trim()}</a>`;
+        if (key.trim().toLowerCase() === 'tag') {
+            return value.trim().split(',').map(tagValue => 
+                `<a href="#${tagValue.trim()}" class="property-tag" onclick="event.stopPropagation(); loadPage('${tagValue.trim()}');">#${tagValue.trim()}</a>`
+            ).join(' ');
         }
         return `<span class="property-tag">${key.trim()}: ${value.trim()}</span>`;
     });
-    
-    // Now process markdown
     content = marked.parse(content);
-    
-    // Process block transclusion {{block_id}}
     const blockMatches = content.match(/\{\{([^}]+)\}\}/g) || [];
     for (const match of blockMatches) {
-        const blockId = match.slice(2, -2); // Remove {{ and }}
+        const blockId = match.slice(2, -2);
         const block = await findBlockById(blockId);
         if (block) {
             const blockContent = await renderNoteContent(block);
@@ -376,1293 +240,633 @@ async function renderNoteContent(note) {
                 <div class="transcluded-block" data-block-id="${blockId}">
                     ${blockContent}
                     <div class="transclusion-source">
-                        <a href="#${block.page_id}" onclick="event.preventDefault(); loadPage('${block.page_id}');">
-                            Source: ${block.page_title || block.page_id}
-                        </a>
-                    </div>
-                </div>
-            `);
-        } else {
-            content = content.replace(match, `<span class="broken-transclusion">${match}</span>`);
-        }
+                        <a href="#${block.page_id}" onclick="event.stopPropagation(); loadPage('${block.page_id}');">
+                            Source: ${block.page_title || block.page_id}</a></div></div>`);
+        } else { content = content.replace(match, `<span class="broken-transclusion">${match}</span>`); }
     }
-    
-    // Process images to add click-to-enlarge functionality
-    content = content.replace(/<img src="([^"]+)" alt="([^"]+)"/g, (match, src, alt) => {
-        return `<img src="${src}" alt="${alt}" class="note-image" onclick="showImageModal(this.src, this.alt)">`;
+    content = content.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
+        return `<img src="${src}" alt="${alt}" class="note-image" onclick="event.stopPropagation(); showImageModal(this.src, this.alt)">`;
     });
-    
-    // Process TODO/DONE status with improved regex
     content = content.replace(/<p>(TODO|DONE)\s*(.*?)<\/p>/g, (match, status, textContentHtml) => {
         const isDone = status === 'DONE';
-        // ... (processedTextForDisplay logic remains the same)
         const processedTextForDisplay = textContentHtml.replace(/\[\[(.*?)\]\]/g, (linkMatch, p1) => {
             return `<a href="#${p1}" class="internal-link" onclick="event.stopPropagation(); loadPage('${p1}');">${p1}</a>`;
         });
-        
-        return `
-            <div class="todo-item">
-                <label class="todo-checkbox">
+        return `<div class="todo-item"><label class="todo-checkbox">
                     <input type="checkbox" ${isDone ? 'checked' : ''} 
                         onchange="event.stopPropagation(); toggleTodo('${note.block_id}', this.checked)"> 
-                    <span class="status-${status.toLowerCase()}">${processedTextForDisplay}</span>
-                </label>
-            </div>
-        `;
+                    <span class="status-${status.toLowerCase()}">${processedTextForDisplay}</span></label></div>`;
     });
-    
-    // Process links
     content = content.replace(/\[\[(.*?)\]\]/g, (match, p1) => {
-        return `<a href="#${p1}" class="internal-link" onclick="event.preventDefault(); loadPage('${p1}');">${p1}</a>`;
+        return `<a href="#${p1}" class="internal-link" onclick="event.stopPropagation(); loadPage('${p1}');">${p1}</a>`;
     });
-    
-    // Add attachments section
     if (note.attachments && note.attachments.length > 0) {
         content += '<div class="attachments">';
         note.attachments.forEach(attachment => {
             const fileExtension = attachment.filename.split('.').pop().toLowerCase();
-            let icon = '📄'; // Default icon
-            let preview = '';
-            
-            // Determine icon and preview based on file type
+            let icon = '📄'; let previewHtml = '';
             if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
-                icon = '🖼️';
-                preview = `<img src="uploads/${attachment.filename}" class="attachment-image" alt="${attachment.original_name}">`;
+                icon = '🖼️'; previewHtml = `<img src="uploads/${attachment.filename}" class="attachment-image" alt="${attachment.original_name}">`;
             } else if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
-                icon = '🎥';
-                preview = `<video src="uploads/${attachment.filename}" controls class="attachment-preview"></video>`;
+                icon = '🎥'; previewHtml = `<div class="attachment-preview"><video src="uploads/${attachment.filename}" controls></video></div>`;
             } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
-                icon = '🎵';
-                preview = `<audio src="uploads/${attachment.filename}" controls class="attachment-preview"></audio>`;
-            } else if (['pdf'].includes(fileExtension)) {
-                icon = '📑';
-            } else if (['doc', 'docx'].includes(fileExtension)) {
-                icon = '📝';
-            } else if (['xls', 'xlsx'].includes(fileExtension)) {
-                icon = '📊';
-            } else if (['zip', 'rar', '7z'].includes(fileExtension)) {
-                icon = '📦';
-            } else if (['js', 'py', 'java', 'cpp', 'html', 'css'].includes(fileExtension)) {
-                icon = '💻';
-            }
-            
-            content += `
-                <div class="attachment">
-                    <span class="attachment-icon">${icon}</span>
-                    <a href="uploads/${attachment.filename}" target="_blank" class="attachment-name">${attachment.original_name}</a>
-                    <span class="attachment-size">${formatFileSize(attachment.size)}</span>
-                    <div class="attachment-actions">
-                        <button onclick="deleteAttachment(${attachment.id})" title="Delete attachment">×</button>
-                    </div>
-                    ${preview}
-                </div>
-            `;
+                icon = '🎵'; previewHtml = `<div class="attachment-preview"><audio src="uploads/${attachment.filename}" controls></audio></div>`;
+            } 
+            content += `<div class="attachment"><div class="attachment-info">
+                        <span class="attachment-icon">${icon}</span>
+                        <a href="uploads/${attachment.filename}" target="_blank" class="attachment-name" onclick="event.stopPropagation();">${attachment.original_name}</a>
+                        <span class="attachment-size">${formatFileSize(attachment.size)}</span>
+                        <div class="attachment-actions"><button onclick="event.stopPropagation(); deleteAttachment(${attachment.id}, event)" title="Delete attachment">×</button></div>
+                    </div>${previewHtml}</div>`;
         });
         content += '</div>';
     }
-    
     return content;
 }
 
-// Helper function to format file size
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-// Update renderOutline to add focus button
 async function renderOutline(notes, level = 0) {
     if (!notes) return '';
-    
-    const renderedNotes = await Promise.all(notes.map(async note => {
-        // Ensure block_id is available
+    const renderedNotesPromises = notes.map(async note => {
         const blockId = note.block_id;
-        const content = await renderNoteContent(note);
-        
-        // Check if content is just a single page link
-        const singleLinkMatch = note.content.match(/^\[\[(.*?)\]\]$/);
+        const contentHtml = await renderNoteContent(note);
         let linkedPageType = null;
+        const singleLinkMatch = note.content.match(/^\[\[(.*?)\]\]$/);
         if (singleLinkMatch) {
             const linkedPageId = singleLinkMatch[1];
             try {
-                console.log('Fetching page type for:', linkedPageId);
                 const response = await fetch(`api/page.php?id=${linkedPageId}`);
                 if (response.ok) {
                     const linkedPage = await response.json();
-                    console.log('Linked page data:', linkedPage);
-                    // Check properties.type first, then fall back to root type
-                    if (linkedPage.properties && linkedPage.properties.type) {
-                        linkedPageType = linkedPage.properties.type;
-                        console.log('Setting linked page type from properties:', linkedPageType);
-                    } else if (linkedPage.type) {
-                        linkedPageType = linkedPage.type;
-                        console.log('Setting linked page type from root:', linkedPageType);
-                    } else {
-                        console.log('No type found in linked page data');
-                    }
-                } else {
-                    console.log('Failed to fetch page:', response.status);
+                    linkedPageType = (linkedPage.properties && linkedPage.properties.type) ? linkedPage.properties.type : (linkedPage.type || null);
                 }
-            } catch (error) {
-                console.error('Error fetching linked page type:', error);
-            }
+            } catch (error) { console.error('Error fetching linked page type for outline:', error); }
         }
-        
-        const hasChildrenClass = (note.children && note.children.length > 0) ? 'has-children' : '';
-        // Create the note HTML
+        const hasChildren = note.children && note.children.length > 0;
+        const hasChildrenClass = hasChildren ? 'has-children' : '';
+        const linkedPageTypeClass = linkedPageType ? `linked-page-${linkedPageType.toLowerCase()}` : '';
+        const controlsHtml = `
+            <span class="static-bullet" data-action="zoom-in" title="Zoom in"></span>
+            ${hasChildren ? 
+                `<span class="hover-arrow-toggle" data-action="toggle-children" title="Toggle children">
+                     <svg class="arrow-svg" viewBox="0 0 192 512"><path d="M0 384.662V127.338c0-17.818 21.543-26.741 34.142-14.142l128.662 128.662c7.81 7.81 7.81 20.474 0 28.284L34.142 398.804C21.543 411.404 0 402.48 0 384.662z"></path></svg>
+                 </span>` : '' }`;
         const noteHtml = `
-            <div class="outline-item ${linkedPageType ? `linked-page-${linkedPageType}` : ''} ${hasChildrenClass}" 
-                 data-note-id="${note.id}"
-                 data-level="${level}"
-                 data-content="${note.content.replace(/"/g, '&quot;')}">
+            <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}" 
+                 data-note-id="${note.id}" data-level="${level}" data-content="${note.content.replace(/"/g, '"')}">
                 <div class="outline-content" ${blockId ? `data-block-id="${blockId}"` : ''}>
-                    ${content}
-                    ${note.properties ? renderProperties(note.properties) : ''}
+                    ${controlsHtml}
+                    ${contentHtml}
+                    ${note.properties && Object.keys(note.properties).length > 0 ? renderPropertiesInline(note.properties) : ''}
                     <div class="note-actions">
                         <button data-action="add-child" title="Add child note">+</button>
-                        <button data-action="focus" title="Focus on this thread"></button>
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
                         <button data-action="edit" title="Edit note">✎</button>
                         <button data-action="upload" title="Upload file">↑</button>
                         <button data-action="delete" title="Delete note">×</button>
-                        <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">
-                            ${new Date(note.created_at).toLocaleDateString()}
-                        </span>
+                         | <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">${new Date(note.created_at).toLocaleDateString()}</span>
                     </div>
                 </div>
-            </div>
-        `;
-
-        // If there are children, render them recursively
+            </div>`;
         const childrenHtml = note.children ? await renderOutline(note.children, level + 1) : '';
-        
-        // Return both the note and its children
         return noteHtml + childrenHtml;
-    }));
-    
-    return renderedNotes.join('');
+    });
+    return (await Promise.all(renderedNotesPromises)).join('');
 }
 
-// Update renderPage to handle async content
-async function renderPage(page) {
-    pageTitle.innerHTML = `
-        <span class="page-title-text">${page.title}</span>
-        <button class="edit-properties-button" title="Edit page properties"></button>
-    `;
-    
-    // Render page properties
-    if (page.properties) {
+function renderPropertiesInline(properties) { return ''; } 
+
+async function renderPage(page) { // This is for normal page rendering, not zoomed view
+    pageTitle.innerHTML = `<span class="page-title-text">${page.title}</span>
+                           <button class="edit-properties-button" title="Edit page properties"></button>`;
+    if (page.properties && Object.keys(page.properties).length > 0) {
         const propertiesHtml = Object.entries(page.properties)
-            .map(([key, value]) => `
-                <div class="page-property">
-                    <span class="property-key">${key}:</span>
-                    <span class="property-value">${value}</span>
-                </div>
-            `).join('');
-        pageProperties.innerHTML = `
-            <div class="page-properties-content">
-                ${propertiesHtml}
-            </div>
-        `;
+            .map(([key, value]) => `<div class="page-property"><span class="property-key">${key}:</span><span class="property-value">${value}</span></div>`).join('');
+        pageProperties.innerHTML = `<div class="page-properties-content">${propertiesHtml}</div>`;
+        pageProperties.style.display = 'block';
     } else {
-        pageProperties.innerHTML = `
-            <div class="page-properties-content">
-            </div>
-        `;
+        pageProperties.innerHTML = '';
+        pageProperties.style.display = 'none';
     }
-    
-    // Add edit properties button handler
     const editButton = pageTitle.querySelector('.edit-properties-button');
-    if (editButton) {
-        editButton.onclick = editPageProperties;
-    }
-    
-    outlineContainer.innerHTML = await renderOutline(page.notes);
-    
-    // Render backlinks
+    if (editButton) editButton.onclick = editPageProperties;
+
+    outlineContainer.innerHTML = await renderOutline(page.notes); // Regular outline for the page
+
     const backlinksContainer = document.getElementById('backlinks-container');
-    if (backlinksContainer) {
-        renderBacklinks(page.id).then(html => {
-            backlinksContainer.innerHTML = html;
-        });
-    }
+    if (backlinksContainer) renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
 }
 
 async function editPageProperties() {
     if (!currentPage) return;
-    
     const properties = currentPage.properties || {};
-    const propertyList = Object.entries(properties)
-        .map(([key, value]) => `${key}::${value}`)
-        .join('\n');
-    
-    const editorHtml = `
-        <div class="properties-editor">
+    const propertyList = Object.entries(properties).map(([key, value]) => `${key}::${value}`).join('\n');
+    pageProperties.style.display = 'block';
+    const editorHtml = `<div class="properties-editor">
             <textarea class="properties-textarea" placeholder="Enter properties (one per line, format: key::value)">${propertyList}</textarea>
             <div class="properties-editor-actions">
                 <button class="btn-primary save-properties">Save</button>
                 <button class="btn-secondary cancel-properties">Cancel</button>
-            </div>
-        </div>
-    `;
-    
-    const propertiesContent = pageProperties.querySelector('.page-properties-content');
-    const originalContent = propertiesContent.innerHTML;
+            </div></div>`;
+    let propertiesContent = pageProperties.querySelector('.page-properties-content');
+    const originalContent = propertiesContent ? propertiesContent.innerHTML : '';
+    if (!propertiesContent) {
+        propertiesContent = document.createElement('div');
+        propertiesContent.className = 'page-properties-content';
+        pageProperties.appendChild(propertiesContent);
+    }
     propertiesContent.innerHTML = editorHtml;
-    
     const textarea = propertiesContent.querySelector('.properties-textarea');
     const saveButton = propertiesContent.querySelector('.save-properties');
     const cancelButton = propertiesContent.querySelector('.cancel-properties');
-    
     textarea.focus();
-    
-    // Add Ctrl+Enter handler
-    textarea.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            saveButton.click();
-        }
-    });
-    
+    textarea.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); } });
     saveButton.onclick = async () => {
-        const newProperties = textarea.value.trim();
-        if (!newProperties) {
-            propertiesContent.innerHTML = originalContent;
-            return;
-        }
-        
+        const newPropertiesText = textarea.value.trim();
         const updatedProperties = {};
-        newProperties.split('\n').forEach(line => {
-            const [key, value] = line.split('::').map(s => s.trim());
-            if (key && value) {
-                updatedProperties[key] = value;
-            }
-        });
-        
+        if (newPropertiesText) {
+            newPropertiesText.split('\n').forEach(line => {
+                const parts = line.split('::');
+                if (parts.length === 2) {
+                    const key = parts[0].trim(); const value = parts[1].trim();
+                    if (key && value) updatedProperties[key] = value;
+                }
+            });
+        }
         try {
             const response = await fetch(`api/page.php?id=${currentPage.id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'update',
-                    title: currentPage.title,
-                    type: currentPage.type || 'note',
-                    properties: updatedProperties
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', title: currentPage.title, type: currentPage.type || 'note', properties: updatedProperties })
             });
-            
             const data = await response.json();
-            if (data.error) {
-                console.error(data.error);
-                return;
-            }
-            
+            if (data.error) throw new Error(data.error);
             loadPage(currentPage.id);
         } catch (error) {
             console.error('Error updating properties:', error);
+            propertiesContent.innerHTML = originalContent;
+            if ((Object.keys(properties).length === 0 && !originalContent.includes('page-property')) || !propertiesContent.innerHTML.trim()) {
+                 pageProperties.style.display = 'none';
+            }
         }
     };
-    
     cancelButton.onclick = () => {
         propertiesContent.innerHTML = originalContent;
+        if ((Object.keys(properties).length === 0 && !originalContent.includes('page-property')) || !propertiesContent.innerHTML.trim()) {
+             pageProperties.style.display = 'none';
+        }
     };
-}
-
-function renderProperties(properties) {
-    if (!properties || Object.keys(properties).length === 0) return '';
-    
-    return Object.entries(properties)
-        .map(([key, value]) => `
-            <span class="property-tag">
-                ${key}: ${value}
-            </span>
-        `).join('');
 }
 
 async function renderBacklinks(pageId) {
     try {
         const response = await fetch(`api/backlinks.php?page_id=${pageId}`);
-        if (!response.ok) {
-            throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Network response error: ${response.statusText}`);
         const threads = await response.json();
-
-        if (threads.error) {
-            console.error('Error from backlinks API:', threads.error);
-            return `<h3>Backlinks</h3><p>Error loading backlinks: ${threads.error}</p>`;
-        }
-
-        if (!threads || threads.length === 0) {
-            return '<h3>Backlinks</h3><p>No backlinks found</p>';
-        }
-
+        if (threads.error) throw new Error(threads.error);
+        if (!threads || threads.length === 0) return '<h3>Backlinks</h3><p>No backlinks found</p>';
         let html = '<h3>Backlinks</h3><div class="backlinks-list">';
-
         for (const thread of threads) {
-            // Helper function to build tree structure for notes in a thread
             const buildNoteTree = (notesList) => {
-                if (!notesList || notesList.length === 0) {
-                    return [];
-                }
+                if (!notesList || notesList.length === 0) return [];
                 const noteMap = {};
-                // Initialize each note with a children array and add to map
-                notesList.forEach(note => {
-                    noteMap[note.id] = { ...note, children: [] };
-                });
-
-                const rootNotes = []; // This will store the actual root notes for the thread
+                notesList.forEach(note => { noteMap[note.id] = { ...note, children: [] }; });
+                const rootNotes = [];
                 notesList.forEach(noteData => {
-                    const currentMappedNote = noteMap[noteData.id]; // Get the note object that has the .children array
+                    const currentMappedNote = noteMap[noteData.id];
                     if (noteData.parent_id && noteMap[noteData.parent_id]) {
-                        // If it's a child and its parent is in the current list (noteMap),
-                        // add it to its parent's children array.
                         noteMap[noteData.parent_id].children.push(currentMappedNote);
-                    } else {
-                        // If its parent_id is null, or its parent is not in the current list of notes for this thread,
-                        // then it's a root note for this specific thread.
-                        rootNotes.push(currentMappedNote);
-                    }
+                    } else { rootNotes.push(currentMappedNote); }
                 });
-                return rootNotes; // Return the array of root notes, each potentially with children.
+                return rootNotes;
             };
-            
             const hierarchicalNotes = buildNoteTree(thread.notes);
-            
-            let threadContentHtml = '';
-            if (hierarchicalNotes.length > 0) {
-                 threadContentHtml = await renderOutline(hierarchicalNotes, 0);
-            } else if (thread.notes && thread.notes.length > 0) {
-                // This case might happen if notes exist but buildNoteTree fails to make a tree (e.g. all notes are children of parents not in the list)
-                // For backlinks, the first note(s) in thread.notes should be roots in that context.
-                console.warn("Backlink thread notes were present, but hierarchicalNotes is empty. Thread:", thread, "Hierarchical Notes:", hierarchicalNotes);
-                // As a fallback, could try rendering the raw notes if renderOutline could handle it,
-                // but given it expects a tree, this might be incorrect.
-                // threadContentHtml = '<!-- Could not render note hierarchy for this thread -->';
-            }
-
-
-            html += `
-                <div class="backlink-thread-item">
-                    <a href="#${thread.linking_page_id}" onclick="event.preventDefault(); loadPage('${thread.linking_page_id}');">
-                        ${thread.linking_page_title || thread.linking_page_id}
-                    </a>
-                    <div class="backlink-thread-content">
-                        ${threadContentHtml}
-                    </div>
-                </div>
-            `;
+            const threadContentHtml = hierarchicalNotes.length > 0 ? await renderOutline(hierarchicalNotes, 0) : '';
+            html += `<div class="backlink-thread-item">
+                        <a href="#${thread.linking_page_id}" onclick="event.stopPropagation(); loadPage('${thread.linking_page_id}');">
+                            ${thread.linking_page_title || thread.linking_page_id}</a>
+                        <div class="backlink-thread-content">${threadContentHtml}</div>
+                    </div>`;
         }
-
-        html += '</div>'; // Close backlinks-list
-        return html;
-
-    } catch (error) { // Catches network errors and errors thrown from response.ok check
+        html += '</div>'; return html;
+    } catch (error) {
         console.error('Error loading backlinks:', error);
-        return '<h3>Backlinks</h3><p>Error loading backlinks: ' + error.message + '</p>';
+        return `<h3>Backlinks</h3><p>Error loading backlinks: ${error.message}</p>`;
     }
 }
 
 function renderRecentPages() {
     if (!recentPagesList) return;
-    
     const recentPagesHtml = recentPages
-        .map(page => `
-            <li onclick="loadPage('${page.page_id.replace(/'/g, "\\'")}')">
-                ${page.title || decodeURIComponent(page.page_id)}
-                <small>${new Date(page.last_opened).toLocaleDateString()}</small>
-            </li>
-        `).join('');
-
-    recentPagesList.innerHTML = `
-        <div class="recent-pages-header">
+        .map(page => `<li onclick="loadPage('${page.page_id.replace(/'/g, "\\'")}')">
+                        ${page.title || decodeURIComponent(page.page_id)}
+                        <small>${new Date(page.last_opened).toLocaleDateString()}</small></li>`).join('');
+    recentPagesList.innerHTML = `<div class="recent-pages-header">
             <h3>Recent Pages</h3>
-            <a href="#" class="all-pages-link" onclick="showAllPages(); return false;">All pages</a>
-        </div>
-        <ul>${recentPagesHtml}</ul>
-    `;
+            <a href="#" class="all-pages-link" onclick="event.preventDefault(); showAllPages();">All pages</a>
+        </div><ul>${recentPagesHtml}</ul>`;
 }
 
 async function showAllPages() {
     try {
         const response = await fetch('api/all_pages.php');
         const pages = await response.json();
-        
         const modal = document.createElement('div');
         modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="page-list-modal">
-                <h3>All Pages</h3>
-                <div class="page-list">
-                    ${pages.map(page => `
-                        <div class="page-list-item" onclick="loadPage('${page.id.replace(/'/g, "\\'")}'); document.body.removeChild(modal);">
-                            ${page.title || decodeURIComponent(page.id)}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-        
-        modal.onclick = (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
-        };
-        
+        modal.innerHTML = `<div class="page-list-modal"><h3>All Pages</h3><div class="page-list">
+            ${pages.map(page => `<div class="page-list-item" onclick="loadPage('${page.id.replace(/'/g, "\\'")}'); document.body.removeChild(this.closest('.modal'));">
+                                ${page.title || decodeURIComponent(page.id)}</div>`).join('')}
+            </div><button class="btn-secondary" style="margin-top:15px;" onclick="document.body.removeChild(this.closest('.modal'));">Close</button></div>`;
+        modal.onclick = (e) => { if (e.target === modal) document.body.removeChild(modal); };
         document.body.appendChild(modal);
-    } catch (error) {
-        console.error('Error loading all pages:', error);
-    }
+    } catch (error) { console.error('Error loading all pages:', error); }
 }
 
-function renderSearchResults(results) {
-    const searchResults = document.createElement('div');
-    searchResults.className = 'search-results';
-    
-    results.forEach(result => {
-        const resultElement = document.createElement('div');
-        resultElement.className = 'search-result';
-        resultElement.innerHTML = `
-            <h4>${result.page_title}</h4>
-            <div class="result-content">${renderNoteContent(result)}</div>
-            <div class="result-context">
-                ${result.context.map(note => `
-                    <div class="context-item">${renderNoteContent(note)}</div>
-                `).join('')}
-            </div>
-        `;
-        resultElement.onclick = () => {
-            loadPage(result.page_id);
-            searchInput.value = '';
-            searchResults.remove();
-        };
-        searchResults.appendChild(resultElement);
-    });
-    
-    // Remove existing results if any
-    const existingResults = document.querySelector('.search-results');
-    if (existingResults) {
-        existingResults.remove();
+function renderSearchResults(results) { // For inline search
+    const searchResultsContainer = document.getElementById('search-results-container') || document.createElement('div');
+    searchResultsContainer.id = 'search-results-container';
+    searchResultsContainer.className = 'search-results-inline';
+    if (results.length === 0) {
+        searchResultsContainer.innerHTML = '<p>No results found.</p>';
+    } else {
+        searchResultsContainer.innerHTML = results.map(result => `
+            <div class="search-result-inline-item" onclick="loadPage('${result.page_id}'); searchInput.value=''; this.parentElement.remove();">
+                <strong>${result.page_title || result.page_id}</strong>: ${result.content.substring(0, 100)}...</div>`).join('');
     }
-    
-    document.body.appendChild(searchResults);
+    if (!document.getElementById('search-results-container')) {
+        searchInput.parentNode.insertBefore(searchResultsContainer, searchInput.nextSibling);
+    }
+    document.addEventListener('click', function clearInlineSearch(event) {
+        if (searchResultsContainer.contains(event.target)) return; // Click inside results
+        if (!searchInput.contains(event.target) && !searchResultsContainer.contains(event.target)) {
+            searchResultsContainer.remove();
+            document.removeEventListener('click', clearInlineSearch);
+        }
+    }, { capture: true }); // Use capture to catch click before it might be stopped by other handlers
 }
 
-// Update URL and recent pages when loading a page
 function updateRecentPages(pageId) {
-    window.location.hash = pageId;
     fetch('api/recent_pages.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ page_id: pageId })
     }).then(() => loadRecentPages());
 }
 
 async function uploadFile(noteId, file) {
     if (!file) return;
-
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('note_id', noteId);
-
+    formData.append('file', file); formData.append('note_id', noteId);
     try {
-        const response = await fetch('api/attachment.php', {
-            method: 'POST',
-            body: formData
-        });
-
+        const response = await fetch('api/attachment.php', { method: 'POST', body: formData });
         const data = await response.json();
-        if (data.error) {
-            console.error(data.error);
-            return;
-        }
-
+        if (data.error) throw new Error(data.error);
         loadPage(currentPage.id);
-    } catch (error) {
-        console.error('Error uploading file:', error);
-    }
+    } catch (error) { console.error('Error uploading file:', error); alert('Error uploading file: ' + error.message); }
 }
 
-async function deleteAttachment(id) {
+async function deleteAttachment(id, event) {
+    event.stopPropagation();
     if (!confirm('Are you sure you want to delete this attachment?')) return;
-
     try {
-        const response = await fetch(`api/attachment.php?id=${id}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'delete'
-            })
+        const response = await fetch(`api/attachment.php`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', id: id })
         });
-
         const data = await response.json();
-        if (data.error) {
-            console.error(data.error);
-            return;
-        }
-
+        if (data.error) throw new Error(data.error);
         loadPage(currentPage.id);
-    } catch (error) {
-        console.error('Error deleting attachment:', error);
-    }
+    } catch (error) { console.error('Error deleting attachment:', error); alert('Error deleting attachment: ' + error.message); }
 }
 
-// Add calendar functionality
 function initCalendar() {
     const calendar = document.getElementById('calendar');
     if (!calendar) return;
-
     const today = new Date();
     let currentMonth = today.getMonth();
     let currentYear = today.getFullYear();
-
     function renderCalendar() {
         const firstDay = new Date(currentYear, currentMonth, 1);
         const lastDay = new Date(currentYear, currentMonth + 1, 0);
         const daysInMonth = lastDay.getDate();
-        const startingDay = firstDay.getDay();
-
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                          'July', 'August', 'September', 'October', 'November', 'December'];
-
-        let html = `
-            <div class="calendar-header">
-                <button class="calendar-nav" onclick="prevMonth()">←</button>
-                <span><b>${monthNames[currentMonth]} ${currentYear}</b></span>
-                <button class="calendar-nav" onclick="nextMonth()">→</button>
-            </div>
-            <div class="calendar-grid">
-                <div class="calendar-weekday">Sun</div>
-                <div class="calendar-weekday">Mon</div>
-                <div class="calendar-weekday">Tue</div>
-                <div class="calendar-weekday">Wed</div>
-                <div class="calendar-weekday">Thu</div>
-                <div class="calendar-weekday">Fri</div>
-                <div class="calendar-weekday">Sat</div>
-        `;
-
-        let day = 1;
-        for (let i = 0; i < 6; i++) {
-            for (let j = 0; j < 7; j++) {
-                if (i === 0 && j < startingDay) {
-                    html += '<div class="calendar-day empty"></div>';
-                } else if (day > daysInMonth) {
-                    html += '<div class="calendar-day empty"></div>';
-                } else {
-                    const date = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const isToday = date === today.toISOString().split('T')[0];
-                    html += `
-                        <div class="calendar-day ${isToday ? 'today' : ''}" 
-                             onclick="loadPage('${date}')"
-                             data-date="${date}">
-                            ${day}
-                        </div>
-                    `;
-                    day++;
-                }
-            }
+        const startingDay = (firstDay.getDay() === 0) ? 6 : firstDay.getDay() - 1;
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        let html = `<div class="calendar-header"><button class="calendar-nav" onclick="prevMonth()">←</button>
+                    <span><b>${monthNames[currentMonth]} ${currentYear}</b></span>
+                    <button class="calendar-nav" onclick="nextMonth()">→</button></div>
+                    <div class="calendar-grid">${dayNames.map(d => `<div class="calendar-weekday">${d}</div>`).join('')}`;
+        for (let i = 0; i < startingDay; i++) html += '<div class="calendar-day empty"></div>';
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isToday = date === today.toISOString().split('T')[0];
+            html += `<div class="calendar-day ${isToday ? 'today' : ''}" onclick="loadPage('${date}')" data-date="${date}">${day}</div>`;
         }
-
-        html += '</div>';
-        calendar.innerHTML = html;
+        const totalCells = startingDay + daysInMonth;
+        const remainingCells = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
+        for (let i = 0; i < remainingCells; i++) html += '<div class="calendar-day empty"></div>';
+        html += '</div>'; calendar.innerHTML = html;
     }
-
-    window.prevMonth = () => {
-        if (currentMonth === 0) {
-            currentMonth = 11;
-            currentYear--;
-        } else {
-            currentMonth--;
-        }
-        renderCalendar();
-    };
-
-    window.nextMonth = () => {
-        if (currentMonth === 11) {
-            currentMonth = 0;
-            currentYear++;
-        } else {
-            currentMonth++;
-        }
-        renderCalendar();
-    };
-
+    window.prevMonth = () => { currentMonth = (currentMonth === 0) ? 11 : currentMonth - 1; if (currentMonth === 11) currentYear--; renderCalendar(); };
+    window.nextMonth = () => { currentMonth = (currentMonth === 11) ? 0 : currentMonth + 1; if (currentMonth === 0) currentYear++; renderCalendar(); };
     renderCalendar();
 }
 
-// Add home button functionality
-document.getElementById('home-button').addEventListener('click', (e) => {
-    e.preventDefault();
-    const today = new Date().toISOString().split('T')[0];
-    loadPage(today);
-});
-
-// Add image modal functionality
 function showImageModal(src, alt) {
     const modal = document.createElement('div');
-    modal.className = 'image-modal';
-    modal.innerHTML = `
-        <div class="image-modal-content">
-            <img src="${src}" alt="${alt}">
-            <button class="close-modal">×</button>
-        </div>
-    `;
-    
-    modal.onclick = (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    };
-    
-    modal.querySelector('.close-modal').onclick = () => {
-        document.body.removeChild(modal);
-    };
-    
+    modal.className = 'modal image-modal';
+    modal.innerHTML = `<div class="image-modal-content"><img src="${src}" alt="${alt || 'Pasted Image'}">
+                       <button class="close-modal">×</button></div>`;
+    modal.onclick = (e) => { if (e.target === modal || e.target.classList.contains('close-modal')) document.body.removeChild(modal); };
     document.body.appendChild(modal);
 }
 
-function renderNote(note) {
-    const noteElement = document.createElement('div');
-    noteElement.className = 'outline-item';
-    noteElement.dataset.noteId = note.id;
-    noteElement.dataset.level = note.level;
-    noteElement.dataset.content = note.content;
-    noteElement.dataset.blockId = note.block_id;  // Add block_id to data attributes
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'outline-content';
-    contentDiv.innerHTML = marked.parse(note.content);
-
-    // Add note actions
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'note-actions';
-    actionsDiv.innerHTML = `
-        <button data-action="add-child" title="Add child note">+</button>
-        <button data-action="edit" title="Edit note">✎</button>
-        <button data-action="upload" title="Upload file">↑</button>
-        <button data-action="delete" title="Delete note">×</button>
-        <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">
-            ${new Date(note.created_at).toLocaleDateString()}
-        </span>
-    `;
-
-    contentDiv.appendChild(actionsDiv);
-    noteElement.appendChild(contentDiv);
-
-    // Add event listeners for actions
-    actionsDiv.querySelectorAll('button').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleNoteAction(button.dataset.action, note.id, noteElement);
-        });
-    });
-
-    return noteElement;
-}
-
-// Add this after renderPage function
+// Outline Interaction
 function handleOutlineClick(event) {
     const target = event.target;
     const noteElement = target.closest('.outline-item');
-    if (!noteElement) return;
+    let action = target.dataset.action || target.closest('[data-action]')?.dataset.action;
 
-    const noteId = noteElement.dataset.noteId;
-    const action = target.dataset.action;
+    // Check if click is on breadcrumb-bar for zoom-out
+    if (!action && target.closest('.breadcrumb-bar')) {
+        action = 'zoom-out';
+    }
+    
+    if (!noteElement && action !== 'zoom-out') return; // If no note element and not zooming out, do nothing
+    
+    const noteId = noteElement ? noteElement.dataset.noteId : null;
+
 
     switch (action) {
-        case 'focus':
-            toggleFocus(noteElement);
+        case 'toggle-children':
+            if (noteElement && noteElement.classList.contains('has-children')) toggleChildren(noteElement);
+            break;
+        case 'zoom-in':
+            if (noteElement) zoomInOnNote(noteElement);
+            break;
+        case 'zoom-out': // Handles clicks on elements with data-action="zoom-out" like breadcrumbs
+            zoomOut();
             break;
         case 'copy-block-id':
-            const blockId = noteElement.querySelector('.outline-content').dataset.blockId;
+            const blockId = noteElement.querySelector('.outline-content[data-block-id]')?.dataset.blockId;
             if (blockId) {
-                navigator.clipboard.writeText(blockId).then(() => {
-                    // Visual feedback
-                    target.style.backgroundColor = 'var(--accent-color)';
-                    target.style.color = 'white';
-                    setTimeout(() => {
-                        target.style.backgroundColor = '';
-                        target.style.color = '';
-                    }, 200);
-                });
+                navigator.clipboard.writeText(`{{${blockId}}}`).then(() => {
+                    const button = target.closest('button');
+                    if (button) { button.textContent = 'Copied!'; setTimeout(() => { button.textContent = '#'; }, 1000); }
+                }).catch(err => console.error('Failed to copy block ID:', err));
             }
             break;
-        case 'add-child':
-            createNote(noteId, parseInt(noteElement.dataset.level) + 1);
-            break;
-        case 'edit':
-            editNote(noteId, noteElement.dataset.content);
-            break;
+        case 'add-child': createNote(noteId, parseInt(noteElement.dataset.level) + 1); break;
+        case 'edit': editNote(noteId, noteElement.dataset.content); break;
         case 'upload':
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.style.display = 'none';
+            const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.style.display = 'none';
             document.body.appendChild(fileInput);
-            
-            fileInput.onchange = (e) => {
-                if (e.target.files.length > 0) {
-                    uploadFile(noteId, e.target.files[0]);
-                }
-                document.body.removeChild(fileInput);
-            };
-            
+            fileInput.onchange = (e) => { if (e.target.files.length > 0) uploadFile(noteId, e.target.files[0]); document.body.removeChild(fileInput); };
             fileInput.click();
             break;
-        case 'delete':
-            deleteNote(noteId);
-            break;
+        case 'delete': deleteNote(noteId); break;
     }
 }
 
-// Add back the createNote function
+function toggleChildren(noteElement) {
+    noteElement.classList.toggle('children-hidden');
+    const parentLevel = parseInt(noteElement.dataset.level);
+    const isHidden = noteElement.classList.contains('children-hidden');
+    let currentSibling = noteElement.nextElementSibling;
+    while (currentSibling && currentSibling.classList.contains('outline-item')) {
+        const currentLevel = parseInt(currentSibling.dataset.level);
+        if (currentLevel > parentLevel) {
+            if (isHidden) currentSibling.classList.add('hidden-by-parent');
+            else currentSibling.classList.remove('hidden-by-parent');
+        } else break;
+        currentSibling = currentSibling.nextElementSibling;
+    }
+}
+
 function createNote(parentId = null, level = 0) {
     if (!currentPage) return;
-
+    const noteEditorContainer = document.createElement('div');
+    if (parentId) noteEditorContainer.style.paddingLeft = `calc(var(--indentation-unit) * ${level > 0 ? 1 : 0})`; // Adjust based on actual nesting logic for editor
+    noteEditorContainer.className = 'note-editor-wrapper';
     const noteElement = document.createElement('div');
     noteElement.className = 'note-editor';
-    noteElement.innerHTML = `
-        <textarea class="note-textarea" placeholder="Enter note content... (Ctrl+Enter to save)"></textarea>
+    let templateOptions = '<option value="">No Template</option>';
+    if (noteTemplates && Object.keys(noteTemplates).length > 0) {
+        templateOptions += Object.entries(noteTemplates).map(([key, _]) => `<option value="${key}">${key.charAt(0).toUpperCase() + key.slice(1)}</option>`).join('');
+    }
+    noteElement.innerHTML = `<textarea class="note-textarea" placeholder="Enter note content... (Ctrl+Enter to save)"></textarea>
         <div class="note-editor-actions">
             <button class="btn-primary save-note">Save</button>
             <button class="btn-secondary cancel-note">Cancel</button>
-            <div class="template-selector">
-                <select>
-                    ${Object.entries(noteTemplates).map(([key, _]) => 
-                        `<option value="${key}">${key.charAt(0).toUpperCase() + key.slice(1)}</option>`
-                    ).join('')}
-                </select>
-            </div>
-        </div>
-    `;
-
+            ${Object.keys(noteTemplates).length > 0 ? `<div class="template-selector"><select>${templateOptions}</select></div>` : ''}
+        </div>`;
+    noteEditorContainer.appendChild(noteElement);
     const textarea = noteElement.querySelector('.note-textarea');
     const saveButton = noteElement.querySelector('.save-note');
     const cancelButton = noteElement.querySelector('.cancel-note');
     const templateSelect = noteElement.querySelector('select');
 
     if (parentId) {
-        const parentNote = document.querySelector(`[data-note-id="${parentId}"]`);
-        parentNote.appendChild(noteElement);
-    } else {
-        outlineContainer.appendChild(noteElement);
-    }
-
-    textarea.focus();
-
-    // Add keyboard shortcut
-    textarea.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            saveButton.click();
-        }
-        
-        // Auto-close brackets and braces
-        if (e.key === '{') {
-            e.preventDefault();
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = textarea.value;
-            textarea.value = text.substring(0, start) + '{}' + text.substring(end);
-            textarea.selectionStart = textarea.selectionEnd = start + 1;
-        }
-        if (e.key === '[') {
-            e.preventDefault();
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = textarea.value;
-            textarea.value = text.substring(0, start) + '[]' + text.substring(end);
-            textarea.selectionStart = textarea.selectionEnd = start + 1;
-        }
-    });
-
-    // Add paste handler for images
-    textarea.addEventListener('paste', async (e) => {
-        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-        
-        for (const item of items) {
-            if (item.type.indexOf('image') === 0) {
-                e.preventDefault();
-                
-                const file = item.getAsFile();
-                const formData = new FormData();
-                formData.append('image', file);
-                
-                try {
-                    const response = await fetch('api/image.php', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    const data = await response.json();
-                    if (data.error) {
-                        console.error(data.error);
-                        return;
-                    }
-                    
-                    // Insert image markdown at cursor position
-                    const cursorPos = textarea.selectionStart;
-                    const textBefore = textarea.value.substring(0, cursorPos);
-                    const textAfter = textarea.value.substring(cursorPos);
-                    const imageMarkdown = `![${data.original_name}](uploads/${data.filename})`;
-                    
-                    textarea.value = textBefore + imageMarkdown + textAfter;
-                    textarea.focus();
-                    textarea.selectionStart = textarea.selectionEnd = cursorPos + imageMarkdown.length;
-                } catch (error) {
-                    console.error('Error uploading image:', error);
-                }
+        const parentNoteElement = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
+        if (parentNoteElement) {
+            let nextSibling = parentNoteElement.nextElementSibling;
+            let insertionTarget = parentNoteElement;
+            // Find the last child of the parent to insert after
+            while (nextSibling && nextSibling.classList.contains('outline-item') && parseInt(nextSibling.dataset.level) > parseInt(parentNoteElement.dataset.level)) {
+                insertionTarget = nextSibling;
+                nextSibling = nextSibling.nextElementSibling;
             }
-        }
-    });
+            insertionTarget.insertAdjacentElement('afterend', noteEditorContainer);
 
-    // Add template change handler
-    templateSelect.addEventListener('change', (e) => {
-        const templateContent = noteTemplates[e.target.value] || '';
-        const currentContent = textarea.value;
-        
-        if (currentContent && currentContent.trim()) {
-            textarea.value = currentContent + '\n\n' + templateContent;
-        } else {
-            textarea.value = templateContent;
-        }
-        
-        textarea.focus();
-        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
-    });
-
+            if (parentNoteElement.classList.contains('children-hidden') && !parentNoteElement.classList.contains('has-children')) {
+                 parentNoteElement.classList.remove('children-hidden');
+            }
+            parentNoteElement.classList.add('has-children');
+        } else outlineContainer.appendChild(noteEditorContainer);
+    } else {
+        const lastTopLevelNote = outlineContainer.querySelector('.outline-item[data-level="0"]:last-of-type');
+        if (lastTopLevelNote) lastTopLevelNote.insertAdjacentElement('afterend', noteEditorContainer);
+        else outlineContainer.appendChild(noteEditorContainer);
+    }
+    textarea.focus();
+    textarea.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); } });
+    if (templateSelect) {
+        templateSelect.addEventListener('change', (e) => {
+            const templateKey = e.target.value;
+            if (templateKey && noteTemplates[templateKey]) {
+                textarea.value = textarea.value ? textarea.value + '\n' + noteTemplates[templateKey] : noteTemplates[templateKey];
+                textarea.focus(); textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+            }
+        });
+    }
     saveButton.onclick = async () => {
         const content = textarea.value.trim();
-        if (!content) {
-            noteElement.remove();
-            return;
-        }
-
-        // Extract properties from content
         const properties = {};
-        const propertyRegex = /\{([^:]+)::([^}]+)\}/g;
-        let match;
-        while ((match = propertyRegex.exec(content)) !== null) {
-            const [_, key, value] = match;
-            properties[key.trim()] = value.trim();
-        }
-
+        const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match;
+        let tempContent = content;
+        while ((match = propertyRegex.exec(tempContent)) !== null) properties[match[1].trim()] = match[2].trim();
         try {
             const response = await fetch('api/note.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    page_id: currentPage.id,
-                    content: content,
-                    level: level,
-                    parent_id: parentId,
-                    properties: properties
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ page_id: currentPage.id, content: content, level: level, parent_id: parentId, properties: properties })
             });
-
             const data = await response.json();
-            if (data.error) {
-                console.error(data.error);
-                return;
-            }
-
+            if (data.error) throw new Error(data.error);
             loadPage(currentPage.id);
-        } catch (error) {
-            console.error('Error creating note:', error);
-        }
+        } catch (error) { console.error('Error creating note:', error); alert('Error creating note: ' + error.message); }
     };
-
     cancelButton.onclick = () => {
-        noteElement.remove();
+        noteEditorContainer.remove();
+        if (parentId) {
+            const parentNoteEl = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
+            if (parentNoteEl) {
+                let hasOtherChildren = false; let sibling = parentNoteEl.nextElementSibling;
+                while(sibling && sibling.classList.contains('outline-item') && parseInt(sibling.dataset.level) > parseInt(parentNoteEl.dataset.level)) { hasOtherChildren = true; break; }
+                if (!hasOtherChildren) parentNoteEl.classList.remove('has-children');
+            }
+        }
     };
 }
 
-// Add back the editNote function
-function editNote(id, currentContent) {
-    const noteElement = document.querySelector(`[data-note-id="${id}"]`);
+function editNote(id, currentContentText) {
+    const noteElement = document.querySelector(`.outline-item[data-note-id="${id}"]`);
+    if (!noteElement) return;
     const contentElement = noteElement.querySelector('.outline-content');
-    const originalContent = contentElement.innerHTML;
-
-    const editorElement = document.createElement('div');
-    editorElement.className = 'note-editor';
-    editorElement.innerHTML = `
-        <textarea class="note-textarea">${currentContent}</textarea>
-        <div class="note-editor-actions">
-            <button class="btn-primary save-note">Save</button>
-            <button class="btn-secondary cancel-note">Cancel</button>
-        </div>
-    `;
-
-    const textarea = editorElement.querySelector('.note-textarea');
-    const saveButton = editorElement.querySelector('.save-note');
-    const cancelButton = editorElement.querySelector('.cancel-note');
-
-    contentElement.innerHTML = '';
-    contentElement.appendChild(editorElement);
-    textarea.focus();
-
-    // Add keyboard shortcut
-    textarea.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            saveButton.click();
-        }
-        
-        // Auto-close brackets and braces
-        if (e.key === '{') {
-            e.preventDefault();
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = textarea.value;
-            textarea.value = text.substring(0, start) + '{}' + text.substring(end);
-            textarea.selectionStart = textarea.selectionEnd = start + 1;
-        }
-        if (e.key === '[') {
-            e.preventDefault();
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = textarea.value;
-            textarea.value = text.substring(0, start) + '[]' + text.substring(end);
-            textarea.selectionStart = textarea.selectionEnd = start + 1;
-        }
-    });
-
-    // Add paste handler for images
-    textarea.addEventListener('paste', async (e) => {
-        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-        
-        for (const item of items) {
-            if (item.type.indexOf('image') === 0) {
-                e.preventDefault();
-                
-                const file = item.getAsFile();
-                const formData = new FormData();
-                formData.append('image', file);
-                
-                try {
-                    const response = await fetch('api/image.php', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    const data = await response.json();
-                    if (data.error) {
-                        console.error(data.error);
-                        return;
-                    }
-                    
-                    // Insert image markdown at cursor position
-                    const cursorPos = textarea.selectionStart;
-                    const textBefore = textarea.value.substring(0, cursorPos);
-                    const textAfter = textarea.value.substring(cursorPos);
-                    const imageMarkdown = `![${data.original_name}](uploads/${data.filename})`;
-                    
-                    textarea.value = textBefore + imageMarkdown + textAfter;
-                    textarea.focus();
-                    textarea.selectionStart = textarea.selectionEnd = cursorPos + imageMarkdown.length;
-                } catch (error) {
-                    console.error('Error uploading image:', error);
-                }
-            }
-        }
-    });
-
+    if (!contentElement) return;
+    const originalDisplay = contentElement.style.display;
+    contentElement.style.display = 'none';
+    const editorWrapper = document.createElement('div');
+    editorWrapper.className = 'note-editor-wrapper edit-mode';
+    const noteEditorDiv = document.createElement('div');
+    noteEditorDiv.className = 'note-editor';
+    noteEditorDiv.innerHTML = `<textarea class="note-textarea">${currentContentText}</textarea>
+        <div class="note-editor-actions"><button class="btn-primary save-note">Save</button><button class="btn-secondary cancel-note">Cancel</button></div>`;
+    editorWrapper.appendChild(noteEditorDiv);
+    noteElement.insertBefore(editorWrapper, contentElement);
+    const textarea = noteEditorDiv.querySelector('.note-textarea');
+    const saveButton = noteEditorDiv.querySelector('.save-note');
+    const cancelButton = noteEditorDiv.querySelector('.cancel-note');
+    textarea.focus(); textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+    textarea.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); } });
     saveButton.onclick = async () => {
-        const content = textarea.value.trim();
-        if (!content) {
-            contentElement.innerHTML = originalContent;
-            return;
-        }
-
-        // Extract properties from content
-        const properties = {};
-        const propertyRegex = /\{([^:]+)::([^}]+)\}/g;
-        let match;
-        while ((match = propertyRegex.exec(content)) !== null) {
-            const [_, key, value] = match;
-            properties[key.trim()] = value.trim();
-        }
-
+        const newContent = textarea.value.trim();
+        const properties = {}; const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match; let tempContent = newContent;
+        while ((match = propertyRegex.exec(tempContent)) !== null) properties[match[1].trim()] = match[2].trim();
         try {
             const response = await fetch(`api/note.php?id=${id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'update',
-                    content: content,
-                    properties: properties,
-                    level: parseInt(noteElement.dataset.level) || 0,
-                    parent_id: noteElement.dataset.parentId || null
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', content: newContent, properties: properties, level: parseInt(noteElement.dataset.level) || 0 })
             });
-
             const data = await response.json();
-            if (data.error) {
-                console.error(data.error);
-                return;
-            }
-
+            if (data.error) throw new Error(data.error);
             loadPage(currentPage.id);
-        } catch (error) {
-            console.error('Error updating note:', error);
-        }
+        } catch (error) { console.error('Error updating note:', error); alert('Error updating note: ' + error.message); }
     };
-
-    cancelButton.onclick = () => {
-        contentElement.innerHTML = originalContent;
-    };
+    cancelButton.onclick = () => { editorWrapper.remove(); contentElement.style.display = originalDisplay; };
 }
 
-// Add back the deleteNote function
 async function deleteNote(id) {
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="delete-confirmation-modal">
-            <h3>Delete Note</h3>
-            <p>Are you sure you want to delete this note and all its children?</p>
-            <div class="button-group">
-                <button class="btn-secondary cancel-delete">Cancel</button>
-                <button class="btn-primary confirm-delete">Delete</button>
-            </div>
-        </div>
-    `;
-    
+    modal.innerHTML = `<div class="delete-confirmation-modal"><h3>Delete Note</h3>
+        <p>Are you sure you want to delete this note and all its children?</p>
+        <div class="button-group"><button class="btn-secondary cancel-delete">Cancel</button><button class="btn-primary confirm-delete">Delete</button></div></div>`;
     document.body.appendChild(modal);
-    
-    // Close modal when clicking outside
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            document.body.removeChild(modal);
-        }
-    });
-    
-    // Handle cancel
-    modal.querySelector('.cancel-delete').onclick = () => {
-        document.body.removeChild(modal);
-    };
-    
-    // Handle confirm
+    modal.querySelector('.cancel-delete').onclick = () => document.body.removeChild(modal);
     modal.querySelector('.confirm-delete').onclick = async () => {
         try {
-            const response = await fetch(`api/note.php?id=${id}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'delete'
-                })
-            });
-
+            const response = await fetch(`api/note.php?id=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete' }) });
             const data = await response.json();
-            if (data.error) {
-                console.error(data.error);
-                return;
-            }
-
-            document.body.removeChild(modal);
-            loadPage(currentPage.id);
-        } catch (error) {
-            console.error('Error deleting note:', error);
-        }
+            if (data.error) throw new Error(data.error);
+            document.body.removeChild(modal); loadPage(currentPage.id);
+        } catch (error) { console.error('Error deleting note:', error); alert('Error deleting note: ' + error.message); document.body.removeChild(modal); }
     };
+    modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
-async function showSearchResults() {
+async function showSearchResults() { // For Advanced Search results page
     const results = JSON.parse(sessionStorage.getItem('searchResults') || '[]');
     const query = sessionStorage.getItem('searchQuery') || '';
-    
-    // Hide new note button and backlinks only on search results page
     document.getElementById('new-note').style.display = 'none';
     document.getElementById('backlinks-container').style.display = 'none';
-    
-    // Render all results content first
-    const renderedResults = await Promise.all(results.map(async result => {
+    pageProperties.style.display = 'none';
+    const renderedResultsPromises = results.map(async result => {
         const content = await renderNoteContent(result);
-        return `
-            <div class="search-result-item">
-                <div class="result-header">
-                    <a href="#${result.page_id}" onclick="event.preventDefault(); loadPage('${result.page_id}');">
-                        ${result.page_title || result.page_id}
-                    </a>
-                    <span class="result-date">${new Date(result.created_at).toLocaleDateString()}</span>
-                </div>
-                <div class="result-content">${content}</div>
-            </div>
-        `;
-    }));
-    
-    outlineContainer.innerHTML = `
-        <div class="search-results-page">
-            <div class="search-results-header">
-                <h2>Advanced Search Results</h2>
-                <div class="search-actions">
-                    <button class="btn-secondary" onclick="copySearchLink()">Copy Search Link</button>
-                    <button class="btn-secondary" onclick="loadPage(currentPage.id)">Back to Page</button>
-                </div>
-            </div>
-            <div class="search-query">
-                <strong>Query:</strong> <code>${query}</code>
-            </div>
-            ${renderedResults.join('')}
-        </div>
-    `;
-    
-    // Update page title
-    pageTitle.innerHTML = '<span class="page-title-text">Search Results</span>';
-    pageProperties.innerHTML = '';
+        return `<div class="search-result-item"><div class="result-header">
+                    <a href="#${result.page_id}" onclick="event.stopPropagation(); loadPage('${result.page_id}');">${result.page_title || result.page_id}</a>
+                    <span class="result-date">${new Date(result.created_at).toLocaleDateString()}</span></div>
+                <div class="result-content">${content}</div></div>`;
+    });
+    const renderedResultsHtml = (await Promise.all(renderedResultsPromises)).join('');
+    outlineContainer.innerHTML = `<div class="search-results-page"><div class="search-results-header">
+            <h2>Advanced Search Results</h2><div class="search-actions"><button class="btn-secondary" onclick="copySearchLink()">Copy Search Link</button>
+            <button class="btn-secondary" onclick="window.history.back()">Back</button></div></div>
+        <div class="search-query" style="margin-bottom:1em; font-size:0.9em;"><strong>Query:</strong> <code>${query}</code></div>
+        ${renderedResultsHtml}</div>`;
+    pageTitle.innerHTML = '<span class="page-title-text">Search Results</span>'; // Set search results title
 }
-
-// Add function to copy search link
 function copySearchLink() {
     const query = sessionStorage.getItem('searchQuery') || '';
-    const searchLink = `<<${query}>>`;
-    navigator.clipboard.writeText(searchLink).then(() => {
-        alert('Search link copied to clipboard!');
-    });
+    navigator.clipboard.writeText(`<<${query}>>`).then(() => alert('Search link copied!')).catch(err => alert('Failed to copy: ' + err));
 }
-
-// Add function to execute search from link
 async function executeSearchLink(query) {
     try {
-        const response = await fetch('api/advanced_search.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
+        const response = await fetch('api/advanced_search.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const results = await response.json();
-        if (results.error) {
-            throw new Error(results.error);
-        }
-        
-        // Store results and show search page
+        if (results.error) throw new Error(results.error);
         sessionStorage.setItem('searchResults', JSON.stringify(results));
         sessionStorage.setItem('searchQuery', query);
         window.location.hash = 'search-results';
-    } catch (error) {
-        console.error('Error executing search link:', error);
-        alert('Error executing search: ' + error.message);
-    }
+    } catch (error) { console.error('Error executing search link:', error); alert('Error executing search: ' + error.message); }
 }
 
-async function toggleTodo(blockId, isDone) { // Changed noteId to blockId
+async function toggleTodo(blockId, isDone) {
     try {
-        // Fetch the current note data using the blockId (UUID)
-        const currentNote = await findBlockById(blockId); // This now uses the UUID
-        if (!currentNote) {
-            // Updated error message for clarity
-            console.error('Note not found for toggling TODO (by block_id):', blockId);
-            alert('Error: Could not find the note to update.');
-            return;
-        }
-
-        let rawContent = currentNote.content; 
-
-        // Determine existing status and task text
-        let taskTextWithProperties = "";
-        if (rawContent.startsWith('TODO ')) {
-            taskTextWithProperties = rawContent.substring(5);
-        } else if (rawContent.startsWith('DONE ')) {
-            taskTextWithProperties = rawContent.substring(5);
-        } else {
-            taskTextWithProperties = rawContent;
-            console.warn('Toggling a note that does not start with TODO/DONE:', rawContent);
-        }
-
+        const currentNote = await findBlockById(blockId);
+        if (!currentNote) throw new Error('Note not found for toggling TODO');
+        let rawContent = currentNote.content; let taskTextWithProperties = "";
+        if (rawContent.startsWith('TODO ')) taskTextWithProperties = rawContent.substring(5);
+        else if (rawContent.startsWith('DONE ')) taskTextWithProperties = rawContent.substring(5);
+        else taskTextWithProperties = rawContent; 
         const taskSpecificProperties = {};
-        let cleanTaskDescription = taskTextWithProperties.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
-            taskSpecificProperties[key.trim()] = value.trim();
-            return ''; 
-        }).trim();
-
-        let newContentString;
+        let cleanTaskDescription = taskTextWithProperties.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => { taskSpecificProperties[key.trim()] = value.trim(); return ''; }).trim();
+        let newStatusPrefix = isDone ? 'DONE ' : 'TODO ';
+        let newContentString = newStatusPrefix + cleanTaskDescription;
         const updatedNoteProperties = { ...(currentNote.properties || {}) }; 
-
-        if (isDone) {
-            newContentString = `DONE ${cleanTaskDescription}`;
-            taskSpecificProperties['done-at'] = new Date().toISOString();
-        } else {
-            newContentString = `TODO ${cleanTaskDescription}`;
-            delete taskSpecificProperties['done-at']; 
-        }
-
-        for (const [key, value] of Object.entries(taskSpecificProperties)) {
-            newContentString += ` {${key}::${value}}`;
-            updatedNoteProperties[key] = value; 
-        }
-        if (!isDone) {
-            delete updatedNoteProperties['done-at'];
-        }
-
-        const response = await fetch(`api/note.php?id=${currentNote.id}`, { // Uses currentNote.id (PK)
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action: 'update',
-                content: newContentString.trim(),
-                properties: updatedNoteProperties, 
-                level: currentNote.level,          
-                parent_id: currentNote.parent_id   
-            })
+        if (isDone) taskSpecificProperties['done-at'] = new Date().toISOString().split('T')[0];
+        else delete taskSpecificProperties['done-at']; 
+        for (const [key, value] of Object.entries(taskSpecificProperties)) { newContentString += ` {${key}::${value}}`; updatedNoteProperties[key] = value; }
+        if (!isDone) delete updatedNoteProperties['done-at'];
+        
+        const response = await fetch(`api/note.php?id=${currentNote.id}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update', content: newContentString.trim(), properties: updatedNoteProperties, level: currentNote.level, parent_id: currentNote.parent_id })
         });
-
         const data = await response.json();
-        if (data.error) {
-            console.error('Error updating todo status (API):', data.error);
-            alert('Error updating task: ' + data.error);
-            const checkbox = document.querySelector(`[data-block-id="${blockId}"] input[type="checkbox"], [data-note-id="${currentNote.id}"] input[type="checkbox"]`); // Try both selectors
-            if (checkbox) checkbox.checked = !isDone;
-            return;
-        }
-
-        const checkbox = document.querySelector(`[data-block-id="${blockId}"] input[type="checkbox"], [data-note-id="${currentNote.id}"] input[type="checkbox"]`); // Try both selectors
-        if (checkbox) {
-            checkbox.checked = isDone; 
-            checkbox.style.transform = 'scale(1.2)';
-            setTimeout(() => {
-                checkbox.style.transform = 'scale(1)';
-            }, 200);
-        }
-        loadPage(currentPage.id);
-
+        if (data.error) throw new Error(data.error);
+        loadPage(currentPage.id); 
     } catch (error) {
-        console.error('Error updating todo status (JS):', error);
-        alert('Error updating task: ' + error.message);
-        const checkbox = document.querySelector(`[data-block-id="${blockId}"] input[type="checkbox"], [data-note-id="${currentNote.id}"] input[type="checkbox"]`); // Try both selectors
+        console.error('Error updating todo status:', error); alert('Error updating task: ' + error.message);
+        const checkbox = document.querySelector(`input[type="checkbox"][onchange*="'${blockId}'"]`);
         if (checkbox) checkbox.checked = !isDone; 
     }
 }
 
-// Helper function to find a note by ID in a tree structure
-function findNoteInTree(noteId, notesArray) {
-    if (!notesArray) return null;
+// --- Logseq-style Zoom (Focus) Functions ---
+
+function findNoteAndPath(targetId, notesArray, currentPath = []) {
     for (const note of notesArray) {
-        if (note.id.toString() === noteId.toString()) { // Ensure ID comparison is robust
-            return note;
+        const newPath = [...currentPath, note];
+        if (String(note.id) === String(targetId)) {
+            return { note, path: newPath };
         }
         if (note.children) {
-            const foundInChildren = findNoteInTree(noteId, note.children);
+            const foundInChildren = findNoteAndPath(targetId, note.children, newPath);
             if (foundInChildren) {
                 return foundInChildren;
             }
@@ -1671,111 +875,93 @@ function findNoteInTree(noteId, notesArray) {
     return null;
 }
 
-// Helper function to adjust levels of notes and their children
 function adjustLevels(notesArray, currentLevel) {
     if (!notesArray) return;
     notesArray.forEach(note => {
         note.level = currentLevel;
-        if (note.children && note.children.length > 0) {
-            adjustLevels(note.children, currentLevel + 1);
-        }
+        if (note.children) adjustLevels(note.children, currentLevel + 1);
     });
 }
 
-// Function to handle exiting focus mode
-function exitFocusMode() {
-    document.body.classList.remove('focus-mode-active');
-    // Remove 'focused' class from any outline items
-    document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
-    if (currentPage && currentPage.id) {
-        loadPage(currentPage.id); // Reload the original page
-    } else {
-        // Fallback if currentPage is not set, maybe load a default page or clear view
-        const today = new Date().toISOString().split('T')[0];
-        loadPage(today);
-    }
+function renderBreadcrumbs(path) {
+    if (!path || path.length === 0 || !currentPage) return '';
+
+    let breadcrumbHtml = '<div class="breadcrumb-bar" data-action="zoom-out" title="Click to zoom out">';
+    
+    breadcrumbHtml += `<span class="breadcrumb-item page-link">${currentPage.title}</span>`;
+
+    path.forEach((note, index) => {
+        const contentSnippet = note.content.length > 30 ? note.content.substring(0, 27) + '...' : (note.content || 'Untitled Note');
+        const isLast = index === path.length - 1;
+        breadcrumbHtml += `<span class="breadcrumb-separator">»</span>`;
+        breadcrumbHtml += `<span class="breadcrumb-item ${isLast ? 'current-focus' : ''}">${contentSnippet}</span>`;
+    });
+
+    breadcrumbHtml += '</div>';
+    return breadcrumbHtml;
 }
 
-// Add focus toggle functionality
-async function toggleFocus(noteElement) { // Made async as renderFocusedView is async
-    if (document.body.classList.contains('focus-mode-active')) {
-        // If already in focus mode, exit focus mode
-        exitFocusMode();
+
+async function zoomInOnNote(noteElement) {
+    if (document.body.classList.contains('logseq-focus-active')) {
+        const currentlyZoomedId = outlineContainer.querySelector('.outline-item[data-level="0"]')?.dataset.noteId;
+        if (currentlyZoomedId === noteElement.dataset.noteId) { 
+            await zoomOut();
+            return;
+        }
+        await zoomOut(); 
+        setTimeout(() => zoomInOnNote(noteElement), 50); 
         return;
     }
 
-    if (!currentPage || !currentPage.notes) {
-        console.error("Current page data or notes are not available for focusing.");
-        return;
-    }
-    
+    if (!currentPage || !currentPage.notes) return;
     const noteId = noteElement.dataset.noteId;
-    if (!noteId) {
-        console.error("Note ID not found on element for focusing.");
+    if (!noteId) return;
+
+    const noteDataWithPath = findNoteAndPath(noteId, currentPage.notes);
+    if (!noteDataWithPath || !noteDataWithPath.note) { 
+        console.error("Note to zoom not found in current page data:", noteId);
         return;
     }
-
-    const noteInFullTree = findNoteInTree(noteId, currentPage.notes);
-
-    if (!noteInFullTree) {
-        console.error(`Note with ID ${noteId} not found in currentPage.notes.`);
-        return;
-    }
-
-    // Deep clone the note to avoid modifying the original data structure
-    const clonedNote = JSON.parse(JSON.stringify(noteInFullTree));
-
-    // Set the cloned note's level to 0 and adjust children levels
-    clonedNote.level = 0;
-    if (clonedNote.children && clonedNote.children.length > 0) {
-        adjustLevels(clonedNote.children, 1);
-    }
-
-    // Create the page data for the focused view
-    const focusedPageData = {
-        ...currentPage, // Spread current page properties (id, title, etc.)
-        notes: [clonedNote] // The single, re-leveled note tree
-    };
     
-    // Render the focused view
-    await renderFocusedView(focusedPageData, noteElement); // Pass original element for potential styling
+    const { note: noteInFullTree, path: breadcrumbPath } = noteDataWithPath;
+
+    document.body.classList.add('logseq-focus-active');
+    outlineContainer.classList.add('focused'); 
+
+    const clonedFocusedNote = JSON.parse(JSON.stringify(noteInFullTree));
+    clonedFocusedNote.level = 0;
+    if (clonedFocusedNote.children) {
+        adjustLevels(clonedFocusedNote.children, 1);
+    }
+    const focusedNotesArray = [clonedFocusedNote];
+
+    // Page title remains UNCHANGED. No modification to #page-title element.
+
+    pageProperties.style.display = 'none';
+    document.getElementById('new-note').style.display = 'none';
+    document.getElementById('backlinks-container').style.display = 'none';
+
+    const breadcrumbsHtml = renderBreadcrumbs(breadcrumbPath);
+    outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0));
+    
+    const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
+    focusedDomNote?.scrollIntoView({ behavior: 'auto', block: 'start' });
 }
 
-// Add function to render focused view
-async function renderFocusedView(pageData, originalNoteElement) {
-    document.body.classList.add('focus-mode-active');
+async function zoomOut() {
+    document.body.classList.remove('logseq-focus-active');
+    outlineContainer.classList.remove('focused');
     
-    // Add 'focused' class to the specific element that was clicked to enter focus mode.
-    // This is useful if CSS targets .outline-item.focused to highlight the origin.
-    if (originalNoteElement) {
-         // First, remove 'focused' from any other elements to ensure only one is marked.
-        document.querySelectorAll('.outline-item.focused').forEach(el => el.classList.remove('focused'));
-        originalNoteElement.classList.add('focused');
-    }
+    document.getElementById('new-note').style.display = 'block';
+    document.getElementById('backlinks-container').style.display = 'block';
+    // Page properties visibility will be handled by loadPage -> renderPage
 
-    // Update page title with an unfocus button
-    // Ensure currentPage.id is available for the unfocus button, or use pageData.id
-    const originalPageId = currentPage ? currentPage.id : pageData.id; // Fallback if needed
-    pageTitle.innerHTML = `
-        <button class="btn-secondary unfocus-button" onclick="exitFocusMode()">Back</button>
-        <span class="page-title-text">${pageData.title} (Focused)</span>
-        <button class="edit-properties-button" title="Edit page properties"></button>
-    `;
-     // Re-attach edit properties button handler if needed for focused view
-    const editButton = pageTitle.querySelector('.edit-properties-button');
-    if (editButton) {
-        editButton.onclick = editPageProperties; // Assumes editPageProperties can work with focusedPageData
+    if (currentPage && currentPage.id) {
+        await loadPage(currentPage.id); 
+    } else {
+        console.warn("Zooming out but currentPage is not fully defined. Reloading to today's page.");
+        const today = new Date().toISOString().split('T')[0];
+        window.location.hash = today;
     }
-    
-    // Clear the outline container
-    outlineContainer.innerHTML = ''; // Or some loading indicator
-    
-    // Render the focused note and its children
-    // pageData.notes should be an array with the single focused note tree
-    const renderedNotes = await renderOutline(pageData.notes, 0); // Start rendering at level 0
-    outlineContainer.innerHTML = renderedNotes;
-    
-    // Scroll the focused note (which is the first and only top-level item) into view
-    const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
-    focusedDomNote?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-} 
+}
