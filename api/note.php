@@ -52,6 +52,52 @@ try {
         error_log("Notice: Attempted to enable foreign_keys. Check SQLite logs if issues persist with FKs.");
     }
 
+    // Helper function to ensure a page exists, creating it if not.
+    function _ensurePageExists($pageId, $db) {
+        // Check for existing page
+        $stmt = $db->prepare('SELECT id FROM pages WHERE id = :pageId');
+        if (!$stmt) {
+            error_log("Error preparing statement to check page '{$pageId}': " . $db->lastErrorMsg());
+            return false;
+        }
+        $stmt->bindValue(':pageId', $pageId, SQLITE3_TEXT);
+        $result = $stmt->execute();
+
+        if (!$result) {
+            error_log("Error checking existence of page '{$pageId}': " . $db->lastErrorMsg());
+            $stmt->close();
+            return false;
+        }
+
+        if ($result->fetchArray(SQLITE3_ASSOC)) {
+            error_log("Page '{$pageId}' already exists.");
+            $stmt->close();
+            return true;
+        }
+        $stmt->close(); // Close select statement before preparing insert
+
+        // Create new page if not found
+        error_log("Page '{$pageId}' not found, creating it.");
+        $insertStmt = $db->prepare('INSERT INTO pages (id, title, type) VALUES (:id, :title, :type)');
+        if (!$insertStmt) {
+            error_log("Error preparing statement to create page '{$pageId}': " . $db->lastErrorMsg());
+            return false;
+        }
+        $insertStmt->bindValue(':id', $pageId, SQLITE3_TEXT);
+        $insertStmt->bindValue(':title', $pageId, SQLITE3_TEXT); // Use ID as initial title
+        $insertStmt->bindValue(':type', 'note', SQLITE3_TEXT);   // Default type
+
+        if ($insertStmt->execute()) {
+            error_log("Page '{$pageId}' created successfully.");
+            $insertStmt->close();
+            return true;
+        } else {
+            error_log("Error creating page '{$pageId}': " . $db->lastErrorMsg());
+            $insertStmt->close();
+            return false;
+        }
+    }
+
     // Helper function to parse content and update page_links table
     function _updatePageLinks($noteId, $sourcePageId, $content) {
         global $db;
@@ -80,16 +126,27 @@ try {
                     throw new Exception('Failed to prepare insert page_links statement: ' . $db->lastErrorMsg());
                 }
 
-                foreach ($targetPageIds as $targetPageId) {
-                    // Future enhancement: Normalize targetPageId (e.g. trim, replace multiple spaces)
-                    // For now, using it as extracted.
+                foreach ($targetPageIds as $targetPageIdRaw) {
+                    $targetPageId = trim($targetPageIdRaw); // Trim the target ID
+
+                    // Ensure the target page exists or is created before adding the link
+                    if (!_ensurePageExists($targetPageId, $db)) {
+                        error_log("Could not ensure page '{$targetPageId}' exists or be created. Skipping link from Note ID {$noteId}.");
+                        continue; // Skip this link
+                    }
+                    
+                    // Reset and bind values for inserting the link
+                    $stmt->reset(); // Important to reset after potential use by _ensurePageExists or previous loop
                     $stmt->bindValue(':source_page_id', $sourcePageId, SQLITE3_TEXT);
-                    $stmt->bindValue(':target_page_id', trim($targetPageId), SQLITE3_TEXT); // Trim the target ID
+                    $stmt->bindValue(':target_page_id', $targetPageId, SQLITE3_TEXT);
                     $stmt->bindValue(':source_note_id', $noteId, SQLITE3_INTEGER);
                     
                     if (!$stmt->execute()) {
-                        // If a target_page_id doesn't exist in 'pages', this will fail due to FK constraint.
-                        // This is acceptable as per requirements.
+                        // This should ideally not happen now if FKs are on and _ensurePageExists worked,
+                        // but other errors could occur (e.g., unique constraint if re-adding same link, though unlikely here)
+                        error_log('Failed to insert page_link for Note ID {$noteId} to target "' . $targetPageId . '": ' . $db->lastErrorMsg());
+                        // Decide if this should throw an exception or just log and continue
+                        // For now, consistent with previous behavior of throwing on insert failure:
                         throw new Exception('Failed to insert page_link for target "' . $targetPageId . '": ' . $db->lastErrorMsg());
                     }
                 }
