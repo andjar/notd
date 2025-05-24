@@ -1,21 +1,30 @@
 :root {
-    --primary-color: #2c3e50;
-    --secondary-color: #34495e;
-    --accent-color: #3498db;
-    --text-color: #2c3e50;
-    --text-muted: #7f8c8d; 
-    --note-text-color: #1a1a1a;
-    --note-bg-color: #ffffff;
-    --bg-color: #f8fafc;
-    --bg-secondary: rgba(0, 0, 0, 0.02);
+    --primary-color: #2d3748;   /* Dark Slate Gray - for very important headers, less heavy */
+    --secondary-color: #4a5568;  /* Cool Gray - for secondary UI elements */
+    --accent-color: #3182ce;    /* A slightly brighter, cleaner blue */
+    --text-color: #4A4A4A;      /* Medium-Dark Gray - for body text, cleaner */
+    --text-muted: #718096;      /* Lighter Cool Gray - for muted text */
+    
+    --note-text-color: var(--text-color);
+    --note-bg-color: #ffffff;          
+    
+    --bg-color: #ffffff;               
+    --bg-secondary: #f7fafc;        /* Very Light Blue-Gray - for blockquotes, code */
+    --sidebar-bg: #edf2f7;         /* Light Blue-Gray - for sidebar */
+    
+    --border-color: #e2e8f0;        /* Light Gray - for borders */
+    --hover-color: #edf2f7;         /* Matches sidebar or a slightly more active light gray */
+    
+    /* For these, we should use RGB versions of new colors for opacity if we want to maintain that effect */
+    /* Or, pick solid, lighter grays */
+    --bullet-color: #a0aec0;        /* Medium Gray - for bullets (was semi-transparent) */
+    --thread-line-color: #cbd5e0;   /* Light Gray - for thread lines (was semi-transparent) */
+
     --sidebar-width: 280px;
-    --sidebar-bg: #ffffff;
-    --border-color: #e2e8f0;
-    --hover-color: #f1f5f9;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.05);
-    --radius-sm: 4px;
-    --radius-md: 6px;
+    --radius-sm: 0;
+    --radius-md: 0;
 
     /* --- Compact UI & Threading Variables --- */
     --indentation-unit: 1.8em; 
@@ -25,8 +34,6 @@
     --controls-top-offset: 0.75em; 
     --arrow-left-indent: -1.7em;   
     --bullet-left-indent: -0.7em;  
-    --bullet-color: var(--text-muted); 
-    --thread-line-color: var(--border-color);
     --thread-line-width: 1px; 
     --note-compact-margin-bottom: 0.2rem;
     --note-content-compact-padding-y: 2px; 
@@ -46,8 +53,15 @@ body {
     gap: 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
 .main-content {
-    flex: 1; padding: 2rem; max-width: calc(100vw - var(--sidebar-width)); 
-    overflow-y: auto; background: var(--bg-color); width: 100%;
+    flex: 1;
+    padding: 2rem;
+    /* max-width: calc(100vw - var(--sidebar-width)); /* REPLACED by below for better readability on wide screens */
+    max-width: 100ch;   /* Sets a comfortable reading width */
+    margin-left: auto; /* Centers the content block when screen is wider than 75ch */
+    margin-right: auto;/* Centers the content block when screen is wider than 75ch */
+    overflow-y: auto;
+    background: var(--bg-color);
+    width: 100%;       /* Ensures it tries to fill available space up to max-width */
 }
 .calendar-panel { background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 12px; }
 .search-box { margin-bottom: 0px; }
@@ -55,7 +69,7 @@ body {
     width: 100%; padding: 8px 12px; border: 1px solid var(--border-color);
     border-radius: var(--radius-sm); font-size: 0.9em; transition: all 0.2s;
 }
-.search-box input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1); }
+.search-box input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(16, 107, 163, 0.1); } /* Updated accent color alpha */
 #advanced-search-link {
     display: block; margin-top: 5px; color: var(--accent-color);
     text-decoration: none; font-size: 0.9em; text-align: right;
@@ -95,7 +109,7 @@ body {
     background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm);
 }
 .advanced-search-content .help-text code {
-    display: block; margin-top: 8px; padding: 8px; background: var(--primary-color); color: white; 
+    display: block; margin-top: 8px; padding: 8px; background: var(--text-color); color: var(--bg-color); /* Inverted for code block */
     border-radius: var(--radius-sm); font-family: monospace;
 }
 .advanced-search-content .button-group, .delete-confirmation-modal .button-group { display: flex; justify-content: flex-end; gap: 10px; }
@@ -126,7 +140,7 @@ body {
     background: var(--accent-color); color: white; border: none; padding: 8px 16px;
     border-radius: var(--radius-sm); cursor: pointer; font-size: 0.9em; font-weight: 500; transition: all 0.2s;
 }
-.btn-primary:hover { background: #2980b9; transform: translateY(-1px); }
+.btn-primary:hover { background: #005485; transform: translateY(-1px); } /* Darker shade of accent */
 .btn-secondary {
     background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color);
     padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.9em; transition: all 0.2s ease;
@@ -136,7 +150,7 @@ body {
     display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
     padding: 0 0 8px 0; border-bottom: 1px solid var(--border-color);
 }
-.page-title-text { font-size: 1.5em; font-weight: normal; color: var(--primary-color); flex-grow: 1; }
+.page-title-text { font-size: 1.5em; font-weight: 400; color: var(--primary-color); flex-grow: 1; } /* Slightly bolder */
 .edit-properties-button {
     background: none; border: none; font-size: 0.9em; cursor: pointer;
     opacity: 0; transition: all 0.2s; padding: 2px; color: var(--text-muted);
@@ -171,12 +185,10 @@ body {
 
 /* --- Outline Item & Content Structure --- */
 .outline-item { position: relative; margin-bottom: var(--note-compact-margin-bottom); }
-.outline-item[data-level="0"] { padding-left: 0; }
-.outline-item[data-level="1"] { padding-left: var(--indentation-unit); }
-.outline-item[data-level="2"] { padding-left: calc(var(--indentation-unit) * 2); }
-.outline-item[data-level="3"] { padding-left: calc(var(--indentation-unit) * 3); }
-.outline-item[data-level="4"] { padding-left: calc(var(--indentation-unit) * 4); }
-.outline-item[data-level="5"] { padding-left: calc(var(--indentation-unit) * 5); }
+.outline-children {
+    padding-left: var(--indentation-unit);
+    position: relative; /* For thread line positioning if needed for children lines */
+}
 
 .outline-content {  
     background: transparent; 
@@ -212,15 +224,24 @@ body {
 .hover-arrow-toggle:hover .arrow-svg { fill: var(--accent-color); }
 .outline-item.has-children:not(.children-hidden) > .outline-content .hover-arrow-toggle .arrow-svg { transform: rotate(90deg); }
 .outline-item.has-children.children-hidden > .outline-content .hover-arrow-toggle .arrow-svg { transform: rotate(0deg); }
-.outline-item.has-children > .outline-content::after {
+.outline-item {position: relative;}
+.outline-item.has-children::after {
     content: ""; position: absolute;
     left: calc(var(--bullet-left-indent) + (var(--control-icon-size) / 2) - (var(--thread-line-width) / 2)); 
     top: calc(var(--controls-top-offset) + (var(--bullet-visual-size) / 2) + 3px); 
-    bottom: calc((var(--note-content-compact-padding-y) * -1) - (var(--note-compact-margin-bottom) / 2) - 2px); 
-    width: var(--thread-line-width); background-color: var(--thread-line-color); z-index: 1; 
+    bottom: calc( (var(--note-content-compact-padding-y) * -1) - (var(--note-compact-margin-bottom)/2) );
+    width: var(--thread-line-width); background-color: var(--thread-line-color); z-index: 5; 
 }
-.outline-item.has-children:hover > .outline-content::after { background-color: var(--accent-color); }
-.outline-item.hidden-by-parent { display: none; }
+.outline-item.has-children:hover::after { background-color: var(--accent-color); }
+.outline-item.children-hidden > .outline-children {
+    display: none;
+}
+.outline-item.children-hidden > .outline-content .hover-arrow-toggle .arrow-svg {
+    transform: rotate(0deg); /* Ensure arrow points right when hidden */
+}
+.outline-item:not(.children-hidden) > .outline-content .hover-arrow-toggle .arrow-svg {
+    transform: rotate(90deg); /* Ensure arrow points down when shown */
+}
 .outline-content p { margin-bottom: 0.25rem; }
 .outline-content p:last-child { margin-bottom: 0; }
 .outline-content ul, .outline-content ol { margin: 0.5em 0; padding-left: 1.5em; list-style-position: inside; }
@@ -233,7 +254,7 @@ body {
 .outline-content hr { margin: 0.5em 0; border: none; border-top: 1px solid var(--border-color); }
 .note-actions {
     display: flex; align-items: center; gap: 4px; margin-top: 2px; padding: 2px 4px;
-    font-size: 0.8em; color: var(--text-muted); background: var(--bg-secondary);
+    font-size: 0.8em; color: var(--text-muted); 
     border-top: 1px solid var(--border-color); border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 .note-actions button {
@@ -255,28 +276,68 @@ body {
 
 /* Zoom/Focus Mode & Breadcrumbs */
 .breadcrumb-bar {
-    display: flex; align-items: center; flex-wrap: wrap;
-    padding: 6px 10px; /* More compact padding */
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping if path is too long */
+    padding: 6px 10px;
     margin-bottom: 0.75rem; 
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    font-size: 0.85em; /* Slightly smaller */
+    font-size: 0.85em; 
     color: var(--text-muted);
-    cursor: pointer; 
+    cursor: pointer; /* Indicates the whole bar can be clicked to zoom out */
+    line-height: 1.4; 
 }
-.breadcrumb-bar:hover { background-color: var(--hover-color); border-color: var(--accent-color); }
-.breadcrumb-item {
-    padding: 1px 3px; /* Compact */
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 180px; 
+.breadcrumb-bar:hover {
+    background-color: var(--hover-color);
+    /* border-color: var(--accent-color); Optional: highlight border on hover */
 }
-.breadcrumb-item.page-link { font-weight: 500; color: var(--accent-color); }
-.breadcrumb-item.current-focus { font-weight: bold; color: var(--text-color); }
-.breadcrumb-separator { margin: 0 5px; color: var(--text-muted); }
 
-body.logseq-focus-active #page-title { /* No change to page title styling during zoom */ }
-#outline-container.focused { /* Container specific styles during zoom if any */ }
+.breadcrumb-item {
+    padding: 1px 3px; 
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px; /* Adjust as needed */
+    display: inline-block; /* Important for ellipsis to work correctly */
+}
+
+.breadcrumb-item:not(.page-link):not(.current-focus) {
+    color: var(--accent-color); /* Make intermediate items look like links */
+    cursor: pointer; /* Indicate they can be clicked to zoom to that level */
+}
+.breadcrumb-item:not(.page-link):not(.current-focus):hover {
+    text-decoration: underline;
+    background-color: rgba(0,0,0,0.05); /* Subtle hover for individual items */
+    border-radius: var(--radius-sm);
+}
+
+
+.breadcrumb-item.page-link {
+    font-weight: 500;
+    color: var(--accent-color); /* Or var(--primary-color) if preferred */
+    max-width: 220px; /* Page title can be a bit wider */
+}
+.breadcrumb-item.page-link:hover {
+    text-decoration: underline;
+}
+
+
+.breadcrumb-item.current-focus {
+    font-weight: bold;
+    color: var(--text-color); /* Current focused item is more prominent */
+    cursor: default; /* Current focus isn't clickable to re-zoom to itself */
+}
+
+.breadcrumb-separator {
+    margin: 0 5px;
+    color: var(--text-muted);
+    user-select: none; /* Separator isn't selectable */
+}
+
+#outline-container.focused { padding-top: 0; /* Remove extra padding if breadcrumbs are there */ }
+#outline-container{padding-bottom: 5px;}
 
 /* Calendar Styling */
 .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.9em; }
@@ -289,7 +350,7 @@ body.logseq-focus-active #page-title { /* No change to page title styling during
 .calendar-day.empty { cursor: default; background: transparent !important; }
 
 /* Backlinks Styling */
-#backlinks-container { margin-top: 2rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); }
+#backlinks-container { margin-top: 2rem; padding: 1rem; background: var(--sidebar-bg); border-radius: var(--radius-md); }
 .backlink-thread-item {
     margin-bottom: 1rem; padding: 1rem; background: var(--note-bg-color);
     border: 1px solid var(--border-color); border-radius: var(--radius-md);
@@ -368,9 +429,9 @@ body.logseq-focus-active #page-title { /* No change to page title styling during
 }
 
 .home-link { 
-    color: var(--accent-color); text-decoration: none; font-size: 1.8em; 
+    color: var(--accent-color); text-decoration: none; font-size: 2.5em; 
     display: block; text-align: center; margin-bottom: 10px; 
-    padding: 10px 0; font-weight: 500;
+    padding: 10px 0; font-weight: 300;
 }
 .home-link:hover { text-decoration: none; color: var(--primary-color); }
 
@@ -452,3 +513,16 @@ body.logseq-focus-active #page-title { /* No change to page title styling during
     line-height: 40px; text-align: center; padding:0; transition: background 0.2s;
 }
 .image-modal .close-modal:hover { background: rgba(0,0,0,0.6); }
+
+.calendar-day.selected-date {
+    background-color: rgba(52, 152, 219, 0.15); /* Weak blue from --accent-color */
+    /* border: 1px solid var(--accent-color); Optional: add a border */
+    color: var(--accent-color); /* Optional: change text color */
+}
+
+.calendar-day.today.selected-date {
+    /* If today is also selected, it should still look like 'today' primarily */
+    background-color: var(--accent-color); /* Keeps the stronger 'today' blue */
+    color: white;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3); /* Add an inner ring or similar to distinguish */
+}

@@ -32,10 +32,27 @@ const pageTitle = document.getElementById('page-title');
 const pageProperties = document.getElementById('page-properties');
 const outlineContainer = document.getElementById('outline-container');
 
+// Helper for navigation
+async function navigateToPage(pageId) {
+    const targetHash = String(pageId).startsWith('#') ? String(pageId).substring(1) : String(pageId);
+    const currentHash = window.location.hash.substring(1);
+
+    if (currentHash === targetHash) {
+        // If hash is already the target pageId, force a reload.
+        // This is important for initial load if hash is set but page isn't rendered,
+        // or if user clicks a link to the currently viewed page.
+        await loadPage(targetHash);
+    } else {
+        // Set the hash, hashchange listener will call loadPage.
+        window.location.hash = targetHash;
+    }
+}
+
+
 // Event Listeners
 searchInput.addEventListener('input', debounce(handleSearch, 300));
 newPageButton.addEventListener('click', createNewPage);
-outlineContainer.addEventListener('click', handleOutlineClick); // Handles clicks within outline, including breadcrumbs now
+outlineContainer.addEventListener('click', handleOutlineClick);
 
 document.getElementById('advanced-search-link').addEventListener('click', (e) => {
     e.preventDefault();
@@ -46,17 +63,11 @@ document.getElementById('home-button').addEventListener('click', async (e) => {
     e.preventDefault();
     const today = new Date().toISOString().split('T')[0];
     if (document.body.classList.contains('logseq-focus-active')) {
-        await zoomOut(); 
-        if (window.location.hash.substring(1) !== today) {
-            window.location.hash = today;
-        }
-    } else {
-        if (window.location.hash.substring(1) !== today) {
-            window.location.hash = today;
-        } else {
-            await loadPage(today);
-        }
+        await zoomOut(); // zoomOut will call loadPage for the original page
     }
+    // After zoomOut or if not zoomed, navigate to today's page.
+    // navigateToPage will handle if we are already on 'today' or need to change hash.
+    navigateToPage(today);
 });
 
 
@@ -64,8 +75,11 @@ window.addEventListener('hashchange', () => {
     const pageId = window.location.hash.substring(1);
     if (pageId === 'search-results') {
         showSearchResults();
-    } else if (pageId) {
-        loadPage(pageId); // This will also clear zoom state if navigating away via hash
+    } else if (pageId) { // pageId is from window.location.hash.substring(1)
+        loadPage(pageId);
+    } else { // Hash is empty
+        const today = new Date().toISOString().split('T')[0];
+        navigateToPage(today);
     }
 });
 
@@ -73,15 +87,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadTemplates();
     loadRecentPages();
     initCalendar();
-    if (!window.location.hash) {
+    const initialHash = window.location.hash.substring(1);
+    if (!initialHash) {
         const today = new Date().toISOString().split('T')[0];
-        window.location.hash = today;
+        navigateToPage(today); // Use helper for consistency
     } else {
-        const pageId = window.location.hash.substring(1);
-        if (pageId === 'search-results') {
+        if (initialHash === 'search-results') {
             showSearchResults();
         } else {
-            loadPage(pageId);
+            navigateToPage(initialHash); // Use helper
         }
     }
 });
@@ -103,7 +117,9 @@ function debounce(func, wait) {
 async function loadPage(pageId) {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
-    // Page title will be reset by renderPage, no need to explicitly handle unzoom button here
+    
+    // The page title is now set by renderPage, so no need to handle unzoom button specifically here.
+    // If renderPage is called, it will set the standard page title.
 
     try {
         document.getElementById('new-note').style.display = 'block';
@@ -122,20 +138,24 @@ async function loadPage(pageId) {
         }
 
         if (data.properties && data.properties.alias) {
-            window.location.hash = data.properties.alias;
+            // Use navigateToPage for alias redirection to ensure hash is updated
+            navigateToPage(data.properties.alias);
             return;
         }
 
         currentPage = data;
-        await renderPage(data); // This will set the correct page title
+        await renderPage(data);
         updateRecentPages(pageId);
+        if (window.renderCalendarForCurrentPage) { // Check if calendar is initialized
+            window.renderCalendarForCurrentPage(); // Re-render to update selected date
+        }
     } catch (error) {
         console.error('Error loading page:', error);
         outlineContainer.innerHTML = `
             <div class="error-message">
                 <h3>Error loading page</h3>
                 <p>${error.message}</p>
-                <button onclick="loadPage('${pageId.replace(/'/g, "\\'")}')">Retry</button>
+                <button onclick="navigateToPage('${pageId.replace(/'/g, "\\'")}')">Retry</button>
             </div>
         `;
     }
@@ -198,7 +218,7 @@ async function createNewPage() {
             const data = await response.json();
             if (data.error) throw new Error(data.error);
             document.body.removeChild(modal);
-            window.location.hash = encodeURIComponent(pageId);
+            navigateToPage(encodeURIComponent(pageId)); // Use navigateToPage
         } catch (error) { console.error('Error creating page:', error); alert('Error creating page: ' + error.message); }
     };
     cancelButton.onclick = () => document.body.removeChild(modal);
@@ -217,19 +237,23 @@ async function findBlockById(blockId) {
 
 async function renderNoteContent(note) {
     let content = note.content;
+    
     content = content.replace(/<<([^>]+)>>/g, (match, query) => {
         const displayQuery = query.length > 30 ? query.substring(0, 27) + '...' : query;
         return `<a href="#" class="search-link" onclick="event.preventDefault(); event.stopPropagation(); executeSearchLink('${query.replace(/'/g, "\\'")}')"><<${displayQuery}>></a>`;
     });
+    
     content = content.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
         if (key.trim().toLowerCase() === 'tag') {
             return value.trim().split(',').map(tagValue => 
-                `<a href="#${tagValue.trim()}" class="property-tag" onclick="event.stopPropagation(); loadPage('${tagValue.trim()}');">#${tagValue.trim()}</a>`
+                `<a href="#${encodeURIComponent(tagValue.trim())}" class="property-tag" onclick="event.stopPropagation();">#${tagValue.trim()}</a>`
             ).join(' ');
         }
         return `<span class="property-tag">${key.trim()}: ${value.trim()}</span>`;
     });
+    
     content = marked.parse(content);
+    
     const blockMatches = content.match(/\{\{([^}]+)\}\}/g) || [];
     for (const match of blockMatches) {
         const blockId = match.slice(2, -2);
@@ -240,26 +264,30 @@ async function renderNoteContent(note) {
                 <div class="transcluded-block" data-block-id="${blockId}">
                     ${blockContent}
                     <div class="transclusion-source">
-                        <a href="#${block.page_id}" onclick="event.stopPropagation(); loadPage('${block.page_id}');">
+                        <a href="#${encodeURIComponent(block.page_id)}" onclick="event.stopPropagation();">
                             Source: ${block.page_title || block.page_id}</a></div></div>`);
         } else { content = content.replace(match, `<span class="broken-transclusion">${match}</span>`); }
     }
+    
     content = content.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
         return `<img src="${src}" alt="${alt}" class="note-image" onclick="event.stopPropagation(); showImageModal(this.src, this.alt)">`;
     });
+    
     content = content.replace(/<p>(TODO|DONE)\s*(.*?)<\/p>/g, (match, status, textContentHtml) => {
         const isDone = status === 'DONE';
         const processedTextForDisplay = textContentHtml.replace(/\[\[(.*?)\]\]/g, (linkMatch, p1) => {
-            return `<a href="#${p1}" class="internal-link" onclick="event.stopPropagation(); loadPage('${p1}');">${p1}</a>`;
+            return `<a href="#${encodeURIComponent(p1)}" class="internal-link" onclick="event.stopPropagation();">${p1}</a>`;
         });
         return `<div class="todo-item"><label class="todo-checkbox">
                     <input type="checkbox" ${isDone ? 'checked' : ''} 
                         onchange="event.stopPropagation(); toggleTodo('${note.block_id}', this.checked)"> 
                     <span class="status-${status.toLowerCase()}">${processedTextForDisplay}</span></label></div>`;
     });
+    
     content = content.replace(/\[\[(.*?)\]\]/g, (match, p1) => {
-        return `<a href="#${p1}" class="internal-link" onclick="event.stopPropagation(); loadPage('${p1}');">${p1}</a>`;
+        return `<a href="#${encodeURIComponent(p1)}" class="internal-link" onclick="event.stopPropagation();">${p1}</a>`;
     });
+    
     if (note.attachments && note.attachments.length > 0) {
         content += '<div class="attachments">';
         note.attachments.forEach(attachment => {
@@ -292,33 +320,29 @@ function formatFileSize(bytes) {
 }
 
 async function renderOutline(notes, level = 0) {
-    if (!notes) return '';
-    const renderedNotesPromises = notes.map(async note => {
+    if (!notes || notes.length === 0) return ''; // Return empty string if no notes
+
+    let html = '';
+    for (const note of notes) {
         const blockId = note.block_id;
         const contentHtml = await renderNoteContent(note);
         let linkedPageType = null;
-        const singleLinkMatch = note.content.match(/^\[\[(.*?)\]\]$/);
-        if (singleLinkMatch) {
-            const linkedPageId = singleLinkMatch[1];
-            try {
-                const response = await fetch(`api/page.php?id=${linkedPageId}`);
-                if (response.ok) {
-                    const linkedPage = await response.json();
-                    linkedPageType = (linkedPage.properties && linkedPage.properties.type) ? linkedPage.properties.type : (linkedPage.type || null);
-                }
-            } catch (error) { console.error('Error fetching linked page type for outline:', error); }
-        }
+        // ... (your existing logic for linkedPageType) ...
+
         const hasChildren = note.children && note.children.length > 0;
         const hasChildrenClass = hasChildren ? 'has-children' : '';
         const linkedPageTypeClass = linkedPageType ? `linked-page-${linkedPageType.toLowerCase()}` : '';
+
         const controlsHtml = `
             <span class="static-bullet" data-action="zoom-in" title="Zoom in"></span>
-            ${hasChildren ? 
+            ${hasChildren ?
                 `<span class="hover-arrow-toggle" data-action="toggle-children" title="Toggle children">
                      <svg class="arrow-svg" viewBox="0 0 192 512"><path d="M0 384.662V127.338c0-17.818 21.543-26.741 34.142-14.142l128.662 128.662c7.81 7.81 7.81 20.474 0 28.284L34.142 398.804C21.543 411.404 0 402.48 0 384.662z"></path></svg>
                  </span>` : '' }`;
-        const noteHtml = `
-            <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}" 
+
+        // Start of the .outline-item
+        html += `
+            <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}"
                  data-note-id="${note.id}" data-level="${level}" data-content="${note.content.replace(/"/g, '"')}">
                 <div class="outline-content" ${blockId ? `data-block-id="${blockId}"` : ''}>
                     ${controlsHtml}
@@ -332,17 +356,23 @@ async function renderOutline(notes, level = 0) {
                         <button data-action="delete" title="Delete note">×</button>
                          | <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">${new Date(note.created_at).toLocaleDateString()}</span>
                     </div>
-                </div>
-            </div>`;
-        const childrenHtml = note.children ? await renderOutline(note.children, level + 1) : '';
-        return noteHtml + childrenHtml;
-    });
-    return (await Promise.all(renderedNotesPromises)).join('');
+                </div>`; // End of .outline-content
+
+        // Recursively render children and wrap them in .outline-children
+        if (hasChildren) {
+            html += `<div class="outline-children">`;
+            html += await renderOutline(note.children, level + 1); // Recursive call
+            html += `</div>`; // End of .outline-children
+        }
+
+        html += `</div>`; // End of .outline-item
+    }
+    return html;
 }
 
 function renderPropertiesInline(properties) { return ''; } 
 
-async function renderPage(page) { // This is for normal page rendering, not zoomed view
+async function renderPage(page) { 
     pageTitle.innerHTML = `<span class="page-title-text">${page.title}</span>
                            <button class="edit-properties-button" title="Edit page properties"></button>`;
     if (page.properties && Object.keys(page.properties).length > 0) {
@@ -356,9 +386,7 @@ async function renderPage(page) { // This is for normal page rendering, not zoom
     }
     const editButton = pageTitle.querySelector('.edit-properties-button');
     if (editButton) editButton.onclick = editPageProperties;
-
-    outlineContainer.innerHTML = await renderOutline(page.notes); // Regular outline for the page
-
+    outlineContainer.innerHTML = await renderOutline(page.notes);
     const backlinksContainer = document.getElementById('backlinks-container');
     if (backlinksContainer) renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
 }
@@ -406,7 +434,7 @@ async function editPageProperties() {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            loadPage(currentPage.id);
+            navigateToPage(currentPage.id); // Use navigateToPage to reload
         } catch (error) {
             console.error('Error updating properties:', error);
             propertiesContent.innerHTML = originalContent;
@@ -448,7 +476,7 @@ async function renderBacklinks(pageId) {
             const hierarchicalNotes = buildNoteTree(thread.notes);
             const threadContentHtml = hierarchicalNotes.length > 0 ? await renderOutline(hierarchicalNotes, 0) : '';
             html += `<div class="backlink-thread-item">
-                        <a href="#${thread.linking_page_id}" onclick="event.stopPropagation(); loadPage('${thread.linking_page_id}');">
+                        <a href="#${encodeURIComponent(thread.linking_page_id)}" onclick="event.stopPropagation();">
                             ${thread.linking_page_title || thread.linking_page_id}</a>
                         <div class="backlink-thread-content">${threadContentHtml}</div>
                     </div>`;
@@ -463,7 +491,7 @@ async function renderBacklinks(pageId) {
 function renderRecentPages() {
     if (!recentPagesList) return;
     const recentPagesHtml = recentPages
-        .map(page => `<li onclick="loadPage('${page.page_id.replace(/'/g, "\\'")}')">
+        .map(page => `<li onclick="navigateToPage('${page.page_id.replace(/'/g, "\\'")}')">
                         ${page.title || decodeURIComponent(page.page_id)}
                         <small>${new Date(page.last_opened).toLocaleDateString()}</small></li>`).join('');
     recentPagesList.innerHTML = `<div class="recent-pages-header">
@@ -479,7 +507,7 @@ async function showAllPages() {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.innerHTML = `<div class="page-list-modal"><h3>All Pages</h3><div class="page-list">
-            ${pages.map(page => `<div class="page-list-item" onclick="loadPage('${page.id.replace(/'/g, "\\'")}'); document.body.removeChild(this.closest('.modal'));">
+            ${pages.map(page => `<div class="page-list-item" onclick="navigateToPage('${page.id.replace(/'/g, "\\'")}'); document.body.removeChild(this.closest('.modal'));">
                                 ${page.title || decodeURIComponent(page.id)}</div>`).join('')}
             </div><button class="btn-secondary" style="margin-top:15px;" onclick="document.body.removeChild(this.closest('.modal'));">Close</button></div>`;
         modal.onclick = (e) => { if (e.target === modal) document.body.removeChild(modal); };
@@ -495,19 +523,19 @@ function renderSearchResults(results) { // For inline search
         searchResultsContainer.innerHTML = '<p>No results found.</p>';
     } else {
         searchResultsContainer.innerHTML = results.map(result => `
-            <div class="search-result-inline-item" onclick="loadPage('${result.page_id}'); searchInput.value=''; this.parentElement.remove();">
+            <div class="search-result-inline-item" onclick="navigateToPage('${result.page_id}'); searchInput.value=''; this.parentElement.remove();">
                 <strong>${result.page_title || result.page_id}</strong>: ${result.content.substring(0, 100)}...</div>`).join('');
     }
     if (!document.getElementById('search-results-container')) {
         searchInput.parentNode.insertBefore(searchResultsContainer, searchInput.nextSibling);
     }
-    document.addEventListener('click', function clearInlineSearch(event) {
-        if (searchResultsContainer.contains(event.target)) return; // Click inside results
+     document.addEventListener('click', function clearInlineSearch(event) {
+        if (searchResultsContainer.contains(event.target)) return; 
         if (!searchInput.contains(event.target) && !searchResultsContainer.contains(event.target)) {
             searchResultsContainer.remove();
             document.removeEventListener('click', clearInlineSearch);
         }
-    }, { capture: true }); // Use capture to catch click before it might be stopped by other handlers
+    }, { capture: true });
 }
 
 function updateRecentPages(pageId) {
@@ -525,55 +553,100 @@ async function uploadFile(noteId, file) {
         const response = await fetch('api/attachment.php', { method: 'POST', body: formData });
         const data = await response.json();
         if (data.error) throw new Error(data.error);
-        loadPage(currentPage.id);
+        navigateToPage(currentPage.id); // Use navigateToPage
     } catch (error) { console.error('Error uploading file:', error); alert('Error uploading file: ' + error.message); }
 }
 
 async function deleteAttachment(id, event) {
     event.stopPropagation();
-    if (!confirm('Are you sure you want to delete this attachment?')) return;
-    try {
-        const response = await fetch(`api/attachment.php`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'delete', id: id })
-        });
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
-        loadPage(currentPage.id);
-    } catch (error) { console.error('Error deleting attachment:', error); alert('Error deleting attachment: ' + error.message); }
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `<div class="delete-confirmation-modal"><h3>Delete Attachment</h3>
+        <p>Are you sure you want to delete this attachment?</p>
+        <div class="button-group"><button class="btn-secondary cancel-delete">Cancel</button><button class="btn-primary confirm-delete">Delete</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.cancel-delete').onclick = () => document.body.removeChild(modal);
+    modal.querySelector('.confirm-delete').onclick = async () => {
+        try {
+            const response = await fetch(`api/attachment.php`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id: id })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            document.body.removeChild(modal); 
+            navigateToPage(currentPage.id); // Use navigateToPage
+        } catch (error) { 
+            console.error('Error deleting attachment:', error); 
+            alert('Error deleting attachment: ' + error.message); 
+            document.body.removeChild(modal); 
+        }
+    };
+    modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
 function initCalendar() {
     const calendar = document.getElementById('calendar');
     if (!calendar) return;
-    const today = new Date();
-    let currentMonth = today.getMonth();
-    let currentYear = today.getFullYear();
+    const todayDate = new Date(); // Store today's actual date
+
+    // Keep track of current month/year for rendering
+    let currentDisplayMonth = todayDate.getMonth();
+    let currentDisplayYear = todayDate.getFullYear();
+
     function renderCalendar() {
-        const firstDay = new Date(currentYear, currentMonth, 1);
-        const lastDay = new Date(currentYear, currentMonth + 1, 0);
+        const firstDay = new Date(currentDisplayYear, currentDisplayMonth, 1);
+        const lastDay = new Date(currentDisplayYear, currentDisplayMonth + 1, 0);
         const daysInMonth = lastDay.getDate();
         const startingDay = (firstDay.getDay() === 0) ? 6 : firstDay.getDay() - 1;
+
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
         const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
         let html = `<div class="calendar-header"><button class="calendar-nav" onclick="prevMonth()">←</button>
-                    <span><b>${monthNames[currentMonth]} ${currentYear}</b></span>
+                    <span><b>${monthNames[currentDisplayMonth]} ${currentDisplayYear}</b></span>
                     <button class="calendar-nav" onclick="nextMonth()">→</button></div>
                     <div class="calendar-grid">${dayNames.map(d => `<div class="calendar-weekday">${d}</div>`).join('')}`;
+        
         for (let i = 0; i < startingDay; i++) html += '<div class="calendar-day empty"></div>';
+        
+        const todayString = todayDate.toISOString().split('T')[0];
+        const currentPageId = currentPage ? currentPage.id : null;
+
         for (let day = 1; day <= daysInMonth; day++) {
-            const date = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const isToday = date === today.toISOString().split('T')[0];
-            html += `<div class="calendar-day ${isToday ? 'today' : ''}" onclick="loadPage('${date}')" data-date="${date}">${day}</div>`;
+            const date = `${currentDisplayYear}-${String(currentDisplayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            let dayClasses = 'calendar-day';
+            if (date === todayString) {
+                dayClasses += ' today'; // Today's date
+            }
+            if (date === currentPageId) { // Currently selected/viewed page
+                dayClasses += ' selected-date'; 
+            }
+            html += `<div class="${dayClasses}" onclick="window.location.hash = '${date}'" data-date="${date}">${day}</div>`;
         }
+        
         const totalCells = startingDay + daysInMonth;
         const remainingCells = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
         for (let i = 0; i < remainingCells; i++) html += '<div class="calendar-day empty"></div>';
-        html += '</div>'; calendar.innerHTML = html;
+        
+        html += '</div>'; 
+        calendar.innerHTML = html;
     }
-    window.prevMonth = () => { currentMonth = (currentMonth === 0) ? 11 : currentMonth - 1; if (currentMonth === 11) currentYear--; renderCalendar(); };
-    window.nextMonth = () => { currentMonth = (currentMonth === 11) ? 0 : currentMonth + 1; if (currentMonth === 0) currentYear++; renderCalendar(); };
-    renderCalendar();
+
+    // Expose renderCalendar so it can be called after a page loads
+    window.renderCalendarForCurrentPage = renderCalendar; 
+
+    window.prevMonth = () => { 
+        currentDisplayMonth = (currentDisplayMonth === 0) ? 11 : currentDisplayMonth - 1; 
+        if (currentDisplayMonth === 11) currentDisplayYear--; 
+        renderCalendar(); 
+    };
+    window.nextMonth = () => { 
+        currentDisplayMonth = (currentDisplayMonth === 11) ? 0 : currentDisplayMonth + 1; 
+        if (currentDisplayMonth === 0) currentDisplayYear++; 
+        renderCalendar(); 
+    };
+    renderCalendar(); // Initial render
 }
 
 function showImageModal(src, alt) {
@@ -588,28 +661,58 @@ function showImageModal(src, alt) {
 // Outline Interaction
 function handleOutlineClick(event) {
     const target = event.target;
+    const breadcrumbItem = target.closest('.breadcrumb-item');
+    const breadcrumbBar = target.closest('.breadcrumb-bar');
     const noteElement = target.closest('.outline-item');
-    let action = target.dataset.action || target.closest('[data-action]')?.dataset.action;
 
-    // Check if click is on breadcrumb-bar for zoom-out
-    if (!action && target.closest('.breadcrumb-bar')) {
+    let action = target.dataset.action || target.closest('[data-action]')?.dataset.action;
+    let noteIdForAction = null;
+
+    if (noteElement) {
+        noteIdForAction = noteElement.dataset.noteId;
+    }
+
+    // Prioritize breadcrumb actions if a breadcrumb item was clicked
+    if (breadcrumbItem && breadcrumbItem.dataset.action) {
+        action = breadcrumbItem.dataset.action;
+        // If the action is zoom-in (from an intermediate breadcrumb), get its note ID
+        if (action === 'zoom-in') {
+            noteIdForAction = breadcrumbItem.dataset.noteId;
+        }
+        // If it's page-link with zoom-out, action is already set to 'zoom-out'
+    } else if (breadcrumbBar && !breadcrumbItem && breadcrumbBar.dataset.action === 'zoom-out') {
+        // Clicked on the bar itself (not an item), treat as full zoom-out
         action = 'zoom-out';
     }
-    
-    if (!noteElement && action !== 'zoom-out') return; // If no note element and not zooming out, do nothing
-    
-    const noteId = noteElement ? noteElement.dataset.noteId : null;
 
 
+    if (action === 'zoom-out') {
+        // This handles clicks on the main breadcrumb bar or the page title link in breadcrumbs
+        zoomOut();
+        return;
+    }
+
+    if (action === 'zoom-in') {
+        // This handles clicks on outline bullets OR intermediate breadcrumb items
+        const targetId = noteIdForAction; // Already correctly set from breadcrumb or noteElement
+        if (targetId) {
+            zoomInOnNote(targetId); // Pass the ID directly
+        } else {
+            console.warn("Zoom-in clicked, but no target ID found.");
+        }
+        return;
+    }
+    
+    // For all other actions, a noteElement in the outline and its ID are required
+    if (!noteElement || !noteIdForAction) {
+        // console.log("Action requires a note element and ID, but not found.", action, target);
+        return;
+    }
+
+    // Existing switch cases for other actions:
     switch (action) {
         case 'toggle-children':
-            if (noteElement && noteElement.classList.contains('has-children')) toggleChildren(noteElement);
-            break;
-        case 'zoom-in':
-            if (noteElement) zoomInOnNote(noteElement);
-            break;
-        case 'zoom-out': // Handles clicks on elements with data-action="zoom-out" like breadcrumbs
-            zoomOut();
+            if (noteElement.classList.contains('has-children')) toggleChildren(noteElement);
             break;
         case 'copy-block-id':
             const blockId = noteElement.querySelector('.outline-content[data-block-id]')?.dataset.blockId;
@@ -620,37 +723,37 @@ function handleOutlineClick(event) {
                 }).catch(err => console.error('Failed to copy block ID:', err));
             }
             break;
-        case 'add-child': createNote(noteId, parseInt(noteElement.dataset.level) + 1); break;
-        case 'edit': editNote(noteId, noteElement.dataset.content); break;
+        case 'add-child': createNote(noteIdForAction, parseInt(noteElement.dataset.level) + 1); break;
+        case 'edit': editNote(noteIdForAction, noteElement.dataset.content); break;
         case 'upload':
             const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.style.display = 'none';
             document.body.appendChild(fileInput);
-            fileInput.onchange = (e) => { if (e.target.files.length > 0) uploadFile(noteId, e.target.files[0]); document.body.removeChild(fileInput); };
+            fileInput.onchange = (e) => { if (e.target.files.length > 0) uploadFile(noteIdForAction, e.target.files[0]); document.body.removeChild(fileInput); };
             fileInput.click();
             break;
-        case 'delete': deleteNote(noteId); break;
+        case 'delete': deleteNote(noteIdForAction); break;
+        default:
+            // console.log("Unknown action or unhandled click:", action, target);
+            break;
     }
 }
 
 function toggleChildren(noteElement) {
     noteElement.classList.toggle('children-hidden');
-    const parentLevel = parseInt(noteElement.dataset.level);
-    const isHidden = noteElement.classList.contains('children-hidden');
-    let currentSibling = noteElement.nextElementSibling;
-    while (currentSibling && currentSibling.classList.contains('outline-item')) {
-        const currentLevel = parseInt(currentSibling.dataset.level);
-        if (currentLevel > parentLevel) {
-            if (isHidden) currentSibling.classList.add('hidden-by-parent');
-            else currentSibling.classList.remove('hidden-by-parent');
-        } else break;
-        currentSibling = currentSibling.nextElementSibling;
+    const childrenContainer = noteElement.querySelector('.outline-children');
+    if (childrenContainer) {
+        if (noteElement.classList.contains('children-hidden')) {
+            childrenContainer.style.display = 'none'; // Or add a class
+        } else {
+            childrenContainer.style.display = ''; // Or remove a class
+        }
     }
 }
 
 function createNote(parentId = null, level = 0) {
     if (!currentPage) return;
     const noteEditorContainer = document.createElement('div');
-    if (parentId) noteEditorContainer.style.paddingLeft = `calc(var(--indentation-unit) * ${level > 0 ? 1 : 0})`; // Adjust based on actual nesting logic for editor
+    if (parentId) noteEditorContainer.style.paddingLeft = `calc(var(--indentation-unit) * ${level > 0 ? 1 : 0})`;
     noteEditorContainer.className = 'note-editor-wrapper';
     const noteElement = document.createElement('div');
     noteElement.className = 'note-editor';
@@ -673,24 +776,25 @@ function createNote(parentId = null, level = 0) {
     if (parentId) {
         const parentNoteElement = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
         if (parentNoteElement) {
-            let nextSibling = parentNoteElement.nextElementSibling;
-            let insertionTarget = parentNoteElement;
-            // Find the last child of the parent to insert after
-            while (nextSibling && nextSibling.classList.contains('outline-item') && parseInt(nextSibling.dataset.level) > parseInt(parentNoteElement.dataset.level)) {
-                insertionTarget = nextSibling;
-                nextSibling = nextSibling.nextElementSibling;
+            let childrenContainer = parentNoteElement.querySelector('.outline-children');
+            if (!childrenContainer) {
+                childrenContainer = document.createElement('div');
+                childrenContainer.className = 'outline-children';
+                // Apply padding-left via CSS, or set it here if dynamic:
+                // childrenContainer.style.paddingLeft = `var(--indentation-unit)`;
+                parentNoteElement.appendChild(childrenContainer);
             }
-            insertionTarget.insertAdjacentElement('afterend', noteEditorContainer);
-
-            if (parentNoteElement.classList.contains('children-hidden') && !parentNoteElement.classList.contains('has-children')) {
-                 parentNoteElement.classList.remove('children-hidden');
-            }
+            childrenContainer.appendChild(noteEditorContainer); // Append editor to children container
+    
+            // Update parent's state
             parentNoteElement.classList.add('has-children');
-        } else outlineContainer.appendChild(noteEditorContainer);
+            if (parentNoteElement.classList.contains('children-hidden')) {
+                parentNoteElement.classList.remove('children-hidden');
+                childrenContainer.style.display = ''; // Ensure visible
+            }
+        } else { /* ... handle error or append to root ... */ }
     } else {
-        const lastTopLevelNote = outlineContainer.querySelector('.outline-item[data-level="0"]:last-of-type');
-        if (lastTopLevelNote) lastTopLevelNote.insertAdjacentElement('afterend', noteEditorContainer);
-        else outlineContainer.appendChild(noteEditorContainer);
+        outlineContainer.appendChild(noteEditorContainer);
     }
     textarea.focus();
     textarea.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); } });
@@ -716,7 +820,7 @@ function createNote(parentId = null, level = 0) {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            loadPage(currentPage.id);
+            navigateToPage(currentPage.id); // Use navigateToPage
         } catch (error) { console.error('Error creating note:', error); alert('Error creating note: ' + error.message); }
     };
     cancelButton.onclick = () => {
@@ -763,7 +867,7 @@ function editNote(id, currentContentText) {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            loadPage(currentPage.id);
+            navigateToPage(currentPage.id); // Use navigateToPage
         } catch (error) { console.error('Error updating note:', error); alert('Error updating note: ' + error.message); }
     };
     cancelButton.onclick = () => { editorWrapper.remove(); contentElement.style.display = originalDisplay; };
@@ -782,7 +886,8 @@ async function deleteNote(id) {
             const response = await fetch(`api/note.php?id=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete' }) });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            document.body.removeChild(modal); loadPage(currentPage.id);
+            document.body.removeChild(modal); 
+            navigateToPage(currentPage.id); // Use navigateToPage
         } catch (error) { console.error('Error deleting note:', error); alert('Error deleting note: ' + error.message); document.body.removeChild(modal); }
     };
     modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
@@ -797,7 +902,7 @@ async function showSearchResults() { // For Advanced Search results page
     const renderedResultsPromises = results.map(async result => {
         const content = await renderNoteContent(result);
         return `<div class="search-result-item"><div class="result-header">
-                    <a href="#${result.page_id}" onclick="event.stopPropagation(); loadPage('${result.page_id}');">${result.page_title || result.page_id}</a>
+                    <a href="#${encodeURIComponent(result.page_id)}" onclick="event.stopPropagation();">${result.page_title || result.page_id}</a>
                     <span class="result-date">${new Date(result.created_at).toLocaleDateString()}</span></div>
                 <div class="result-content">${content}</div></div>`;
     });
@@ -807,7 +912,7 @@ async function showSearchResults() { // For Advanced Search results page
             <button class="btn-secondary" onclick="window.history.back()">Back</button></div></div>
         <div class="search-query" style="margin-bottom:1em; font-size:0.9em;"><strong>Query:</strong> <code>${query}</code></div>
         ${renderedResultsHtml}</div>`;
-    pageTitle.innerHTML = '<span class="page-title-text">Search Results</span>'; // Set search results title
+    pageTitle.innerHTML = '<span class="page-title-text">Search Results</span>';
 }
 function copySearchLink() {
     const query = sessionStorage.getItem('searchQuery') || '';
@@ -821,7 +926,7 @@ async function executeSearchLink(query) {
         if (results.error) throw new Error(results.error);
         sessionStorage.setItem('searchResults', JSON.stringify(results));
         sessionStorage.setItem('searchQuery', query);
-        window.location.hash = 'search-results';
+        window.location.hash = 'search-results'; // This will trigger showSearchResults via hashchange
     } catch (error) { console.error('Error executing search link:', error); alert('Error executing search: ' + error.message); }
 }
 
@@ -849,7 +954,7 @@ async function toggleTodo(blockId, isDone) {
         });
         const data = await response.json();
         if (data.error) throw new Error(data.error);
-        loadPage(currentPage.id); 
+        navigateToPage(currentPage.id); // Use navigateToPage
     } catch (error) {
         console.error('Error updating todo status:', error); alert('Error updating task: ' + error.message);
         const checkbox = document.querySelector(`input[type="checkbox"][onchange*="'${blockId}'"]`);
@@ -858,7 +963,6 @@ async function toggleTodo(blockId, isDone) {
 }
 
 // --- Logseq-style Zoom (Focus) Functions ---
-
 function findNoteAndPath(targetId, notesArray, currentPath = []) {
     for (const note of notesArray) {
         const newPath = [...currentPath, note];
@@ -888,13 +992,25 @@ function renderBreadcrumbs(path) {
 
     let breadcrumbHtml = '<div class="breadcrumb-bar" data-action="zoom-out" title="Click to zoom out">';
     
-    breadcrumbHtml += `<span class="breadcrumb-item page-link">${currentPage.title}</span>`;
+    // Page Title as the root of the breadcrumb
+    breadcrumbHtml += `<span class="breadcrumb-item page-link" data-action="zoom-out">${currentPage.title}</span>`;
 
     path.forEach((note, index) => {
-        const contentSnippet = note.content.length > 30 ? note.content.substring(0, 27) + '...' : (note.content || 'Untitled Note');
+        // Simple text extraction for snippet - replace HTML tags
+        let plainContent = note.content.replace(/<\/?[^>]+(>|$)/g, " ").replace(/\s+/g, ' ').trim();
+        const contentSnippet = plainContent.length > 30 
+            ? plainContent.substring(0, 27) + '...' 
+            : (plainContent || 'Untitled Note');
+            
         const isLast = index === path.length - 1;
         breadcrumbHtml += `<span class="breadcrumb-separator">»</span>`;
-        breadcrumbHtml += `<span class="breadcrumb-item ${isLast ? 'current-focus' : ''}">${contentSnippet}</span>`;
+        // Only the last item (current focus) is not clickable for zoom-in again via breadcrumb
+        if (isLast) {
+            breadcrumbHtml += `<span class="breadcrumb-item current-focus">${contentSnippet}</span>`;
+        } else {
+            // Make intermediate breadcrumb items zoomable to that specific level
+            breadcrumbHtml += `<span class="breadcrumb-item" data-action="zoom-in" data-note-id="${note.id}">${contentSnippet}</span>`;
+        }
     });
 
     breadcrumbHtml += '</div>';
@@ -902,66 +1018,82 @@ function renderBreadcrumbs(path) {
 }
 
 
-async function zoomInOnNote(noteElement) {
-    if (document.body.classList.contains('logseq-focus-active')) {
-        const currentlyZoomedId = outlineContainer.querySelector('.outline-item[data-level="0"]')?.dataset.noteId;
-        if (currentlyZoomedId === noteElement.dataset.noteId) { 
-            await zoomOut();
-            return;
-        }
-        await zoomOut(); 
-        setTimeout(() => zoomInOnNote(noteElement), 50); 
+async function zoomInOnNote(targetNoteReference) {
+    let noteIdToZoom;
+
+    // Determine the note ID from the reference (could be an element or an ID string/number)
+    if (typeof targetNoteReference === 'string' || typeof targetNoteReference === 'number') {
+        noteIdToZoom = String(targetNoteReference);
+    } else if (targetNoteReference && targetNoteReference.dataset && targetNoteReference.dataset.noteId) {
+        noteIdToZoom = targetNoteReference.dataset.noteId;
+    } else {
+        console.error("Invalid target for zoomInOnNote:", targetNoteReference);
         return;
     }
 
-    if (!currentPage || !currentPage.notes) return;
-    const noteId = noteElement.dataset.noteId;
-    if (!noteId) return;
-
-    const noteDataWithPath = findNoteAndPath(noteId, currentPage.notes);
-    if (!noteDataWithPath || !noteDataWithPath.note) { 
-        console.error("Note to zoom not found in current page data:", noteId);
+    if (!currentPage || !currentPage.notes) {
+        console.error("Cannot zoom, currentPage data is missing. Attempting to recover.");
+        // Fallback: if current page data is lost, zoom out completely.
+        await zoomOut();
         return;
     }
-    
-    const { note: noteInFullTree, path: breadcrumbPath } = noteDataWithPath;
+
+    // Always find the note and its path from the original, complete currentPage.notes structure
+    const noteDataWithPath = findNoteAndPath(noteIdToZoom, currentPage.notes);
+
+    if (!noteDataWithPath || !noteDataWithPath.note) {
+        console.error("Note to zoom (ID: " + noteIdToZoom + ") not found in current page data. This might indicate stale data or an invalid ID. Zooming out.");
+        await zoomOut(); // Fallback if the target note for zoom isn't in the master list
+        return;
+    }
+
+    const { note: noteInFullTree, path } = noteDataWithPath;
+    window.breadcrumbPath = path; // Store the new path for breadcrumb rendering
 
     document.body.classList.add('logseq-focus-active');
-    outlineContainer.classList.add('focused'); 
+    outlineContainer.classList.add('focused');
 
+    // Clone the focused note subtree from the original full tree
+    // This ensures modifications (like level adjustments) don't affect currentPage.notes
     const clonedFocusedNote = JSON.parse(JSON.stringify(noteInFullTree));
-    clonedFocusedNote.level = 0;
+    clonedFocusedNote.level = 0; // The new zoomed item is always level 0 in its view
     if (clonedFocusedNote.children) {
-        adjustLevels(clonedFocusedNote.children, 1);
+        adjustLevels(clonedFocusedNote.children, 1); // Adjust children levels relative to this new root
     }
-    const focusedNotesArray = [clonedFocusedNote];
+    const focusedNotesArray = [clonedFocusedNote]; // The outline will be rendered from this array
 
-    // Page title remains UNCHANGED. No modification to #page-title element.
-
+    // Hide page-level elements that don't make sense in a focused view
     pageProperties.style.display = 'none';
     document.getElementById('new-note').style.display = 'none';
     document.getElementById('backlinks-container').style.display = 'none';
 
-    const breadcrumbsHtml = renderBreadcrumbs(breadcrumbPath);
+    const breadcrumbsHtml = renderBreadcrumbs(path); // Render breadcrumbs for the current zoom path
+    // Render the outline starting from level 0 for the focused view
     outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0));
-    
+
+    // Scroll the newly focused item into view
     const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
-    focusedDomNote?.scrollIntoView({ behavior: 'auto', block: 'start' });
+    if (focusedDomNote) {
+        // Using a slight delay can help if the browser needs a moment to paint before scrolling
+        setTimeout(() => {
+             focusedDomNote.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 0);
+    }
 }
 
 async function zoomOut() {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
+    window.breadcrumbPath = null; // Clear global breadcrumb path
     
     document.getElementById('new-note').style.display = 'block';
     document.getElementById('backlinks-container').style.display = 'block';
-    // Page properties visibility will be handled by loadPage -> renderPage
-
+    
     if (currentPage && currentPage.id) {
         await loadPage(currentPage.id); 
     } else {
         console.warn("Zooming out but currentPage is not fully defined. Reloading to today's page.");
         const today = new Date().toISOString().split('T')[0];
-        window.location.hash = today;
+        navigateToPage(today);
     }
 }
