@@ -98,7 +98,7 @@ NoteAncestry AS (
 LinkingNoteHierarchyRoots AS (
     SELECT DISTINCT -- A single linking_note_id will trace to one root
         na.source_page_id,
-        na.linking_note_id, 
+        na.linking_note_id,
         na.current_ancestor_id AS root_note_id
     FROM NoteAncestry na
     WHERE (na.parent_id IS NULL OR na.parent_id = 0) -- This is the top-most parent (0 also considered root-like)
@@ -111,13 +111,14 @@ FullThreads AS (
         r.source_page_id,
         r.root_note_id, -- This is the key for grouping in PHP
         n.id,
-        n.page_id AS note_actual_page_id, 
+        n.page_id AS note_actual_page_id,
         n.content,
         -- n.level, -- Removed level
         n.parent_id AS actual_parent_id, -- Select actual parent_id from notes table
         n.block_id,
         n.created_at,
-        n.updated_at
+        n.updated_at,
+        n."order" AS note_order -- <<< ADDED
     FROM LinkingNoteHierarchyRoots r
     JOIN notes n ON r.root_note_id = n.id AND r.source_page_id = n.page_id -- Start with the root notes themselves
 
@@ -133,7 +134,8 @@ FullThreads AS (
         child.parent_id AS actual_parent_id, -- Select actual parent_id from notes table (aliased as child)
         child.block_id,
         child.created_at,
-        child.updated_at
+        child.updated_at,
+        child."order" AS note_order -- <<< ADDED
     FROM FullThreads ft
     JOIN notes child ON ft.id = child.parent_id -- Correct join condition using actual column name
     WHERE child.page_id = ft.source_page_id -- Crucial: Ensure children are on the same page
@@ -148,14 +150,15 @@ SELECT
     ft.block_id,
     ft.created_at,
     ft.updated_at,
-    ft.root_note_id -- This is critical for the PHP grouping logic
+    ft.root_note_id, -- This is critical for the PHP grouping logic
+    ft.note_order -- OPTIONAL: Select if needed by PHP, not strictly required if only for ORDER BY
 FROM FullThreads ft
 JOIN pages p ON ft.source_page_id = p.id
 ORDER BY
-    ft.source_page_id, 
-    ft.root_note_id,   
+    ft.source_page_id,
+    ft.root_note_id,
     -- ft.level, -- Removed level from ORDER BY
-    n."order", -- Assuming 'order' column exists on notes for consistent ordering within a level
+    ft.note_order, -- <<< CORRECTED
     ft.id;
 SQL;
 

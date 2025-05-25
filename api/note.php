@@ -602,17 +602,5 @@ function reorderNote($data) {
         error_log("Error reordering note " . ($note_id ?? 'unknown') . ": " . $e->getMessage());
         return ['error' => $e->getMessage()];
     }
-} catch (Exception $e) {
-    error_log("Error in note.php: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
-    $error = ['error' => $e->getMessage()];
-    error_log("Sending error response: " . json_encode($error));
-    echo json_encode($error);
-} finally {
-    if (isset($db)) {
-        $db->close();
-    }
-    // End output buffering and send the response
-    ob_end_flush();
 }
 ?> 
