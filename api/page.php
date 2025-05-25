@@ -24,6 +24,7 @@ try {
     if (!$db) {
         throw new Exception('Failed to connect to database: ' . SQLite3::lastErrorMsg());
     }
+    $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
     // Enable foreign key constraints for this connection
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
         error_log("Notice: Attempted to enable foreign_keys for page.php. Check SQLite logs if issues persist with FKs.");
@@ -150,7 +151,6 @@ try {
                 n.id,
                 n.page_id,
                 n.content,
-                n.level,
                 n.parent_id,
                 n.block_id,
                 n.created_at,
@@ -168,7 +168,7 @@ try {
             FROM notes n
             WHERE n.page_id = :page_id
             GROUP BY n.id -- Group by note ID as subqueries handle aggregation per note
-            ORDER BY n.level, n.id
+            ORDER BY "order", n.id -- Order by 'order' primarily, then by id as a fallback for stable sorting
 SQL;
         $stmt = $db->prepare($sql);
         if (!$stmt) {
@@ -181,42 +181,53 @@ SQL;
             throw new Exception('Failed to execute notes query: ' . $db->lastErrorMsg());
         }
         
-        $notes = [];
-        $noteMap = [];
-        
+        $allNotesFlat = [];
         while ($note = $result->fetchArray(SQLITE3_ASSOC)) {
-            // Parse properties from JSON string
             $note['properties'] = json_decode($note['properties_json'], true) ?: [];
             unset($note['properties_json']);
-            
-            // Parse attachments from JSON string
             $note['attachments'] = json_decode($note['attachments_json'], true) ?: [];
             unset($note['attachments_json']);
-            
-            // Build note tree
-            if ($note['parent_id'] === null) {
-                $notes[] = $note;
-                $noteMap[$note['id']] = &$notes[count($notes) - 1];
-            } else {
-                // Ensure parent exists in the map before trying to attach child
-                if (isset($noteMap[$note['parent_id']])) {
-                    if (!isset($noteMap[$note['parent_id']]['children'])) {
-                        $noteMap[$note['parent_id']]['children'] = [];
+            $allNotesFlat[$note['id']] = $note; // Store by ID for easier lookup
+        }
+
+        // Helper function to build the tree and assign levels
+        function buildTreeWithLevels($allNotesMap, $parentId, $currentLevel) {
+            $tree = [];
+            foreach ($allNotesMap as $noteId => $note) {
+                // Check parent_id matching (strict for null, loose for numbers/strings from DB)
+                $noteParentId = $note['parent_id'];
+                $isRootMatch = ($parentId === null && $noteParentId === null);
+                $isChildMatch = ($parentId !== null && $noteParentId == $parentId);
+
+                if ($isRootMatch || $isChildMatch) {
+                    $noteData = $note; // Copy note data
+                    $noteData['level'] = $currentLevel;
+                    
+                    // Recursively find children for the current note
+                    // Pass the original map, but the current note's ID as the new parentId
+                    $children = buildTreeWithLevels($allNotesMap, $noteId, $currentLevel + 1);
+                    if (!empty($children)) {
+                        $noteData['children'] = $children;
+                    } else {
+                        $noteData['children'] = []; // Ensure children property always exists
                     }
-                    $noteMap[$note['parent_id']]['children'][] = $note;
-                    $noteMap[$note['id']] = &$noteMap[$note['parent_id']]['children'][count($noteMap[$note['parent_id']]['children']) - 1];
-                } else {
-                    // Log orphaned note if parent_id is set but not found in map (e.g. due to data integrity or if parent is not yet processed)
-                    // Adding to root as a fallback, though ORDER BY should make this rare for valid data.
-                    error_log("Orphaned note detected: ID {$note['id']} with parent_id {$note['parent_id']} not found in map. Adding to root.");
-                    $notes[] = $note;
-                    $noteMap[$note['id']] = &$notes[count($notes) - 1];
+                    $tree[] = $noteData;
+                    // It's important NOT to unset from $allNotesMap here if notes can be shared or if order of processing matters
+                    // The current structure implies each note has one parent in the context of a page.
                 }
             }
+            // Sort the current level by the 'order' property before returning
+            usort($tree, function($a, $b) {
+                return ($a['order'] ?? 0) <=> ($b['order'] ?? 0);
+            });
+            return $tree;
         }
         
-        $page['notes'] = $notes;
-        error_log("Notes retrieved: " . json_encode($notes));
+        // Build the hierarchical notes structure starting with root notes (parent_id IS NULL)
+        $hierarchicalNotes = buildTreeWithLevels($allNotesFlat, null, 0);
+        
+        $page['notes'] = $hierarchicalNotes;
+        error_log("Notes retrieved and structured: " . json_encode($hierarchicalNotes));
         
         return $page;
     }

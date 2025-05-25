@@ -5,6 +5,18 @@ ini_set('display_errors', 0);
 
 try {
     $db = new SQLite3('../db/notes.db');
+    if (!$db) {
+        // This specific check might be redundant if SQLite3 constructor throws an exception on failure,
+        // but it's a good early check. The main catch block will handle exceptions.
+        throw new Exception('Failed to connect to database in attachment.php');
+    }
+    $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
+    
+    // Enable foreign key constraints (optional but good practice)
+    if (!$db->exec('PRAGMA foreign_keys = ON;')) {
+        error_log("Notice: Attempted to enable foreign_keys for attachment.php. Check SQLite logs if issues persist.");
+    }
+
     $uploadsDir = __DIR__ . '/../uploads';
 
     if (!file_exists($uploadsDir)) {

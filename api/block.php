@@ -10,6 +10,7 @@ try {
     if (!$db) {
         throw new Exception('Failed to connect to database: ' . SQLite3::lastErrorMsg());
     }
+    $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
 
     $id = $_GET['id'] ?? null;
     if (!$id) {

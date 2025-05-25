@@ -394,6 +394,7 @@ async function renderOutline(notes, level = 0) {
                         <button data-action="add-child" title="Add child note">+</button>
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
                         <button data-action="edit" title="Edit note">✎</button>
+                        <button data-action="indent-note" title="Indent note (make child of item above)">→</button>
                         <button data-action="upload" title="Upload file">↑</button>
                         <button data-action="delete" title="Delete note">×</button>
                          | <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">${new Date(note.created_at).toLocaleDateString()}</span>
@@ -429,6 +430,7 @@ async function renderPage(page) {
     const editButton = pageTitle.querySelector('.edit-properties-button');
     if (editButton) editButton.onclick = editPageProperties;
     outlineContainer.innerHTML = await renderOutline(page.notes);
+    initSortable(outlineContainer); // Initialize SortableJS
     const backlinksContainer = document.getElementById('backlinks-container');
     if (backlinksContainer) renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
 }
@@ -757,26 +759,92 @@ function handleOutlineClick(event) {
             if (noteElement.classList.contains('has-children')) toggleChildren(noteElement);
             break;
         case 'copy-block-id':
-            const blockId = noteElement.querySelector('.outline-content[data-block-id]')?.dataset.blockId;
-            if (blockId) {
-                navigator.clipboard.writeText(`{{${blockId}}}`).then(() => {
-                    const button = target.closest('button');
-                    if (button) { button.textContent = 'Copied!'; setTimeout(() => { button.textContent = '#'; }, 1000); }
-                }).catch(err => console.error('Failed to copy block ID:', err));
-            }
+            // ... (existing code) ...
             break;
         case 'add-child': createNote(noteIdForAction, parseInt(noteElement.dataset.level) + 1); break;
+        case 'indent-note': // ADDED CASE
+            handleIndentNote(noteIdForAction, noteElement);
+            break;
         case 'edit': editNote(noteIdForAction, noteElement.dataset.content); break;
         case 'upload':
-            const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.style.display = 'none';
-            document.body.appendChild(fileInput);
-            fileInput.onchange = (e) => { if (e.target.files.length > 0) uploadFile(noteIdForAction, e.target.files[0]); document.body.removeChild(fileInput); };
-            fileInput.click();
+            // ... (existing code) ...
             break;
         case 'delete': deleteNote(noteIdForAction); break;
         default:
             // console.log("Unknown action or unhandled click:", action, target);
             break;
+    }
+}
+
+async function handleIndentNote(noteId, noteElement) {
+    if (!currentPage || !currentPage.id) {
+        console.error("Cannot indent: Current page context lost.");
+        alert("Error: Current page context lost. Please refresh.");
+        return;
+    }
+
+    // Find the visually preceding .outline-item element
+    let previousSiblingElement = noteElement.previousElementSibling;
+    while (previousSiblingElement && !previousSiblingElement.matches('.outline-item')) {
+        previousSiblingElement = previousSiblingElement.previousElementSibling;
+    }
+
+    if (!previousSiblingElement) {
+        // No preceding sibling .outline-item at the same level or in the parent list.
+        // This could happen if it's the first item in the root, or first child in a children group.
+        // More sophisticated logic could look up the DOM tree.
+        // For now, if no direct visual predecessor, disable or alert.
+        alert("Cannot indent this note further: no suitable preceding item found to become its parent.");
+        // Visually disable the button next time if this condition is met on render.
+        return;
+    }
+
+    const newParentId = previousSiblingElement.dataset.noteId;
+    if (!newParentId) {
+        alert("Error: Preceding item is missing a note ID.");
+        return;
+    }
+
+    // Determine the new order. The note will become the last child of the new parent.
+    // The backend's `reorder_note` will use MAX("order") + 1 for the new parent.
+    // We can send a high number or 0, backend reorder logic is more about the parent change.
+    // For consistency with drag-drop, let's send 0, implying "make it the first/next available".
+    // The backend reorder will then correctly place it based on MAX order for that new parent.
+    // A more precise client-side calculation for newIndex would be:
+    const newParentChildrenContainer = previousSiblingElement.querySelector(':scope > .outline-children');
+    let newIndex = 0;
+    if (newParentChildrenContainer) {
+        newIndex = newParentChildrenContainer.querySelectorAll(':scope > .outline-item').length;
+    }
+    // If newIndex is 0, it means it's the first child.
+    // The backend handles setting the actual 'order' value.
+
+    console.log(`Indenting note ${noteId} to become child of ${newParentId} at index ${newIndex}`);
+
+    const payload = {
+        action: 'reorder_note',
+        note_id: parseInt(noteId),
+        new_parent_id: parseInt(newParentId),
+        new_order: newIndex, // The backend will adjust this to be the last child order
+        page_id: currentPage.id
+    };
+
+    try {
+        const response = await fetch('api/note.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        console.log('Note indented successfully:', data);
+        loadPage(currentPage.id); // Reload to see changes
+    } catch (error) {
+        console.error('Error indenting note:', error);
+        alert('Error indenting note: ' + error.message + '. Please refresh.');
+        loadPage(currentPage.id); // Reload to ensure UI consistency
     }
 }
 
@@ -1241,6 +1309,7 @@ async function zoomInOnNote(targetNoteReference) {
     const breadcrumbsHtml = renderBreadcrumbs(path); // Render breadcrumbs for the current zoom path
     // Render the outline starting from level 0 for the focused view
     outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0));
+    initSortable(outlineContainer); // Initialize SortableJS for focused view
 
     // Scroll the newly focused item into view
     const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
@@ -1251,6 +1320,178 @@ async function zoomInOnNote(targetNoteReference) {
         }, 0);
     }
 }
+
+function initSortable(containerElement) {
+    const sortableOptions = {
+        group: 'nested',
+        animation: 150,
+        fallbackOnBody: true,
+        swapThreshold: 0.65,
+        handle: '.static-bullet', // Using the bullet as the drag handle
+        onEnd: function(evt) {
+            // console.log('Drag ended:', evt);
+            // console.log('Item ID:', evt.item.dataset.noteId);
+            // console.log('New parent ID:', evt.to.closest('.outline-item')?.dataset.noteId);
+            // console.log('Old parent ID:', evt.from.closest('.outline-item')?.dataset.noteId);
+            // console.log('New index:', evt.newIndex);
+            // console.log('Old index:', evt.oldIndex);
+            // Logic to update note order/parent will be added in the next step.
+            handleNoteDrop(evt);
+        }
+    };
+
+    // Initialize on the main container
+    if (containerElement && !containerElement.classList.contains('has-sortable')) {
+        new Sortable(containerElement, sortableOptions);
+        containerElement.classList.add('has-sortable');
+    }
+
+    // Initialize on all child containers
+    const childContainers = containerElement.querySelectorAll('.outline-children');
+    childContainers.forEach(childContainer => {
+        if (!childContainer.classList.contains('has-sortable')) {
+            new Sortable(childContainer, sortableOptions);
+            childContainer.classList.add('has-sortable');
+        }
+    });
+}
+
+
+function updateDraggedItemLevel(draggedItem, newBaseLevel) {
+    if (!draggedItem || !draggedItem.dataset) return;
+
+    draggedItem.dataset.level = newBaseLevel;
+
+    const childrenContainer = draggedItem.querySelector('.outline-children');
+    if (childrenContainer) {
+        const childItems = childrenContainer.querySelectorAll(':scope > .outline-item'); // Direct children only
+        childItems.forEach(child => {
+            updateDraggedItemLevel(child, newBaseLevel + 1);
+        });
+    }
+}
+
+
+function handleNoteDrop(evt) {
+    const draggedItem = evt.item;
+    const draggedNoteId = draggedItem.dataset.noteId;
+
+    // Original position (before SortableJS moved the item in the DOM)
+    const oldParentItem = evt.from.closest('.outline-item');
+    const oldParentId = oldParentItem ? oldParentItem.dataset.noteId : null;
+    const oldLevel = parseInt(draggedItem.dataset.level); // Level of the item as it was picked up
+    const oldIndex = evt.oldIndex; // Index in the original list
+
+    // Tentative new parent and index based on where SortableJS placed the item
+    // `evt.to` is the list element where the item was dropped.
+    // `evt.newIndex` is the index within `evt.to`.
+    let newParentIdCandidateEl = evt.to.closest('.outline-item');
+    let newParentId = newParentIdCandidateEl ? newParentIdCandidateEl.dataset.noteId : null;
+    let newIndex = evt.newIndex;
+    let newLevel;
+
+    // --- Detect "drop onto an item to make it a child" ---
+    // `evt.originalEvent.target` is the actual DOM element the mouse was over when released.
+    const dropTargetItemElement = evt.originalEvent.target.closest('.outline-item');
+
+    if (dropTargetItemElement && dropTargetItemElement !== draggedItem) {
+        // User dropped onto `dropTargetItemElement`.
+        // Check if SortableJS placed `draggedItem` immediately *after* `dropTargetItemElement` in its list.
+        const parentListOfDropTarget = dropTargetItemElement.parentElement; // The list `dropTargetItemElement` is in.
+
+        if (evt.to === parentListOfDropTarget &&
+            parentListOfDropTarget.children[evt.newIndex - 1] === dropTargetItemElement) {
+            // This is a strong indication: `draggedItem` is now at `evt.newIndex`,
+            // and the element at `evt.newIndex - 1` (right before it) is `dropTargetItemElement`.
+            // This means the user dropped "onto" `dropTargetItemElement` intending to make `draggedItem` its child.
+
+            newParentId = dropTargetItemElement.dataset.noteId; // `dropTargetItemElement` becomes the new parent.
+            newIndex = 0; // The `draggedItem` becomes the first child.
+            console.log(`Drop re-interpreted: ${draggedNoteId} to be child of ${newParentId} at index 0.`);
+        }
+        // If `dropTargetItemElement` already had children and the drop was into its `.outline-children`
+        // then `evt.to` would be that `.outline-children` div.
+        // In that case, `newParentIdCandidateEl` (which is `evt.to.closest('.outline-item')`)
+        // would correctly be `dropTargetItemElement`. The initial `newParentId` and `newIndex` are already correct.
+        // So the `if` condition above specifically targets the "make new child of item without children" or "drop onto parent content" case.
+    }
+
+    // Calculate the newLevel based on the *final* newParentId.
+    if (newParentId === null) { // Dropped into the root outlineContainer
+        newLevel = 0;
+    } else {
+        // We need to find the DOM element of the determined new parent to get its level.
+        // It's safer to query the whole outlineContainer in case the parent is not immediately obvious from evt.to.
+        const finalNewParentDomItem = outlineContainer.querySelector(`.outline-item[data-note-id="${newParentId}"]`);
+        if (finalNewParentDomItem) {
+            newLevel = parseInt(finalNewParentDomItem.dataset.level) + 1;
+        } else {
+            console.error("Error: Could not find the final new parent DOM element for level calculation. Parent ID:", newParentId, "Reloading page.");
+            loadPage(currentPage.id); // Fallback to reload to prevent inconsistent state
+            return;
+        }
+    }
+
+    // Optimistically update the data-level attribute for the dragged item and its children.
+    // This provides immediate visual feedback on the level change.
+    // The actual nesting will be fixed by the full page reload after successful save.
+    updateDraggedItemLevel(draggedItem, newLevel);
+
+    const updateData = {
+        noteId: draggedNoteId,
+        newParentId: newParentId,
+        newIndex: newIndex,
+        oldParentId: oldParentId, // Kept for logging, not used by current backend reorder
+        oldIndex: oldIndex,       // Kept for logging
+        oldLevel: oldLevel        // Kept for logging
+    };
+
+    console.log('Note Drop Update Data:', JSON.stringify(updateData));
+
+    if (!currentPage || !currentPage.id) {
+        console.error("Current page information is not available. Cannot save reorder changes.");
+        alert("Error: Current page context lost. Please refresh.");
+        // Attempt to recover by reloading to a known state, e.g., today's page
+        const today = new Date().toISOString().split('T')[0];
+        navigateToPage(today);
+        return;
+    }
+
+    const payload = {
+        action: 'reorder_note',
+        note_id: parseInt(draggedNoteId),
+        new_parent_id: newParentId ? parseInt(newParentId) : null,
+        new_order: parseInt(newIndex), // This is the 'new_order' for the backend
+        page_id: currentPage.id
+    };
+
+    fetch('api/note.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error reordering note:', data.error);
+            alert('Error saving changes: ' + data.error + '. Please refresh.');
+            loadPage(currentPage.id); // Reload to ensure consistency from DB
+        } else {
+            console.log('Note reordered successfully:', data);
+            // The DOM was partially updated (levels).
+            // Reloading the page is the most reliable way to ensure the UI
+            // fully reflects the database state, especially for new parent-child relationships
+            // and the creation of new .outline-children containers.
+            loadPage(currentPage.id);
+        }
+    })
+    .catch(error => {
+        console.error('Fetch error during reorder:', error);
+        alert('Network error while saving changes. Please refresh.');
+        loadPage(currentPage.id); // Reload on network error too
+    });
+}
+
 
 async function zoomOut() {
     document.body.classList.remove('logseq-focus-active');

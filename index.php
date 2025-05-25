@@ -45,6 +45,7 @@ if (!file_exists($dbPath)) {
             </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html> 
