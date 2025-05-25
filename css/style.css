@@ -39,12 +39,19 @@
     --note-content-compact-padding-y: 2px; 
     --note-actions-icon-size: 0.9em;
     --note-actions-button-padding: 3px;
+
+    /* Logseq-like TODO/DONE colors (can be customized) */
+    --todo-bg-color: #fffbeb; /* Light yellow */
+    --todo-text-color: #92400e; /* Dark yellow/brown */
+    --done-bg-color: #ecfdf5; /* Light green */
+    --done-text-color: #065f46; /* Dark green */
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     color: var(--text-color); background: var(--bg-color); line-height: 1.6;
+    font-size: 1.0625em; /* Approx 17px if base is 16px - INCREASED TEXT SIZE */
 }
 .container { display: flex; min-height: 100vh; position: relative; }
 .sidebar {
@@ -151,6 +158,7 @@ body {
     padding: 0 0 8px 0; border-bottom: 1px solid var(--border-color);
 }
 .page-title-text { font-size: 1.5em; font-weight: 400; color: var(--primary-color); flex-grow: 1; } /* Slightly bolder */
+
 .edit-properties-button {
     background: none; border: none; font-size: 0.9em; cursor: pointer;
     opacity: 0; transition: all 0.2s; padding: 2px; color: var(--text-muted);
@@ -267,12 +275,47 @@ body {
 .note-actions button[data-action="delete"]:hover { color: #e74c3c; background-color: #fff0f0; }
 .note-actions .actions-separator { margin: 0 4px; color: var(--border-color); }
 .note-date { display: inline; font-size: 0.8em; color: var(--text-muted); }
-.outline-content .property-tag { font-size: 0.75em; padding: 1px 5px; margin: 2px 2px 2px 0; line-height: 1.3; }
-.outline-content .property-tag a { border-bottom: none; }
-.outline-content .property-tag a:hover { background: var(--accent-color); color: white; border-bottom: none; }
-.outline-content a { color: var(--accent-color); text-decoration: none; border-bottom: 1px solid var(--border-color); transition: all 0.2s ease; }
-.outline-content a:hover { border-bottom-color: var(--accent-color); }
-.outline-content a.property-tag, .outline-content a.attachment-name, .outline-content a.internal-link { border-bottom: none; }
+/* Tags #tag or property-tag */
+a.property-tag, span.property-tag {
+    display: inline-flex; align-items: center; padding: 1px 5px; /* Slightly less padding */
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); font-size: 0.8em; 
+    color: var(--text-color); margin: 2px; white-space: nowrap;
+}
+a.property-tag { /* Specifically for clickable #tags */
+    color: var(--accent-color); 
+    text-decoration: none;
+}
+a.property-tag:hover {
+    background: var(--hover-color);
+    color: var(--primary-color);
+    text-decoration: none;
+}
+.tag-link-brackets { /* For [[#tag]] style if implemented */
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+.outline-content a.property-tag, .outline-content a.attachment-name { border-bottom: none; }
+.outline-content a { 
+    color: var(--accent-color); 
+    text-decoration: none; 
+    transition: all 0.2s ease; 
+}
+/* Internal Links [[Page]] */
+.internal-link {
+    color: var(--accent-color);
+    text-decoration: none;
+    padding: 0 1px; /* Minimal padding around the link text */
+    border-bottom: 1px solid var(--border-color); /* Subtle underline */
+}
+.internal-link:hover {
+    border-bottom-color: var(--accent-color);
+}
+.internal-link-brackets {
+    color: var(--text-muted);
+    opacity: 0.6; /* Logseq style for brackets */
+    font-weight: normal; 
+}
 
 /* Zoom/Focus Mode & Breadcrumbs */
 .breadcrumb-bar {
@@ -489,11 +532,71 @@ body {
 .outline-content .attachment.broken:hover { background: #ffe0e0; border-color: #c0392b; color: #c0392b; }
 
 /* TODO/DONE Styling */
-.todo-item { margin: 0.2em 0; }
-.todo-checkbox { display: flex; align-items: center; cursor: pointer; }
-.todo-checkbox input[type="checkbox"] { margin-right: 0.5em; cursor: pointer; transform: scale(1.1); }
-.todo-checkbox .status-todo { color: var(--note-text-color); }
-.todo-checkbox .status-done { text-decoration: line-through; color: var(--text-muted); }
+/* Block Refs {{blockId}} - If you make them clickable/styled */
+.block-ref-brackets {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+a.block-ref-link { 
+    color: var(--accent-color);
+    text-decoration: none;
+    font-family: monospace; /* Logseq style */
+    border-bottom: 1px dotted var(--border-color); /* Dotted for distinction */
+}
+a.block-ref-link:hover {
+    border-bottom-color: var(--accent-color);
+}
+
+/* TODO/DONE Styling - Logseq Inspired */
+.todo-item { 
+    margin: 0.1em 0; /* Reduced margin for compactness */
+    display: flex; /* Added for alignment */
+    align-items: center; /* Added for alignment */
+}
+.todo-checkbox { /* Will not be used if we follow Logseq's marker approach */
+    /* display: flex; align-items: center; cursor: pointer; */
+}
+.todo-checkbox input[type="checkbox"] {
+    margin-right: 0.4em; /* Space between checkbox and marker */
+    cursor: pointer;
+    transform: scale(1); /* Default size is fine */
+    vertical-align: middle; /* Better alignment with text */
+}
+.todo-marker {
+    display: inline-block;
+    padding: 1px 6px; /* Logseq-like padding */
+    border-radius: var(--radius-sm);
+    font-weight: 500; 
+    font-size: 0.75em; /* Smaller than main text */
+    margin-right: 0.4em;
+    cursor: pointer;
+    text-transform: uppercase;
+    line-height: 1.4; /* Ensure it aligns well vertically */
+    vertical-align: middle;
+}
+.todo-marker.status-todo {
+    background-color: var(--todo-bg-color);
+    color: var(--todo-text-color);
+    border: 1px solid var(--todo-text-color); /* Subtle border */
+}
+.todo-marker.status-done {
+    background-color: var(--done-bg-color);
+    color: var(--done-text-color);
+    border: 1px solid var(--done-text-color); /* Subtle border */
+}
+.todo-text { /* Class for the actual task text content */
+    display: inline; /* To flow with the marker */
+    vertical-align: middle;
+}
+.todo-text.status-done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    opacity: 0.8; /* Slightly faded */
+}
+.todo-item .todo-checkbox .status-todo, 
+.todo-item .todo-checkbox .status-done {
+    /* These were for the old structure, might not be needed if text is in .todo-text */
+}
 
 /* Image Modal for full-size preview */
 .image-modal .image-modal-content {
