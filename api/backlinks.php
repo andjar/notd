@@ -15,6 +15,8 @@ if (php_sapi_name() == 'cli') {
     }
 }
 
+ob_start(); // Start output buffering
+
 header('Content-Type: application/json');
 
 // Set error handling for this script
@@ -22,6 +24,14 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); // Errors should be logged, not displayed for API
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Consistent error logging
+
+// Custom error handler to convert errors to ErrorExceptions
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    if (!(error_reporting() & $errno)) {
+        return false;
+    }
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
 
 // Database connection details
 $db_path = __DIR__ . '/../db/notes.db'; // Make path robust
@@ -103,7 +113,7 @@ FullThreads AS (
         n.id,
         n.page_id AS note_actual_page_id, 
         n.content,
-        n.level,
+        -- n.level, -- Removed level
         n.parent_id AS actual_parent_id, -- Select actual parent_id from notes table
         n.block_id,
         n.created_at,
@@ -119,7 +129,7 @@ FullThreads AS (
         child.id,
         child.page_id AS note_actual_page_id,
         child.content,
-        child.level,
+        -- child.level, -- Removed level
         child.parent_id AS actual_parent_id, -- Select actual parent_id from notes table (aliased as child)
         child.block_id,
         child.created_at,
@@ -133,7 +143,7 @@ SELECT
     p.title AS linking_page_title,
     ft.id,
     ft.content,
-    ft.level,
+    -- ft.level, -- Removed level
     ft.actual_parent_id AS parent_id, -- Use the correctly aliased parent_id
     ft.block_id,
     ft.created_at,
@@ -144,7 +154,8 @@ JOIN pages p ON ft.source_page_id = p.id
 ORDER BY
     ft.source_page_id, 
     ft.root_note_id,   
-    ft.level,          
+    -- ft.level, -- Removed level from ORDER BY
+    n."order", -- Assuming 'order' column exists on notes for consistent ordering within a level
     ft.id;
 SQL;
 
@@ -182,7 +193,7 @@ SQL;
         $currentNotes[] = [
             'id' => $row['id'],
             'content' => $row['content'],
-            'level' => $row['level'],
+            // 'level' => $row['level'], // Level removed
             'parent_id' => $row['parent_id'],
             'block_id' => $row['block_id'],
             'created_at' => $row['created_at'],
@@ -200,15 +211,31 @@ SQL;
         ];
     }
 
+    if (ob_get_level() > 0 && ob_get_length() > 0) {
+        ob_clean(); // Clean buffer if anything was outputted before successful json response
+    }
+    if (!headers_sent()) {
+         header('Content-Type: application/json'); // Ensure header is set
+    }
     echo json_encode($threads);
 
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+} catch (Throwable $e) { // Catch Throwable to include ErrorExceptions
+    if (ob_get_level() > 0 && ob_get_length() > 0) { // Check if buffer is active and has content
+        ob_clean(); // Clean the buffer
+    }
+    if (!headers_sent()) { // Check if headers already sent
+      header('Content-Type: application/json'); // Re-affirm header
+      http_response_code(500); // Set appropriate HTTP status
+    }
+    error_log("Error in backlinks.php: " . $e->getMessage() . "\nStack trace:\n" . $e->getTraceAsString());
+    echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
 } finally {
     // Close the database connection
     if (isset($pdo)) {
         $pdo = null;
+    }
+    if (ob_get_level() > 0) { // Check if buffering is active
+        ob_end_flush(); // Flush the output buffer
     }
 }
 

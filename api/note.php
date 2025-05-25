@@ -413,22 +413,32 @@ try {
         $input = '';
         if (php_sapi_name() == 'cli' && isset($GLOBALS['cliInputPayload'])) {
             $input = $GLOBALS['cliInputPayload'];
-            error_log("Using PHP_INPUT_PAYLOAD (CLI mode) for POST data.");
+            error_log("api/note.php: Using PHP_INPUT_PAYLOAD (CLI mode) for POST data: " . $input);
         } else {
             $input = file_get_contents('php://input');
         }
-        error_log("Received input: " . $input);
+        error_log('api/note.php: Raw POST input: ' . $input); // Log it
         
         $data = json_decode($input, true);
+        error_log('api/note.php: Decoded data: ' . print_r($data, true));
         if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log('api/note.php: JSON decode error: ' . json_last_error_msg());
             throw new Exception('Invalid JSON: ' . json_last_error_msg());
         }
         
         if (!$data) {
-            throw new Exception('Invalid data');
+            // This check might be redundant if json_decode($input, true) on an empty string $input results in null,
+            // and then json_last_error() is JSON_ERROR_NONE.
+            // However, if $input is e.g. "null", $data becomes null, json_last_error is NONE.
+            // Or if $input is an empty JSON object "{}", $data is an empty array.
+            // Explicitly checking if $data is falsey (null, false, empty array if that's considered invalid) might be intended.
+            // For now, the original logic is kept, but with added logging.
+            error_log('api/note.php: $data is empty or invalid after decoding. Input was: ' . $input);
+            throw new Exception('Invalid data - POST data decoded to empty or invalid structure.');
         }
 
-        $action = $data['action'] ?? 'create';
+        $action = $data['action'] ?? 'create'; // Default to 'create' if no action specified
+        error_log('api/note.php: Action determined: ' . $action);
         
         switch ($action) {
             case 'create':
@@ -463,26 +473,51 @@ try {
                 throw new Exception('Invalid action');
         }
         
-        error_log("Sending response: " . json_encode($result));
+        error_log('api/note.php: Encoding SUCCESS response: ' . print_r($result, true));
         echo json_encode($result);
     } else {
-        throw new Exception('Method not allowed');
+        // For GET or other methods not explicitly handled by POST logic
+        // This path should ideally not be reached if specific handlers for GET, etc., are defined
+        // or if a general "Method not allowed" is thrown earlier for non-POST requests.
+        // However, if it's reached, it implies a logic flaw or unhandled method.
+        error_log('api/note.php: Reached unhandled method: ' . $method . ' in main try block.');
+        throw new Exception('Method not allowed: ' . $method);
     }
-} catch (Exception $e) {
+} catch (Throwable $e) { // Changed from Exception to Throwable to catch Errors as well
     // Clean the output buffer before sending a JSON error response
     // This helps prevent partial HTML output if any occurred before this catch block was reached.
     if (ob_get_length()) {
         ob_clean();
     }
-    error_log("Error in note.php: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
-    $error = ['error' => $e->getMessage()];
+    $errorMessage = $e->getMessage();
+    $errorCode = $e->getCode(); // Can be useful for specific error types
+    $errorFile = $e->getFile();
+    $errorLine = $e->getLine();
+
+    // Log detailed error information
+    error_log(sprintf(
+        "api/note.php: Throwable caught: Message: %s | Code: %s | File: %s | Line: %s",
+        $errorMessage,
+        $errorCode,
+        $errorFile,
+        $errorLine
+    ));
+    // Optionally log stack trace for more context, can be very verbose
+    // error_log("Stack trace: " . $e->getTraceAsString());
+
+    $errorResponseArray = ['error' => $errorMessage];
+    
     // Ensure header is set, in case it was cleared or not set due to early output/error
     if (!headers_sent()) {
         header('Content-Type: application/json');
+        // Potentially set a more specific HTTP status code if available from $errorCode or $e type
+        // For instance, if it's a validation error, might be 400, if DB unavailable, 503, etc.
+        // Defaulting to 500 for server-side issues.
+        http_response_code(500); 
     }
-    error_log("Sending error response: " . json_encode($error));
-    echo json_encode($error);
+    
+    error_log('api/note.php: Encoding ERROR response: ' . print_r($errorResponseArray, true));
+    echo json_encode($errorResponseArray);
 } finally {
     if (isset($db)) {
         $db->close();
