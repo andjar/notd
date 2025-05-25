@@ -40,6 +40,16 @@ ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Use absolute path 
 // Set JSON header
 header('Content-Type: application/json');
 
+// Custom error handler to convert errors to ErrorExceptions
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // Respect error_reporting level
+    if (!(error_reporting() & $errno)) {
+        // This error code is not included in error_reporting
+        return false;
+    }
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
+
 try {
     $db = new SQLite3(__DIR__ . '/../db/notes.db'); // Use absolute path for database
     if (!$db) {
@@ -458,9 +468,18 @@ try {
         throw new Exception('Method not allowed');
     }
 } catch (Exception $e) {
+    // Clean the output buffer before sending a JSON error response
+    // This helps prevent partial HTML output if any occurred before this catch block was reached.
+    if (ob_get_length()) {
+        ob_clean();
+    }
     error_log("Error in note.php: " . $e->getMessage());
     error_log("Stack trace: " . $e->getTraceAsString());
     $error = ['error' => $e->getMessage()];
+    // Ensure header is set, in case it was cleared or not set due to early output/error
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+    }
     error_log("Sending error response: " . json_encode($error));
     echo json_encode($error);
 } finally {
@@ -468,7 +487,13 @@ try {
         $db->close();
     }
     // End output buffering and send the response
-    ob_end_flush();
+    // ob_end_flush() might send whatever is in the buffer if not cleaned.
+    // If an error occurred and we cleaned the buffer, this might not be desired
+    // unless we specifically echo the JSON error *before* ob_end_flush in the catch.
+    // The current structure echoes, then ob_end_flush() sends it.
+    if (ob_get_level() > 0) { // Check if buffering is active
+        ob_end_flush();
+    }
 }
 
 function reorderNote($data) {
