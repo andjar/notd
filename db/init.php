@@ -37,9 +37,9 @@ if (!file_exists($dbPath)) {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             page_id TEXT NOT NULL,
             content TEXT NOT NULL,
-            level INTEGER NOT NULL,
             parent_id INTEGER,
             block_id TEXT,
+            "order" INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE

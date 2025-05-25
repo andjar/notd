@@ -164,11 +164,30 @@ try {
         try {
             // Generate a unique block ID
             $blockId = uniqid('block_');
+
+            // Determine the order for the new note
+            $orderQuery = 'SELECT MAX("order") AS max_order FROM notes WHERE page_id = :page_id';
+            if (!empty($data['parent_id'])) {
+                $orderQuery .= ' AND parent_id = :parent_id';
+            } else {
+                $orderQuery .= ' AND parent_id IS NULL';
+            }
+            $orderStmt = $db->prepare($orderQuery);
+            if (!$orderStmt) {
+                throw new Exception('Failed to prepare order query: ' . $db->lastErrorMsg());
+            }
+            $orderStmt->bindValue(':page_id', $data['page_id'], SQLITE3_TEXT);
+            if (!empty($data['parent_id'])) {
+                $orderStmt->bindValue(':parent_id', $data['parent_id'], SQLITE3_INTEGER);
+            }
+            $orderResult = $orderStmt->execute();
+            $maxOrderRow = $orderResult->fetchArray(SQLITE3_ASSOC);
+            $newOrder = ($maxOrderRow && isset($maxOrderRow['max_order'])) ? $maxOrderRow['max_order'] + 1 : 0;
             
             // Insert the note
             $stmt = $db->prepare('
-                INSERT INTO notes (page_id, content, level, parent_id, block_id)
-                VALUES (:page_id, :content, :level, :parent_id, :block_id)
+                INSERT INTO notes (page_id, content, parent_id, block_id, "order")
+                VALUES (:page_id, :content, :parent_id, :block_id, :order_val)
             ');
             
             if (!$stmt) {
@@ -177,9 +196,10 @@ try {
             
             $stmt->bindValue(':page_id', $data['page_id'], SQLITE3_TEXT);
             $stmt->bindValue(':content', $data['content'], SQLITE3_TEXT);
-            $stmt->bindValue(':level', $data['level'], SQLITE3_INTEGER);
-            $stmt->bindValue(':parent_id', $data['parent_id'], SQLITE3_INTEGER);
+            // Level is no longer directly set here; it's calculated dynamically in page.php
+            $stmt->bindValue(':parent_id', $data['parent_id'] ?? null, $data['parent_id'] === null ? SQLITE3_NULL : SQLITE3_INTEGER);
             $stmt->bindValue(':block_id', $blockId, SQLITE3_TEXT);
+            $stmt->bindValue(':order_val', $newOrder, SQLITE3_INTEGER);
             
             if (!$stmt->execute()) {
                 throw new Exception('Failed to insert note: ' . $db->lastErrorMsg());
@@ -250,8 +270,11 @@ try {
             // Prepare fields to update
             $updateFields = [];
             if (isset($data['content'])) $updateFields[] = "content = :content";
-            if (isset($data['level'])) $updateFields[] = "level = :level";
-            if (isset($data['parent_id'])) $updateFields[] = "parent_id = :parent_id";
+            // Level is no longer directly updated here
+            // parent_id can be explicitly set to null, so check with array_key_exists
+            if (array_key_exists('parent_id', $data)) $updateFields[] = "parent_id = :parent_id";
+            if (isset($data['order'])) $updateFields[] = "\"order\" = :order_val";
+
 
             if (!empty($updateFields)) {
                 $updateFields[] = "updated_at = CURRENT_TIMESTAMP";
@@ -264,8 +287,10 @@ try {
 
                 $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
                 if (isset($data['content'])) $stmt->bindValue(':content', $data['content'], SQLITE3_TEXT);
-                if (isset($data['level'])) $stmt->bindValue(':level', $data['level'], SQLITE3_INTEGER);
-                if (isset($data['parent_id'])) $stmt->bindValue(':parent_id', $data['parent_id'], SQLITE3_INTEGER); // parent_id can be null
+                // Level is no longer directly updated here
+                if (array_key_exists('parent_id', $data)) $stmt->bindValue(':parent_id', $data['parent_id'], $data['parent_id'] === null ? SQLITE3_NULL : SQLITE3_INTEGER);
+                if (isset($data['order'])) $stmt->bindValue(':order_val', $data['order'], SQLITE3_INTEGER);
+
 
                 if (!$stmt->execute()) {
                     throw new Exception('Failed to update note: ' . $db->lastErrorMsg());
@@ -412,6 +437,16 @@ try {
                 }
                 $result = deleteNote($id);
                 break;
+
+            case 'reorder_note':
+                // new_level is no longer required from the client for reorder_note
+                if (!isset($data['note_id'], $data['new_order'], $data['page_id'])) { // new_parent_id can be null
+                    throw new Exception('Missing required fields for reorder_note (note_id, new_order, page_id)');
+                }
+                // Ensure new_parent_id is explicitly handled if missing, defaulting to null
+                $data['new_parent_id'] = $data['new_parent_id'] ?? null;
+                $result = reorderNote($data);
+                break;
                 
             default:
                 throw new Exception('Invalid action');
@@ -421,6 +456,90 @@ try {
         echo json_encode($result);
     } else {
         throw new Exception('Method not allowed');
+    }
+} catch (Exception $e) {
+    error_log("Error in note.php: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    $error = ['error' => $e->getMessage()];
+    error_log("Sending error response: " . json_encode($error));
+    echo json_encode($error);
+} finally {
+    if (isset($db)) {
+        $db->close();
+    }
+    // End output buffering and send the response
+    ob_end_flush();
+}
+
+function reorderNote($data) {
+    global $db;
+    error_log("Reordering note with data: " . json_encode($data));
+
+    $note_id = $data['note_id'];
+    $new_parent_id = $data['new_parent_id'];
+    // $new_level = $data['new_level']; // Level is no longer managed here
+    $new_order = $data['new_order'];
+    $page_id = $data['page_id'];
+
+    $db->exec('BEGIN TRANSACTION');
+    try {
+        // Fetch current state (old_parent_id, old_order)
+        $stmt_fetch = $db->prepare('SELECT parent_id, "order" FROM notes WHERE id = :note_id AND page_id = :page_id');
+        if (!$stmt_fetch) throw new Exception('Failed to prepare fetch statement: ' . $db->lastErrorMsg());
+        $stmt_fetch->bindValue(':note_id', $note_id, SQLITE3_INTEGER);
+        $stmt_fetch->bindValue(':page_id', $page_id, SQLITE3_TEXT);
+        $current_state = $stmt_fetch->execute()->fetchArray(SQLITE3_ASSOC);
+        if (!$current_state) throw new Exception('Note not found or page_id mismatch.');
+        $old_parent_id = $current_state['parent_id']; // This can be NULL
+        $old_order = $current_state['order'];
+
+        // 1. Decrement orders in the old list
+        $sql_decrement = 'UPDATE notes SET "order" = "order" - 1 WHERE page_id = :page_id AND ';
+        $old_parent_check_sql = ($old_parent_id === null) ? "parent_id IS NULL" : "parent_id = :old_parent_id";
+        $sql_decrement .= $old_parent_check_sql . ' AND "order" > :old_order';
+        
+        $stmt_decrement = $db->prepare($sql_decrement);
+        if (!$stmt_decrement) throw new Exception('Failed to prepare decrement statement: ' . $db->lastErrorMsg());
+        $stmt_decrement->bindValue(':page_id', $page_id, SQLITE3_TEXT);
+        if ($old_parent_id !== null) {
+            $stmt_decrement->bindValue(':old_parent_id', $old_parent_id, SQLITE3_INTEGER);
+        }
+        $stmt_decrement->bindValue(':old_order', $old_order, SQLITE3_INTEGER);
+        if (!$stmt_decrement->execute()) throw new Exception('Failed to execute decrement: ' . $db->lastErrorMsg());
+
+        // 2. Increment orders in the new list
+        $sql_increment = 'UPDATE notes SET "order" = "order" + 1 WHERE page_id = :page_id AND ';
+        $new_parent_check_sql = ($new_parent_id === null) ? "parent_id IS NULL" : "parent_id = :new_parent_id";
+        $sql_increment .= $new_parent_check_sql . ' AND "order" >= :new_order AND id != :note_id';
+        
+        $stmt_increment = $db->prepare($sql_increment);
+        if (!$stmt_increment) throw new Exception('Failed to prepare increment statement: ' . $db->lastErrorMsg());
+        $stmt_increment->bindValue(':page_id', $page_id, SQLITE3_TEXT);
+        if ($new_parent_id !== null) {
+            $stmt_increment->bindValue(':new_parent_id', $new_parent_id, SQLITE3_INTEGER);
+        }
+        $stmt_increment->bindValue(':new_order', $new_order, SQLITE3_INTEGER);
+        $stmt_increment->bindValue(':note_id', $note_id, SQLITE3_INTEGER);
+        if (!$stmt_increment->execute()) throw new Exception('Failed to execute increment: ' . $db->lastErrorMsg());
+
+        // 3. Update the target note
+        // Level is no longer updated here
+        $stmt_update = $db->prepare('UPDATE notes SET parent_id = :new_parent_id, "order" = :new_order, updated_at = CURRENT_TIMESTAMP WHERE id = :note_id AND page_id = :page_id');
+        if (!$stmt_update) throw new Exception('Failed to prepare update statement: ' . $db->lastErrorMsg());
+        $stmt_update->bindValue(':new_parent_id', $new_parent_id, $new_parent_id === null ? SQLITE3_NULL : SQLITE3_INTEGER);
+        // $stmt_update->bindValue(':new_level', $new_level, SQLITE3_INTEGER); // Level removed
+        $stmt_update->bindValue(':new_order', $new_order, SQLITE3_INTEGER);
+        $stmt_update->bindValue(':note_id', $note_id, SQLITE3_INTEGER);
+        $stmt_update->bindValue(':page_id', $page_id, SQLITE3_TEXT);
+        if (!$stmt_update->execute()) throw new Exception('Failed to execute update: ' . $db->lastErrorMsg());
+
+        $db->exec('COMMIT');
+        error_log("Note reordered successfully for note ID: " . $note_id);
+        return ['success' => true];
+    } catch (Exception $e) {
+        $db->exec('ROLLBACK');
+        error_log("Error reordering note " . ($note_id ?? 'unknown') . ": " . $e->getMessage());
+        return ['error' => $e->getMessage()];
     }
 } catch (Exception $e) {
     error_log("Error in note.php: " . $e->getMessage());

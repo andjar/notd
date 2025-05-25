@@ -629,3 +629,35 @@ a.block-ref-link:hover {
     color: white;
     box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3); /* Add an inner ring or similar to distinguish */
 }
+
+/* SortableJS Drag and Drop Styles */
+.static-bullet {
+    cursor: grab;
+}
+
+.static-bullet:active {
+    cursor: grabbing;
+}
+
+.outline-item.sortable-chosen {
+    opacity: 0.8;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.outline-item.sortable-ghost {
+    background-color: #e0f7fa; /* Light cyan placeholder */
+    border: 1px dashed var(--accent-color);
+    opacity: 0.6;
+    border-radius: var(--radius-md); /* Match outline-item radius if any */
+}
+
+/* Optional: Highlight for .outline-children when dragging over */
+/* This requires SortableJS to add a class to the target list, e.g., 'sortable-target-highlight' */
+/* Or more generically if it adds a class to the element being dragged over. */
+/* For now, we'll assume no specific class is added by SortableJS directly to .outline-children for this. */
+/* If SortableJS adds a general class like 'sortable-over' to the container being dragged over: */
+.outline-children.sortable-over { /* Example if SortableJS adds 'sortable-over' to the list being hovered */
+    background-color: rgba(49, 130, 206, 0.05); /* Subtle blue, from accent */
+    outline: 1px dashed var(--accent-color);
+    outline-offset: -2px; /* Pull outline inwards */
+}

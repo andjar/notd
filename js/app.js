@@ -429,6 +429,7 @@ async function renderPage(page) {
     const editButton = pageTitle.querySelector('.edit-properties-button');
     if (editButton) editButton.onclick = editPageProperties;
     outlineContainer.innerHTML = await renderOutline(page.notes);
+    initSortable(outlineContainer); // Initialize SortableJS
     const backlinksContainer = document.getElementById('backlinks-container');
     if (backlinksContainer) renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
 }
@@ -1241,6 +1242,7 @@ async function zoomInOnNote(targetNoteReference) {
     const breadcrumbsHtml = renderBreadcrumbs(path); // Render breadcrumbs for the current zoom path
     // Render the outline starting from level 0 for the focused view
     outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0));
+    initSortable(outlineContainer); // Initialize SortableJS for focused view
 
     // Scroll the newly focused item into view
     const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
@@ -1251,6 +1253,136 @@ async function zoomInOnNote(targetNoteReference) {
         }, 0);
     }
 }
+
+function initSortable(containerElement) {
+    const sortableOptions = {
+        group: 'nested',
+        animation: 150,
+        fallbackOnBody: true,
+        swapThreshold: 0.65,
+        handle: '.static-bullet', // Using the bullet as the drag handle
+        onEnd: function(evt) {
+            // console.log('Drag ended:', evt);
+            // console.log('Item ID:', evt.item.dataset.noteId);
+            // console.log('New parent ID:', evt.to.closest('.outline-item')?.dataset.noteId);
+            // console.log('Old parent ID:', evt.from.closest('.outline-item')?.dataset.noteId);
+            // console.log('New index:', evt.newIndex);
+            // console.log('Old index:', evt.oldIndex);
+            // Logic to update note order/parent will be added in the next step.
+            handleNoteDrop(evt);
+        }
+    };
+
+    // Initialize on the main container
+    if (containerElement && !containerElement.classList.contains('has-sortable')) {
+        new Sortable(containerElement, sortableOptions);
+        containerElement.classList.add('has-sortable');
+    }
+
+    // Initialize on all child containers
+    const childContainers = containerElement.querySelectorAll('.outline-children');
+    childContainers.forEach(childContainer => {
+        if (!childContainer.classList.contains('has-sortable')) {
+            new Sortable(childContainer, sortableOptions);
+            childContainer.classList.add('has-sortable');
+        }
+    });
+}
+
+
+function updateDraggedItemLevel(draggedItem, newBaseLevel) {
+    if (!draggedItem || !draggedItem.dataset) return;
+
+    draggedItem.dataset.level = newBaseLevel;
+
+    const childrenContainer = draggedItem.querySelector('.outline-children');
+    if (childrenContainer) {
+        const childItems = childrenContainer.querySelectorAll(':scope > .outline-item'); // Direct children only
+        childItems.forEach(child => {
+            updateDraggedItemLevel(child, newBaseLevel + 1);
+        });
+    }
+}
+
+
+function handleNoteDrop(evt) {
+    const draggedItem = evt.item;
+    const draggedNoteId = draggedItem.dataset.noteId;
+    const oldLevel = parseInt(draggedItem.dataset.level);
+    const oldIndex = evt.oldIndex;
+
+    const oldParentItem = evt.from.closest('.outline-item');
+    const oldParentId = oldParentItem ? oldParentItem.dataset.noteId : null;
+
+    const newParentItem = evt.to.closest('.outline-item');
+    const newParentId = newParentItem ? newParentItem.dataset.noteId : null;
+
+    let newLevel;
+    if (newParentId === null) { // Dropped into the main outlineContainer
+        newLevel = 0;
+    } else {
+        const newParentLevel = newParentItem ? parseInt(newParentItem.dataset.level) : -1; // Should always find parent if not root
+        newLevel = newParentLevel + 1;
+    }
+    
+    // Update data-level attribute before logging, so it reflects the new state
+    updateDraggedItemLevel(draggedItem, newLevel);
+
+    const updateData = {
+        noteId: draggedNoteId,
+        newParentId: newParentId,
+        newIndex: evt.newIndex,
+        newLevel: newLevel, 
+        oldParentId: oldParentId,
+        oldIndex: oldIndex,
+        oldLevel: oldLevel 
+    };
+
+    console.log('Note Drop Update Data:', JSON.stringify(updateData));
+
+    if (!currentPage || !currentPage.id) {
+        console.error("Current page information is not available. Cannot save reorder changes.");
+        alert("Error: Current page context lost. Please refresh.");
+        // Optionally, try to force a reload or redirect to a default page.
+        // For now, we just prevent the API call.
+        return;
+    }
+
+    const payload = {
+        action: 'reorder_note',
+        note_id: parseInt(updateData.noteId),
+        new_parent_id: updateData.newParentId ? parseInt(updateData.newParentId) : null,
+        // new_level is no longer sent to the backend
+        new_order: parseInt(updateData.newIndex), // This is the 'new_order' for the backend
+        page_id: currentPage.id 
+    };
+
+    fetch('api/note.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error reordering note:', data.error);
+            alert('Error saving changes: ' + data.error + '. Please refresh.');
+            loadPage(currentPage.id); // Reload to ensure consistency
+        } else {
+            console.log('Note reordered successfully:', data);
+            // The DOM was already updated optimistically regarding levels.
+            // The order of siblings might have changed. Reloading the page
+            // is the simplest way to ensure the UI reflects the database state.
+            loadPage(currentPage.id);
+        }
+    })
+    .catch(error => {
+        console.error('Fetch error:', error);
+        alert('Network error while saving changes. Please refresh.');
+        loadPage(currentPage.id);
+    });
+}
+
 
 async function zoomOut() {
     document.body.classList.remove('logseq-focus-active');
