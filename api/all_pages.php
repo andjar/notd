@@ -27,6 +27,7 @@ try {
             GROUP_CONCAT(DISTINCT prop.property_key || ":" || prop.property_value) as properties
         FROM pages p
         LEFT JOIN properties prop ON p.id = prop.page_id
+        WHERE p.type <> "journal"
         GROUP BY p.id
         ORDER BY p.updated_at DESC
     ');
