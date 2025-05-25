@@ -43,19 +43,55 @@ if (!move_uploaded_file($file['tmp_name'], $filepath)) {
 }
 
 // If note_id is provided, create an attachment record
+$db = null; // Initialize $db to null
 if ($noteId) {
-    require_once 'db.php';
-    
-    $stmt = $db->prepare('INSERT INTO attachments (note_id, filename, original_name) VALUES (?, ?, ?)');
-    $stmt->execute([$noteId, $filename, $file['name']]);
-    
-    echo json_encode([
-        'success' => true,
-        'filename' => $filename,
-        'original_name' => $file['name'],
-        'attachment_id' => $db->lastInsertId()
-    ]);
+    try {
+        $db = new SQLite3(__DIR__ . '/../db/notes.db'); // Use absolute path
+        if (!$db) {
+            // This specific check might be redundant if SQLite3 constructor throws an exception on failure,
+            // but it's a safeguard. The main catch block will handle exceptions.
+            throw new Exception('Failed to connect to database in image.php');
+        }
+        $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
+        
+        // Enable foreign key constraints for this connection (optional but good practice)
+        if (!$db->exec('PRAGMA foreign_keys = ON;')) {
+            error_log("Notice: Attempted to enable foreign_keys for image.php. Check SQLite logs if issues persist.");
+        }
+
+        $stmt = $db->prepare('INSERT INTO attachments (note_id, filename, original_name, file_path, mime_type, size) VALUES (:note_id, :filename, :original_name, :file_path, :mime_type, :size)');
+        if (!$stmt) {
+            throw new Exception('Failed to prepare statement: ' . $db->lastErrorMsg());
+        }
+        
+        $stmt->bindValue(':note_id', $noteId, SQLITE3_INTEGER);
+        $stmt->bindValue(':filename', $filename, SQLITE3_TEXT); // The new unique filename
+        $stmt->bindValue(':original_name', $file['name'], SQLITE3_TEXT); // The original uploaded filename
+        $stmt->bindValue(':file_path', 'uploads/' . $filename, SQLITE3_TEXT); // Relative path to the file
+        $stmt->bindValue(':mime_type', $file['type'], SQLITE3_TEXT);
+        $stmt->bindValue(':size', $file['size'], SQLITE3_INTEGER);
+
+        if (!$stmt->execute()) {
+            throw new Exception('Failed to execute statement: ' . $db->lastErrorMsg());
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'filename' => $filename, // unique filename
+            'original_name' => $file['name'],
+            'attachment_id' => $db->lastInsertRowID()
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500); // Internal Server Error
+        error_log("Database error in image.php: " . $e->getMessage());
+        echo json_encode(['error' => 'Database operation failed: ' . $e->getMessage()]);
+    } finally {
+        if ($db) {
+            $db->close();
+        }
+    }
 } else {
+    // If no note_id, just return the success of upload without DB interaction for attachment
     echo json_encode([
         'success' => true,
         'filename' => $filename,

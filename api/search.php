@@ -14,6 +14,7 @@ if (!$db) {
     echo json_encode(['error' => 'Failed to connect to database.']);
     exit;
 }
+$db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
 
 // Enable foreign key constraints for this connection
 if (!$db->exec('PRAGMA foreign_keys = ON;')) {

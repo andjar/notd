@@ -39,6 +39,7 @@ try {
     // Connect to SQLite database
     $pdo = new PDO('sqlite:' . $db_path);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_TIMEOUT, 5); // Set busy timeout to 5 seconds for PDO
     // Enable foreign key constraints for this connection
     if (!$pdo->exec('PRAGMA foreign_keys = ON;')) {
         // Log or handle error if PRAGMA command fails.

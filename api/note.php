@@ -55,6 +55,7 @@ try {
     if (!$db) {
         throw new Exception('Failed to connect to database: ' . SQLite3::lastErrorMsg());
     }
+    $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
     // Enable foreign key constraints for this connection
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
         // Log or handle error if PRAGMA command fails, though it usually doesn't throw on its own.
