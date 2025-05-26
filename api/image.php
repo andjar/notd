@@ -1,6 +1,12 @@
 <?php
 header('Content-Type: application/json');
 
+// Set error handling
+error_reporting(E_ERROR);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/php_errors.log');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);

@@ -1,6 +1,12 @@
 <?php
 header('Content-Type: application/json');
 
+// Set error handling
+error_reporting(E_ERROR);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/php_errors.log');
+
 // Retrieve and sanitize the search query
 $query = isset($_GET['q']) ? trim($_GET['q']) : '';
 

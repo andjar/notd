@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json');
-error_reporting(E_ALL);
+error_reporting(E_ERROR);
 ini_set('display_errors', 1);
 
 try {
