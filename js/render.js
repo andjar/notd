@@ -263,6 +263,7 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
                     ${contentHtml}
                     ${note.properties && Object.keys(note.properties).length > 0 ? renderPropertiesInline(note.properties) : ''}
                     <div class="note-actions">
+                        <button class="favorite-star ${note.favorite ? 'active' : ''}" data-action="toggle-favorite" title="Toggle favorite">★</button>
                         <button data-action="add-child" title="Add child note">+</button>
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
                         <button data-action="edit" title="Edit note">✎</button>
@@ -611,3 +612,72 @@ function renderBreadcrumbs(path) {
 - copySearchLink (from ui.js - handles clipboard copy)
 - fetchBacklinksAPI (from api.js)
 */
+
+function renderNote(note, level = 0, parentId = null) {
+    const noteElement = document.createElement('div');
+    noteElement.className = 'outline-item';
+    noteElement.dataset.noteId = note.id;
+    noteElement.dataset.level = level;
+    noteElement.dataset.content = note.content;
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'outline-content';
+
+    // Add bullet and arrow toggle
+    const bullet = document.createElement('div');
+    bullet.className = 'static-bullet';
+    contentDiv.appendChild(bullet);
+
+    if (note.children && note.children.length > 0) {
+        noteElement.classList.add('has-children');
+        const arrowToggle = document.createElement('div');
+        arrowToggle.className = 'hover-arrow-toggle';
+        arrowToggle.innerHTML = '<svg class="arrow-svg" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>';
+        contentDiv.appendChild(arrowToggle);
+    }
+
+    // Render note content
+    const content = document.createElement('div');
+    content.innerHTML = marked.parse(note.content);
+    contentDiv.appendChild(content);
+
+    // Add note actions
+    const actions = document.createElement('div');
+    actions.className = 'note-actions';
+    
+    // Add favorite star
+    const starButton = document.createElement('button');
+    starButton.className = 'favorite-star' + (note.favorite ? ' active' : '');
+    starButton.innerHTML = '★';
+    starButton.onclick = (e) => {
+        e.stopPropagation();
+        toggleFavorite(note.id, starButton);
+    };
+    actions.appendChild(starButton);
+
+    // Add other action buttons
+    const editButton = document.createElement('button');
+    editButton.innerHTML = '✎';
+    editButton.onclick = () => editNote(note.id, note.content);
+    actions.appendChild(editButton);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.innerHTML = '×';
+    deleteButton.onclick = () => deleteNote(note.id);
+    actions.appendChild(deleteButton);
+
+    contentDiv.appendChild(actions);
+    noteElement.appendChild(contentDiv);
+
+    // Render children if any
+    if (note.children && note.children.length > 0) {
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'outline-children';
+        note.children.forEach(child => {
+            childrenContainer.appendChild(renderNote(child, level + 1, note.id));
+        });
+        noteElement.appendChild(childrenContainer);
+    }
+
+    return noteElement;
+}

@@ -1,21 +1,30 @@
 // Functions and variables related to UI interactions
 // (e.g., event handlers, DOM manipulation, modal logic)
 
+// Initialize highlight.js
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof hljs !== 'undefined') {
+        hljs.highlightAll();
+    }
+});
+
 // --- DOM Element Selections ---
 // These constants store references to frequently used DOM elements.
+let searchInput;
+let recentPagesList;
+let newPageButton;
+let pageTitle;
+let pageProperties;
+let outlineContainer;
 
-/** @type {HTMLInputElement} Search input field. */
-const searchInput = document.getElementById('search');
-/** @type {HTMLElement} List element for recent pages. */
-const recentPagesList = document.getElementById('recent-pages-list');
-/** @type {HTMLButtonElement} Button to create a new page. */
-const newPageButton = document.getElementById('new-page');
-/** @type {HTMLElement} Element to display the current page's title. */
-const pageTitle = document.getElementById('page-title');
-/** @type {HTMLElement} Element to display page properties. */
-const pageProperties = document.getElementById('page-properties');
-/** @type {HTMLElement} Container for the main note outline. */
-const outlineContainer = document.getElementById('outline-container');
+document.addEventListener('DOMContentLoaded', () => {
+    searchInput = document.getElementById('search');
+    recentPagesList = document.getElementById('recent-pages-list');
+    newPageButton = document.getElementById('new-page');
+    pageTitle = document.getElementById('page-title');
+    pageProperties = document.getElementById('page-properties');
+    outlineContainer = document.getElementById('outline-container');
+});
 
 // Placeholder for UI functions that will be moved here
 // function exampleUiFunction() {}
@@ -351,74 +360,6 @@ function handleSnippetReplacement(event) {
  * @param {HTMLElement} noteElement - The DOM element of the note whose children are to be toggled.
  */
 function toggleChildren(noteElement) {
-
-    if (typedChar === null || typedChar === undefined || typedChar.length !== 1) {
-        return;
-    }
-
-    let closeBracketChar = null;
-    if (typedChar === '[') {
-        closeBracketChar = ']';
-    } else if (typedChar === '{') {
-        closeBracketChar = '}';
-    }
-
-    if (closeBracketChar) {
-        const cursorPos = textarea.selectionStart;
-        const value = textarea.value;
-        const textBeforeCursor = value.substring(0, cursorPos);
-        const textAfterCursor = value.substring(cursorPos);
-        textarea.value = textBeforeCursor + closeBracketChar + textAfterCursor;
-        textarea.selectionStart = textarea.selectionEnd = cursorPos;
-    }
-}
-
-function handleSnippetReplacement(event) {
-    const textarea = event.target;
-    setTimeout(() => {
-        const cursorPos = textarea.selectionStart;
-        const text = textarea.value;
-        let textBeforeCursor = text.substring(0, cursorPos);
-        // let replacementMade = false; // This variable was unused in original code
-        let triggerChar = '';
-
-        if(event.key === ' ' || event.key === 'Enter' || (event.data === ' ' && event.type === 'input')) {
-             triggerChar = ' ';
-        } else if (event.type === 'input' && event.data !== null) {
-            return; // Only trigger on space or enter for typed snippets
-        } else {
-            return; // Ignore other event types like backspace, arrow keys etc. for snippet replacement logic
-        }
-
-        if (textBeforeCursor.endsWith(':t' + triggerChar)) {
-            const replacement = '{tag::}';
-            const triggerFull = ':t' + triggerChar;
-            textarea.value = textBeforeCursor.slice(0, -triggerFull.length) + replacement + text.substring(cursorPos);
-            textarea.selectionStart = textarea.selectionEnd = cursorPos - triggerFull.length + replacement.length - 1; // Place cursor inside {}
-            // replacementMade = true;
-        }
-        else if (textBeforeCursor.endsWith(':r' + triggerChar)) {
-            const now = new Date();
-            const timeString = now.toISOString();
-            const replacement = `{time::${timeString}} `;
-            const triggerFull = ':r' + triggerChar;
-            textarea.value = textBeforeCursor.slice(0, -triggerFull.length) + replacement + text.substring(cursorPos);
-            textarea.selectionStart = textarea.selectionEnd = cursorPos - triggerFull.length + replacement.length;
-            // replacementMade = true;
-        }
-        else if (textBeforeCursor.endsWith(':d' + triggerChar)) {
-            const now = new Date();
-            const dateString = now.toISOString().split('T')[0];
-            const replacement = `{date::${dateString}} `;
-            const triggerFull = ':d' + triggerChar;
-            textarea.value = textBeforeCursor.slice(0, -triggerFull.length) + replacement + text.substring(cursorPos);
-            textarea.selectionStart = textarea.selectionEnd = cursorPos - triggerFull.length + replacement.length;
-            // replacementMade = true;
-        }
-    }, 0);
-}
-
-function toggleChildren(noteElement) {
     // noteElement is a DOM element
     noteElement.classList.toggle('children-hidden');
     const childrenContainer = noteElement.querySelector('.outline-children');
@@ -470,33 +411,49 @@ function handleGlobalKeyDown(event) {
         return;
     }
 
+    // Handle Control+Space and Control+D first
+    if (event.ctrlKey && event.code === 'Space') {
+        event.preventDefault();
+        showPageSearchModal();
+        return;
+    }
+    if (event.ctrlKey && event.key === 'd') {
+        event.preventDefault();
+        showFavoritesModal();
+        return;
+    }
+
+    // Handle Shift+Enter first
+    if (event.shiftKey && event.key === 'Enter') {
+        event.preventDefault();
+        showFavoritesModal();
+        return;
+    }
+
     // Handle Esc key within an active editor (e.g., to cancel editing)
-    if (isEditorOpen) { // `isEditorOpen` from state.js
+    if (isEditorOpen) {
         if (event.key === 'Escape') {
-            // Attempt to find and click a 'cancel' button in the active editor.
-            // This assumes a specific structure for editor modals/forms.
             const cancelButton = document.querySelector('.note-editor .cancel-note');
             if (cancelButton) {
                 cancelButton.click();
                 event.preventDefault();
             }
         }
-        return; // Other keys are likely handled by the textarea itself.
+        return;
     }
 
     // If no block is active, ArrowDown/ArrowUp/Space might activate the first block or create a new one.
     if (!activeBlockElement && (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === ' ')) {
         const firstBlock = outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)');
         if (firstBlock) {
-            setActiveBlock(firstBlock); // Activate the first block.
-             if (event.key === ' ') event.preventDefault(); // Prevent space from typing if activating.
+            setActiveBlock(firstBlock);
+            if (event.key === ' ') event.preventDefault();
         } else if (event.key === ' ' && currentPage && (!currentPage.notes || currentPage.notes.length === 0)) {
-            // If space is pressed on an empty page, initiate new note creation.
-            createNote(null, 0); // `createNote` (app.js) handles the process.
+            createNote(null, 0);
             event.preventDefault();
             return;
         } else {
-            return; // No active block and no action to take.
+            return;
         }
     }
 
@@ -647,3 +604,353 @@ function navigateBlocks(direction) {
         setActiveBlock(trulyVisibleItems[trulyVisibleItems.length - 1]); // Wrap to last if navigating down from last.
     }
 }
+
+// --- Sidebar Toggle Functionality ---
+
+/**
+ * Toggles the sidebar visibility on mobile devices and handles the collapse state.
+ * The sidebar will automatically collapse on mobile devices and can be toggled with a button.
+ */
+function initializeSidebarToggle() {
+    const sidebar = document.querySelector('.sidebar');
+    const toggleButton = document.getElementById('sidebar-toggle');
+    let isCollapsed = false;
+
+    function toggleSidebar() {
+        isCollapsed = !isCollapsed;
+        sidebar.classList.toggle('collapsed');
+        toggleButton.innerHTML = isCollapsed ? '✕' : '☰';
+    }
+
+    toggleButton.addEventListener('click', toggleSidebar);
+
+    // Handle window resize
+    function handleResize() {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            sidebar.classList.add('collapsed');
+            toggleButton.innerHTML = '✕';
+            toggleButton.style.display = 'flex';
+        } else {
+            sidebar.classList.remove('collapsed');
+            toggleButton.innerHTML = '☰';
+            toggleButton.style.display = 'none';
+        }
+    }
+
+    // Initial setup
+    handleResize();
+    window.addEventListener('resize', handleResize);
+}
+
+// Initialize sidebar toggle when the DOM is loaded
+document.addEventListener('DOMContentLoaded', initializeSidebarToggle);
+
+// --- Page Search Functionality ---
+
+let pageSearchModal = null;
+let pageSearchInput = null;
+let pageSearchResults = null;
+let selectedIndex = -1;
+let searchTimeout = null;
+
+/**
+ * Shows the page search modal and initializes the search functionality.
+ * The modal can be triggered with Control+Space and allows searching through pages.
+ */
+function showPageSearchModal() {
+    if (pageSearchModal) return; // Don't show if already visible
+
+    // Create modal elements
+    const overlay = document.createElement('div');
+    overlay.className = 'page-search-overlay';
+    
+    const modal = document.createElement('div');
+    modal.className = 'page-search-modal';
+    modal.innerHTML = `
+        <input type="text" class="page-search-input" placeholder="Search pages...">
+        <div class="page-search-results"></div>
+    `;
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    // Store references
+    pageSearchModal = modal;
+    pageSearchInput = modal.querySelector('.page-search-input');
+    pageSearchResults = modal.querySelector('.page-search-results');
+    
+    // Focus input
+    pageSearchInput.focus();
+    
+    // Add event listeners
+    pageSearchInput.addEventListener('input', handlePageSearch);
+    pageSearchInput.addEventListener('keydown', handlePageSearchKeydown);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closePageSearchModal();
+        }
+    });
+}
+
+/**
+ * Closes the page search modal and cleans up.
+ */
+function closePageSearchModal() {
+    if (!pageSearchModal) return;
+    
+    pageSearchModal.parentElement.remove();
+    pageSearchModal = null;
+    pageSearchInput = null;
+    pageSearchResults = null;
+    selectedIndex = -1;
+}
+
+/**
+ * Handles the search input and updates results.
+ * @param {Event} event - The input event.
+ */
+async function handlePageSearch(event) {
+    const query = event.target.value.trim();
+    
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+    
+    searchTimeout = setTimeout(async () => {
+        if (!query) {
+            pageSearchResults.innerHTML = '';
+            return;
+        }
+        
+        try {
+            const response = await fetch(`api/search_pages.php?q=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error('Search failed');
+            
+            const pages = await response.json();
+            renderPageSearchResults(pages);
+        } catch (error) {
+            console.error('Search error:', error);
+            pageSearchResults.innerHTML = '<div class="page-search-item">Error performing search</div>';
+        }
+    }, 150);
+}
+
+/**
+ * Renders the search results in the modal.
+ * @param {Array} pages - Array of page objects with id, title, and date properties.
+ */
+function renderPageSearchResults(pages) {
+    if (!pages.length) {
+        pageSearchResults.innerHTML = '<div class="page-search-item">No results found</div>';
+        return;
+    }
+    
+    pageSearchResults.innerHTML = pages.map((page, index) => `
+        <div class="page-search-item ${index === selectedIndex ? 'selected' : ''}" data-index="${index}">
+            <span class="page-title">${page.title || decodeURIComponent(page.id)}</span>
+            <span class="page-date">${new Date(page.date).toLocaleDateString()}</span>
+        </div>
+    `).join('');
+    
+    // Add click handlers
+    pageSearchResults.querySelectorAll('.page-search-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const index = parseInt(item.dataset.index);
+            navigateToPage(pages[index].id);
+            closePageSearchModal();
+        });
+    });
+}
+
+/**
+ * Handles keyboard navigation in the search modal.
+ * @param {KeyboardEvent} event - The keyboard event.
+ */
+function handlePageSearchKeydown(event) {
+    const items = pageSearchResults.querySelectorAll('.page-search-item');
+    
+    switch (event.key) {
+        case 'ArrowDown':
+            event.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+            updateSelectedItem(items);
+            break;
+            
+        case 'ArrowUp':
+            event.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, 0);
+            updateSelectedItem(items);
+            break;
+            
+        case 'Enter':
+            event.preventDefault();
+            if (selectedIndex >= 0 && items[selectedIndex]) {
+                items[selectedIndex].click();
+            }
+            break;
+            
+        case 'Escape':
+            event.preventDefault();
+            closePageSearchModal();
+            break;
+    }
+}
+
+/**
+ * Updates the selected item in the search results.
+ * @param {NodeList} items - The list of search result items.
+ */
+function updateSelectedItem(items) {
+    items.forEach((item, index) => {
+        item.classList.toggle('selected', index === selectedIndex);
+        if (index === selectedIndex) {
+            item.scrollIntoView({ block: 'nearest' });
+        }
+    });
+}
+
+// Add global keyboard shortcut
+document.addEventListener('keydown', (event) => {
+    if (event.ctrlKey && event.code === 'Space') {
+        event.preventDefault();
+        showPageSearchModal();
+    }
+});
+
+// --- Favorites Functionality ---
+
+let favoritesModal = null;
+
+/**
+ * Toggles the favorite status of a note.
+ * @param {string} noteId - The ID of the note to toggle.
+ * @param {HTMLElement} starButton - The star button element.
+ */
+async function toggleFavorite(noteId, starButton) {
+    try {
+        const response = await fetch('api/toggle_favorite.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ note_id: noteId })
+        });
+        
+        if (!response.ok) throw new Error('Failed to toggle favorite');
+        
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        
+        starButton.classList.toggle('active', result.is_favorite);
+        
+    } catch (error) {
+        console.error('Error toggling favorite:', error);
+        alert('Failed to update favorite status');
+    }
+}
+
+/**
+ * Shows the favorites modal with all favorited notes.
+ */
+async function showFavoritesModal() {
+    if (favoritesModal) return;
+    
+    try {
+        const response = await fetch('api/get_favorites.php');
+        if (!response.ok) throw new Error('Failed to fetch favorites');
+        
+        const favorites = await response.json();
+        if (favorites.error) throw new Error(favorites.error);
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'page-search-overlay';
+        
+        const modal = document.createElement('div');
+        modal.className = 'favorites-modal';
+        modal.innerHTML = `
+            <h3>Favorite Notes</h3>
+            <div class="favorites-list">
+                ${favorites.length ? favorites.map(note => `
+                    <div class="favorite-item">
+                        <div class="note-content">${note.content}</div>
+                        <div class="note-actions">
+                            <button class="btn-secondary" onclick="navigateToPage('${note.page_id}')">View</button>
+                            <button class="btn-secondary" onclick="removeFavorite('${note.id}', this)">Remove</button>
+                        </div>
+                    </div>
+                `).join('') : '<div class="favorite-item">No favorite notes yet</div>'}
+            </div>
+            <button class="btn-secondary" style="margin-top:15px;" onclick="closeFavoritesModal()">Close</button>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        favoritesModal = overlay;
+        
+        // Close on overlay click
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                closeFavoritesModal();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error showing favorites:', error);
+        alert('Failed to load favorites');
+    }
+}
+
+/**
+ * Closes the favorites modal.
+ */
+function closeFavoritesModal() {
+    if (!favoritesModal) return;
+    
+    favoritesModal.remove();
+    favoritesModal = null;
+}
+
+/**
+ * Removes a note from favorites.
+ * @param {string} noteId - The ID of the note to remove.
+ * @param {HTMLElement} button - The remove button element.
+ */
+async function removeFavorite(noteId, button) {
+    try {
+        const response = await fetch('api/toggle_favorite.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ note_id: noteId })
+        });
+        
+        if (!response.ok) throw new Error('Failed to remove favorite');
+        
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+        
+        // Remove the item from the list
+        button.closest('.favorite-item').remove();
+        
+        // If no favorites left, show message
+        const list = document.querySelector('.favorites-list');
+        if (!list.children.length) {
+            list.innerHTML = '<div class="favorite-item">No favorite notes yet</div>';
+        }
+        
+    } catch (error) {
+        console.error('Error removing favorite:', error);
+        alert('Failed to remove favorite');
+    }
+}
+
+// Update the global keyboard shortcut
+document.addEventListener('keydown', (event) => {
+    if (event.ctrlKey && event.key === 'd') {
+        event.preventDefault();
+        showFavoritesModal();
+    }
+});

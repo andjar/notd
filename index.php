@@ -11,11 +11,14 @@ if (!file_exists($dbPath)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>notd</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="css/style.css">
     <script src="js/libs/marked.min.js"></script>
     <script src="js/libs/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
 </head>
 <body>
+    <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
     <div class="container">
         <div class="sidebar">
             <a href="#" id="home-button" class="home-link">notd</a>

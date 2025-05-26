@@ -29,24 +29,43 @@ async function navigateToPage(pageId) {
     }
 }
 
-searchInput.addEventListener('input', debounce(handleSearch, 300));
-newPageButton.addEventListener('click', createNewPage);
-outlineContainer.addEventListener('click', handleOutlineClick);
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadTemplates();
+    loadRecentPages();
+    initCalendar();
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    
+    // Add event listeners after DOM is loaded
+    searchInput.addEventListener('input', debounce(handleSearch, 300));
+    newPageButton.addEventListener('click', createNewPage);
+    outlineContainer.addEventListener('click', handleOutlineClick);
 
-document.getElementById('advanced-search-link').addEventListener('click', (e) => {
-    e.preventDefault();
-    showAdvancedSearch();
-});
+    document.getElementById('advanced-search-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        showAdvancedSearch();
+    });
 
-document.getElementById('home-button').addEventListener('click', async (e) => {
-    e.preventDefault();
-    const today = new Date().toISOString().split('T')[0];
-    if (document.body.classList.contains('logseq-focus-active')) {
-        await zoomOut();
+    document.getElementById('home-button').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const today = new Date().toISOString().split('T')[0];
+        if (document.body.classList.contains('logseq-focus-active')) {
+            await zoomOut();
+        }
+        navigateToPage(today);
+    });
+
+    const initialHash = window.location.hash.substring(1);
+    if (!initialHash) {
+        const today = new Date().toISOString().split('T')[0];
+        navigateToPage(today);
+    } else {
+        if (initialHash === 'search-results') {
+            showSearchResults();
+        } else {
+            navigateToPage(initialHash);
+        }
     }
-    navigateToPage(today);
 });
-
 
 window.addEventListener('hashchange', () => {
     const pageId = window.location.hash.substring(1);
@@ -58,24 +77,6 @@ window.addEventListener('hashchange', () => {
     } else {
         const today = new Date().toISOString().split('T')[0];
         navigateToPage(today);
-    }
-});
-
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadTemplates();
-    loadRecentPages();
-    initCalendar();
-    document.addEventListener('keydown', handleGlobalKeyDown);
-    const initialHash = window.location.hash.substring(1);
-    if (!initialHash) {
-        const today = new Date().toISOString().split('T')[0];
-        navigateToPage(today);
-    } else {
-        if (initialHash === 'search-results') {
-            showSearchResults();
-        } else {
-            navigateToPage(initialHash);
-        }
     }
 });
 
