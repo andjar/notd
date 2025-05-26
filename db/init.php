@@ -92,6 +92,46 @@ if (!file_exists($dbPath)) {
             throw new Exception('Failed to create properties table: ' . $db->lastErrorMsg());
         }
 
+        // Create FTS5 table for notes search
+        echo "Creating notes_fts (FTS5) table...\n";
+        $result = $db->exec('CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+            note_id UNINDEXED, 
+            content,
+            tokenize = \'porter unicode61\'
+        )');
+        if (!$result) {
+            // Note: FTS5 might not be enabled. The application should handle this gracefully if possible,
+            // or this error will indicate a setup issue.
+            throw new Exception('Failed to create notes_fts table. FTS5 module may not be enabled in SQLite: ' . $db->lastErrorMsg());
+        }
+
+        // Triggers to keep FTS table synchronized with notes table
+        echo "Creating triggers for notes_fts synchronization...\n";
+        $triggers = [
+            "CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+                INSERT INTO notes_fts (note_id, content) VALUES (new.id, new.content);
+            END;",
+            "CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+                DELETE FROM notes_fts WHERE note_id = old.id;
+            END;",
+            "CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE OF content ON notes BEGIN
+                UPDATE notes_fts SET content = new.content WHERE note_id = new.id;
+            END;"
+        ];
+
+        foreach ($triggers as $triggerSql) {
+            $result = $db->exec($triggerSql);
+            if (!$result) {
+                throw new Exception('Failed to create FTS trigger (' . substr($triggerSql, 20, 30) . '...): ' . $db->lastErrorMsg());
+            }
+        }
+        
+        // It's good practice to populate the FTS table if notes already exist.
+        // However, init.php is for new databases, so notes table should be empty.
+        // If this script were a migration tool, an initial population step would go here:
+        // $db->exec('INSERT INTO notes_fts (note_id, content) SELECT id, content FROM notes;');
+
+
         // Create recent_pages table
         echo "Creating recent_pages table...\n";
         $result = $db->exec('CREATE TABLE IF NOT EXISTS recent_pages (
@@ -136,7 +176,7 @@ if (!file_exists($dbPath)) {
 
         // Verify tables were created
         echo "Verifying tables...\n";
-        $tables = ['pages', 'notes', 'attachments', 'properties', 'recent_pages', 'page_links'];
+        $tables = ['pages', 'notes', 'attachments', 'properties', 'notes_fts', 'recent_pages', 'page_links']; // Added notes_fts
         foreach ($tables as $table) {
             $result = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='$table'");
             if (!$result || !$result->fetchArray()) {
@@ -157,7 +197,7 @@ if (!file_exists($dbPath)) {
 // If the database exists, verify tables
 try {
     $db = new SQLite3($dbPath);
-    $tables = ['pages', 'notes', 'attachments', 'properties', 'recent_pages', 'page_links'];
+    $tables = ['pages', 'notes', 'attachments', 'properties', 'notes_fts', 'recent_pages', 'page_links']; // Added notes_fts
     $missing = [];
     
     foreach ($tables as $table) {
