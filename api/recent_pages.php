@@ -16,7 +16,7 @@ try {
     $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
     // Enable foreign key constraints for this connection
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
-        error_log("Notice: Attempted to enable foreign_keys for recent_pages.php. Check SQLite logs if issues persist with FKs.");
+        // error_log("Notice: Attempted to enable foreign_keys for recent_pages.php. Check SQLite logs if issues persist with FKs.");
     }
 
     function getRecentPages() {

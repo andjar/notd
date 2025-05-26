@@ -14,7 +14,7 @@ try {
     
     // Enable foreign key constraints (optional but good practice)
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
-        error_log("Notice: Attempted to enable foreign_keys for attachment.php. Check SQLite logs if issues persist.");
+        // error_log("Notice: Attempted to enable foreign_keys for attachment.php. Check SQLite logs if issues persist.");
     }
 
     $uploadsDir = __DIR__ . '/../uploads';

@@ -28,7 +28,7 @@ try {
     }
     $db->busyTimeout(5000);
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
-        error_log("Notice: Attempted to enable foreign_keys for batch_blocks.php. Check SQLite logs if issues persist with FKs.");
+        // error_log("Notice: Attempted to enable foreign_keys for batch_blocks.php. Check SQLite logs if issues persist with FKs.");
     }
 
     if (!isset($_GET['ids']) || empty($_GET['ids'])) {
