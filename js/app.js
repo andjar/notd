@@ -1234,8 +1234,6 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
     textarea.addEventListener('input', (event) => {
         const currentTextarea = event.target;
         const cursorPos = currentTextarea.selectionStart;
-        const currentTextarea = event.target;
-        const cursorPos = currentTextarea.selectionStart;
         const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
         // const textAfterCursor = currentTextarea.value.substring(cursorPos); // Not strictly needed for the revised logic
 
@@ -1449,8 +1447,6 @@ function editNote(id, currentContentText) {
 
     // Link autosuggestion event listeners (same as in createNote)
     textarea.addEventListener('input', (event) => {
-        const currentTextarea = event.target;
-        const cursorPos = currentTextarea.selectionStart;
         const currentTextarea = event.target;
         const cursorPos = currentTextarea.selectionStart;
         const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
