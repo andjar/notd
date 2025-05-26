@@ -1,4 +1,3 @@
-// Initialize marked with code highlighting
 marked.setOptions({
     highlight: function(code, lang) {
         if (lang && hljs.getLanguage(lang)) {
@@ -8,175 +7,28 @@ marked.setOptions({
     }
 });
 
-// State management
-let currentPage = null;
-let recentPages = [];
-let prefetchedBlocks = {}; // Cache for prefetched blocks for the current page load
-let noteTemplates = {};
-let activeBlockElement = null; // For keyboard navigation
-let isEditorOpen = false;      // To track if a textarea editor is active
+// State variables are now in js/state.js
 
-// Autosuggestion variables
-let suggestionsPopup = null;
-let activeSuggestionIndex = -1;
-let currentSuggestions = [];
+// loadTemplates is now in js/api.js and will be called during initialization
 
-// Load templates
-async function loadTemplates() {
-    try {
-        const response = await fetch('api/templates.php');
-        const templates = await response.json();
-        noteTemplates = templates;
-    } catch (error) {
-        console.error('Error loading templates:', error);
-    }
-}
+// Suggestion Popup Logic (closeSuggestionsPopup, positionSuggestionsPopup, insertSuggestion, updateHighlightedSuggestion)
+// is now in js/ui.js.
+// renderSuggestions (which uses some of these) is in js/render.js.
 
-// Helper functions for autosuggestions
+// DOM Element Selections are now in js/ui.js
+// (searchInput, recentPagesList, newPageButton, pageTitle, pageProperties, outlineContainer)
 
-function closeSuggestionsPopup() {
-    if (suggestionsPopup) {
-        suggestionsPopup.remove();
-        suggestionsPopup = null;
-    }
-    activeSuggestionIndex = -1;
-    currentSuggestions = [];
-}
-
-function positionSuggestionsPopup(textarea) {
-    if (!suggestionsPopup) return;
-
-    const rect = textarea.getBoundingClientRect();
-    suggestionsPopup.style.position = 'absolute';
-    // Position below the textarea for now, adjust with CSS later
-    suggestionsPopup.style.top = `${window.scrollY + rect.bottom}px`;
-    suggestionsPopup.style.left = `${window.scrollX + rect.left}px`;
-    suggestionsPopup.style.zIndex = '1000'; // Ensure it's on top
-}
-
-function renderSuggestions(suggestions, textarea) {
-    closeSuggestionsPopup();
-    if (!suggestions || suggestions.length === 0) {
-        return;
-    }
-
-    suggestionsPopup = document.createElement('div');
-    suggestionsPopup.className = 'suggestions-popup';
-
-    suggestions.forEach((suggestion, index) => {
-        const item = document.createElement('div');
-        item.className = 'suggestion-item';
-        item.textContent = suggestion.title;
-        item.dataset.id = suggestion.id; // Store id if needed later
-        item.dataset.title = suggestion.title; // Store title for insertion
-
-        item.addEventListener('mousedown', (event) => {
-            event.preventDefault(); // Prevent textarea blur before click
-            insertSuggestion(textarea, suggestion.title);
-            closeSuggestionsPopup();
-        });
-        suggestionsPopup.appendChild(item);
-    });
-
-    document.body.appendChild(suggestionsPopup);
-    positionSuggestionsPopup(textarea);
-    currentSuggestions = suggestions; // Update current suggestions
-}
-
-function insertSuggestion(textarea, title) {
-    const currentValue = textarea.value;
-    const cursorPos = textarea.selectionStart;
-
-    let startIndex = -1;
-    // Find the opening [[ by searching backwards from the cursor
-    for (let i = cursorPos - 1; i >= 0; i--) {
-        if (currentValue.substring(i, i + 2) === '[[') {
-            // Ensure this [[ isn't already part of a completed link before the cursor
-            const partAfterOpenBrackets = currentValue.substring(i + 2, cursorPos);
-            if (!partAfterOpenBrackets.includes(']]')) {
-                startIndex = i;
-                break;
-            }
-        }
-    }
-
-    if (startIndex === -1) {
-        // This case should ideally not be reached if suggestions are visible,
-        // but as a fallback, insert the link at the current cursor position.
-        // Or, decide if we should not insert if the context is lost.
-        // For now, let's assume the context is still valid if this function is called.
-        // A more robust solution might involve passing the match object.
-        console.warn("Could not reliably find start of link for insertion. Inserting at cursor, but this might be incorrect.");
-        
-        // Fallback: attempt to find the LAST open [[ before cursor if primary logic fails
-        const lastOpenBracket = currentValue.lastIndexOf('[[', cursorPos -1);
-        if (lastOpenBracket !== -1 && !currentValue.substring(lastOpenBracket + 2, cursorPos).includes(']]')) {
-            startIndex = lastOpenBracket;
-        } else {
-            // If still no valid start, don't insert.
-            return;
-        }
-    }
-
-    const textBeforeLinkStart = currentValue.substring(0, startIndex);
-
-    // Determine endIndex for replacement
-    let endIndex = cursorPos;
-    if (currentValue.substring(cursorPos, cursorPos + 2) === ']]') {
-        endIndex = cursorPos + 2;
-    }
-
-    const newLinkContent = `[[${title}]]`;
-    const textAfterReplacedPart = currentValue.substring(endIndex);
-
-    textarea.value = textBeforeLinkStart + newLinkContent + textAfterReplacedPart;
-
-    const newCursorPos = startIndex + newLinkContent.length;
-    textarea.selectionStart = textarea.selectionEnd = newCursorPos;
-    textarea.focus();
-
-    // It's important to dispatch an input event if other listeners might depend on it,
-    // but be cautious if this could re-trigger the suggestion logic unnecessarily.
-    // For now, keeping it as it might be used for other features or by `handleAutoCloseBrackets` logic.
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function updateHighlightedSuggestion(items) {
-    if (!suggestionsPopup || !items || items.length === 0) return;
-
-    items.forEach((item, index) => {
-        if (index === activeSuggestionIndex) {
-            item.classList.add('highlighted');
-            item.scrollIntoView({ block: 'nearest' });
-        } else {
-            item.classList.remove('highlighted');
-        }
-    });
-}
-
-
-// DOM Elements
-const searchInput = document.getElementById('search');
-const recentPagesList = document.getElementById('recent-pages-list');
-const newPageButton = document.getElementById('new-page');
-const pageTitle = document.getElementById('page-title');
-const pageProperties = document.getElementById('page-properties');
-const outlineContainer = document.getElementById('outline-container');
-
-// Helper for navigation
 async function navigateToPage(pageId) {
     const targetHash = String(pageId).startsWith('#') ? String(pageId).substring(1) : String(pageId);
     const currentHash = window.location.hash.substring(1);
 
     if (currentHash === targetHash) {
-        await loadPage(targetHash); // Reload if same page
+        await loadPage(targetHash);
     } else {
         window.location.hash = targetHash;
     }
 }
 
-
-// Event Listeners
 searchInput.addEventListener('input', debounce(handleSearch, 300));
 newPageButton.addEventListener('click', createNewPage);
 outlineContainer.addEventListener('click', handleOutlineClick);
@@ -201,7 +53,7 @@ window.addEventListener('hashchange', () => {
     if (pageId === 'search-results') {
         showSearchResults();
     } else if (pageId) {
-        clearActiveBlock(); // Clear active block on page change
+        clearActiveBlock();
         loadPage(pageId);
     } else {
         const today = new Date().toISOString().split('T')[0];
@@ -213,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadTemplates();
     loadRecentPages();
     initCalendar();
-    document.addEventListener('keydown', handleGlobalKeyDown); // Add global keydown listener
+    document.addEventListener('keydown', handleGlobalKeyDown);
     const initialHash = window.location.hash.substring(1);
     if (!initialHash) {
         const today = new Date().toISOString().split('T')[0];
@@ -229,9 +81,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function handleAutoCloseBrackets(event) {
     const textarea = event.target;
-    const typedChar = event.data; // The character(s) that were just inserted
+    const typedChar = event.data;
 
-    // We only care about single character insertions of '[' or '{'
     if (typedChar === null || typedChar === undefined || typedChar.length !== 1) {
         return;
     }
@@ -244,84 +95,50 @@ function handleAutoCloseBrackets(event) {
     }
 
     if (closeBracketChar) {
-        const cursorPos = textarea.selectionStart; // Cursor is now *after* the typedChar
+        const cursorPos = textarea.selectionStart;
 
-        // The textarea.value already includes the typedChar.
-        // We need to insert the closeBracketChar right after the typedChar (which is at cursorPos - 1)
-        // and before anything that was originally after the cursor.
         const value = textarea.value;
-        const textBeforeCursor = value.substring(0, cursorPos); // This includes the typedChar
+        const textBeforeCursor = value.substring(0, cursorPos);
         const textAfterCursor = value.substring(cursorPos);
 
-        // New value: textBeforeCursor (which ends with typedChar) + closeBracketChar + textAfterCursor
         textarea.value = textBeforeCursor + closeBracketChar + textAfterCursor;
 
-        // Move the cursor back to be between the open and close brackets
-        // (i.e., at the position it was after typing the open bracket, before we added the close one)
         textarea.selectionStart = textarea.selectionEnd = cursorPos;
     }
 }
 
-// Utility Functions
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
+// debounce is now in js/utils.js
 
-function setActiveBlock(element, scrollIntoView = true) {
-    if (activeBlockElement) {
-        activeBlockElement.classList.remove('block-keyboard-focus');
-    }
-    activeBlockElement = element;
-    if (activeBlockElement) {
-        activeBlockElement.classList.add('block-keyboard-focus');
-        if (scrollIntoView) {
-            // Check if the element is an editor wrapper or content and scroll appropriately
-            const targetToScroll = activeBlockElement.querySelector('.note-textarea') || activeBlockElement;
-            targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-    }
-}
+// setActiveBlock, clearActiveBlock are now in js/ui.js
 
-function clearActiveBlock() {
-    if (activeBlockElement) {
-        activeBlockElement.classList.remove('block-keyboard-focus');
-    }
-    activeBlockElement = null;
-}
-
-
-// API Functions & Page Rendering
+/**
+ * Loads a page by its ID and renders it.
+ * Fetches page data from the API, handles potential errors,
+ * updates the UI to display the page content, title, properties,
+ * and recent pages list. Also handles alias redirection and
+ * re-activation of a block if specified in sessionStorage.
+ * @async
+ * @param {string} pageId - The ID of the page to load.
+ * @returns {Promise<void>} A promise that resolves when the page is loaded and rendered, or rejects on error.
+ */
 async function loadPage(pageId) {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
-    clearActiveBlock(); // Clear active block when loading a new page
+    clearActiveBlock();
 
     try {
         document.getElementById('new-note').style.display = 'block';
         document.getElementById('backlinks-container').style.display = 'block';
 
-        const response = await fetch(`api/page.php?id=${pageId}`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const text = await response.text();
-        if (!text) throw new Error('Empty response from server');
-        const data = JSON.parse(text);
+        // Use fetchPageData from api.js
+        const data = await fetchPageData(pageId);
 
-        if (data.error) {
-            console.error('Server error:', data.error);
-            outlineContainer.innerHTML = `<div class="error-message"><h3>Error loading page</h3><p>${data.error}</p></div>`;
-            return;
-        }
+        // Error handling for data.error is already within fetchPageData,
+        // but we might want specific UI updates here if an error is re-thrown.
+        // For now, assuming fetchPageData throws an error that's caught below.
 
         if (data.properties && data.properties.alias) {
-            navigateToPage(data.properties.alias);
+            navigateToPage(data.properties.alias); // This navigation will trigger another loadPage
             return;
         }
 
@@ -332,7 +149,6 @@ async function loadPage(pageId) {
             window.renderCalendarForCurrentPage();
         }
 
-        // Check for block to activate after reload (used by create/edit/indent operations)
         const reActivateId = sessionStorage.getItem('lastActiveBlockIdBeforeReload');
         if (reActivateId) {
             const reActivatedBlock = document.querySelector(`.outline-item[data-note-id="${reActivateId}"]`);
@@ -354,12 +170,13 @@ async function loadPage(pageId) {
 
 async function loadRecentPages() {
     try {
-        const response = await fetch('api/recent_pages.php');
-        const data = await response.json();
-        if (data.error) { console.error(data.error); return; }
-        recentPages = data;
-        renderRecentPages();
-    } catch (error) { console.error('Error loading recent pages:', error); }
+        // Use fetchRecentPages from api.js
+        const data = await fetchRecentPages();
+        recentPages = data; // recentPages is a global state variable
+        renderRecentPages(); // `renderRecentPages` is in js/render.js
+    } catch (error) {
+        console.error('Error loading recent pages:', error);
+    }
 }
 
 async function handleSearch(event) {
@@ -370,12 +187,20 @@ async function handleSearch(event) {
         return;
     }
     try {
-        const response = await fetch(`api/search.php?q=${encodeURIComponent(query)}`);
-        const results = await response.json();
-        renderSearchResults(results);
-    } catch (error) { console.error('Error searching:', error); }
+        // Use searchPages from api.js
+        const results = await searchPages(query);
+        renderSearchResults(results); // `renderSearchResults` is in js/render.js
+    } catch (error) {
+        console.error('Error searching:', error);
+    }
 }
 
+/**
+ * Creates a modal dialog for the user to enter a new page ID and create a new page.
+ * On successful creation, navigates to the new page.
+ * @async
+ * @returns {Promise<void>} A promise that resolves when the new page is created and navigated to, or when the dialog is cancelled.
+ */
 async function createNewPage() {
     const pageEditor = document.createElement('div');
     pageEditor.className = 'page-editor';
@@ -402,289 +227,22 @@ async function createNewPage() {
         let type = 'note'; let properties = {};
         if (/^\d{4}-\d{2}-\d{2}$/.test(pageId)) { type = 'journal'; properties = { 'type': 'journal' }; }
         try {
-            const response = await fetch('api/page.php', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: encodeURIComponent(pageId), title: pageId, type, properties })
-            });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            document.body.removeChild(modal);
-            navigateToPage(encodeURIComponent(pageId));
-        } catch (error) { console.error('Error creating page:', error); alert('Error creating page: ' + error.message); }
+            // Use createNewPageAPI from api.js
+            await createNewPageAPI(pageId, type, properties);
+            document.body.removeChild(modal); // UI manipulation, will be part of ui.js
+            navigateToPage(encodeURIComponent(pageId)); // Coordination, likely stays in app.js or ui.js
+        } catch (error) {
+            console.error('Error creating page:', error);
+            alert('Error creating page: ' + error.message); // UI interaction
+        }
     };
-    cancelButton.onclick = () => document.body.removeChild(modal);
+    cancelButton.onclick = () => document.body.removeChild(modal); // UI manipulation
     modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
-async function findBlockById(blockId) {
-    try {
-        const response = await fetch(`api/block.php?id=${blockId}`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
-        return data;
-    } catch (error) { console.error('Error finding block:', error); return null; }
-}
-
-async function renderNoteContent(note, prefetchedBlocks = {}) {
-    let processedContent = note.content || ''; // Ensure content is not null
-
-    // 1. TODO Pre-processing
-    processedContent = processedContent.replace(/^(TODO|DONE)\s*(.*)/gm, (match, status, taskText) => {
-        return `%%TODO_ITEM%%${status}%%${taskText}%%`;
-    });
-
-    // 2. Transclusion Placeholder Replacement (Pre-Markdown)
-    const transclusionPlaceholders = [];
-    const blockMatches = processedContent.matchAll(/\{\{([^}]+)\}\}/g); // Use matchAll for capturing groups
-
-    for (const blockRefMatch of blockMatches) {
-        const fullMatch = blockRefMatch[0]; // e.g., "{{blockId}}"
-        const blockId = blockRefMatch[1].trim();
-        let renderedBlockContent = '';
-        let sourcePageId = null;
-        let sourcePageTitle = null;
-        let blockDataForRecursiveCall = null;
-
-        if (prefetchedBlocks && prefetchedBlocks[blockId]) {
-            const prefetchedData = prefetchedBlocks[blockId];
-            sourcePageId = prefetchedData.page_id;
-            sourcePageTitle = prefetchedData.page_title;
-            blockDataForRecursiveCall = {
-                content: prefetchedData.content,
-                id: prefetchedData.note_id,
-                block_id: blockId,
-                attachments: prefetchedData.attachments || [],
-                properties: prefetchedData.properties || {}
-            };
-            renderedBlockContent = await renderNoteContent(blockDataForRecursiveCall, prefetchedBlocks);
-        } else {
-            const fallbackBlock = await findBlockById(blockId);
-            if (fallbackBlock) {
-                sourcePageId = fallbackBlock.page_id;
-                sourcePageTitle = fallbackBlock.page_title;
-                renderedBlockContent = await renderNoteContent(fallbackBlock, prefetchedBlocks);
-            } else {
-                renderedBlockContent = `<span class="block-ref-brackets">{{</span><a href="#" class="block-ref-link" onclick="event.stopPropagation(); console.warn('Block not found: ${blockId}')">${blockId}</a><span class="block-ref-brackets">}}</span><span class="broken-transclusion"> (not found)</span>`;
-                // For "not found", we directly replace and skip placeholder logic for this item
-                processedContent = processedContent.replace(fullMatch, renderedBlockContent);
-                continue;
-            }
-        }
-
-        const placeholderId = `%%TRANSCLUSION_PLACEHOLDER_${transclusionPlaceholders.length}%%`;
-        transclusionPlaceholders.push({
-            placeholder: placeholderId,
-            html: renderedBlockContent, // This is already HTML
-            blockId: blockId,
-            sourcePageId: sourcePageId,
-            sourcePageTitle: sourcePageTitle
-        });
-        processedContent = processedContent.replace(fullMatch, placeholderId);
-    }
-
-    // 3. Other Pre-Markdown Replacements
-    processedContent = processedContent.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
-        if (key.trim().toLowerCase() === 'tag') {
-            return value.trim().split(',').map(tagValue =>
-                `<a href="#${encodeURIComponent(tagValue.trim())}" class="property-tag" onclick="event.stopPropagation();">#${tagValue.trim()}</a>`
-            ).join(' ');
-        }
-        return `<span class="property-tag">${key.trim()}: ${value.trim()}</span>`;
-    });
-
-    processedContent = processedContent.replace(/<<([^>]+)>>/g, (match, query) => {
-        const displayQuery = query.length > 30 ? query.substring(0, 27) + '...' : query;
-        return `<a href="#" class="search-link" onclick="event.preventDefault(); event.stopPropagation(); executeSearchLink('${query.replace(/'/g, "\\'")}')"><<${displayQuery}>></a>`;
-    });
-
-    // 4. Main Markdown Parsing
-    let htmlContent = marked.parse(processedContent);
-
-    // 5. Transclusion HTML Injection (Post-Markdown)
-    transclusionPlaceholders.forEach(item => {
-        const finalTransclusionWrapperHtml = `
-            <div class="transcluded-block" data-block-id="${item.blockId}">
-                ${item.html}
-                <div class="transclusion-source">
-                    <a href="#${encodeURIComponent(item.sourcePageId)}" onclick="event.stopPropagation();">
-                        Source: ${item.sourcePageTitle || item.sourcePageId}</a>
-                </div>
-            </div>`;
-        htmlContent = htmlContent.split(item.placeholder).join(finalTransclusionWrapperHtml);
-    });
-
-    // 6. Post-Markdown Replacements
-    htmlContent = htmlContent.replace(/\[\[([^\]#]+?)\]\]/g, (match, pageName) => {
-        return `<span class="internal-link-brackets">[[</span><a href="#${encodeURIComponent(pageName.trim())}" class="internal-link" onclick="event.stopPropagation();">${pageName.trim()}</a><span class="internal-link-brackets">]]</span>`;
-    });
-    htmlContent = htmlContent.replace(/\[\[#(.*?)\]\]/g, (match, tagName) => {
-        return `<span class="internal-link-brackets">[[</span><a href="#${encodeURIComponent(tagName.trim())}" class="property-tag" onclick="event.stopPropagation();">#${tagName.trim()}</a><span class="internal-link-brackets">]]</span>`;
-    });
-    htmlContent = htmlContent.replace(/(^|\s)#([a-zA-Z0-9_\-\/]+)/g, (match, precedingSpace, tagName) => {
-        return `${precedingSpace}<a href="#${encodeURIComponent(tagName)}" class="property-tag" onclick="event.stopPropagation();">#${tagName}</a>`;
-    });
-
-    htmlContent = htmlContent.replace(/%%TODO_ITEM%%(TODO|DONE)%%(.*?)%%/g, (match, status, taskTextHtml) => {
-        const isDone = status === 'DONE';
-        return `<div class="todo-item">
-                    <label class="todo-checkbox">
-                        <input type="checkbox" ${isDone ? 'checked' : ''}
-                            onclick="event.stopPropagation();"
-                            onchange="toggleTodo('${note.block_id || note.id}', this.checked)">
-                        <span class="todo-marker status-${status.toLowerCase()}"
-                              onclick="event.stopPropagation(); this.previousElementSibling.click();">${status}</span>
-                        <span class="todo-text status-${status.toLowerCase()}">${taskTextHtml.trim()}</span>
-                    </label>
-                </div>`;
-    });
-
-    htmlContent = htmlContent.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
-        return `<img src="${src}" alt="${alt}" class="note-image" onclick="event.stopPropagation(); showImageModal(this.src, this.alt)">`;
-    });
-
-    if (note.attachments && note.attachments.length > 0) {
-        htmlContent += '<div class="attachments">';
-        note.attachments.forEach(attachment => {
-            const fileExtension = attachment.filename.split('.').pop().toLowerCase();
-            let icon = '📄'; let previewHtml = '';
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
-                icon = '🖼️'; previewHtml = `<img src="uploads/${attachment.filename}" class="attachment-image" alt="${attachment.original_name}">`;
-            } else if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
-                icon = '🎥'; previewHtml = `<div class="attachment-preview"><video src="uploads/${attachment.filename}" controls></video></div>`;
-            } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
-                icon = '🎵'; previewHtml = `<div class="attachment-preview"><audio src="uploads/${attachment.filename}" controls></audio></div>`;
-            }
-            htmlContent += `<div class="attachment"><div class="attachment-info">
-                        <span class="attachment-icon">${icon}</span>
-                        <a href="uploads/${attachment.filename}" target="_blank" class="attachment-name" onclick="event.stopPropagation();">${attachment.original_name}</a>
-                        <span class="attachment-size">${formatFileSize(attachment.size)}</span>
-                        <div class="attachment-actions"><button onclick="event.stopPropagation(); deleteAttachment(${attachment.id}, event)" title="Delete attachment">×</button></div>
-                    </div>${previewHtml}</div>`;
-        });
-        htmlContent += '</div>';
-    }
-    return htmlContent;
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
-    if (!notes || notes.length === 0) return '';
-
-    let html = '';
-    for (const note of notes) {
-        const blockId = note.block_id;
-        const contentHtml = await renderNoteContent(note, prefetchedBlocks);
-        let linkedPageType = null;
-        // ... (your existing logic for linkedPageType) ...
-
-        const hasChildren = note.children && note.children.length > 0;
-        const hasChildrenClass = hasChildren ? 'has-children' : '';
-        const linkedPageTypeClass = linkedPageType ? `linked-page-${linkedPageType.toLowerCase()}` : '';
-
-        // Date and Time Formatting
-        const createdAt = new Date(note.created_at);
-        const displayDate = createdAt.toLocaleDateString();
-        // Show time with hours and minutes, locale-dependent (e.g., 3:30 PM or 15:30)
-        const displayTime = createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        const controlsHtml = `
-            <span class="static-bullet" data-action="zoom-in" title="Zoom in"></span>
-            ${hasChildren ?
-                `<span class="hover-arrow-toggle" data-action="toggle-children" title="Toggle children">
-                     <svg class="arrow-svg" viewBox="0 0 192 512"><path d="M0 384.662V127.338c0-17.818 21.543-26.741 34.142-14.142l128.662 128.662c7.81 7.81 7.81 20.474 0 28.284L34.142 398.804C21.543 411.404 0 402.48 0 384.662z"></path></svg>
-                 </span>` : '' }`;
-
-        html += `
-            <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}"
-                 data-note-id="${note.id}" data-level="${level}" data-content="${note.content.replace(/"/g, '"')}">
-                <div class="outline-content" ${blockId ? `data-block-id="${blockId}"` : ''}>
-                    ${controlsHtml}
-                    ${contentHtml}
-                    ${note.properties && Object.keys(note.properties).length > 0 ? renderPropertiesInline(note.properties) : ''}
-                    <div class="note-actions">
-                        <button data-action="add-child" title="Add child note">+</button>
-                        ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
-                        <button data-action="edit" title="Edit note">✎</button>
-                        <button data-action="indent-note" title="Indent note (make child of item above)">→</button>
-                        <button data-action="upload" title="Upload file">🗎</button>
-                        <button data-action="delete" title="Delete note">×</button>
-                        ︱<span class="note-date" title="Created: ${createdAt.toLocaleString()}">${displayDate} ${displayTime}</span>
-                    </div>
-                </div>`;
-
-        if (hasChildren) {
-            html += `<div class="outline-children">`;
-            html += await renderOutline(note.children, level + 1, prefetchedBlocks);
-            html += `</div>`;
-        }
-
-        html += `</div>`;
-    }
-    return html;
-}
-
-function renderPropertiesInline(properties) { return ''; }
-
-async function renderPage(page) {
-    pageTitle.innerHTML = `<span class="page-title-text">${page.title}</span>
-                           <button class="edit-properties-button" title="Edit page properties"></button>`;
-    if (page.properties && Object.keys(page.properties).length > 0) {
-        const propertiesHtml = Object.entries(page.properties)
-            .map(([key, value]) => `<div class="page-property"><span class="property-key">${key}:</span><span class="property-value">${value}</span></div>`).join('');
-        pageProperties.innerHTML = `<div class="page-properties-content">${propertiesHtml}</div>`;
-        pageProperties.style.display = 'block';
-    } else {
-        pageProperties.innerHTML = '';
-        pageProperties.style.display = 'none';
-    }
-    const editButton = pageTitle.querySelector('.edit-properties-button');
-    if (editButton) editButton.onclick = editPageProperties;
-
-    const blockIdsToFetch = new Set();
-    function collectBlockIdsRecursive(notes) {
-        if (!notes) return;
-        for (const note of notes) {
-            if (note.content) {
-                const matches = note.content.matchAll(/{{\s*([a-zA-Z0-9_-]+)\s*}}/g);
-                for (const match of matches) {
-                    blockIdsToFetch.add(match[1].trim());
-                }
-            }
-            if (note.children) {
-                collectBlockIdsRecursive(note.children);
-            }
-        }
-    }
-
-    prefetchedBlocks = {};
-    collectBlockIdsRecursive(page.notes);
-
-    if (blockIdsToFetch.size > 0) {
-        try {
-            const idsArray = Array.from(blockIdsToFetch);
-            const response = await fetch(`api/batch_blocks.php?ids=${idsArray.join(',')}`);
-            if (response.ok) {
-                prefetchedBlocks = await response.json();
-            } else {
-                console.error('Failed to fetch batch blocks:', response.status, await response.text());
-            }
-        } catch (error) {
-            console.error('Error fetching batch blocks:', error);
-        }
-    }
-
-    outlineContainer.innerHTML = await renderOutline(page.notes, 0, prefetchedBlocks);
-    initSortable(outlineContainer);
-    const backlinksContainer = document.getElementById('backlinks-container');
-    if (backlinksContainer) renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
-}
+// Note: Functions related to rendering and specific UI interactions (like DOM element selections)
+// have been moved to their respective files (render.js, ui.js, etc.).
+// This file, app.js, primarily handles application flow, event listeners, and coordination between modules.
 
 async function editPageProperties() {
     if (!currentPage) return;
@@ -723,15 +281,11 @@ async function editPageProperties() {
             });
         }
         try {
-            const response = await fetch(`api/page.php?id=${currentPage.id}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update', title: currentPage.title, type: currentPage.type || 'note', properties: updatedProperties })
-            });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            navigateToPage(currentPage.id);
+            // Use updatePagePropertiesAPI from api.js
+            await updatePagePropertiesAPI(currentPage.id, currentPage.title, currentPage.type, updatedProperties);
+            navigateToPage(currentPage.id); // Coordination
         } catch (error) {
-            console.error('Error updating properties:', error);
+            console.error('Error updating properties:', error); // Error handling
             propertiesContent.innerHTML = originalContent;
             if ((Object.keys(properties).length === 0 && !originalContent.includes('page-property')) || !propertiesContent.innerHTML.trim()) {
                  pageProperties.style.display = 'none';
@@ -746,54 +300,8 @@ async function editPageProperties() {
     };
 }
 
-async function renderBacklinks(pageId) {
-    try {
-        const response = await fetch(`api/backlinks.php?page_id=${pageId}`);
-        if (!response.ok) throw new Error(`Network response error: ${response.statusText}`);
-        const threads = await response.json();
-        if (threads.error) throw new Error(threads.error);
-        if (!threads || threads.length === 0) return '<h3>Backlinks</h3><p>No backlinks found</p>';
-        let html = '<h3>Backlinks</h3><div class="backlinks-list">';
-        for (const thread of threads) {
-            const buildNoteTree = (notesList) => {
-                if (!notesList || notesList.length === 0) return [];
-                const noteMap = {};
-                notesList.forEach(note => { noteMap[note.id] = { ...note, children: [] }; });
-                const rootNotes = [];
-                notesList.forEach(noteData => {
-                    const currentMappedNote = noteMap[noteData.id];
-                    if (noteData.parent_id && noteMap[noteData.parent_id]) {
-                        noteMap[noteData.parent_id].children.push(currentMappedNote);
-                    } else { rootNotes.push(currentMappedNote); }
-                });
-                return rootNotes;
-            };
-            const hierarchicalNotes = buildNoteTree(thread.notes);
-            const threadContentHtml = hierarchicalNotes.length > 0 ? await renderOutline(hierarchicalNotes, 0, prefetchedBlocks) : '';
-            html += `<div class="backlink-thread-item">
-                        <a href="#${encodeURIComponent(thread.linking_page_id)}" onclick="event.stopPropagation();">
-                            ${thread.linking_page_title || thread.linking_page_id}</a>
-                        <div class="backlink-thread-content">${threadContentHtml}</div>
-                    </div>`;
-        }
-        html += '</div>'; return html;
-    } catch (error) {
-        console.error('Error loading backlinks:', error);
-        return `<h3>Backlinks</h3><p>Error loading backlinks: ${error.message}</p>`;
-    }
-}
-
-function renderRecentPages() {
-    if (!recentPagesList) return;
-    const recentPagesHtml = recentPages
-        .map(page => `<li onclick="navigateToPage('${page.page_id.replace(/'/g, "\\'")}')">
-                        ${page.title || decodeURIComponent(page.page_id)}
-                        <small>${new Date(page.last_opened).toLocaleDateString()}</small></li>`).join('');
-    recentPagesList.innerHTML = `<div class="recent-pages-header">
-            <h3>Recent Pages</h3>
-            <a href="#" class="all-pages-link" onclick="event.preventDefault(); showAllPages();">All pages</a>
-        </div><ul>${recentPagesHtml}</ul>`;
-}
+// renderBacklinks is now in js/render.js.
+// renderRecentPages is now in js/render.js.
 
 async function showAllPages() {
     try {
@@ -810,46 +318,25 @@ async function showAllPages() {
     } catch (error) { console.error('Error loading all pages:', error); }
 }
 
-function renderSearchResults(results) {
-    const searchResultsContainer = document.getElementById('search-results-container') || document.createElement('div');
-    searchResultsContainer.id = 'search-results-container';
-    searchResultsContainer.className = 'search-results-inline';
-    if (results.length === 0) {
-        searchResultsContainer.innerHTML = '<p>No results found.</p>';
-    } else {
-        searchResultsContainer.innerHTML = results.map(result => `
-            <div class="search-result-inline-item" onclick="navigateToPage('${result.page_id}'); searchInput.value=''; this.parentElement.remove();">
-                <strong>${result.page_title || result.page_id}</strong>: ${result.content.substring(0, 100)}...</div>`).join('');
-    }
-    if (!document.getElementById('search-results-container')) {
-        searchInput.parentNode.insertBefore(searchResultsContainer, searchInput.nextSibling);
-    }
-     document.addEventListener('click', function clearInlineSearch(event) {
-        if (searchResultsContainer.contains(event.target)) return;
-        if (!searchInput.contains(event.target) && !searchResultsContainer.contains(event.target)) {
-            searchResultsContainer.remove();
-            document.removeEventListener('click', clearInlineSearch);
-        }
-    }, { capture: true });
-}
+// renderSearchResults (for inline search results) is now in js/render.js.
 
 function updateRecentPages(pageId) {
-    fetch('api/recent_pages.php', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page_id: pageId })
-    }).then(() => loadRecentPages());
+    // Use updateRecentPagesAPI from api.js
+    updateRecentPagesAPI(pageId)
+        .then(() => loadRecentPages()) // loadRecentPages will be refactored
+        .catch(error => console.error('Error updating recent pages:', error)); // Add error handling
 }
 
 async function uploadFile(noteId, file) {
     if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file); formData.append('note_id', noteId);
     try {
-        const response = await fetch('api/attachment.php', { method: 'POST', body: formData });
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
-        navigateToPage(currentPage.id);
-    } catch (error) { console.error('Error uploading file:', error); alert('Error uploading file: ' + error.message); }
+        // Use uploadFileAPI from api.js
+        await uploadFileAPI(noteId, file);
+        navigateToPage(currentPage.id); // Coordination
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Error uploading file: ' + error.message); // UI interaction
+    }
 }
 
 async function deleteAttachment(id, event) {
@@ -860,24 +347,20 @@ async function deleteAttachment(id, event) {
         <p>Are you sure you want to delete this attachment?</p>
         <div class="button-group"><button class="btn-secondary cancel-delete">Cancel</button><button class="btn-primary confirm-delete">Delete</button></div></div>`;
     document.body.appendChild(modal);
-    modal.querySelector('.cancel-delete').onclick = () => document.body.removeChild(modal);
+    modal.querySelector('.cancel-delete').onclick = () => document.body.removeChild(modal); // UI
     modal.querySelector('.confirm-delete').onclick = async () => {
         try {
-            const response = await fetch(`api/attachment.php`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'delete', id: id })
-            });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            document.body.removeChild(modal);
-            navigateToPage(currentPage.id);
+            // Use deleteAttachmentAPI from api.js
+            await deleteAttachmentAPI(id);
+            document.body.removeChild(modal); // UI
+            navigateToPage(currentPage.id); // Coordination
         } catch (error) {
             console.error('Error deleting attachment:', error);
-            alert('Error deleting attachment: ' + error.message);
-            document.body.removeChild(modal);
+            alert('Error deleting attachment: ' + error.message); // UI
+            document.body.removeChild(modal); // UI
         }
     };
-    modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
+    modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); }); // UI
 }
 
 function initCalendar() {
@@ -955,15 +438,14 @@ function handleOutlineClick(event) {
     const target = event.target;
     const breadcrumbItem = target.closest('.breadcrumb-item');
     const breadcrumbBar = target.closest('.breadcrumb-bar');
-    const noteElement = target.closest('.outline-item:not(.note-editor-wrapper .outline-item)'); // Ensure we don't select an item within an editor
+    const noteElement = target.closest('.outline-item:not(.note-editor-wrapper .outline-item)');
 
     let action = target.dataset.action || target.closest('[data-action]')?.dataset.action;
     let noteIdForAction = null;
 
     if (noteElement) {
         noteIdForAction = noteElement.dataset.noteId;
-        // If a block (not an editor) is clicked, make it active for keyboard nav
-        if (!isEditorOpen && !action) { // Only if no specific action and editor is not open
+        if (!isEditorOpen && !action) {
             setActiveBlock(noteElement);
         }
     }
@@ -994,9 +476,9 @@ function handleOutlineClick(event) {
         return;
     }
 
-    if (!noteElement || !noteIdForAction) { // Clicks outside actionable items
-        if (!target.closest('.note-editor')) { // If click is not inside an editor
-             clearActiveBlock(); // Clear focus if clicking on empty space
+    if (!noteElement || !noteIdForAction) {
+        if (!target.closest('.note-editor')) {
+             clearActiveBlock();
         }
         return;
     }
@@ -1013,7 +495,7 @@ function handleOutlineClick(event) {
                     .catch(err => console.error('Failed to copy block ID:', err));
             }
             break;
-        case 'add-child': // This is the "+" button, it should always add a child
+        case 'add-child':
             createNote(noteIdForAction, parseInt(noteElement.dataset.level) + 1);
             break;
         case 'indent-note':
@@ -1066,26 +548,19 @@ async function handleIndentNote(noteId, noteElement) {
         note_id: parseInt(noteId),
         new_parent_id: parseInt(newParentId),
         new_order: newIndex,
-        page_id: currentPage.id
+        page_id: currentPage.id // currentPage is global state
     };
 
     try {
-        const response = await fetch('api/note.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteId);
+        // Use reorderNoteAPI from api.js
+        await reorderNoteAPI(payload.note_id, payload.new_parent_id, payload.new_order, payload.page_id);
+        sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteId); // UI/State
         // loadPage will handle re-activation
-        loadPage(currentPage.id);
+        loadPage(currentPage.id); // Coordination
     } catch (error) {
         console.error('Error indenting note:', error);
-        alert('Error indenting note: ' + error.message + '. Please refresh.');
-        loadPage(currentPage.id);
+        alert('Error indenting note: ' + error.message + '. Please refresh.'); // UI
+        loadPage(currentPage.id); // Coordination
     }
 }
 
@@ -1125,26 +600,19 @@ async function handleOutdentNote(noteId, noteElement) {
         note_id: parseInt(noteId),
         new_parent_id: newGrandparentId ? parseInt(newGrandparentId) : null,
         new_order: newIndex,
-        page_id: currentPage.id
+        page_id: currentPage.id // currentPage is global state
     };
 
     try {
-        const response = await fetch('api/note.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteId);
+        // Use reorderNoteAPI from api.js
+        await reorderNoteAPI(payload.note_id, payload.new_parent_id, payload.new_order, payload.page_id);
+        sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteId); // UI/State
         // loadPage will handle re-activation
-        loadPage(currentPage.id);
+        loadPage(currentPage.id); // Coordination
     } catch (error) {
         console.error('Error outdenting note:', error);
-        alert('Error outdenting note: ' + error.message + '. Please refresh.');
-        loadPage(currentPage.id);
+        alert('Error outdenting note: ' + error.message + '. Please refresh.'); // UI
+        loadPage(currentPage.id); // Coordination
     }
 }
 
@@ -1161,6 +629,16 @@ function toggleChildren(noteElement) {
     }
 }
 
+/**
+ * Creates a new note editor in the UI, allowing the user to input content.
+ * The editor can be placed as a child of an existing note, after a specific element, or at the top level.
+ * Handles template selection, saving the new note to the backend, and updating the UI.
+ * @param {string|null} [parentId=null] - The ID of the parent note. If null, the note is a top-level note.
+ * @param {number} [level=0] - The indentation level of the new note.
+ * @param {HTMLElement|null} [insertAfterElement=null] - The element after which to insert the new note editor.
+ * @param {number|null} [intendedOrder=null] - The desired order/index for the new note among its siblings.
+ * @returns {void}
+ */
 function createNote(parentId = null, level = 0, insertAfterElement = null, intendedOrder = null) {
     if (!currentPage) return;
     clearActiveBlock();
@@ -1227,264 +705,41 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
         }
         if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); }
     });
-    textarea.addEventListener('input', handleSnippetReplacement); // For space-triggered snippets
-    textarea.addEventListener('input', handleAutoCloseBrackets);   // ADDED: Auto-close brackets
+    textarea.addEventListener('input', handleSnippetReplacement);
+    textarea.addEventListener('input', handleAutoCloseBrackets);
 
     // Link autosuggestion event listeners
     textarea.addEventListener('input', (event) => {
         const currentTextarea = event.target;
         const cursorPos = currentTextarea.selectionStart;
         const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
-        // const textAfterCursor = currentTextarea.value.substring(cursorPos); // Not strictly needed for the revised logic
 
         const linkPattern = /\[\[([a-zA-Z0-9_-\s]{2,})$/;
         const match = textBeforeCursor.match(linkPattern);
 
         if (match) {
             const searchTerm = match[1];
-            fetch(`api/suggest_pages.php?q=${encodeURIComponent(searchTerm)}`)
-                .then(response => response.json())
+            // Use fetchPageSuggestionsAPI from api.js
+            fetchPageSuggestionsAPI(searchTerm)
                 .then(suggestions => {
                     if (suggestions.length > 0) {
-                        renderSuggestions(suggestions, currentTextarea);
+                        renderSuggestions(suggestions, currentTextarea); // renderSuggestions will be moved to render.js
                     } else {
-                        closeSuggestionsPopup();
+                        closeSuggestionsPopup(); // closeSuggestionsPopup will be moved to ui.js
                     }
                 })
                 .catch(error => {
                     console.error('Error fetching suggestions:', error);
-                    closeSuggestionsPopup();
+                    closeSuggestionsPopup(); // closeSuggestionsPopup will be moved to ui.js
                 });
         } else {
-            // If the pattern [[search_term is not before the cursor,
-            // or if the link is fully formed like [[search_term]] by manual typing, then close.
-            if (textBeforeCursor.endsWith(']]')) { // User manually typed closing brackets
+            if (textBeforeCursor.endsWith(']]')) {
                 closeSuggestionsPopup();
             } else {
-                // This part handles closing when the user moves cursor away or deletes text
-                // such that [[pattern is no longer met.
-                // Check if the cursor is still within a potential link context that just doesn't meet min length yet
                 const potentialLinkPattern = /\[\[([a-zA-Z0-9_-\s]*)$/;
                 if (!textBeforeCursor.match(potentialLinkPattern)) {
                      closeSuggestionsPopup();
                 }
-                // If it matches potentialLinkPattern but not linkPattern (e.g. "[[a"), do nothing, wait for more input.
-                // If it does not match potentialLinkPattern (e.g. "[[a] b" or "x [[a"), close.
-            }
-        }
-    });
-
-    textarea.addEventListener('keydown', (event) => {
-        if (!suggestionsPopup || currentSuggestions.length === 0) return;
-
-        const items = suggestionsPopup.querySelectorAll('.suggestion-item');
-        if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            activeSuggestionIndex = (activeSuggestionIndex + 1) % items.length;
-            updateHighlightedSuggestion(items);
-        } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            activeSuggestionIndex = (activeSuggestionIndex - 1 + items.length) % items.length;
-            updateHighlightedSuggestion(items);
-        } else if (event.key === 'Enter') {
-            event.preventDefault();
-            if (activeSuggestionIndex >= 0 && activeSuggestionIndex < items.length) {
-                const selectedTitle = currentSuggestions[activeSuggestionIndex].title;
-                insertSuggestion(textarea, selectedTitle);
-            }
-            closeSuggestionsPopup();
-        } else if (event.key === 'Escape') {
-            event.preventDefault();
-            closeSuggestionsPopup();
-        } else if (event.key === ']') {
-            const nextChar = textarea.value.substring(textarea.selectionStart, textarea.selectionStart + 1);
-            if (nextChar === ']') { // User is typing ']]'
-                 setTimeout(closeSuggestionsPopup, 50); // Give it a moment to type both
-            }
-        }
-    });
-
-    textarea.addEventListener('blur', (event) => {
-        if (suggestionsPopup && !suggestionsPopup.contains(event.relatedTarget)) {
-            setTimeout(() => closeSuggestionsPopup(), 150); // Increased delay
-        }
-    });
-
-
-    if (templateSelect) {
-        templateSelect.addEventListener('change', (e) => {
-            const templateKey = e.target.value;
-            if (templateKey && noteTemplates[templateKey]) {
-                textarea.value = textarea.value ? textarea.value + '\n' + noteTemplates[templateKey] : noteTemplates[templateKey];
-                textarea.focus(); textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
-            }
-        });
-    }
-    // ... (rest of saveButton.onclick and cancelButton.onclick from createNote)
-    saveButton.onclick = async () => {
-        const content = textarea.value.trim();
-        const properties = {};
-        const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match;
-        let tempContent = content;
-        while ((match = propertyRegex.exec(tempContent)) !== null) properties[match[1].trim()] = match[2].trim();
-
-        try {
-            // Step 1: Create the note
-            const createResponse = await fetch('api/note.php', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    page_id: currentPage.id,
-                    content: content,
-                    level: level, 
-                    parent_id: parentId, 
-                    properties: properties
-                })
-            });
-            const createData = await createResponse.json();
-            isEditorOpen = false; 
-            if (createData.error) throw new Error(`Create error: ${createData.error}`);
-            if (!createData.id) throw new Error('Note created but no ID returned.');
-
-            const newNoteId = createData.id;
-
-            if (insertAfterElement && intendedOrder !== null) {
-                const reorderPayload = {
-                    action: 'reorder_note',
-                    note_id: parseInt(newNoteId),
-                    new_parent_id: parentId ? parseInt(parentId) : null,
-                    new_order: parseInt(intendedOrder),
-                    page_id: currentPage.id
-                };
-                const reorderResponse = await fetch('api/note.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reorderPayload)
-                });
-                const reorderData = await reorderResponse.json();
-                if (reorderData.error) {
-                    console.warn(`Note created (ID: ${newNoteId}), but reorder failed: ${reorderData.error}. The note might not be in the exact intended position.`);
-                }
-            }
-
-            sessionStorage.setItem('lastActiveBlockIdBeforeReload', newNoteId.toString());
-            loadPage(currentPage.id);
-
-        } catch (error) {
-            isEditorOpen = false; 
-            console.error('Error creating note:', error); alert('Error creating note: ' + error.message);
-        }
-    };
-
-    cancelButton.onclick = () => {
-        noteEditorContainer.remove();
-        isEditorOpen = false;
-
-        let blockToReactivate = null;
-        if (insertAfterElement) { 
-            blockToReactivate = insertAfterElement;
-        } else if (parentId) {   
-            blockToReactivate = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
-            if (blockToReactivate) {
-                const childrenContainer = blockToReactivate.querySelector('.outline-children');
-                if (childrenContainer && childrenContainer.children.length === 0) {
-                    if (!Array.from(childrenContainer.children).some(childEl => childEl.matches('.outline-item'))) {
-                        blockToReactivate.classList.remove('has-children');
-                    }
-                }
-            }
-        } else { 
-            const prevSibling = noteEditorContainer.previousElementSibling;
-            if (prevSibling && prevSibling.matches('.outline-item')) {
-                blockToReactivate = prevSibling;
-            }
-        }
-
-        if (blockToReactivate) {
-            setActiveBlock(blockToReactivate, false);
-        } else if (outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)')) { 
-            setActiveBlock(outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)'), false);
-        }
-    };
-}
-
-
-function editNote(id, currentContentText) {
-    const noteElement = document.querySelector(`.outline-item[data-note-id="${id}"]`);
-    if (!noteElement || noteElement.querySelector('.note-editor-wrapper')) return;
-
-    clearActiveBlock();
-    isEditorOpen = true;
-    const noteIdBeingEdited = id;
-
-    const contentElement = noteElement.querySelector('.outline-content');
-    if (!contentElement) return;
-    const originalDisplay = contentElement.style.display;
-    contentElement.style.display = 'none';
-    const editorWrapper = document.createElement('div');
-    editorWrapper.className = 'note-editor-wrapper edit-mode';
-    const noteEditorDiv = document.createElement('div');
-    noteEditorDiv.className = 'note-editor';
-    noteEditorDiv.innerHTML = `<textarea class="note-textarea">${currentContentText}</textarea>
-        <div class="note-editor-actions"><button class="btn-primary save-note">Save</button><button class="btn-secondary cancel-note">Cancel</button></div>`;
-    editorWrapper.appendChild(noteEditorDiv);
-    noteElement.insertBefore(editorWrapper, contentElement);
-
-    const textarea = noteEditorDiv.querySelector('.note-textarea');
-    const saveButton = noteEditorDiv.querySelector('.save-note');
-    const cancelButton = noteEditorDiv.querySelector('.cancel-note');
-
-    textarea.focus();
-    textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
-
-    textarea.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-            handleSnippetReplacement(e);
-        }
-        if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); }
-    });
-    textarea.addEventListener('input', handleSnippetReplacement);
-    textarea.addEventListener('input', handleAutoCloseBrackets);   // ADDED: Auto-close brackets
-
-    // Link autosuggestion event listeners (same as in createNote)
-    textarea.addEventListener('input', (event) => {
-        const currentTextarea = event.target;
-        const cursorPos = currentTextarea.selectionStart;
-        const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
-        // const textAfterCursor = currentTextarea.value.substring(cursorPos); // Not strictly needed
-
-        const linkPattern = /\[\[([a-zA-Z0-9_-\s]{2,})$/;
-        const match = textBeforeCursor.match(linkPattern);
-
-        if (match) {
-            const searchTerm = match[1];
-            fetch(`api/suggest_pages.php?q=${encodeURIComponent(searchTerm)}`)
-                .then(response => response.json())
-                .then(suggestions => {
-                    if (suggestions.length > 0) {
-                        renderSuggestions(suggestions, currentTextarea);
-                    } else {
-                        closeSuggestionsPopup();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching suggestions:', error);
-                    closeSuggestionsPopup();
-                });
-        } else {
-            // If the pattern [[search_term is not before the cursor,
-            // or if the link is fully formed like [[search_term]] by manual typing, then close.
-            if (textBeforeCursor.endsWith(']]')) { // User manually typed closing brackets
-                closeSuggestionsPopup();
-            } else {
-                // This part handles closing when the user moves cursor away or deletes text
-                // such that [[pattern is no longer met.
-                // Check if the cursor is still within a potential link context that just doesn't meet min length yet
-                const potentialLinkPattern = /\[\[([a-zA-Z0-9_-\s]*)$/;
-                if (!textBeforeCursor.match(potentialLinkPattern)) {
-                     closeSuggestionsPopup();
-                }
-                // If it matches potentialLinkPattern but not linkPattern (e.g. "[[a"), do nothing, wait for more input.
-                // If it does not match potentialLinkPattern (e.g. "[[a] b" or "x [[a"), close.
             }
         }
     });
@@ -1521,28 +776,214 @@ function editNote(id, currentContentText) {
 
     textarea.addEventListener('blur', (event) => {
         if (suggestionsPopup && !suggestionsPopup.contains(event.relatedTarget)) {
-            setTimeout(() => closeSuggestionsPopup(), 150); // Increased delay
+            setTimeout(() => closeSuggestionsPopup(), 150);
+        }
+    });
+
+
+    if (templateSelect) {
+        templateSelect.addEventListener('change', (e) => {
+            const templateKey = e.target.value;
+            if (templateKey && noteTemplates[templateKey]) {
+                textarea.value = textarea.value ? textarea.value + '\n' + noteTemplates[templateKey] : noteTemplates[templateKey];
+                textarea.focus(); textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+            }
+        });
+    }
+    saveButton.onclick = async () => {
+        const content = textarea.value.trim();
+        const properties = {};
+        const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match;
+        let tempContent = content;
+        while ((match = propertyRegex.exec(tempContent)) !== null) properties[match[1].trim()] = match[2].trim();
+
+        try {
+            // Use createNoteAPI from api.js
+            // createNoteAPI now handles both creation and the conditional reorder
+            const newNoteData = await createNoteAPI(
+                currentPage.id, // pageId (currentPage is global state)
+                content,        // content
+                level,          // level
+                parentId,       // parentId
+                properties,     // properties
+                (insertAfterElement && intendedOrder !== null) ? intendedOrder : null // intendedOrder
+            );
+            isEditorOpen = false; // state variable
+
+            // newNoteData contains { id: newNoteId, ... }
+            sessionStorage.setItem('lastActiveBlockIdBeforeReload', newNoteData.id.toString()); // UI/State
+            loadPage(currentPage.id); // Coordination
+
+        } catch (error) {
+            isEditorOpen = false; // state variable
+            console.error('Error creating note:', error);
+            alert('Error creating note: ' + error.message); // UI interaction
+        }
+    };
+
+    cancelButton.onclick = () => {
+        noteEditorContainer.remove();
+        isEditorOpen = false;
+
+        let blockToReactivate = null;
+        if (insertAfterElement) { 
+            blockToReactivate = insertAfterElement;
+        } else if (parentId) {   
+            blockToReactivate = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
+            if (blockToReactivate) {
+                const childrenContainer = blockToReactivate.querySelector('.outline-children');
+                if (childrenContainer && childrenContainer.children.length === 0) {
+                    if (!Array.from(childrenContainer.children).some(childEl => childEl.matches('.outline-item'))) {
+                        blockToReactivate.classList.remove('has-children');
+                    }
+                }
+            }
+        } else { 
+            const prevSibling = noteEditorContainer.previousElementSibling;
+            if (prevSibling && prevSibling.matches('.outline-item')) {
+                blockToReactivate = prevSibling;
+            }
+        }
+
+        if (blockToReactivate) {
+            setActiveBlock(blockToReactivate, false);
+        } else if (outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)')) { 
+            setActiveBlock(outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)'), false);
+        }
+    };
+}
+
+/**
+ * Opens an editor to modify an existing note.
+ * Replaces the note's content with a textarea for editing and provides save/cancel buttons.
+ * Handles saving the updated content or reverting to the original content.
+ * @param {string} id - The ID of the note to edit.
+ * @param {string} currentContentText - The current raw text content of the note.
+ * @returns {void}
+ */
+function editNote(id, currentContentText) {
+    const noteElement = document.querySelector(`.outline-item[data-note-id="${id}"]`);
+    if (!noteElement || noteElement.querySelector('.note-editor-wrapper')) return;
+
+    clearActiveBlock();
+    isEditorOpen = true;
+    const noteIdBeingEdited = id;
+
+    const contentElement = noteElement.querySelector('.outline-content');
+    if (!contentElement) return;
+    const originalDisplay = contentElement.style.display;
+    contentElement.style.display = 'none';
+    const editorWrapper = document.createElement('div');
+    editorWrapper.className = 'note-editor-wrapper edit-mode';
+    const noteEditorDiv = document.createElement('div');
+    noteEditorDiv.className = 'note-editor';
+    noteEditorDiv.innerHTML = `<textarea class="note-textarea">${currentContentText}</textarea>
+        <div class="note-editor-actions"><button class="btn-primary save-note">Save</button><button class="btn-secondary cancel-note">Cancel</button></div>`;
+    editorWrapper.appendChild(noteEditorDiv);
+    noteElement.insertBefore(editorWrapper, contentElement);
+
+    const textarea = noteEditorDiv.querySelector('.note-textarea');
+    const saveButton = noteEditorDiv.querySelector('.save-note');
+    const cancelButton = noteEditorDiv.querySelector('.cancel-note');
+
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            handleSnippetReplacement(e);
+        }
+        if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); }
+    });
+    textarea.addEventListener('input', handleSnippetReplacement);
+    textarea.addEventListener('input', handleAutoCloseBrackets);
+
+    // Link autosuggestion event listeners (same as in createNote)
+    textarea.addEventListener('input', (event) => {
+        const currentTextarea = event.target;
+        const cursorPos = currentTextarea.selectionStart;
+        const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
+
+        const linkPattern = /\[\[([a-zA-Z0-9_-\s]{2,})$/;
+        const match = textBeforeCursor.match(linkPattern);
+
+        if (match) {
+            const searchTerm = match[1];
+            // Use fetchPageSuggestionsAPI from api.js
+            fetchPageSuggestionsAPI(searchTerm)
+                .then(suggestions => {
+                    if (suggestions.length > 0) {
+                        renderSuggestions(suggestions, currentTextarea); // renderSuggestions will be moved to render.js
+                    } else {
+                        closeSuggestionsPopup(); // closeSuggestionsPopup will be moved to ui.js
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching suggestions:', error);
+                    closeSuggestionsPopup(); // closeSuggestionsPopup will be moved to ui.js
+                });
+        } else {
+            if (textBeforeCursor.endsWith(']]')) {
+                closeSuggestionsPopup();
+            } else {
+                const potentialLinkPattern = /\[\[([a-zA-Z0-9_-\s]*)$/;
+                if (!textBeforeCursor.match(potentialLinkPattern)) {
+                     closeSuggestionsPopup();
+                }
+            }
+        }
+    });
+
+    textarea.addEventListener('keydown', (event) => {
+        if (!suggestionsPopup || currentSuggestions.length === 0) return;
+
+        const items = suggestionsPopup.querySelectorAll('.suggestion-item');
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            activeSuggestionIndex = (activeSuggestionIndex + 1) % items.length;
+            updateHighlightedSuggestion(items);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            activeSuggestionIndex = (activeSuggestionIndex - 1 + items.length) % items.length;
+            updateHighlightedSuggestion(items);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (activeSuggestionIndex >= 0 && activeSuggestionIndex < items.length) {
+                const selectedTitle = currentSuggestions[activeSuggestionIndex].title;
+                insertSuggestion(textarea, selectedTitle);
+            }
+            closeSuggestionsPopup();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeSuggestionsPopup();
+        } else if (event.key === ']') {
+            const nextChar = textarea.value.substring(textarea.selectionStart, textarea.selectionStart + 1);
+            if (nextChar === ']') {
+                 setTimeout(closeSuggestionsPopup, 50);
+            }
+        }
+    });
+
+    textarea.addEventListener('blur', (event) => {
+        if (suggestionsPopup && !suggestionsPopup.contains(event.relatedTarget)) {
+            setTimeout(() => closeSuggestionsPopup(), 150);
         }
     });
     
-    // ... (rest of saveButton.onclick and cancelButton.onclick from editNote)
     saveButton.onclick = async () => {
         const newContent = textarea.value.trim();
         const properties = {}; const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match; let tempContent = newContent;
         while ((match = propertyRegex.exec(tempContent)) !== null) properties[match[1].trim()] = match[2].trim();
         try {
-            const response = await fetch(`api/note.php?id=${id}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update', content: newContent, properties: properties, level: parseInt(noteElement.dataset.level) || 0 })
-            });
-            const data = await response.json();
-            isEditorOpen = false;
-            if (data.error) throw new Error(data.error);
-            sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteIdBeingEdited);
-            loadPage(currentPage.id);
+            // Use updateNoteAPI from api.js
+            await updateNoteAPI(id, newContent, properties, parseInt(noteElement.dataset.level) || 0);
+            isEditorOpen = false; // state variable
+            sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteIdBeingEdited); // UI/State
+            loadPage(currentPage.id); // Coordination
         } catch (error) {
-            isEditorOpen = false;
-            console.error('Error updating note:', error); alert('Error updating note: ' + error.message);
+            isEditorOpen = false; // state variable
+            console.error('Error updating note:', error);
+            alert('Error updating note: ' + error.message); // UI interaction
         }
     };
     cancelButton.onclick = () => {
@@ -1561,128 +1002,95 @@ async function deleteNote(id) {
         <p>Are you sure you want to delete this note and all its children?</p>
         <div class="button-group"><button class="btn-secondary cancel-delete">Cancel</button><button class="btn-primary confirm-delete">Delete</button></div></div>`;
     document.body.appendChild(modal);
-    modal.querySelector('.cancel-delete').onclick = () => document.body.removeChild(modal);
+    modal.querySelector('.cancel-delete').onclick = () => document.body.removeChild(modal); // UI
     modal.querySelector('.confirm-delete').onclick = async () => {
         try {
-            const response = await fetch(`api/note.php?id=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete' }) });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            document.body.removeChild(modal);
-            clearActiveBlock();
-            navigateToPage(currentPage.id);
-        } catch (error) { console.error('Error deleting note:', error); alert('Error deleting note: ' + error.message); document.body.removeChild(modal); }
+            // Use deleteNoteAPI from api.js
+            await deleteNoteAPI(id);
+            document.body.removeChild(modal); // UI
+            clearActiveBlock(); // UI/State
+            navigateToPage(currentPage.id); // Coordination
+        } catch (error) {
+            console.error('Error deleting note:', error);
+            alert('Error deleting note: ' + error.message); // UI
+            document.body.removeChild(modal); // UI
+        }
     };
-    modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
+    modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); }); // UI
 }
 
 async function showSearchResults() {
-    const results = JSON.parse(sessionStorage.getItem('searchResults') || '[]');
-    const query = sessionStorage.getItem('searchQuery') || '';
-    document.getElementById('new-note').style.display = 'none';
-    document.getElementById('backlinks-container').style.display = 'none';
-    pageProperties.style.display = 'none';
-    const renderedResultsPromises = results.map(async result => {
-        const content = await renderNoteContent(result, prefetchedBlocks);
-        return `<div class="search-result-item"><div class="result-header">
-                    <a href="#${encodeURIComponent(result.page_id)}" onclick="event.stopPropagation();">${result.page_title || result.page_id}</a>
-                    <span class="result-date">${new Date(result.created_at).toLocaleDateString()}</span></div>
-                <div class="result-content">${content}</div></div>`;
-    });
-    const renderedResultsHtml = (await Promise.all(renderedResultsPromises)).join('');
-    outlineContainer.innerHTML = `<div class="search-results-page"><div class="search-results-header">
-            <h2>Advanced Search Results</h2><div class="search-actions"><button class="btn-secondary" onclick="copySearchLink()">Copy Search Link</button>
-            <button class="btn-secondary" onclick="window.history.back()">Back</button></div></div>
-        <div class="search-query" style="margin-bottom:1em; font-size:0.9em;"><strong>Query:</strong> <code>${query}</code></div>
-        ${renderedResultsHtml}</div>`;
-    pageTitle.innerHTML = '<span class="page-title-text">Search Results</span>';
+    // This function in app.js is now primarily for coordination.
+    // The actual rendering of the search results page is in js/render.js (showSearchResults function).
+    // It will use global state like sessionStorage and call renderNoteContent from render.js.
+    await showSearchResults(); // Corrected function name to call from render.js
 }
+
+// copySearchLink will be moved to js/ui.js
 function copySearchLink() {
     const query = sessionStorage.getItem('searchQuery') || '';
     navigator.clipboard.writeText(`<<${query}>>`).then(() => alert('Search link copied!')).catch(err => alert('Failed to copy: ' + err));
 }
 async function executeSearchLink(query) {
     try {
-        const response = await fetch('api/advanced_search.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const results = await response.json();
-        if (results.error) throw new Error(results.error);
-        sessionStorage.setItem('searchResults', JSON.stringify(results));
-        sessionStorage.setItem('searchQuery', query);
-        window.location.hash = 'search-results';
-    } catch (error) { console.error('Error executing search link:', error); alert('Error executing search: ' + error.message); }
+        // Use executeSearchLinkAPI from api.js
+        const results = await executeSearchLinkAPI(query);
+        sessionStorage.setItem('searchResults', JSON.stringify(results)); // State/UI related
+        sessionStorage.setItem('searchQuery', query); // State/UI related
+        window.location.hash = 'search-results'; // Coordination
+    } catch (error) {
+        console.error('Error executing search link:', error);
+        alert('Error executing search: ' + error.message); // UI interaction
+    }
 }
 
 async function toggleTodo(blockId, isDone) {
     try {
         let currentNoteData;
+        // Attempt to get data from prefetchedBlocks first
         if (prefetchedBlocks && prefetchedBlocks[blockId]) {
             const prefetched = prefetchedBlocks[blockId];
             currentNoteData = {
-                id: prefetched.note_id,
+                id: prefetched.note_id, // This should be the main note ID, not the block_id if they differ
                 content: prefetched.content,
-                block_id: blockId,
-                properties: {},
-                level: 0,
-                parent_id: null
+                block_id: blockId, // Keep the block_id that was passed
+                properties: prefetched.properties || {}, // Ensure properties exists
+                level: prefetched.level || 0, // Ensure level exists
+                parent_id: prefetched.parent_id !== undefined ? prefetched.parent_id : null // Ensure parent_id exists
             };
         } else {
-            currentNoteData = await findBlockById(blockId);
+            // Fallback to fetching the block by its specific ID if not in prefetched or if more details are needed
+            // findBlockByIdAPI is designed to fetch a block by its block_id (which might be different from note_id)
+            const blockData = await findBlockByIdAPI(blockId);
+            if (!blockData) throw new Error('Note/Block not found for toggling TODO');
+            currentNoteData = {
+                id: blockData.note_id || blockData.id, // Prefer note_id if available, else id
+                content: blockData.content,
+                block_id: blockId, // Keep the original blockId
+                properties: blockData.properties || {},
+                level: blockData.level || 0,
+                parent_id: blockData.parent_id !== undefined ? blockData.parent_id : null
+            };
         }
 
-        if (!currentNoteData) throw new Error('Note not found for toggling TODO');
+        if (!currentNoteData || currentNoteData.id === undefined) throw new Error('Essential note data (like ID) is missing for toggling TODO');
 
-        let rawContent = currentNoteData.content;
-        let taskTextWithProperties = "";
+        // The logic for constructing newContentString and updatedNoteProperties is now in toggleTodoAPI.
+        // We pass the necessary raw parts to it.
+        await toggleTodoAPI(
+            currentNoteData.id,         // The main ID of the note/item to update
+            blockId,                    // The specific block_id (can be same as note_id)
+            currentNoteData.content,    // Raw content
+            isDone,
+            currentNoteData.properties, // Current properties
+            currentNoteData.level,      // Current level
+            currentNoteData.parent_id   // Current parent_id
+        );
 
-        if (rawContent.startsWith('TODO ')) {
-            taskTextWithProperties = rawContent.substring(5);
-        } else if (rawContent.startsWith('DONE ')) {
-            taskTextWithProperties = rawContent.substring(5);
-        } else {
-            taskTextWithProperties = rawContent;
-        }
-
-        const taskSpecificProperties = {};
-        let cleanTaskDescription = taskTextWithProperties.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
-            taskSpecificProperties[key.trim()] = value.trim();
-            return '';
-        }).trim();
-
-        let newStatusPrefix = isDone ? 'DONE ' : 'TODO ';
-        let newContentString = newStatusPrefix + cleanTaskDescription;
-
-        const updatedNoteProperties = { ...(currentNoteData.properties || {}) };
-
-        if (isDone) {
-            taskSpecificProperties['done-at'] = new Date().toISOString();
-        } else {
-            delete taskSpecificProperties['done-at'];
-        }
-
-        for (const [key, value] of Object.entries(taskSpecificProperties)) {
-            newContentString += ` {${key}::${value}}`;
-            updatedNoteProperties[key] = value;
-        }
-        if (!isDone) {
-            delete updatedNoteProperties['done-at'];
-        }
-
-        const response = await fetch(`api/note.php?id=${currentNoteData.id}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'update',
-                content: newContentString.trim(),
-                properties: updatedNoteProperties,
-                level: currentNoteData.level,
-                parent_id: currentNoteData.parent_id
-            })
-        });
-        const data = await response.json();
-        if (data.error) throw new Error(data.error);
-        navigateToPage(currentPage.id);
+        navigateToPage(currentPage.id); // Coordination
     } catch (error) {
         console.error('Error updating todo status:', error);
-        alert('Error updating task: ' + error.message);
+        alert('Error updating task: ' + error.message); // UI interaction
         const checkbox = document.querySelector(`input[type="checkbox"][onchange*="'${blockId}'"]`);
         if (checkbox) checkbox.checked = !isDone;
     }
@@ -1720,6 +1128,8 @@ function showAdvancedSearch() {
     });
 }
 
+// replacePropertyTags is now in js/render.js
+
 async function executeAdvancedSearch() {
     const queryInput = document.getElementById('advanced-search-query');
     if (!queryInput) {
@@ -1733,96 +1143,30 @@ async function executeAdvancedSearch() {
     }
 
     try {
-        const response = await fetch('api/advanced_search.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query })
-        });
+        // Use executeAdvancedSearchAPI from api.js
+        const results = await executeAdvancedSearchAPI(query);
 
-        if (!response.ok) {
-            let errorMsg = `HTTP error! status: ${response.status}`;
-            try {
-                const errorData = await response.json();
-                if (errorData && errorData.error) {
-                    errorMsg = errorData.error;
-                }
-            } catch (e) { }
-            throw new Error(errorMsg);
-        }
+        sessionStorage.setItem('searchResults', JSON.stringify(results)); // State/UI
+        sessionStorage.setItem('searchQuery', query); // State/UI
 
-        const results = await response.json();
-        if (results.error) {
-            throw new Error(results.error);
-        }
-
-        sessionStorage.setItem('searchResults', JSON.stringify(results));
-        sessionStorage.setItem('searchQuery', query);
-
-        const modal = document.querySelector('.advanced-search-content');
+        const modal = document.querySelector('.advanced-search-content'); // UI
         if (modal && modal.closest('.modal')) {
-            modal.closest('.modal').remove();
+            modal.closest('.modal').remove(); // UI
         }
 
-        window.location.hash = 'search-results';
+        window.location.hash = 'search-results'; // Coordination
     } catch (error) {
         console.error('Error executing advanced search:', error);
-        alert('Error executing search: ' + error.message);
+        alert('Error executing search: ' + error.message); // UI
     }
 }
 
-function findNoteAndPath(targetId, notesArray, currentPath = []) {
-    for (const note of notesArray) {
-        const newPath = [...currentPath, note];
-        if (String(note.id) === String(targetId)) {
-            return { note, path: newPath };
-        }
-        if (note.children) {
-            const foundInChildren = findNoteAndPath(targetId, note.children, newPath);
-            if (foundInChildren) {
-                return foundInChildren;
-            }
-        }
-    }
-    return null;
-}
+// findNoteAndPath is now in js/utils.js
+// adjustLevels is now in js/utils.js
 
-function adjustLevels(notesArray, currentLevel) {
-    if (!notesArray) return;
-    notesArray.forEach(note => {
-        note.level = currentLevel;
-        if (note.children) adjustLevels(note.children, currentLevel + 1);
-    });
-}
+// renderBreadcrumbs is now in js/render.js
 
-function renderBreadcrumbs(path) {
-    if (!path || path.length === 0 || !currentPage) return '';
-
-    let breadcrumbHtml = '<div class="breadcrumb-bar" data-action="zoom-out" title="Click to zoom out">';
-
-    breadcrumbHtml += `<span class="breadcrumb-item page-link" data-action="zoom-out">${currentPage.title}</span>`;
-
-    path.forEach((note, index) => {
-        let plainContent = note.content.replace(/<\/?[^>]+(>|$)/g, " ").replace(/\s+/g, ' ').trim();
-        const contentSnippet = plainContent.length > 30
-            ? plainContent.substring(0, 27) + '...'
-            : (plainContent || 'Untitled Note');
-
-        const isLast = index === path.length - 1;
-        breadcrumbHtml += `<span class="breadcrumb-separator">»</span>`;
-        if (isLast) {
-            breadcrumbHtml += `<span class="breadcrumb-item current-focus">${contentSnippet}</span>`;
-        } else {
-            breadcrumbHtml += `<span class="breadcrumb-item" data-action="zoom-in" data-note-id="${note.id}">${contentSnippet}</span>`;
-        }
-    });
-
-    breadcrumbHtml += '</div>';
-    return breadcrumbHtml;
-}
-
-
+// zoomInOnNote and zoomOut will be moved to ui.js (or app.js if more coordination heavy)
 async function zoomInOnNote(targetNoteReference) {
     let noteIdToZoom;
 
@@ -1976,218 +1320,45 @@ function handleNoteDrop(evt) {
         note_id: parseInt(draggedNoteId),
         new_parent_id: newParentId ? parseInt(newParentId) : null,
         new_order: parseInt(newIndex),
-        page_id: currentPage.id
+        page_id: currentPage.id // currentPage is global state
     };
 
-    fetch('api/note.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            console.error('Error reordering note:', data.error);
-            alert('Error saving changes: ' + data.error + '. Please refresh.');
-            loadPage(currentPage.id);
-        } else {
-            sessionStorage.setItem('lastActiveBlockIdBeforeReload', draggedNoteId);
+    // Use reorderNoteAPI from api.js
+    reorderNoteAPI(payload.note_id, payload.new_parent_id, payload.new_order, payload.page_id)
+        .then(() => {
+            sessionStorage.setItem('lastActiveBlockIdBeforeReload', draggedNoteId); // UI/State
             // loadPage will handle re-activation
-            loadPage(currentPage.id);
-        }
-    })
-    .catch(error => {
-        console.error('Fetch error during reorder:', error);
-        alert('Network error while saving changes. Please refresh.');
-        loadPage(currentPage.id);
-    });
+            loadPage(currentPage.id); // Coordination
+        })
+        .catch(error => {
+            console.error('Error reordering note:', error);
+            alert('Error saving changes: ' + error.message + '. Please refresh.'); // UI
+            loadPage(currentPage.id); // Coordination
+        });
 }
 
-
+// zoomOut will be moved to ui.js (or app.js if more coordination heavy)
 async function zoomOut() {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
     window.breadcrumbPath = null;
-    clearActiveBlock();
+    clearActiveBlock(); // clearActiveBlock is in ui.js
 
     document.getElementById('new-note').style.display = 'block';
     document.getElementById('backlinks-container').style.display = 'block';
 
     if (currentPage && currentPage.id) {
-        await loadPage(currentPage.id);
+        await loadPage(currentPage.id); // loadPage is in app.js (coordination)
     } else {
         console.warn("Zooming out but currentPage is not fully defined. Reloading to today's page.");
         const today = new Date().toISOString().split('T')[0];
-        navigateToPage(today);
+        navigateToPage(today); // navigateToPage is in app.js (coordination)
     }
 }
 
-// MODIFIED handleGlobalKeyDown function
-function handleGlobalKeyDown(event) {
-    if (document.querySelector('.modal')) {
-        return;
-    }
+// handleGlobalKeyDown is now in js/ui.js
+// navigateBlocks is now in js/ui.js
 
-    if (isEditorOpen) {
-        if (event.key === 'Escape') {
-            const cancelButton = document.querySelector('.note-editor .cancel-note');
-            if (cancelButton) {
-                cancelButton.click();
-                event.preventDefault();
-            }
-        }
-        // Ctrl+Enter for saving is handled by individual editor instances
-        return;
-    }
-
-    if (!activeBlockElement && (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === ' ')) {
-        const firstBlock = outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)');
-        if (firstBlock) {
-            setActiveBlock(firstBlock);
-             if (event.key === ' ') event.preventDefault();
-        } else if (event.key === ' ' && currentPage && (!currentPage.notes || currentPage.notes.length === 0)) {
-            createNote(null, 0); // Create new top-level note
-            event.preventDefault();
-            return;
-        } else {
-            return;
-        }
-    }
-
-    if (!activeBlockElement) return;
-
-    switch (event.key) {
-        case 'ArrowUp':
-            navigateBlocks(-1);
-            event.preventDefault();
-            break;
-        case 'ArrowDown':
-            navigateBlocks(1);
-            event.preventDefault();
-            break;
-        case ' ':
-            if (activeBlockElement) {
-                const noteId = activeBlockElement.dataset.noteId;
-                const content = activeBlockElement.dataset.content;
-                editNote(noteId, content);
-                event.preventDefault();
-            }
-            break;
-        case 'Enter':
-            if (activeBlockElement) {
-                if (event.ctrlKey || event.metaKey) { // Ctrl+Enter or Cmd+Enter for child
-                    const parentId = activeBlockElement.dataset.noteId;
-                    const currentLevel = parseInt(activeBlockElement.dataset.level) || 0;
-                    createNote(parentId, currentLevel + 1, null, null); // Last two args null for child
-                } else { // Enter for sibling
-                    const currentLevel = parseInt(activeBlockElement.dataset.level) || 0;
-                    const parentOfActiveElement = activeBlockElement.parentElement.closest('.outline-item');
-                    const siblingParentId = parentOfActiveElement ? parentOfActiveElement.dataset.noteId : null;
-
-                    let intendedOrderForSibling = 0;
-                    const siblingsContainer = activeBlockElement.parentElement;
-                    const actualSiblings = Array.from(siblingsContainer.children)
-                                               .filter(el => el.matches('.outline-item'));
-                    const activeBlockIndexInActualSiblings = actualSiblings.indexOf(activeBlockElement);
-
-                    if (activeBlockIndexInActualSiblings !== -1) {
-                        intendedOrderForSibling = activeBlockIndexInActualSiblings + 1;
-                    } else {
-                        intendedOrderForSibling = actualSiblings.length; // Fallback: append
-                        console.warn("Active block not found among its actual siblings for order calculation. Appending.");
-                    }
-                    createNote(siblingParentId, currentLevel, activeBlockElement, intendedOrderForSibling);
-                }
-                event.preventDefault();
-            }
-            break;
-        case 'Tab':
-            if (activeBlockElement) {
-                if (event.shiftKey) {
-                    handleOutdentNote(activeBlockElement.dataset.noteId, activeBlockElement);
-                } else {
-                    handleIndentNote(activeBlockElement.dataset.noteId, activeBlockElement);
-                }
-                event.preventDefault();
-            }
-            break;
-        case 'Escape':
-            clearActiveBlock();
-            event.preventDefault();
-            break;
-    }
-}
-
-
-function navigateBlocks(direction) {
-    if (!activeBlockElement && direction === 1) {
-        const firstBlock = outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)');
-        if (firstBlock) setActiveBlock(firstBlock);
-        return;
-    }
-    if (!activeBlockElement) return;
-
-    let allItems = Array.from(outlineContainer.querySelectorAll('.outline-item'));
-
-    // Filter out items that are part of an editor, unless it's the active block itself (if editor is open)
-    allItems = allItems.filter(item => !item.closest('.note-editor-wrapper') || item === activeBlockElement);
-
-    // Create a flat list of only VISIBLE items in their DOM order
-    const trulyVisibleItems = [];
-    function getVisibleItemsRecursive(element) {
-        if (element.matches('.outline-item') && getComputedStyle(element).display !== 'none') {
-            trulyVisibleItems.push(element);
-            if (!element.classList.contains('children-hidden')) {
-                const childrenContainer = element.querySelector(':scope > .outline-children');
-                if (childrenContainer) {
-                    Array.from(childrenContainer.children).forEach(child => getVisibleItemsRecursive(child));
-                }
-            }
-        } else if(element.matches('.outline-children') && getComputedStyle(element).display !== 'none'){
-             Array.from(element.children).forEach(child => getVisibleItemsRecursive(child));
-        }
-    }
-    // If focused, start from the focused element's direct children or siblings
-    if (document.body.classList.contains('logseq-focus-active')) {
-        const focusedRootItem = outlineContainer.querySelector('.outline-item[data-level="0"]');
-        if (focusedRootItem) {
-            if (trulyVisibleItems.indexOf(focusedRootItem) === -1) { // Add root if not already added (e.g. if it has no children)
-                 if (getComputedStyle(focusedRootItem).display !== 'none') trulyVisibleItems.push(focusedRootItem);
-            }
-            const childrenContainerOfFocused = focusedRootItem.querySelector(':scope > .outline-children');
-            if (childrenContainerOfFocused && !focusedRootItem.classList.contains('children-hidden')) {
-                 Array.from(childrenContainerOfFocused.children).forEach(child => getVisibleItemsRecursive(child));
-            }
-        }
-    } else {
-        Array.from(outlineContainer.children).forEach(child => getVisibleItemsRecursive(child));
-    }
-
-
-    if (trulyVisibleItems.length === 0) return;
-
-    let currentIndex = trulyVisibleItems.indexOf(activeBlockElement);
-
-    if (currentIndex === -1) {
-        if (trulyVisibleItems.length > 0) {
-            currentIndex = (direction === 1) ? -1 : trulyVisibleItems.length;
-        } else {
-            return;
-        }
-    }
-
-    const nextIndex = currentIndex + direction;
-
-    if (nextIndex >= 0 && nextIndex < trulyVisibleItems.length) {
-        setActiveBlock(trulyVisibleItems[nextIndex]);
-    } else if (nextIndex < 0 && trulyVisibleItems.length > 0) {
-        setActiveBlock(trulyVisibleItems[0]); // Go to first
-    } else if (nextIndex >= trulyVisibleItems.length && trulyVisibleItems.length > 0) {
-        setActiveBlock(trulyVisibleItems[trulyVisibleItems.length - 1]); // Go to last
-    }
-}
-
-// Snippet Replacement Logic
 function handleSnippetReplacement(event) {
     const textarea = event.target;
     setTimeout(() => {
