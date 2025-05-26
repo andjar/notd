@@ -713,3 +713,37 @@ a.block-ref-link:hover {
     outline: none;
     box-shadow: var(--shadow-md); /* Keep its own shadow */
 }
+
+/* Link Autosuggestion Popup Styles */
+.suggestions-popup {
+    position: absolute;
+    background-color: var(--note-bg-color, #ffffff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    box-shadow: var(--shadow-md, 0 2px 4px rgba(0, 0, 0, 0.05));
+    border-radius: var(--radius-sm, 0px);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1100; 
+    min-width: 200px;
+}
+
+.suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: var(--text-color, #4A4A4A);
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover {
+    background-color: var(--hover-color, #edf2f7);
+}
+
+.suggestion-item.highlighted {
+    background-color: var(--accent-color, #3182ce);
+    color: white;
+}
