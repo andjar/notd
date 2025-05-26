@@ -99,6 +99,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+function handleAutoCloseBrackets(event) {
+    const textarea = event.target;
+    const typedChar = event.data; // The character(s) that were just inserted
+
+    // We only care about single character insertions of '[' or '{'
+    if (typedChar === null || typedChar === undefined || typedChar.length !== 1) {
+        return;
+    }
+
+    let closeBracketChar = null;
+    if (typedChar === '[') {
+        closeBracketChar = ']';
+    } else if (typedChar === '{') {
+        closeBracketChar = '}';
+    }
+
+    if (closeBracketChar) {
+        const cursorPos = textarea.selectionStart; // Cursor is now *after* the typedChar
+
+        // The textarea.value already includes the typedChar.
+        // We need to insert the closeBracketChar right after the typedChar (which is at cursorPos - 1)
+        // and before anything that was originally after the cursor.
+        const value = textarea.value;
+        const textBeforeCursor = value.substring(0, cursorPos); // This includes the typedChar
+        const textAfterCursor = value.substring(cursorPos);
+
+        // New value: textBeforeCursor (which ends with typedChar) + closeBracketChar + textAfterCursor
+        textarea.value = textBeforeCursor + closeBracketChar + textAfterCursor;
+
+        // Move the cursor back to be between the open and close brackets
+        // (i.e., at the position it was after typing the open bracket, before we added the close one)
+        textarea.selectionStart = textarea.selectionEnd = cursorPos;
+    }
+}
+
 // Utility Functions
 function debounce(func, wait) {
     let timeout;
@@ -998,14 +1033,12 @@ function toggleChildren(noteElement) {
     }
 }
 
-// MODIFIED createNote function
 function createNote(parentId = null, level = 0, insertAfterElement = null, intendedOrder = null) {
     if (!currentPage) return;
     clearActiveBlock();
     isEditorOpen = true;
 
     const noteEditorContainer = document.createElement('div');
-    // Basic indentation for children editor - final note relies on data-level and CSS
     if (parentId && !insertAfterElement) {
         noteEditorContainer.style.paddingLeft = `calc(var(--indentation-unit) * 1)`;
     }
@@ -1066,7 +1099,8 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
         }
         if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); }
     });
-    textarea.addEventListener('input', handleSnippetReplacement);
+    textarea.addEventListener('input', handleSnippetReplacement); // For space-triggered snippets
+    textarea.addEventListener('input', handleAutoCloseBrackets);   // ADDED: Auto-close brackets
 
     if (templateSelect) {
         templateSelect.addEventListener('change', (e) => {
@@ -1077,7 +1111,7 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
             }
         });
     }
-
+    // ... (rest of saveButton.onclick and cancelButton.onclick from createNote)
     saveButton.onclick = async () => {
         const content = textarea.value.trim();
         const properties = {};
@@ -1092,19 +1126,18 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
                 body: JSON.stringify({
                     page_id: currentPage.id,
                     content: content,
-                    level: level, // Use the level determined by the caller
-                    parent_id: parentId, // Use the parentId determined by the caller
+                    level: level, 
+                    parent_id: parentId, 
                     properties: properties
                 })
             });
             const createData = await createResponse.json();
-            isEditorOpen = false; // Set early, before potential errors in reorder
+            isEditorOpen = false; 
             if (createData.error) throw new Error(`Create error: ${createData.error}`);
             if (!createData.id) throw new Error('Note created but no ID returned.');
 
             const newNoteId = createData.id;
 
-            // Step 2: If it was meant to be a sibling at a specific order, reorder it.
             if (insertAfterElement && intendedOrder !== null) {
                 const reorderPayload = {
                     action: 'reorder_note',
@@ -1125,11 +1158,10 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
             }
 
             sessionStorage.setItem('lastActiveBlockIdBeforeReload', newNoteId.toString());
-            // loadPage will handle re-activation using the sessionStorage item
             loadPage(currentPage.id);
 
         } catch (error) {
-            isEditorOpen = false; // Ensure it's false on error too
+            isEditorOpen = false; 
             console.error('Error creating note:', error); alert('Error creating note: ' + error.message);
         }
     };
@@ -1139,23 +1171,19 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
         isEditorOpen = false;
 
         let blockToReactivate = null;
-        if (insertAfterElement) { // Editor was for a new sibling
+        if (insertAfterElement) { 
             blockToReactivate = insertAfterElement;
-        } else if (parentId) {   // Editor was for a new child
+        } else if (parentId) {   
             blockToReactivate = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
             if (blockToReactivate) {
-                // Clean up 'has-children' if parent is now empty
                 const childrenContainer = blockToReactivate.querySelector('.outline-children');
                 if (childrenContainer && childrenContainer.children.length === 0) {
-                     // Check if there are no actual .outline-item children left
                     if (!Array.from(childrenContainer.children).some(childEl => childEl.matches('.outline-item'))) {
                         blockToReactivate.classList.remove('has-children');
-                        // Optionally, remove the childrenContainer if it's truly empty of persistent items.
-                        // childrenContainer.remove(); // Or let CSS handle display:none for empty ones.
                     }
                 }
             }
-        } else { // Editor was for a new top-level note
+        } else { 
             const prevSibling = noteEditorContainer.previousElementSibling;
             if (prevSibling && prevSibling.matches('.outline-item')) {
                 blockToReactivate = prevSibling;
@@ -1164,7 +1192,7 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
 
         if (blockToReactivate) {
             setActiveBlock(blockToReactivate, false);
-        } else if (outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)')) { // Fallback to first item
+        } else if (outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)')) { 
             setActiveBlock(outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)'), false);
         }
     };
@@ -1173,7 +1201,7 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
 
 function editNote(id, currentContentText) {
     const noteElement = document.querySelector(`.outline-item[data-note-id="${id}"]`);
-    if (!noteElement || noteElement.querySelector('.note-editor-wrapper')) return; // Already editing or element not found
+    if (!noteElement || noteElement.querySelector('.note-editor-wrapper')) return;
 
     clearActiveBlock();
     isEditorOpen = true;
@@ -1190,7 +1218,7 @@ function editNote(id, currentContentText) {
     noteEditorDiv.innerHTML = `<textarea class="note-textarea">${currentContentText}</textarea>
         <div class="note-editor-actions"><button class="btn-primary save-note">Save</button><button class="btn-secondary cancel-note">Cancel</button></div>`;
     editorWrapper.appendChild(noteEditorDiv);
-    noteElement.insertBefore(editorWrapper, contentElement); // Insert editor before the content div
+    noteElement.insertBefore(editorWrapper, contentElement);
 
     const textarea = noteEditorDiv.querySelector('.note-textarea');
     const saveButton = noteEditorDiv.querySelector('.save-note');
@@ -1206,7 +1234,9 @@ function editNote(id, currentContentText) {
         if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); }
     });
     textarea.addEventListener('input', handleSnippetReplacement);
-
+    textarea.addEventListener('input', handleAutoCloseBrackets);   // ADDED: Auto-close brackets
+    
+    // ... (rest of saveButton.onclick and cancelButton.onclick from editNote)
     saveButton.onclick = async () => {
         const newContent = textarea.value.trim();
         const properties = {}; const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match; let tempContent = newContent;
@@ -1220,7 +1250,6 @@ function editNote(id, currentContentText) {
             isEditorOpen = false;
             if (data.error) throw new Error(data.error);
             sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteIdBeingEdited);
-            // loadPage will handle re-activation
             loadPage(currentPage.id);
         } catch (error) {
             isEditorOpen = false;
