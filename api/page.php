@@ -143,87 +143,128 @@ try {
         $page['properties'] = $properties;
         
         error_log("Properties retrieved: " . json_encode($properties));
-        
-        // Get notes for the page with properties and attachments
-        // Using Nowdoc for SQL clarity and safety
-        $sql = <<<'SQL'
-            SELECT 
-                n.id,
-                n.page_id,
-                n.content,
-                n.parent_id,
-                n.block_id,
-                n.created_at,
-                n.updated_at,
-                (
-                    SELECT IFNULL(json_group_array(json_object('key', p.property_key, 'value', p.property_value)), '[]')
-                    FROM properties p
-                    WHERE p.note_id = n.id
-                ) as properties_json,
-                (
-                    SELECT IFNULL(json_group_array(json_object('id', a.id, 'filename', a.filename, 'original_name', a.original_name)), '[]')
-                    FROM attachments a
-                    WHERE a.note_id = n.id
-                ) as attachments_json
-            FROM notes n
-            WHERE n.page_id = :page_id
-            GROUP BY n.id -- Group by note ID as subqueries handle aggregation per note
-            ORDER BY "order", n.id -- Order by 'order' primarily, then by id as a fallback for stable sorting
-SQL;
-        $stmt = $db->prepare($sql);
+
+        // 1. Fetch all notes for the page
+        $stmt = $db->prepare('
+            SELECT id, page_id, content, parent_id, block_id, created_at, updated_at, "order"
+            FROM notes
+            WHERE page_id = :page_id
+            ORDER BY "order", id
+        ');
         if (!$stmt) {
             throw new Exception('Failed to prepare notes query: ' . $db->lastErrorMsg());
         }
-        
         $stmt->bindValue(':page_id', $id, SQLITE3_TEXT);
-        $result = $stmt->execute();
-        if (!$result) {
+        $notesResult = $stmt->execute();
+        if (!$notesResult) {
             throw new Exception('Failed to execute notes query: ' . $db->lastErrorMsg());
         }
-        
-        $allNotesFlat = [];
-        while ($note = $result->fetchArray(SQLITE3_ASSOC)) {
-            $note['properties'] = json_decode($note['properties_json'], true) ?: [];
-            unset($note['properties_json']);
-            $note['attachments'] = json_decode($note['attachments_json'], true) ?: [];
-            unset($note['attachments_json']);
-            $allNotesFlat[$note['id']] = $note; // Store by ID for easier lookup
-        }
 
+        $allNotesFlat = [];
+        $noteIds = [];
+        while ($note = $notesResult->fetchArray(SQLITE3_ASSOC)) {
+            $note['properties'] = []; // Initialize properties
+            $note['attachments'] = []; // Initialize attachments
+            $allNotesFlat[$note['id']] = $note;
+            $noteIds[] = $note['id'];
+        }
+        error_log("All notes fetched. Count: " . count($allNotesFlat));
+
+        if (!empty($noteIds)) {
+            // Create a string of placeholders for the IN clause
+            $placeholders = implode(',', array_fill(0, count($noteIds), '?'));
+
+            // 2. Fetch all properties for these notes
+            $sqlProperties = "
+                SELECT note_id, property_key, property_value
+                FROM properties
+                WHERE note_id IN ($placeholders) AND page_id IS NULL 
+            "; // Ensure we only fetch note-specific properties
+            $stmtProps = $db->prepare($sqlProperties);
+            if (!$stmtProps) {
+                throw new Exception('Failed to prepare properties for notes query: ' . $db->lastErrorMsg());
+            }
+            foreach ($noteIds as $k => $noteId) {
+                $stmtProps->bindValue($k + 1, $noteId, SQLITE3_TEXT);
+            }
+            $propsResult = $stmtProps->execute();
+            if (!$propsResult) {
+                throw new Exception('Failed to execute properties for notes query: ' . $db->lastErrorMsg());
+            }
+            while ($prop = $propsResult->fetchArray(SQLITE3_ASSOC)) {
+                if (isset($allNotesFlat[$prop['note_id']])) {
+                    $allNotesFlat[$prop['note_id']]['properties'][$prop['property_key']] = $prop['property_value'];
+                }
+            }
+            error_log("All properties for notes fetched and mapped.");
+
+            // 3. Fetch all attachments for these notes
+            $sqlAttachments = "
+                SELECT note_id, id, filename, original_name
+                FROM attachments
+                WHERE note_id IN ($placeholders)
+            ";
+            $stmtAttachments = $db->prepare($sqlAttachments);
+            if (!$stmtAttachments) {
+                throw new Exception('Failed to prepare attachments for notes query: ' . $db->lastErrorMsg());
+            }
+            foreach ($noteIds as $k => $noteId) {
+                $stmtAttachments->bindValue($k + 1, $noteId, SQLITE3_TEXT);
+            }
+            $attachmentsResult = $stmtAttachments->execute();
+            if (!$attachmentsResult) {
+                throw new Exception('Failed to execute attachments for notes query: ' . $db->lastErrorMsg());
+            }
+            while ($attachment = $attachmentsResult->fetchArray(SQLITE3_ASSOC)) {
+                if (isset($allNotesFlat[$attachment['note_id']])) {
+                    // Keep only relevant fields for the attachment object
+                    $attachmentData = [
+                        'id' => $attachment['id'],
+                        'filename' => $attachment['filename'],
+                        'original_name' => $attachment['original_name']
+                    ];
+                    $allNotesFlat[$attachment['note_id']]['attachments'][] = $attachmentData;
+                }
+            }
+            error_log("All attachments for notes fetched and mapped.");
+        }
+        
         // Helper function to build the tree and assign levels
+        // This function should be defined outside getPage if it's used elsewhere,
+        // or remain as a local function if only used here.
+        // For this refactoring, assume it's correctly defined as it was.
         function buildTreeWithLevels($allNotesMap, $parentId, $currentLevel) {
             $tree = [];
             foreach ($allNotesMap as $noteId => $note) {
-                // Check parent_id matching (strict for null, loose for numbers/strings from DB)
                 $noteParentId = $note['parent_id'];
-                $isRootMatch = ($parentId === null && $noteParentId === null);
+                $isRootMatch = ($parentId === null && ($noteParentId === null || $noteParentId === ''));
                 $isChildMatch = ($parentId !== null && $noteParentId == $parentId);
 
                 if ($isRootMatch || $isChildMatch) {
-                    $noteData = $note; // Copy note data
+                    $noteData = $note;
                     $noteData['level'] = $currentLevel;
                     
-                    // Recursively find children for the current note
-                    // Pass the original map, but the current note's ID as the new parentId
                     $children = buildTreeWithLevels($allNotesMap, $noteId, $currentLevel + 1);
                     if (!empty($children)) {
                         $noteData['children'] = $children;
                     } else {
-                        $noteData['children'] = []; // Ensure children property always exists
+                        $noteData['children'] = [];
                     }
                     $tree[] = $noteData;
-                    // It's important NOT to unset from $allNotesMap here if notes can be shared or if order of processing matters
-                    // The current structure implies each note has one parent in the context of a page.
                 }
             }
-            // Sort the current level by the 'order' property before returning
             usort($tree, function($a, $b) {
-                return ($a['order'] ?? 0) <=> ($b['order'] ?? 0);
+                // Ensure 'order' exists, default to 0 if not.
+                $orderA = $a['order'] ?? 0;
+                $orderB = $b['order'] ?? 0;
+                if ($orderA == $orderB) {
+                    return ($a['id'] ?? 0) <=> ($b['id'] ?? 0); // Secondary sort by id for stability
+                }
+                return $orderA <=> $orderB;
             });
             return $tree;
         }
         
-        // Build the hierarchical notes structure starting with root notes (parent_id IS NULL)
         $hierarchicalNotes = buildTreeWithLevels($allNotesFlat, null, 0);
         
         $page['notes'] = $hierarchicalNotes;
@@ -231,6 +272,13 @@ SQL;
         
         return $page;
     }
+
+    // It's better practice to define helper functions like buildTreeWithLevels outside of 
+    // the main function if they don't rely heavily on its local scope variables other than arguments.
+    // However, to keep the diff minimal and focused on the N+1 problem, 
+    // I'll leave it as is if it was previously defined inside getPage.
+    // If buildTreeWithLevels was global or static, this comment is not applicable.
+
 
     function createPage($data) {
         global $db;
