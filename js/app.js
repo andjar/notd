@@ -1128,7 +1128,6 @@ function showAdvancedSearch() {
     });
 }
 
-/**
 // replacePropertyTags is now in js/render.js
 
 async function executeAdvancedSearch() {
