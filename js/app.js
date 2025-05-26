@@ -135,7 +135,7 @@ async function loadPage(pageId) {
         }
 
         currentPage = data;
-        await renderPage(data); // This will call the NEW renderPage
+        await renderPage(data); 
         updateRecentPages(pageId);
         if (window.renderCalendarForCurrentPage) { 
             window.renderCalendarForCurrentPage(); 
@@ -226,17 +226,22 @@ async function findBlockById(blockId) {
     } catch (error) { console.error('Error finding block:', error); return null; }
 }
 
-async function renderNoteContent(note, prefetchedBlocks = {}) { 
-    let content = note.content;
-    
-    content = content.replace(/^(TODO|DONE)\s*(.*)/gm, (match, status, taskText) => {
-        return `%%TODO_ITEM%%${status}%%${taskText}%%`; 
+async function renderNoteContent(note, prefetchedBlocks = {}) {
+    let processedContent = note.content || ''; // Ensure content is not null
+
+    // 1. TODO Pre-processing
+    processedContent = processedContent.replace(/^(TODO|DONE)\s*(.*)/gm, (match, status, taskText) => {
+        return `%%TODO_ITEM%%${status}%%${taskText}%%`;
     });
-    
-    const blockMatches = content.match(/\{\{([^}]+)\}\}/g) || [];
+
+    // 2. Transclusion Placeholder Replacement (Pre-Markdown)
+    const transclusionPlaceholders = [];
+    const blockMatches = processedContent.matchAll(/\{\{([^}]+)\}\}/g); // Use matchAll for capturing groups
+
     for (const blockRefMatch of blockMatches) {
-        const blockId = blockRefMatch.slice(2, -2).trim(); 
-        let transclusionHtml = '';
+        const fullMatch = blockRefMatch[0]; // e.g., "{{blockId}}"
+        const blockId = blockRefMatch[1].trim();
+        let renderedBlockContent = '';
         let sourcePageId = null;
         let sourcePageTitle = null;
         let blockDataForRecursiveCall = null;
@@ -245,67 +250,87 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
             const prefetchedData = prefetchedBlocks[blockId];
             sourcePageId = prefetchedData.page_id;
             sourcePageTitle = prefetchedData.page_title;
-            blockDataForRecursiveCall = { // Construct a note-like object for the recursive call
+            blockDataForRecursiveCall = {
                 content: prefetchedData.content,
-                id: prefetchedData.note_id, 
-                block_id: blockId, 
-                attachments: [], // Prefetched data doesn't include these, assume empty or fetch if critical
-                properties: {}   // Same as attachments
+                id: prefetchedData.note_id,
+                block_id: blockId,
+                attachments: [], 
+                properties: {}
             };
-            const renderedBlockContent = await renderNoteContent(blockDataForRecursiveCall, prefetchedBlocks);
-            transclusionHtml = renderedBlockContent;
+            renderedBlockContent = await renderNoteContent(blockDataForRecursiveCall, prefetchedBlocks);
         } else {
-            const fallbackBlock = await findBlockById(blockId); 
+            const fallbackBlock = await findBlockById(blockId);
             if (fallbackBlock) {
                 sourcePageId = fallbackBlock.page_id;
                 sourcePageTitle = fallbackBlock.page_title;
-                // fallbackBlock is a full note object, suitable for renderNoteContent
-                const renderedBlockContent = await renderNoteContent(fallbackBlock, prefetchedBlocks);
-                transclusionHtml = renderedBlockContent;
+                renderedBlockContent = await renderNoteContent(fallbackBlock, prefetchedBlocks);
             } else {
-                content = content.replace(blockRefMatch, `<span class="block-ref-brackets">{{</span><a href="#" class="block-ref-link" onclick="event.stopPropagation(); console.warn('Block not found: ${blockId}')">${blockId}</a><span class="block-ref-brackets">}}</span><span class="broken-transclusion"> (not found)</span>`);
+                renderedBlockContent = `<span class="block-ref-brackets">{{</span><a href="#" class="block-ref-link" onclick="event.stopPropagation(); console.warn('Block not found: ${blockId}')">${blockId}</a><span class="block-ref-brackets">}}</span><span class="broken-transclusion"> (not found)</span>`;
+                // For "not found", we directly replace and skip placeholder logic for this item
+                processedContent = processedContent.replace(fullMatch, renderedBlockContent);
                 continue; 
             }
         }
         
-        content = content.replace(blockRefMatch, `
-            <div class="transcluded-block" data-block-id="${blockId}">
-                ${transclusionHtml}
-                <div class="transclusion-source">
-                    <a href="#${encodeURIComponent(sourcePageId)}" onclick="event.stopPropagation();">
-                        Source: ${sourcePageTitle || sourcePageId}</a>
-                </div>
-            </div>`);
+        const placeholderId = `%%TRANSCLUSION_PLACEHOLDER_${transclusionPlaceholders.length}%%`;
+        transclusionPlaceholders.push({
+            placeholder: placeholderId,
+            html: renderedBlockContent, // This is already HTML
+            blockId: blockId,
+            sourcePageId: sourcePageId,
+            sourcePageTitle: sourcePageTitle
+        });
+        processedContent = processedContent.replace(fullMatch, placeholderId);
     }
 
-    content = content.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
+    // 3. Other Pre-Markdown Replacements
+    processedContent = processedContent.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
         if (key.trim().toLowerCase() === 'tag') {
-            return value.trim().split(',').map(tagValue => 
+            return value.trim().split(',').map(tagValue =>
                 `<a href="#${encodeURIComponent(tagValue.trim())}" class="property-tag" onclick="event.stopPropagation();">#${tagValue.trim()}</a>`
             ).join(' ');
         }
         return `<span class="property-tag">${key.trim()}: ${value.trim()}</span>`;
     });
 
-    content = content.replace(/<<([^>]+)>>/g, (match, query) => {
+    processedContent = processedContent.replace(/<<([^>]+)>>/g, (match, query) => {
         const displayQuery = query.length > 30 ? query.substring(0, 27) + '...' : query;
         return `<a href="#" class="search-link" onclick="event.preventDefault(); event.stopPropagation(); executeSearchLink('${query.replace(/'/g, "\\'")}')"><<${displayQuery}>></a>`;
     });
-    
-    content = marked.parse(content); 
 
-    content = content.replace(/\[\[([^\]#]+?)\]\]/g, (match, pageName) => { 
+    // 4. Main Markdown Parsing
+    let htmlContent = marked.parse(processedContent);
+
+    // 5. Transclusion HTML Injection (Post-Markdown)
+    transclusionPlaceholders.forEach(item => {
+        const finalTransclusionWrapperHtml = `
+            <div class="transcluded-block" data-block-id="${item.blockId}">
+                ${item.html} 
+                <div class="transclusion-source">
+                    <a href="#${encodeURIComponent(item.sourcePageId)}" onclick="event.stopPropagation();">
+                        Source: ${item.sourcePageTitle || item.sourcePageId}</a>
+                </div>
+            </div>`;
+        // Ensure the placeholder is replaced globally in case it appears multiple times,
+        // though it shouldn't with unique placeholders.
+        htmlContent = htmlContent.split(item.placeholder).join(finalTransclusionWrapperHtml);
+    });
+    
+    // 6. Post-Markdown Replacements
+    htmlContent = htmlContent.replace(/\[\[([^\]#]+?)\]\]/g, (match, pageName) => { 
         return `<span class="internal-link-brackets">[[</span><a href="#${encodeURIComponent(pageName.trim())}" class="internal-link" onclick="event.stopPropagation();">${pageName.trim()}</a><span class="internal-link-brackets">]]</span>`;
     });
-    content = content.replace(/\[\[#(.*?)\]\]/g, (match, tagName) => {
+    htmlContent = htmlContent.replace(/\[\[#(.*?)\]\]/g, (match, tagName) => {
         return `<span class="internal-link-brackets">[[</span><a href="#${encodeURIComponent(tagName.trim())}" class="property-tag" onclick="event.stopPropagation();">#${tagName.trim()}</a><span class="internal-link-brackets">]]</span>`;
     });
-    content = content.replace(/(^|\s)#([a-zA-Z0-9_\-\/]+)/g, (match, precedingSpace, tagName) => {
+    htmlContent = htmlContent.replace(/(^|\s)#([a-zA-Z0-9_\-\/]+)/g, (match, precedingSpace, tagName) => {
         return `${precedingSpace}<a href="#${encodeURIComponent(tagName)}" class="property-tag" onclick="event.stopPropagation();">#${tagName}</a>`;
     });
 
-    content = content.replace(/%%TODO_ITEM%%(TODO|DONE)%%(.*?)%%/g, (match, status, taskTextHtml) => {
+    htmlContent = htmlContent.replace(/%%TODO_ITEM%%(TODO|DONE)%%(.*?)%%/g, (match, status, taskTextHtml) => {
         const isDone = status === 'DONE';
+        // taskTextHtml here is already processed by marked.parse (as it was part of processedContent)
+        // and also had its own placeholders (if any) replaced.
         return `<div class="todo-item">
                     <label class="todo-checkbox">
                         <input type="checkbox" ${isDone ? 'checked' : ''} 
@@ -318,12 +343,12 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
                 </div>`;
     });
 
-    content = content.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
+    htmlContent = htmlContent.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
         return `<img src="${src}" alt="${alt}" class="note-image" onclick="event.stopPropagation(); showImageModal(this.src, this.alt)">`;
     });
     
     if (note.attachments && note.attachments.length > 0) {
-        content += '<div class="attachments">';
+        htmlContent += '<div class="attachments">';
         note.attachments.forEach(attachment => {
             const fileExtension = attachment.filename.split('.').pop().toLowerCase();
             let icon = '📄'; let previewHtml = '';
@@ -334,16 +359,16 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
             } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
                 icon = '🎵'; previewHtml = `<div class="attachment-preview"><audio src="uploads/${attachment.filename}" controls></audio></div>`;
             } 
-            content += `<div class="attachment"><div class="attachment-info">
+            htmlContent += `<div class="attachment"><div class="attachment-info">
                         <span class="attachment-icon">${icon}</span>
                         <a href="uploads/${attachment.filename}" target="_blank" class="attachment-name" onclick="event.stopPropagation();">${attachment.original_name}</a>
                         <span class="attachment-size">${formatFileSize(attachment.size)}</span>
                         <div class="attachment-actions"><button onclick="event.stopPropagation(); deleteAttachment(${attachment.id}, event)" title="Delete attachment">×</button></div>
                     </div>${previewHtml}</div>`;
         });
-        content += '</div>';
+        htmlContent += '</div>';
     }
-    return content;
+    return htmlContent;
 }
 
 function formatFileSize(bytes) {
@@ -543,7 +568,6 @@ async function renderBacklinks(pageId) {
                 return rootNotes;
             };
             const hierarchicalNotes = buildNoteTree(thread.notes);
-            // Pass prefetchedBlocks to renderOutline for backlinks, though it might be empty or from main page context
             const threadContentHtml = hierarchicalNotes.length > 0 ? await renderOutline(hierarchicalNotes, 0, prefetchedBlocks) : '';
             html += `<div class="backlink-thread-item">
                         <a href="#${encodeURIComponent(thread.linking_page_id)}" onclick="event.stopPropagation();">
@@ -942,8 +966,6 @@ function createNote(parentId = null, level = 0) {
                 const childrenContainer = parentNoteEl.querySelector('.outline-children');
                 if (childrenContainer && childrenContainer.children.length === 0) {
                     parentNoteEl.classList.remove('has-children');
-                    // Optionally remove the empty childrenContainer, or hide it
-                    // childrenContainer.remove(); 
                 }
             }
         }
@@ -1014,7 +1036,6 @@ async function showSearchResults() {
     document.getElementById('backlinks-container').style.display = 'none';
     pageProperties.style.display = 'none';
     const renderedResultsPromises = results.map(async result => {
-        // Ensure prefetchedBlocks is passed, though it might be from a different page context
         const content = await renderNoteContent(result, prefetchedBlocks); 
         return `<div class="search-result-item"><div class="result-header">
                     <a href="#${encodeURIComponent(result.page_id)}" onclick="event.stopPropagation();">${result.page_title || result.page_id}</a>
@@ -1047,40 +1068,32 @@ async function executeSearchLink(query) {
 
 async function toggleTodo(blockId, isDone) {
     try {
-        // Try to get from prefetched first if it's a pure block_id based toggle
         let currentNoteData;
         if (prefetchedBlocks && prefetchedBlocks[blockId]) {
             const prefetched = prefetchedBlocks[blockId];
-            currentNoteData = { // Reconstruct a note-like object
-                id: prefetched.note_id, // actual note ID
+            currentNoteData = { 
+                id: prefetched.note_id, 
                 content: prefetched.content,
                 block_id: blockId,
-                // These might be missing or stale from prefetched data:
-                properties: {}, // findBlockById would have full properties
-                level: 0,       // unknown from prefetched
-                parent_id: null // unknown from prefetched
+                properties: {}, 
+                level: 0,       
+                parent_id: null 
             };
-            // If properties are critical for TODO state, findBlockById might be better.
-            // For now, assume content is primary.
         } else {
-            currentNoteData = await findBlockById(blockId); // Fetches full note data
+            currentNoteData = await findBlockById(blockId); 
         }
 
         if (!currentNoteData) throw new Error('Note not found for toggling TODO');
         
         let rawContent = currentNoteData.content;
         let taskTextWithProperties = "";
-        let currentStatus = "";
 
         if (rawContent.startsWith('TODO ')) {
             taskTextWithProperties = rawContent.substring(5);
-            currentStatus = "TODO";
         } else if (rawContent.startsWith('DONE ')) {
             taskTextWithProperties = rawContent.substring(5);
-            currentStatus = "DONE";
         } else {
             taskTextWithProperties = rawContent;
-            currentStatus = "TODO"; 
         }
         
         const taskSpecificProperties = {};
@@ -1108,7 +1121,6 @@ async function toggleTodo(blockId, isDone) {
             delete updatedNoteProperties['done-at']; 
         }
         
-        // Use currentNoteData.id which is the actual note ID
         const response = await fetch(`api/note.php?id=${currentNoteData.id}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -1309,7 +1321,6 @@ async function zoomInOnNote(targetNoteReference) {
     document.getElementById('backlinks-container').style.display = 'none';
 
     const breadcrumbsHtml = renderBreadcrumbs(path); 
-    // Pass prefetchedBlocks (which is global) to renderOutline for the zoomed view
     outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0, prefetchedBlocks));
     initSortable(outlineContainer); 
 
