@@ -16,6 +16,11 @@ let noteTemplates = {};
 let activeBlockElement = null; // For keyboard navigation
 let isEditorOpen = false;      // To track if a textarea editor is active
 
+// Autosuggestion variables
+let suggestionsPopup = null;
+let activeSuggestionIndex = -1;
+let currentSuggestions = [];
+
 // Load templates
 async function loadTemplates() {
     try {
@@ -26,6 +31,129 @@ async function loadTemplates() {
         console.error('Error loading templates:', error);
     }
 }
+
+// Helper functions for autosuggestions
+
+function closeSuggestionsPopup() {
+    if (suggestionsPopup) {
+        suggestionsPopup.remove();
+        suggestionsPopup = null;
+    }
+    activeSuggestionIndex = -1;
+    currentSuggestions = [];
+}
+
+function positionSuggestionsPopup(textarea) {
+    if (!suggestionsPopup) return;
+
+    const rect = textarea.getBoundingClientRect();
+    suggestionsPopup.style.position = 'absolute';
+    // Position below the textarea for now, adjust with CSS later
+    suggestionsPopup.style.top = `${window.scrollY + rect.bottom}px`;
+    suggestionsPopup.style.left = `${window.scrollX + rect.left}px`;
+    suggestionsPopup.style.zIndex = '1000'; // Ensure it's on top
+}
+
+function renderSuggestions(suggestions, textarea) {
+    closeSuggestionsPopup();
+    if (!suggestions || suggestions.length === 0) {
+        return;
+    }
+
+    suggestionsPopup = document.createElement('div');
+    suggestionsPopup.className = 'suggestions-popup';
+
+    suggestions.forEach((suggestion, index) => {
+        const item = document.createElement('div');
+        item.className = 'suggestion-item';
+        item.textContent = suggestion.title;
+        item.dataset.id = suggestion.id; // Store id if needed later
+        item.dataset.title = suggestion.title; // Store title for insertion
+
+        item.addEventListener('mousedown', (event) => {
+            event.preventDefault(); // Prevent textarea blur before click
+            insertSuggestion(textarea, suggestion.title);
+            closeSuggestionsPopup();
+        });
+        suggestionsPopup.appendChild(item);
+    });
+
+    document.body.appendChild(suggestionsPopup);
+    positionSuggestionsPopup(textarea);
+    currentSuggestions = suggestions; // Update current suggestions
+}
+
+function insertSuggestion(textarea, title) {
+    const currentValue = textarea.value;
+    const cursorPos = textarea.selectionStart;
+
+    let startIndex = -1;
+    // Find the opening [[ by searching backwards from the cursor
+    for (let i = cursorPos - 1; i >= 0; i--) {
+        if (currentValue.substring(i, i + 2) === '[[') {
+            // Ensure this [[ isn't already part of a completed link before the cursor
+            const partAfterOpenBrackets = currentValue.substring(i + 2, cursorPos);
+            if (!partAfterOpenBrackets.includes(']]')) {
+                startIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (startIndex === -1) {
+        // This case should ideally not be reached if suggestions are visible,
+        // but as a fallback, insert the link at the current cursor position.
+        // Or, decide if we should not insert if the context is lost.
+        // For now, let's assume the context is still valid if this function is called.
+        // A more robust solution might involve passing the match object.
+        console.warn("Could not reliably find start of link for insertion. Inserting at cursor, but this might be incorrect.");
+        
+        // Fallback: attempt to find the LAST open [[ before cursor if primary logic fails
+        const lastOpenBracket = currentValue.lastIndexOf('[[', cursorPos -1);
+        if (lastOpenBracket !== -1 && !currentValue.substring(lastOpenBracket + 2, cursorPos).includes(']]')) {
+            startIndex = lastOpenBracket;
+        } else {
+            // If still no valid start, don't insert.
+            return;
+        }
+    }
+
+    const textBeforeLinkStart = currentValue.substring(0, startIndex);
+
+    // Determine endIndex for replacement
+    let endIndex = cursorPos;
+    if (currentValue.substring(cursorPos, cursorPos + 2) === ']]') {
+        endIndex = cursorPos + 2;
+    }
+
+    const newLinkContent = `[[${title}]]`;
+    const textAfterReplacedPart = currentValue.substring(endIndex);
+
+    textarea.value = textBeforeLinkStart + newLinkContent + textAfterReplacedPart;
+
+    const newCursorPos = startIndex + newLinkContent.length;
+    textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+    textarea.focus();
+
+    // It's important to dispatch an input event if other listeners might depend on it,
+    // but be cautious if this could re-trigger the suggestion logic unnecessarily.
+    // For now, keeping it as it might be used for other features or by `handleAutoCloseBrackets` logic.
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function updateHighlightedSuggestion(items) {
+    if (!suggestionsPopup || !items || items.length === 0) return;
+
+    items.forEach((item, index) => {
+        if (index === activeSuggestionIndex) {
+            item.classList.add('highlighted');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('highlighted');
+        }
+    });
+}
+
 
 // DOM Elements
 const searchInput = document.getElementById('search');
@@ -1102,6 +1230,87 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
     textarea.addEventListener('input', handleSnippetReplacement); // For space-triggered snippets
     textarea.addEventListener('input', handleAutoCloseBrackets);   // ADDED: Auto-close brackets
 
+    // Link autosuggestion event listeners
+    textarea.addEventListener('input', (event) => {
+        const currentTextarea = event.target;
+        const cursorPos = currentTextarea.selectionStart;
+        const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
+        // const textAfterCursor = currentTextarea.value.substring(cursorPos); // Not strictly needed for the revised logic
+
+        const linkPattern = /\[\[([a-zA-Z0-9_-\s]{2,})$/;
+        const match = textBeforeCursor.match(linkPattern);
+
+        if (match) {
+            const searchTerm = match[1];
+            fetch(`api/suggest_pages.php?q=${encodeURIComponent(searchTerm)}`)
+                .then(response => response.json())
+                .then(suggestions => {
+                    if (suggestions.length > 0) {
+                        renderSuggestions(suggestions, currentTextarea);
+                    } else {
+                        closeSuggestionsPopup();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching suggestions:', error);
+                    closeSuggestionsPopup();
+                });
+        } else {
+            // If the pattern [[search_term is not before the cursor,
+            // or if the link is fully formed like [[search_term]] by manual typing, then close.
+            if (textBeforeCursor.endsWith(']]')) { // User manually typed closing brackets
+                closeSuggestionsPopup();
+            } else {
+                // This part handles closing when the user moves cursor away or deletes text
+                // such that [[pattern is no longer met.
+                // Check if the cursor is still within a potential link context that just doesn't meet min length yet
+                const potentialLinkPattern = /\[\[([a-zA-Z0-9_-\s]*)$/;
+                if (!textBeforeCursor.match(potentialLinkPattern)) {
+                     closeSuggestionsPopup();
+                }
+                // If it matches potentialLinkPattern but not linkPattern (e.g. "[[a"), do nothing, wait for more input.
+                // If it does not match potentialLinkPattern (e.g. "[[a] b" or "x [[a"), close.
+            }
+        }
+    });
+
+    textarea.addEventListener('keydown', (event) => {
+        if (!suggestionsPopup || currentSuggestions.length === 0) return;
+
+        const items = suggestionsPopup.querySelectorAll('.suggestion-item');
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            activeSuggestionIndex = (activeSuggestionIndex + 1) % items.length;
+            updateHighlightedSuggestion(items);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            activeSuggestionIndex = (activeSuggestionIndex - 1 + items.length) % items.length;
+            updateHighlightedSuggestion(items);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (activeSuggestionIndex >= 0 && activeSuggestionIndex < items.length) {
+                const selectedTitle = currentSuggestions[activeSuggestionIndex].title;
+                insertSuggestion(textarea, selectedTitle);
+            }
+            closeSuggestionsPopup();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeSuggestionsPopup();
+        } else if (event.key === ']') {
+            const nextChar = textarea.value.substring(textarea.selectionStart, textarea.selectionStart + 1);
+            if (nextChar === ']') { // User is typing ']]'
+                 setTimeout(closeSuggestionsPopup, 50); // Give it a moment to type both
+            }
+        }
+    });
+
+    textarea.addEventListener('blur', (event) => {
+        if (suggestionsPopup && !suggestionsPopup.contains(event.relatedTarget)) {
+            setTimeout(() => closeSuggestionsPopup(), 150); // Increased delay
+        }
+    });
+
+
     if (templateSelect) {
         templateSelect.addEventListener('change', (e) => {
             const templateKey = e.target.value;
@@ -1235,6 +1444,86 @@ function editNote(id, currentContentText) {
     });
     textarea.addEventListener('input', handleSnippetReplacement);
     textarea.addEventListener('input', handleAutoCloseBrackets);   // ADDED: Auto-close brackets
+
+    // Link autosuggestion event listeners (same as in createNote)
+    textarea.addEventListener('input', (event) => {
+        const currentTextarea = event.target;
+        const cursorPos = currentTextarea.selectionStart;
+        const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
+        // const textAfterCursor = currentTextarea.value.substring(cursorPos); // Not strictly needed
+
+        const linkPattern = /\[\[([a-zA-Z0-9_-\s]{2,})$/;
+        const match = textBeforeCursor.match(linkPattern);
+
+        if (match) {
+            const searchTerm = match[1];
+            fetch(`api/suggest_pages.php?q=${encodeURIComponent(searchTerm)}`)
+                .then(response => response.json())
+                .then(suggestions => {
+                    if (suggestions.length > 0) {
+                        renderSuggestions(suggestions, currentTextarea);
+                    } else {
+                        closeSuggestionsPopup();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching suggestions:', error);
+                    closeSuggestionsPopup();
+                });
+        } else {
+            // If the pattern [[search_term is not before the cursor,
+            // or if the link is fully formed like [[search_term]] by manual typing, then close.
+            if (textBeforeCursor.endsWith(']]')) { // User manually typed closing brackets
+                closeSuggestionsPopup();
+            } else {
+                // This part handles closing when the user moves cursor away or deletes text
+                // such that [[pattern is no longer met.
+                // Check if the cursor is still within a potential link context that just doesn't meet min length yet
+                const potentialLinkPattern = /\[\[([a-zA-Z0-9_-\s]*)$/;
+                if (!textBeforeCursor.match(potentialLinkPattern)) {
+                     closeSuggestionsPopup();
+                }
+                // If it matches potentialLinkPattern but not linkPattern (e.g. "[[a"), do nothing, wait for more input.
+                // If it does not match potentialLinkPattern (e.g. "[[a] b" or "x [[a"), close.
+            }
+        }
+    });
+
+    textarea.addEventListener('keydown', (event) => {
+        if (!suggestionsPopup || currentSuggestions.length === 0) return;
+
+        const items = suggestionsPopup.querySelectorAll('.suggestion-item');
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            activeSuggestionIndex = (activeSuggestionIndex + 1) % items.length;
+            updateHighlightedSuggestion(items);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            activeSuggestionIndex = (activeSuggestionIndex - 1 + items.length) % items.length;
+            updateHighlightedSuggestion(items);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            if (activeSuggestionIndex >= 0 && activeSuggestionIndex < items.length) {
+                const selectedTitle = currentSuggestions[activeSuggestionIndex].title;
+                insertSuggestion(textarea, selectedTitle);
+            }
+            closeSuggestionsPopup();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeSuggestionsPopup();
+        } else if (event.key === ']') {
+            const nextChar = textarea.value.substring(textarea.selectionStart, textarea.selectionStart + 1);
+            if (nextChar === ']') {
+                 setTimeout(closeSuggestionsPopup, 50);
+            }
+        }
+    });
+
+    textarea.addEventListener('blur', (event) => {
+        if (suggestionsPopup && !suggestionsPopup.contains(event.relatedTarget)) {
+            setTimeout(() => closeSuggestionsPopup(), 150); // Increased delay
+        }
+    });
     
     // ... (rest of saveButton.onclick and cancelButton.onclick from editNote)
     saveButton.onclick = async () => {
