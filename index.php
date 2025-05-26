@@ -12,8 +12,8 @@ if (!file_exists($dbPath)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>notd</title>
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <script src="js/libs/marked.min.js"></script>
+    <script src="js/libs/highlight.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -45,7 +45,7 @@ if (!file_exists($dbPath)) {
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="js/libs/Sortable.min.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html> 

@@ -11,6 +11,7 @@ marked.setOptions({
 // State management
 let currentPage = null;
 let recentPages = [];
+let prefetchedBlocks = {}; // Cache for prefetched blocks for the current page load
 let noteTemplates = {};
 
 // Load templates
@@ -38,12 +39,8 @@ async function navigateToPage(pageId) {
     const currentHash = window.location.hash.substring(1);
 
     if (currentHash === targetHash) {
-        // If hash is already the target pageId, force a reload.
-        // This is important for initial load if hash is set but page isn't rendered,
-        // or if user clicks a link to the currently viewed page.
         await loadPage(targetHash);
     } else {
-        // Set the hash, hashchange listener will call loadPage.
         window.location.hash = targetHash;
     }
 }
@@ -63,10 +60,8 @@ document.getElementById('home-button').addEventListener('click', async (e) => {
     e.preventDefault();
     const today = new Date().toISOString().split('T')[0];
     if (document.body.classList.contains('logseq-focus-active')) {
-        await zoomOut(); // zoomOut will call loadPage for the original page
+        await zoomOut(); 
     }
-    // After zoomOut or if not zoomed, navigate to today's page.
-    // navigateToPage will handle if we are already on 'today' or need to change hash.
     navigateToPage(today);
 });
 
@@ -75,9 +70,9 @@ window.addEventListener('hashchange', () => {
     const pageId = window.location.hash.substring(1);
     if (pageId === 'search-results') {
         showSearchResults();
-    } else if (pageId) { // pageId is from window.location.hash.substring(1)
+    } else if (pageId) { 
         loadPage(pageId);
-    } else { // Hash is empty
+    } else { 
         const today = new Date().toISOString().split('T')[0];
         navigateToPage(today);
     }
@@ -90,12 +85,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const initialHash = window.location.hash.substring(1);
     if (!initialHash) {
         const today = new Date().toISOString().split('T')[0];
-        navigateToPage(today); // Use helper for consistency
+        navigateToPage(today); 
     } else {
         if (initialHash === 'search-results') {
             showSearchResults();
         } else {
-            navigateToPage(initialHash); // Use helper
+            navigateToPage(initialHash); 
         }
     }
 });
@@ -118,9 +113,6 @@ async function loadPage(pageId) {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
     
-    // The page title is now set by renderPage, so no need to handle unzoom button specifically here.
-    // If renderPage is called, it will set the standard page title.
-
     try {
         document.getElementById('new-note').style.display = 'block';
         document.getElementById('backlinks-container').style.display = 'block';
@@ -138,16 +130,15 @@ async function loadPage(pageId) {
         }
 
         if (data.properties && data.properties.alias) {
-            // Use navigateToPage for alias redirection to ensure hash is updated
             navigateToPage(data.properties.alias);
             return;
         }
 
         currentPage = data;
-        await renderPage(data);
+        await renderPage(data); 
         updateRecentPages(pageId);
-        if (window.renderCalendarForCurrentPage) { // Check if calendar is initialized
-            window.renderCalendarForCurrentPage(); // Re-render to update selected date
+        if (window.renderCalendarForCurrentPage) { 
+            window.renderCalendarForCurrentPage(); 
         }
     } catch (error) {
         console.error('Error loading page:', error);
@@ -218,7 +209,7 @@ async function createNewPage() {
             const data = await response.json();
             if (data.error) throw new Error(data.error);
             document.body.removeChild(modal);
-            navigateToPage(encodeURIComponent(pageId)); // Use navigateToPage
+            navigateToPage(encodeURIComponent(pageId)); 
         } catch (error) { console.error('Error creating page:', error); alert('Error creating page: ' + error.message); }
     };
     cancelButton.onclick = () => document.body.removeChild(modal);
@@ -235,83 +226,111 @@ async function findBlockById(blockId) {
     } catch (error) { console.error('Error finding block:', error); return null; }
 }
 
-async function renderNoteContent(note) {
-    let content = note.content;
-    
-    // 1. Handle TODO/DONE first to preserve their structure before other replacements
-    content = content.replace(/^(TODO|DONE)\s*(.*)/gm, (match, status, taskText) => {
-        // The <p> tags will be added by marked.parse later if needed.
-        // We just want the raw taskText here.
-        // This regex assumes TODO/DONE are at the start of a line (or the block).
-        // If they can be mid-paragraph, a more complex approach is needed.
-        // For now, this handles block-level TODOs well.
-        const isDone = status === 'DONE';
-        // Temporarily mark this for later processing by a more specific regex
-        // This avoids conflicts with general link/tag processing
-        return `%%TODO_ITEM%%${status}%%${taskText}%%`; 
+async function renderNoteContent(note, prefetchedBlocks = {}) {
+    let processedContent = note.content || ''; // Ensure content is not null
+
+    // 1. TODO Pre-processing
+    processedContent = processedContent.replace(/^(TODO|DONE)\s*(.*)/gm, (match, status, taskText) => {
+        return `%%TODO_ITEM%%${status}%%${taskText}%%`;
     });
-    
-    // 2. Transclusions {{blockId}} (Keep your existing logic, it's good)
-    const blockMatches = content.match(/\{\{([^}]+)\}\}/g) || [];
-    for (const blockRefMatch of blockMatches) { // Renamed match to blockRefMatch
-        const blockId = blockRefMatch.slice(2, -2);
-        const block = await findBlockById(blockId);
-        if (block) {
-            const blockContent = await renderNoteContent(block); // Recursive call
-            content = content.replace(blockRefMatch, `
-                <div class="transcluded-block" data-block-id="${blockId}">
-                    ${blockContent}
-                    <div class="transclusion-source">
-                        <a href="#${encodeURIComponent(block.page_id)}" onclick="event.stopPropagation();">
-                            Source: ${block.page_title || block.page_id}</a></div></div>`);
-        } else { 
-            content = content.replace(blockRefMatch, `<span class="block-ref-brackets">{{</span><a href="#" class="block-ref-link" onclick="event.stopPropagation(); console.warn('Block not found: ${blockId}')">${blockId}</a><span class="block-ref-brackets">}}</span><span class="broken-transclusion"> (not found)</span>`);
+
+    // 2. Transclusion Placeholder Replacement (Pre-Markdown)
+    const transclusionPlaceholders = [];
+    const blockMatches = processedContent.matchAll(/\{\{([^}]+)\}\}/g); // Use matchAll for capturing groups
+
+    for (const blockRefMatch of blockMatches) {
+        const fullMatch = blockRefMatch[0]; // e.g., "{{blockId}}"
+        const blockId = blockRefMatch[1].trim();
+        let renderedBlockContent = '';
+        let sourcePageId = null;
+        let sourcePageTitle = null;
+        let blockDataForRecursiveCall = null;
+
+        if (prefetchedBlocks && prefetchedBlocks[blockId]) {
+            const prefetchedData = prefetchedBlocks[blockId];
+            sourcePageId = prefetchedData.page_id;
+            sourcePageTitle = prefetchedData.page_title;
+            blockDataForRecursiveCall = {
+                content: prefetchedData.content,
+                id: prefetchedData.note_id,
+                block_id: blockId,
+                attachments: [], 
+                properties: {}
+            };
+            renderedBlockContent = await renderNoteContent(blockDataForRecursiveCall, prefetchedBlocks);
+        } else {
+            const fallbackBlock = await findBlockById(blockId);
+            if (fallbackBlock) {
+                sourcePageId = fallbackBlock.page_id;
+                sourcePageTitle = fallbackBlock.page_title;
+                renderedBlockContent = await renderNoteContent(fallbackBlock, prefetchedBlocks);
+            } else {
+                renderedBlockContent = `<span class="block-ref-brackets">{{</span><a href="#" class="block-ref-link" onclick="event.stopPropagation(); console.warn('Block not found: ${blockId}')">${blockId}</a><span class="block-ref-brackets">}}</span><span class="broken-transclusion"> (not found)</span>`;
+                // For "not found", we directly replace and skip placeholder logic for this item
+                processedContent = processedContent.replace(fullMatch, renderedBlockContent);
+                continue; 
+            }
         }
+        
+        const placeholderId = `%%TRANSCLUSION_PLACEHOLDER_${transclusionPlaceholders.length}%%`;
+        transclusionPlaceholders.push({
+            placeholder: placeholderId,
+            html: renderedBlockContent, // This is already HTML
+            blockId: blockId,
+            sourcePageId: sourcePageId,
+            sourcePageTitle: sourcePageTitle
+        });
+        processedContent = processedContent.replace(fullMatch, placeholderId);
     }
 
-    // 3. Handle {key::value} properties
-    content = content.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
+    // 3. Other Pre-Markdown Replacements
+    processedContent = processedContent.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
         if (key.trim().toLowerCase() === 'tag') {
-            return value.trim().split(',').map(tagValue => 
-                // Using #tag format directly for properties, no brackets
+            return value.trim().split(',').map(tagValue =>
                 `<a href="#${encodeURIComponent(tagValue.trim())}" class="property-tag" onclick="event.stopPropagation();">#${tagValue.trim()}</a>`
             ).join(' ');
         }
         return `<span class="property-tag">${key.trim()}: ${value.trim()}</span>`;
     });
 
-    // 4. Handle search links <<query>> (Your existing logic is good)
-    content = content.replace(/<<([^>]+)>>/g, (match, query) => {
+    processedContent = processedContent.replace(/<<([^>]+)>>/g, (match, query) => {
         const displayQuery = query.length > 30 ? query.substring(0, 27) + '...' : query;
         return `<a href="#" class="search-link" onclick="event.preventDefault(); event.stopPropagation(); executeSearchLink('${query.replace(/'/g, "\\'")}')"><<${displayQuery}>></a>`;
     });
-    
-    // 5. Markdown Parsing (keep this before final link/tag processing if they are generated by markdown)
-    content = marked.parse(content); // This will add <p> tags etc.
 
-    // 6. Process specific Logseq-style links/tags that might be *in the markdown source*
-    // Page Links: [[Page Name]]
-    content = content.replace(/\[\[([^\]#]+?)\]\]/g, (match, pageName) => { // Updated regex to not capture # in page name
+    // 4. Main Markdown Parsing
+    let htmlContent = marked.parse(processedContent);
+
+    // 5. Transclusion HTML Injection (Post-Markdown)
+    transclusionPlaceholders.forEach(item => {
+        const finalTransclusionWrapperHtml = `
+            <div class="transcluded-block" data-block-id="${item.blockId}">
+                ${item.html} 
+                <div class="transclusion-source">
+                    <a href="#${encodeURIComponent(item.sourcePageId)}" onclick="event.stopPropagation();">
+                        Source: ${item.sourcePageTitle || item.sourcePageId}</a>
+                </div>
+            </div>`;
+        // Ensure the placeholder is replaced globally in case it appears multiple times,
+        // though it shouldn't with unique placeholders.
+        htmlContent = htmlContent.split(item.placeholder).join(finalTransclusionWrapperHtml);
+    });
+    
+    // 6. Post-Markdown Replacements
+    htmlContent = htmlContent.replace(/\[\[([^\]#]+?)\]\]/g, (match, pageName) => { 
         return `<span class="internal-link-brackets">[[</span><a href="#${encodeURIComponent(pageName.trim())}" class="internal-link" onclick="event.stopPropagation();">${pageName.trim()}</a><span class="internal-link-brackets">]]</span>`;
     });
-    // Tags: [[#tag name]] or #tag-name (simpler form)
-    // Handles [[#tag name]]
-    content = content.replace(/\[\[#(.*?)\]\]/g, (match, tagName) => {
+    htmlContent = htmlContent.replace(/\[\[#(.*?)\]\]/g, (match, tagName) => {
         return `<span class="internal-link-brackets">[[</span><a href="#${encodeURIComponent(tagName.trim())}" class="property-tag" onclick="event.stopPropagation();">#${tagName.trim()}</a><span class="internal-link-brackets">]]</span>`;
     });
-    // Handles #tag-name (if not already processed by properties or the above)
-    // Ensure this doesn't conflict with internal links if they can contain #
-    // This regex is simple and might need refinement if your tag names are complex
-    content = content.replace(/(^|\s)#([a-zA-Z0-9_\-\/]+)/g, (match, precedingSpace, tagName) => {
+    htmlContent = htmlContent.replace(/(^|\s)#([a-zA-Z0-9_\-\/]+)/g, (match, precedingSpace, tagName) => {
         return `${precedingSpace}<a href="#${encodeURIComponent(tagName)}" class="property-tag" onclick="event.stopPropagation();">#${tagName}</a>`;
     });
 
-
-    // 7. Final processing for TODO_ITEM placeholders
-    // This needs to happen *after* marked.parse so that links inside taskText are already HTML
-    content = content.replace(/%%TODO_ITEM%%(TODO|DONE)%%(.*?)%%/g, (match, status, taskTextHtml) => {
+    htmlContent = htmlContent.replace(/%%TODO_ITEM%%(TODO|DONE)%%(.*?)%%/g, (match, status, taskTextHtml) => {
         const isDone = status === 'DONE';
-        // taskTextHtml is already processed by marked.parse and other link replacements above
+        // taskTextHtml here is already processed by marked.parse (as it was part of processedContent)
+        // and also had its own placeholders (if any) replaced.
         return `<div class="todo-item">
                     <label class="todo-checkbox">
                         <input type="checkbox" ${isDone ? 'checked' : ''} 
@@ -324,14 +343,12 @@ async function renderNoteContent(note) {
                 </div>`;
     });
 
-    // Image handling (keep your existing)
-    content = content.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
+    htmlContent = htmlContent.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
         return `<img src="${src}" alt="${alt}" class="note-image" onclick="event.stopPropagation(); showImageModal(this.src, this.alt)">`;
     });
     
-    // Attachments (keep your existing)
     if (note.attachments && note.attachments.length > 0) {
-        content += '<div class="attachments">';
+        htmlContent += '<div class="attachments">';
         note.attachments.forEach(attachment => {
             const fileExtension = attachment.filename.split('.').pop().toLowerCase();
             let icon = '📄'; let previewHtml = '';
@@ -342,16 +359,16 @@ async function renderNoteContent(note) {
             } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
                 icon = '🎵'; previewHtml = `<div class="attachment-preview"><audio src="uploads/${attachment.filename}" controls></audio></div>`;
             } 
-            content += `<div class="attachment"><div class="attachment-info">
+            htmlContent += `<div class="attachment"><div class="attachment-info">
                         <span class="attachment-icon">${icon}</span>
                         <a href="uploads/${attachment.filename}" target="_blank" class="attachment-name" onclick="event.stopPropagation();">${attachment.original_name}</a>
                         <span class="attachment-size">${formatFileSize(attachment.size)}</span>
                         <div class="attachment-actions"><button onclick="event.stopPropagation(); deleteAttachment(${attachment.id}, event)" title="Delete attachment">×</button></div>
                     </div>${previewHtml}</div>`;
         });
-        content += '</div>';
+        htmlContent += '</div>';
     }
-    return content;
+    return htmlContent;
 }
 
 function formatFileSize(bytes) {
@@ -361,13 +378,13 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-async function renderOutline(notes, level = 0) {
-    if (!notes || notes.length === 0) return ''; // Return empty string if no notes
+async function renderOutline(notes, level = 0, prefetchedBlocks = {}) { 
+    if (!notes || notes.length === 0) return ''; 
 
     let html = '';
     for (const note of notes) {
         const blockId = note.block_id;
-        const contentHtml = await renderNoteContent(note);
+        const contentHtml = await renderNoteContent(note, prefetchedBlocks); 
         let linkedPageType = null;
         // ... (your existing logic for linkedPageType) ...
 
@@ -382,7 +399,6 @@ async function renderOutline(notes, level = 0) {
                      <svg class="arrow-svg" viewBox="0 0 192 512"><path d="M0 384.662V127.338c0-17.818 21.543-26.741 34.142-14.142l128.662 128.662c7.81 7.81 7.81 20.474 0 28.284L34.142 398.804C21.543 411.404 0 402.48 0 384.662z"></path></svg>
                  </span>` : '' }`;
 
-        // Start of the .outline-item
         html += `
             <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}"
                  data-note-id="${note.id}" data-level="${level}" data-content="${note.content.replace(/"/g, '"')}">
@@ -399,16 +415,15 @@ async function renderOutline(notes, level = 0) {
                         <button data-action="delete" title="Delete note">×</button>
                          | <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">${new Date(note.created_at).toLocaleDateString()}</span>
                     </div>
-                </div>`; // End of .outline-content
+                </div>`; 
 
-        // Recursively render children and wrap them in .outline-children
         if (hasChildren) {
             html += `<div class="outline-children">`;
-            html += await renderOutline(note.children, level + 1); // Recursive call
-            html += `</div>`; // End of .outline-children
+            html += await renderOutline(note.children, level + 1, prefetchedBlocks); 
+            html += `</div>`; 
         }
 
-        html += `</div>`; // End of .outline-item
+        html += `</div>`; 
     }
     return html;
 }
@@ -429,8 +444,43 @@ async function renderPage(page) {
     }
     const editButton = pageTitle.querySelector('.edit-properties-button');
     if (editButton) editButton.onclick = editPageProperties;
-    outlineContainer.innerHTML = await renderOutline(page.notes);
-    initSortable(outlineContainer); // Initialize SortableJS
+
+    // 1. Collect all blockIds for batch fetching
+    const blockIdsToFetch = new Set();
+    function collectBlockIdsRecursive(notes) { 
+        if (!notes) return;
+        for (const note of notes) {
+            if (note.content) {
+                const matches = note.content.matchAll(/{{\s*([a-zA-Z0-9_-]+)\s*}}/g);
+                for (const match of matches) {
+                    blockIdsToFetch.add(match[1].trim()); 
+                }
+            }
+            if (note.children) {
+                collectBlockIdsRecursive(note.children);
+            }
+        }
+    }
+    
+    prefetchedBlocks = {}; 
+    collectBlockIdsRecursive(page.notes);
+
+    if (blockIdsToFetch.size > 0) {
+        try {
+            const idsArray = Array.from(blockIdsToFetch);
+            const response = await fetch(`api/batch_blocks.php?ids=${idsArray.join(',')}`);
+            if (response.ok) {
+                prefetchedBlocks = await response.json();
+            } else {
+                console.error('Failed to fetch batch blocks:', response.status, await response.text());
+            }
+        } catch (error) {
+            console.error('Error fetching batch blocks:', error);
+        }
+    }
+
+    outlineContainer.innerHTML = await renderOutline(page.notes, 0, prefetchedBlocks); 
+    initSortable(outlineContainer); 
     const backlinksContainer = document.getElementById('backlinks-container');
     if (backlinksContainer) renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
 }
@@ -478,7 +528,7 @@ async function editPageProperties() {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            navigateToPage(currentPage.id); // Use navigateToPage to reload
+            navigateToPage(currentPage.id); 
         } catch (error) {
             console.error('Error updating properties:', error);
             propertiesContent.innerHTML = originalContent;
@@ -518,7 +568,7 @@ async function renderBacklinks(pageId) {
                 return rootNotes;
             };
             const hierarchicalNotes = buildNoteTree(thread.notes);
-            const threadContentHtml = hierarchicalNotes.length > 0 ? await renderOutline(hierarchicalNotes, 0) : '';
+            const threadContentHtml = hierarchicalNotes.length > 0 ? await renderOutline(hierarchicalNotes, 0, prefetchedBlocks) : '';
             html += `<div class="backlink-thread-item">
                         <a href="#${encodeURIComponent(thread.linking_page_id)}" onclick="event.stopPropagation();">
                             ${thread.linking_page_title || thread.linking_page_id}</a>
@@ -559,7 +609,7 @@ async function showAllPages() {
     } catch (error) { console.error('Error loading all pages:', error); }
 }
 
-function renderSearchResults(results) { // For inline search
+function renderSearchResults(results) { 
     const searchResultsContainer = document.getElementById('search-results-container') || document.createElement('div');
     searchResultsContainer.id = 'search-results-container';
     searchResultsContainer.className = 'search-results-inline';
@@ -597,7 +647,7 @@ async function uploadFile(noteId, file) {
         const response = await fetch('api/attachment.php', { method: 'POST', body: formData });
         const data = await response.json();
         if (data.error) throw new Error(data.error);
-        navigateToPage(currentPage.id); // Use navigateToPage
+        navigateToPage(currentPage.id); 
     } catch (error) { console.error('Error uploading file:', error); alert('Error uploading file: ' + error.message); }
 }
 
@@ -619,7 +669,7 @@ async function deleteAttachment(id, event) {
             const data = await response.json();
             if (data.error) throw new Error(data.error);
             document.body.removeChild(modal); 
-            navigateToPage(currentPage.id); // Use navigateToPage
+            navigateToPage(currentPage.id); 
         } catch (error) { 
             console.error('Error deleting attachment:', error); 
             alert('Error deleting attachment: ' + error.message); 
@@ -632,9 +682,8 @@ async function deleteAttachment(id, event) {
 function initCalendar() {
     const calendar = document.getElementById('calendar');
     if (!calendar) return;
-    const todayDate = new Date(); // Store today's actual date
+    const todayDate = new Date(); 
 
-    // Keep track of current month/year for rendering
     let currentDisplayMonth = todayDate.getMonth();
     let currentDisplayYear = todayDate.getFullYear();
 
@@ -661,9 +710,9 @@ function initCalendar() {
             const date = `${currentDisplayYear}-${String(currentDisplayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             let dayClasses = 'calendar-day';
             if (date === todayString) {
-                dayClasses += ' today'; // Today's date
+                dayClasses += ' today'; 
             }
-            if (date === currentPageId) { // Currently selected/viewed page
+            if (date === currentPageId) { 
                 dayClasses += ' selected-date'; 
             }
             html += `<div class="${dayClasses}" onclick="window.location.hash = '${date}'" data-date="${date}">${day}</div>`;
@@ -677,7 +726,6 @@ function initCalendar() {
         calendar.innerHTML = html;
     }
 
-    // Expose renderCalendar so it can be called after a page loads
     window.renderCalendarForCurrentPage = renderCalendar; 
 
     window.prevMonth = () => { 
@@ -690,7 +738,7 @@ function initCalendar() {
         if (currentDisplayMonth === 0) currentDisplayYear++; 
         renderCalendar(); 
     };
-    renderCalendar(); // Initial render
+    renderCalendar(); 
 }
 
 function showImageModal(src, alt) {
@@ -702,7 +750,6 @@ function showImageModal(src, alt) {
     document.body.appendChild(modal);
 }
 
-// Outline Interaction
 function handleOutlineClick(event) {
     const target = event.target;
     const breadcrumbItem = target.closest('.breadcrumb-item');
@@ -716,62 +763,60 @@ function handleOutlineClick(event) {
         noteIdForAction = noteElement.dataset.noteId;
     }
 
-    // Prioritize breadcrumb actions if a breadcrumb item was clicked
     if (breadcrumbItem && breadcrumbItem.dataset.action) {
         action = breadcrumbItem.dataset.action;
-        // If the action is zoom-in (from an intermediate breadcrumb), get its note ID
         if (action === 'zoom-in') {
             noteIdForAction = breadcrumbItem.dataset.noteId;
         }
-        // If it's page-link with zoom-out, action is already set to 'zoom-out'
     } else if (breadcrumbBar && !breadcrumbItem && breadcrumbBar.dataset.action === 'zoom-out') {
-        // Clicked on the bar itself (not an item), treat as full zoom-out
         action = 'zoom-out';
     }
 
 
     if (action === 'zoom-out') {
-        // This handles clicks on the main breadcrumb bar or the page title link in breadcrumbs
         zoomOut();
         return;
     }
 
     if (action === 'zoom-in') {
-        // This handles clicks on outline bullets OR intermediate breadcrumb items
-        const targetId = noteIdForAction; // Already correctly set from breadcrumb or noteElement
+        const targetId = noteIdForAction; 
         if (targetId) {
-            zoomInOnNote(targetId); // Pass the ID directly
+            zoomInOnNote(targetId); 
         } else {
             console.warn("Zoom-in clicked, but no target ID found.");
         }
         return;
     }
     
-    // For all other actions, a noteElement in the outline and its ID are required
     if (!noteElement || !noteIdForAction) {
-        // console.log("Action requires a note element and ID, but not found.", action, target);
         return;
     }
 
-    // Existing switch cases for other actions:
     switch (action) {
         case 'toggle-children':
             if (noteElement.classList.contains('has-children')) toggleChildren(noteElement);
             break;
         case 'copy-block-id':
-            // ... (existing code) ...
+            const blockIdToCopy = noteElement.querySelector('.outline-content[data-block-id]')?.dataset.blockId;
+            if (blockIdToCopy) {
+                navigator.clipboard.writeText(`{{${blockIdToCopy}}}`)
+                    .then(() => console.log('Block ID copied:', blockIdToCopy))
+                    .catch(err => console.error('Failed to copy block ID:', err));
+            }
             break;
         case 'add-child': createNote(noteIdForAction, parseInt(noteElement.dataset.level) + 1); break;
-        case 'indent-note': // ADDED CASE
+        case 'indent-note': 
             handleIndentNote(noteIdForAction, noteElement);
             break;
         case 'edit': editNote(noteIdForAction, noteElement.dataset.content); break;
         case 'upload':
-            // ... (existing code) ...
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.onchange = (e) => uploadFile(noteIdForAction, e.target.files[0]);
+            fileInput.click();
             break;
         case 'delete': deleteNote(noteIdForAction); break;
         default:
-            // console.log("Unknown action or unhandled click:", action, target);
             break;
     }
 }
@@ -783,19 +828,13 @@ async function handleIndentNote(noteId, noteElement) {
         return;
     }
 
-    // Find the visually preceding .outline-item element
     let previousSiblingElement = noteElement.previousElementSibling;
     while (previousSiblingElement && !previousSiblingElement.matches('.outline-item')) {
         previousSiblingElement = previousSiblingElement.previousElementSibling;
     }
 
     if (!previousSiblingElement) {
-        // No preceding sibling .outline-item at the same level or in the parent list.
-        // This could happen if it's the first item in the root, or first child in a children group.
-        // More sophisticated logic could look up the DOM tree.
-        // For now, if no direct visual predecessor, disable or alert.
         alert("Cannot indent this note further: no suitable preceding item found to become its parent.");
-        // Visually disable the button next time if this condition is met on render.
         return;
     }
 
@@ -805,27 +844,17 @@ async function handleIndentNote(noteId, noteElement) {
         return;
     }
 
-    // Determine the new order. The note will become the last child of the new parent.
-    // The backend's `reorder_note` will use MAX("order") + 1 for the new parent.
-    // We can send a high number or 0, backend reorder logic is more about the parent change.
-    // For consistency with drag-drop, let's send 0, implying "make it the first/next available".
-    // The backend reorder will then correctly place it based on MAX order for that new parent.
-    // A more precise client-side calculation for newIndex would be:
     const newParentChildrenContainer = previousSiblingElement.querySelector(':scope > .outline-children');
     let newIndex = 0;
     if (newParentChildrenContainer) {
         newIndex = newParentChildrenContainer.querySelectorAll(':scope > .outline-item').length;
     }
-    // If newIndex is 0, it means it's the first child.
-    // The backend handles setting the actual 'order' value.
-
-    console.log(`Indenting note ${noteId} to become child of ${newParentId} at index ${newIndex}`);
-
+    
     const payload = {
         action: 'reorder_note',
         note_id: parseInt(noteId),
         new_parent_id: parseInt(newParentId),
-        new_order: newIndex, // The backend will adjust this to be the last child order
+        new_order: newIndex, 
         page_id: currentPage.id
     };
 
@@ -839,12 +868,11 @@ async function handleIndentNote(noteId, noteElement) {
         if (data.error) {
             throw new Error(data.error);
         }
-        console.log('Note indented successfully:', data);
-        loadPage(currentPage.id); // Reload to see changes
+        loadPage(currentPage.id); 
     } catch (error) {
         console.error('Error indenting note:', error);
         alert('Error indenting note: ' + error.message + '. Please refresh.');
-        loadPage(currentPage.id); // Reload to ensure UI consistency
+        loadPage(currentPage.id); 
     }
 }
 
@@ -853,9 +881,9 @@ function toggleChildren(noteElement) {
     const childrenContainer = noteElement.querySelector('.outline-children');
     if (childrenContainer) {
         if (noteElement.classList.contains('children-hidden')) {
-            childrenContainer.style.display = 'none'; // Or add a class
+            childrenContainer.style.display = 'none'; 
         } else {
-            childrenContainer.style.display = ''; // Or remove a class
+            childrenContainer.style.display = ''; 
         }
     }
 }
@@ -890,19 +918,16 @@ function createNote(parentId = null, level = 0) {
             if (!childrenContainer) {
                 childrenContainer = document.createElement('div');
                 childrenContainer.className = 'outline-children';
-                // Apply padding-left via CSS, or set it here if dynamic:
-                // childrenContainer.style.paddingLeft = `var(--indentation-unit)`;
                 parentNoteElement.appendChild(childrenContainer);
             }
-            childrenContainer.appendChild(noteEditorContainer); // Append editor to children container
+            childrenContainer.appendChild(noteEditorContainer); 
     
-            // Update parent's state
             parentNoteElement.classList.add('has-children');
             if (parentNoteElement.classList.contains('children-hidden')) {
                 parentNoteElement.classList.remove('children-hidden');
-                childrenContainer.style.display = ''; // Ensure visible
+                childrenContainer.style.display = ''; 
             }
-        } else { /* ... handle error or append to root ... */ }
+        } else { outlineContainer.appendChild(noteEditorContainer); }
     } else {
         outlineContainer.appendChild(noteEditorContainer);
     }
@@ -930,7 +955,7 @@ function createNote(parentId = null, level = 0) {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            navigateToPage(currentPage.id); // Use navigateToPage
+            navigateToPage(currentPage.id); 
         } catch (error) { console.error('Error creating note:', error); alert('Error creating note: ' + error.message); }
     };
     cancelButton.onclick = () => {
@@ -938,9 +963,10 @@ function createNote(parentId = null, level = 0) {
         if (parentId) {
             const parentNoteEl = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
             if (parentNoteEl) {
-                let hasOtherChildren = false; let sibling = parentNoteEl.nextElementSibling;
-                while(sibling && sibling.classList.contains('outline-item') && parseInt(sibling.dataset.level) > parseInt(parentNoteEl.dataset.level)) { hasOtherChildren = true; break; }
-                if (!hasOtherChildren) parentNoteEl.classList.remove('has-children');
+                const childrenContainer = parentNoteEl.querySelector('.outline-children');
+                if (childrenContainer && childrenContainer.children.length === 0) {
+                    parentNoteEl.classList.remove('has-children');
+                }
             }
         }
     };
@@ -977,7 +1003,7 @@ function editNote(id, currentContentText) {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            navigateToPage(currentPage.id); // Use navigateToPage
+            navigateToPage(currentPage.id); 
         } catch (error) { console.error('Error updating note:', error); alert('Error updating note: ' + error.message); }
     };
     cancelButton.onclick = () => { editorWrapper.remove(); contentElement.style.display = originalDisplay; };
@@ -997,20 +1023,20 @@ async function deleteNote(id) {
             const data = await response.json();
             if (data.error) throw new Error(data.error);
             document.body.removeChild(modal); 
-            navigateToPage(currentPage.id); // Use navigateToPage
+            navigateToPage(currentPage.id); 
         } catch (error) { console.error('Error deleting note:', error); alert('Error deleting note: ' + error.message); document.body.removeChild(modal); }
     };
     modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
-async function showSearchResults() { // For Advanced Search results page
+async function showSearchResults() { 
     const results = JSON.parse(sessionStorage.getItem('searchResults') || '[]');
     const query = sessionStorage.getItem('searchQuery') || '';
     document.getElementById('new-note').style.display = 'none';
     document.getElementById('backlinks-container').style.display = 'none';
     pageProperties.style.display = 'none';
     const renderedResultsPromises = results.map(async result => {
-        const content = await renderNoteContent(result);
+        const content = await renderNoteContent(result, prefetchedBlocks); 
         return `<div class="search-result-item"><div class="result-header">
                     <a href="#${encodeURIComponent(result.page_id)}" onclick="event.stopPropagation();">${result.page_title || result.page_id}</a>
                     <span class="result-date">${new Date(result.created_at).toLocaleDateString()}</span></div>
@@ -1028,7 +1054,7 @@ function copySearchLink() {
     const query = sessionStorage.getItem('searchQuery') || '';
     navigator.clipboard.writeText(`<<${query}>>`).then(() => alert('Search link copied!')).catch(err => alert('Failed to copy: ' + err));
 }
-async function executeSearchLink(query) { // Renamed from executeSearchLink
+async function executeSearchLink(query) { 
     try {
         const response = await fetch('api/advanced_search.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -1036,42 +1062,50 @@ async function executeSearchLink(query) { // Renamed from executeSearchLink
         if (results.error) throw new Error(results.error);
         sessionStorage.setItem('searchResults', JSON.stringify(results));
         sessionStorage.setItem('searchQuery', query);
-        window.location.hash = 'search-results'; // This will trigger showSearchResults via hashchange
+        window.location.hash = 'search-results'; 
     } catch (error) { console.error('Error executing search link:', error); alert('Error executing search: ' + error.message); }
 }
 
 async function toggleTodo(blockId, isDone) {
     try {
-        const currentNote = await findBlockById(blockId);
-        if (!currentNote) throw new Error('Note not found for toggling TODO');
+        let currentNoteData;
+        if (prefetchedBlocks && prefetchedBlocks[blockId]) {
+            const prefetched = prefetchedBlocks[blockId];
+            currentNoteData = { 
+                id: prefetched.note_id, 
+                content: prefetched.content,
+                block_id: blockId,
+                properties: {}, 
+                level: 0,       
+                parent_id: null 
+            };
+        } else {
+            currentNoteData = await findBlockById(blockId); 
+        }
+
+        if (!currentNoteData) throw new Error('Note not found for toggling TODO');
         
-        let rawContent = currentNote.content;
+        let rawContent = currentNoteData.content;
         let taskTextWithProperties = "";
-        let currentStatus = "";
 
         if (rawContent.startsWith('TODO ')) {
             taskTextWithProperties = rawContent.substring(5);
-            currentStatus = "TODO";
         } else if (rawContent.startsWith('DONE ')) {
             taskTextWithProperties = rawContent.substring(5);
-            currentStatus = "DONE";
         } else {
-            // If no prefix, assume it's an undifferentiated task, treat as TODO for toggling
             taskTextWithProperties = rawContent;
-            currentStatus = "TODO"; // Or handle as error if prefix is mandatory
         }
         
         const taskSpecificProperties = {};
-        // Extract properties from the task text part
         let cleanTaskDescription = taskTextWithProperties.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
             taskSpecificProperties[key.trim()] = value.trim();
             return ''; 
         }).trim();
 
         let newStatusPrefix = isDone ? 'DONE ' : 'TODO ';
-        let newContentString = newStatusPrefix + cleanTaskDescription; // Start with clean description
+        let newContentString = newStatusPrefix + cleanTaskDescription; 
 
-        const updatedNoteProperties = { ...(currentNote.properties || {}) }; 
+        const updatedNoteProperties = { ...(currentNoteData.properties || {}) }; 
         
         if (isDone) {
             taskSpecificProperties['done-at'] = new Date().toISOString();
@@ -1079,23 +1113,22 @@ async function toggleTodo(blockId, isDone) {
             delete taskSpecificProperties['done-at']; 
         }
         
-        // Re-append all task-specific properties (including the new/removed done-at)
         for (const [key, value] of Object.entries(taskSpecificProperties)) {
             newContentString += ` {${key}::${value}}`;
-            updatedNoteProperties[key] = value; // Also update the main note properties
+            updatedNoteProperties[key] = value; 
         }
         if (!isDone) {
-            delete updatedNoteProperties['done-at']; // Ensure it's removed from main properties too
+            delete updatedNoteProperties['done-at']; 
         }
         
-        const response = await fetch(`api/note.php?id=${currentNote.id}`, {
+        const response = await fetch(`api/note.php?id=${currentNoteData.id}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 action: 'update', 
                 content: newContentString.trim(), 
                 properties: updatedNoteProperties, 
-                level: currentNote.level, 
-                parent_id: currentNote.parent_id 
+                level: currentNoteData.level, 
+                parent_id: currentNoteData.parent_id 
             })
         });
         const data = await response.json();
@@ -1104,7 +1137,6 @@ async function toggleTodo(blockId, isDone) {
     } catch (error) {
         console.error('Error updating todo status:', error); 
         alert('Error updating task: ' + error.message);
-        // Revert checkbox state on error
         const checkbox = document.querySelector(`input[type="checkbox"][onchange*="'${blockId}'"]`);
         if (checkbox) checkbox.checked = !isDone; 
     }
@@ -1130,13 +1162,11 @@ function showAdvancedSearch() {
 
     document.body.appendChild(modal);
 
-    // Focus the textarea
     const textarea = modal.querySelector('#advanced-search-query');
     if (textarea) {
         textarea.focus();
     }
 
-    // Close modal when clicking outside
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.remove();
@@ -1153,8 +1183,6 @@ async function executeAdvancedSearch() {
     const query = queryInput.value.trim();
     
     if (!query) {
-        // Optionally, provide feedback to the user that a query is required
-        // For now, just return if query is empty, matching original behavior
         return;
     }
 
@@ -1168,16 +1196,13 @@ async function executeAdvancedSearch() {
         });
 
         if (!response.ok) {
-            // Attempt to get error message from response body
             let errorMsg = `HTTP error! status: ${response.status}`;
             try {
                 const errorData = await response.json();
                 if (errorData && errorData.error) {
                     errorMsg = errorData.error;
                 }
-            } catch (e) {
-                // Ignore if response is not JSON or doesn't have error field
-            }
+            } catch (e) { }
             throw new Error(errorMsg);
         }
 
@@ -1201,7 +1226,6 @@ async function executeAdvancedSearch() {
     }
 }
 
-// --- Logseq-style Zoom (Focus) Functions ---
 function findNoteAndPath(targetId, notesArray, currentPath = []) {
     for (const note of notesArray) {
         const newPath = [...currentPath, note];
@@ -1231,11 +1255,9 @@ function renderBreadcrumbs(path) {
 
     let breadcrumbHtml = '<div class="breadcrumb-bar" data-action="zoom-out" title="Click to zoom out">';
     
-    // Page Title as the root of the breadcrumb
     breadcrumbHtml += `<span class="breadcrumb-item page-link" data-action="zoom-out">${currentPage.title}</span>`;
 
     path.forEach((note, index) => {
-        // Simple text extraction for snippet - replace HTML tags
         let plainContent = note.content.replace(/<\/?[^>]+(>|$)/g, " ").replace(/\s+/g, ' ').trim();
         const contentSnippet = plainContent.length > 30 
             ? plainContent.substring(0, 27) + '...' 
@@ -1243,11 +1265,9 @@ function renderBreadcrumbs(path) {
             
         const isLast = index === path.length - 1;
         breadcrumbHtml += `<span class="breadcrumb-separator">»</span>`;
-        // Only the last item (current focus) is not clickable for zoom-in again via breadcrumb
         if (isLast) {
             breadcrumbHtml += `<span class="breadcrumb-item current-focus">${contentSnippet}</span>`;
         } else {
-            // Make intermediate breadcrumb items zoomable to that specific level
             breadcrumbHtml += `<span class="breadcrumb-item" data-action="zoom-in" data-note-id="${note.id}">${contentSnippet}</span>`;
         }
     });
@@ -1260,7 +1280,6 @@ function renderBreadcrumbs(path) {
 async function zoomInOnNote(targetNoteReference) {
     let noteIdToZoom;
 
-    // Determine the note ID from the reference (could be an element or an ID string/number)
     if (typeof targetNoteReference === 'string' || typeof targetNoteReference === 'number') {
         noteIdToZoom = String(targetNoteReference);
     } else if (targetNoteReference && targetNoteReference.dataset && targetNoteReference.dataset.noteId) {
@@ -1272,49 +1291,41 @@ async function zoomInOnNote(targetNoteReference) {
 
     if (!currentPage || !currentPage.notes) {
         console.error("Cannot zoom, currentPage data is missing. Attempting to recover.");
-        // Fallback: if current page data is lost, zoom out completely.
         await zoomOut();
         return;
     }
 
-    // Always find the note and its path from the original, complete currentPage.notes structure
     const noteDataWithPath = findNoteAndPath(noteIdToZoom, currentPage.notes);
 
     if (!noteDataWithPath || !noteDataWithPath.note) {
-        console.error("Note to zoom (ID: " + noteIdToZoom + ") not found in current page data. This might indicate stale data or an invalid ID. Zooming out.");
-        await zoomOut(); // Fallback if the target note for zoom isn't in the master list
+        console.error("Note to zoom (ID: " + noteIdToZoom + ") not found in current page data. Zooming out.");
+        await zoomOut(); 
         return;
     }
 
     const { note: noteInFullTree, path } = noteDataWithPath;
-    window.breadcrumbPath = path; // Store the new path for breadcrumb rendering
+    window.breadcrumbPath = path; 
 
     document.body.classList.add('logseq-focus-active');
     outlineContainer.classList.add('focused');
 
-    // Clone the focused note subtree from the original full tree
-    // This ensures modifications (like level adjustments) don't affect currentPage.notes
     const clonedFocusedNote = JSON.parse(JSON.stringify(noteInFullTree));
-    clonedFocusedNote.level = 0; // The new zoomed item is always level 0 in its view
+    clonedFocusedNote.level = 0; 
     if (clonedFocusedNote.children) {
-        adjustLevels(clonedFocusedNote.children, 1); // Adjust children levels relative to this new root
+        adjustLevels(clonedFocusedNote.children, 1); 
     }
-    const focusedNotesArray = [clonedFocusedNote]; // The outline will be rendered from this array
+    const focusedNotesArray = [clonedFocusedNote]; 
 
-    // Hide page-level elements that don't make sense in a focused view
     pageProperties.style.display = 'none';
     document.getElementById('new-note').style.display = 'none';
     document.getElementById('backlinks-container').style.display = 'none';
 
-    const breadcrumbsHtml = renderBreadcrumbs(path); // Render breadcrumbs for the current zoom path
-    // Render the outline starting from level 0 for the focused view
-    outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0));
-    initSortable(outlineContainer); // Initialize SortableJS for focused view
+    const breadcrumbsHtml = renderBreadcrumbs(path); 
+    outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0, prefetchedBlocks));
+    initSortable(outlineContainer); 
 
-    // Scroll the newly focused item into view
     const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
     if (focusedDomNote) {
-        // Using a slight delay can help if the browser needs a moment to paint before scrolling
         setTimeout(() => {
              focusedDomNote.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 0);
@@ -1327,26 +1338,17 @@ function initSortable(containerElement) {
         animation: 150,
         fallbackOnBody: true,
         swapThreshold: 0.65,
-        handle: '.static-bullet', // Using the bullet as the drag handle
+        handle: '.static-bullet', 
         onEnd: function(evt) {
-            // console.log('Drag ended:', evt);
-            // console.log('Item ID:', evt.item.dataset.noteId);
-            // console.log('New parent ID:', evt.to.closest('.outline-item')?.dataset.noteId);
-            // console.log('Old parent ID:', evt.from.closest('.outline-item')?.dataset.noteId);
-            // console.log('New index:', evt.newIndex);
-            // console.log('Old index:', evt.oldIndex);
-            // Logic to update note order/parent will be added in the next step.
             handleNoteDrop(evt);
         }
     };
 
-    // Initialize on the main container
     if (containerElement && !containerElement.classList.contains('has-sortable')) {
         new Sortable(containerElement, sortableOptions);
         containerElement.classList.add('has-sortable');
     }
 
-    // Initialize on all child containers
     const childContainers = containerElement.querySelectorAll('.outline-children');
     childContainers.forEach(childContainer => {
         if (!childContainer.classList.contains('has-sortable')) {
@@ -1364,7 +1366,7 @@ function updateDraggedItemLevel(draggedItem, newBaseLevel) {
 
     const childrenContainer = draggedItem.querySelector('.outline-children');
     if (childrenContainer) {
-        const childItems = childrenContainer.querySelectorAll(':scope > .outline-item'); // Direct children only
+        const childItems = childrenContainer.querySelectorAll(':scope > .outline-item'); 
         childItems.forEach(child => {
             updateDraggedItemLevel(child, newBaseLevel + 1);
         });
@@ -1376,82 +1378,56 @@ function handleNoteDrop(evt) {
     const draggedItem = evt.item;
     const draggedNoteId = draggedItem.dataset.noteId;
 
-    // Original position (before SortableJS moved the item in the DOM)
     const oldParentItem = evt.from.closest('.outline-item');
     const oldParentId = oldParentItem ? oldParentItem.dataset.noteId : null;
-    const oldLevel = parseInt(draggedItem.dataset.level); // Level of the item as it was picked up
-    const oldIndex = evt.oldIndex; // Index in the original list
+    const oldLevel = parseInt(draggedItem.dataset.level); 
+    const oldIndex = evt.oldIndex; 
 
-    // Tentative new parent and index based on where SortableJS placed the item
-    // `evt.to` is the list element where the item was dropped.
-    // `evt.newIndex` is the index within `evt.to`.
     let newParentIdCandidateEl = evt.to.closest('.outline-item');
     let newParentId = newParentIdCandidateEl ? newParentIdCandidateEl.dataset.noteId : null;
     let newIndex = evt.newIndex;
     let newLevel;
 
-    // --- Detect "drop onto an item to make it a child" ---
-    // `evt.originalEvent.target` is the actual DOM element the mouse was over when released.
     const dropTargetItemElement = evt.originalEvent.target.closest('.outline-item');
 
     if (dropTargetItemElement && dropTargetItemElement !== draggedItem) {
-        // User dropped onto `dropTargetItemElement`.
-        // Check if SortableJS placed `draggedItem` immediately *after* `dropTargetItemElement` in its list.
-        const parentListOfDropTarget = dropTargetItemElement.parentElement; // The list `dropTargetItemElement` is in.
+        const parentListOfDropTarget = dropTargetItemElement.parentElement; 
 
         if (evt.to === parentListOfDropTarget &&
             parentListOfDropTarget.children[evt.newIndex - 1] === dropTargetItemElement) {
-            // This is a strong indication: `draggedItem` is now at `evt.newIndex`,
-            // and the element at `evt.newIndex - 1` (right before it) is `dropTargetItemElement`.
-            // This means the user dropped "onto" `dropTargetItemElement` intending to make `draggedItem` its child.
-
-            newParentId = dropTargetItemElement.dataset.noteId; // `dropTargetItemElement` becomes the new parent.
-            newIndex = 0; // The `draggedItem` becomes the first child.
-            console.log(`Drop re-interpreted: ${draggedNoteId} to be child of ${newParentId} at index 0.`);
+            newParentId = dropTargetItemElement.dataset.noteId; 
+            newIndex = 0; 
         }
-        // If `dropTargetItemElement` already had children and the drop was into its `.outline-children`
-        // then `evt.to` would be that `.outline-children` div.
-        // In that case, `newParentIdCandidateEl` (which is `evt.to.closest('.outline-item')`)
-        // would correctly be `dropTargetItemElement`. The initial `newParentId` and `newIndex` are already correct.
-        // So the `if` condition above specifically targets the "make new child of item without children" or "drop onto parent content" case.
     }
 
-    // Calculate the newLevel based on the *final* newParentId.
-    if (newParentId === null) { // Dropped into the root outlineContainer
+    if (newParentId === null) { 
         newLevel = 0;
     } else {
-        // We need to find the DOM element of the determined new parent to get its level.
-        // It's safer to query the whole outlineContainer in case the parent is not immediately obvious from evt.to.
         const finalNewParentDomItem = outlineContainer.querySelector(`.outline-item[data-note-id="${newParentId}"]`);
         if (finalNewParentDomItem) {
             newLevel = parseInt(finalNewParentDomItem.dataset.level) + 1;
         } else {
-            console.error("Error: Could not find the final new parent DOM element for level calculation. Parent ID:", newParentId, "Reloading page.");
-            loadPage(currentPage.id); // Fallback to reload to prevent inconsistent state
+            console.error("Error: Could not find the final new parent DOM element for level calculation. Reloading page.");
+            loadPage(currentPage.id); 
             return;
         }
     }
 
-    // Optimistically update the data-level attribute for the dragged item and its children.
-    // This provides immediate visual feedback on the level change.
-    // The actual nesting will be fixed by the full page reload after successful save.
     updateDraggedItemLevel(draggedItem, newLevel);
 
     const updateData = {
         noteId: draggedNoteId,
         newParentId: newParentId,
         newIndex: newIndex,
-        oldParentId: oldParentId, // Kept for logging, not used by current backend reorder
-        oldIndex: oldIndex,       // Kept for logging
-        oldLevel: oldLevel        // Kept for logging
+        oldParentId: oldParentId, 
+        oldIndex: oldIndex,       
+        oldLevel: oldLevel        
     };
 
-    console.log('Note Drop Update Data:', JSON.stringify(updateData));
 
     if (!currentPage || !currentPage.id) {
         console.error("Current page information is not available. Cannot save reorder changes.");
         alert("Error: Current page context lost. Please refresh.");
-        // Attempt to recover by reloading to a known state, e.g., today's page
         const today = new Date().toISOString().split('T')[0];
         navigateToPage(today);
         return;
@@ -1461,7 +1437,7 @@ function handleNoteDrop(evt) {
         action: 'reorder_note',
         note_id: parseInt(draggedNoteId),
         new_parent_id: newParentId ? parseInt(newParentId) : null,
-        new_order: parseInt(newIndex), // This is the 'new_order' for the backend
+        new_order: parseInt(newIndex), 
         page_id: currentPage.id
     };
 
@@ -1475,20 +1451,15 @@ function handleNoteDrop(evt) {
         if (data.error) {
             console.error('Error reordering note:', data.error);
             alert('Error saving changes: ' + data.error + '. Please refresh.');
-            loadPage(currentPage.id); // Reload to ensure consistency from DB
+            loadPage(currentPage.id); 
         } else {
-            console.log('Note reordered successfully:', data);
-            // The DOM was partially updated (levels).
-            // Reloading the page is the most reliable way to ensure the UI
-            // fully reflects the database state, especially for new parent-child relationships
-            // and the creation of new .outline-children containers.
             loadPage(currentPage.id);
         }
     })
     .catch(error => {
         console.error('Fetch error during reorder:', error);
         alert('Network error while saving changes. Please refresh.');
-        loadPage(currentPage.id); // Reload on network error too
+        loadPage(currentPage.id); 
     });
 }
 
@@ -1496,7 +1467,7 @@ function handleNoteDrop(evt) {
 async function zoomOut() {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
-    window.breadcrumbPath = null; // Clear global breadcrumb path
+    window.breadcrumbPath = null; 
     
     document.getElementById('new-note').style.display = 'block';
     document.getElementById('backlinks-container').style.display = 'block';

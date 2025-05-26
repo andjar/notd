@@ -118,11 +118,12 @@ try {
                 }
                 
                 if ($data['action'] === 'delete') {
-                    if (!$id) {
-                        echo json_encode(['error' => 'Attachment ID required']);
+                    $attachmentIdToDelete = $data['id'] ?? null; // Get id from JSON data
+                    if (!$attachmentIdToDelete) {
+                        echo json_encode(['error' => 'Attachment ID required in JSON payload']);
                         break;
                     }
-                    echo json_encode(handleDelete($id));
+                    echo json_encode(handleDelete($attachmentIdToDelete)); // Pass the correct ID
                 } else {
                     echo json_encode(['error' => 'Invalid action']);
                 }

@@ -1,4 +1,18 @@
 <?php
+// Simulate GET request for CLI execution
+if (php_sapi_name() == 'cli') {
+    $_SERVER['REQUEST_METHOD'] = 'GET'; // Force request method for CLI
+    // Parse command line arguments into $_GET
+    if (isset($argv) && is_array($argv)) {
+        foreach ($argv as $arg) {
+            if (strpos($arg, '=') !== false) {
+                list($key, $value) = explode('=', $arg, 2);
+                $_GET[$key] = $value;
+            }
+        }
+    }
+}
+
 header('Content-Type: application/json');
 
 // Set error handling for this script (consistent with others)
@@ -24,36 +38,64 @@ if (!$db->exec('PRAGMA foreign_keys = ON;')) {
 function searchNotes($query) {
     global $db;
     
-    // Search in notes content
-    $stmt = $db->prepare('
-        SELECT n.*, p.title as page_title, p.id as page_id,
-               GROUP_CONCAT(prop.property_key || ":" || prop.property_value) as properties
-        FROM notes n
+    // Search using FTS5
+    // The fts.rank column is implicitly available from FTS5 and indicates relevance.
+    $sql = '
+        SELECT n.id, n.content, n.page_id, n.block_id, n.created_at, n.updated_at,
+               p.title as page_title, 
+               (SELECT GROUP_CONCAT(prop.property_key || ":" || prop.property_value) 
+                FROM properties prop 
+                WHERE prop.note_id = n.id AND prop.page_id IS NULL) as properties_concat,
+               fts.rank -- Include FTS rank for ordering
+        FROM notes_fts fts
+        JOIN notes n ON fts.note_id = n.id
         JOIN pages p ON n.page_id = p.id
-        LEFT JOIN properties prop ON n.id = prop.note_id
-        WHERE n.content LIKE :query
-        GROUP BY n.id
-        ORDER BY n.updated_at DESC
+        WHERE fts.notes_fts MATCH :query -- Match against the FTS table virtual column
+        GROUP BY n.id -- Group by note ID to ensure unique notes if properties join duplicates
+        ORDER BY fts.rank, n.updated_at DESC -- Order by relevance, then by update date
         LIMIT 50
-    ');
+    ';
     
-    $stmt->bindValue(':query', '%' . $query . '%', SQLITE3_TEXT);
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        // Fallback or error handling if FTS query preparation fails
+        // For now, let's log and return empty, or could throw an exception.
+        error_log("Failed to prepare FTS search statement: " . $db->lastErrorMsg());
+        // Potentially fallback to LIKE search if FTS not available/working
+        // For this task, we assume FTS is the primary path.
+        return [];
+    }
+    
+    // For FTS MATCH, we don't use '%' wildcards like in LIKE
+    $stmt->bindValue(':query', $query, SQLITE3_TEXT);
     $result = $stmt->execute();
+    
+    if (!$result) {
+        error_log("Failed to execute FTS search: " . $db->lastErrorMsg());
+        return [];
+    }
     
     $notes = [];
     while ($note = $result->fetchArray(SQLITE3_ASSOC)) {
         // Parse properties
         $properties = [];
-        if ($note['properties']) {
-            foreach (explode(',', $note['properties']) as $prop) {
-                list($key, $value) = explode(':', $prop, 2);
-                $properties[$key] = $value;
+        if (isset($note['properties_concat']) && $note['properties_concat']) {
+            foreach (explode(',', $note['properties_concat']) as $propPair) {
+                // Ensure there's a colon before splitting
+                if (strpos($propPair, ':') !== false) {
+                    list($key, $value) = explode(':', $propPair, 2);
+                    $properties[$key] = $value;
+                }
             }
         }
         $note['properties'] = $properties;
+        unset($note['properties_concat']); // Clean up the concatenated string
+        // The 'rank' column is available in $note if needed, but not explicitly used in the final $note structure here.
         
         // Add context (parent notes)
-        $context = getNoteContext($note['id']);
+        // The getNoteContext function signature was updated in a previous subtask
+        // getNoteContext($noteId, $maxDepth = 5)
+        $context = getNoteContext($note['id'], 3); // Fetch up to 3 levels of parent context
         $note['context'] = $context;
         
         $notes[] = $note;
@@ -62,31 +104,55 @@ function searchNotes($query) {
     return $notes;
 }
 
-function getNoteContext($noteId) {
+function getNoteContext($noteId, $maxDepth = 5) { // Signature from previous subtask
     global $db;
     
     $context = [];
-    $currentId = $noteId;
+    $currentNoteIdForParentLookup = $noteId; 
+    $currentDepth = 0;
     
-    while ($currentId) {
-        $stmt = $db->prepare('
-            SELECT id, content, parent_id
+    while ($currentNoteIdForParentLookup && $currentDepth < $maxDepth) {
+        $stmtParentId = $db->prepare('SELECT parent_id FROM notes WHERE id = :id');
+        if (!$stmtParentId) {
+            error_log("Failed to prepare parent_id lookup: " . $db->lastErrorMsg());
+            break;
+        }
+        $stmtParentId->bindValue(':id', $currentNoteIdForParentLookup, SQLITE3_INTEGER);
+        $parentIdResult = $stmtParentId->execute();
+        $parentRow = $parentIdResult->fetchArray(SQLITE3_ASSOC);
+        $stmtParentId->close(); 
+
+        if (!$parentRow || $parentRow['parent_id'] === null) {
+            break; 
+        }
+        
+        $parentId = $parentRow['parent_id'];
+
+        $stmtParentDetails = $db->prepare('
+            SELECT id, content
             FROM notes
-            WHERE id = :id
+            WHERE id = :parent_id
         ');
+        if (!$stmtParentDetails) {
+            error_log("Failed to prepare parent_details lookup: " . $db->lastErrorMsg());
+            break;
+        }
+        $stmtParentDetails->bindValue(':parent_id', $parentId, SQLITE3_INTEGER);
+        $parentDetailsResult = $stmtParentDetails->execute();
+        $parentNote = $parentDetailsResult->fetchArray(SQLITE3_ASSOC);
+        $stmtParentDetails->close(); 
         
-        $stmt->bindValue(':id', $currentId, SQLITE3_INTEGER);
-        $result = $stmt->execute();
-        $note = $result->fetchArray(SQLITE3_ASSOC);
-        
-        if (!$note) break;
+        if (!$parentNote) {
+            break; 
+        }
         
         array_unshift($context, [
-            'id' => $note['id'],
-            'content' => $note['content']
+            'id' => $parentNote['id'],
+            'content' => $parentNote['content']
         ]);
         
-        $currentId = $note['parent_id'];
+        $currentNoteIdForParentLookup = $parentId; 
+        $currentDepth++;
     }
     
     return $context;
