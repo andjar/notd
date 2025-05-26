@@ -1,6 +1,12 @@
 <?php
 header('Content-Type: application/json');
 
+// Set error handling
+error_reporting(E_ERROR);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/../logs/php_errors.log');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
@@ -56,7 +62,7 @@ if ($noteId) {
         
         // Enable foreign key constraints for this connection (optional but good practice)
         if (!$db->exec('PRAGMA foreign_keys = ON;')) {
-            error_log("Notice: Attempted to enable foreign_keys for image.php. Check SQLite logs if issues persist.");
+            // error_log("Notice: Attempted to enable foreign_keys for image.php. Check SQLite logs if issues persist.");
         }
 
         $stmt = $db->prepare('INSERT INTO attachments (note_id, filename, original_name, file_path, mime_type, size) VALUES (:note_id, :filename, :original_name, :file_path, :mime_type, :size)');

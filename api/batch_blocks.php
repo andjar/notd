@@ -14,7 +14,7 @@ if (php_sapi_name() == 'cli') {
 }
 
 header('Content-Type: application/json');
-error_reporting(E_ALL);
+error_reporting(E_ERROR);
 ini_set('display_errors', 0); // Disable displaying errors to the client
 ini_set('log_errors', 1);
 error_log(__DIR__ . '/../logs/php_errors.log');
@@ -28,7 +28,7 @@ try {
     }
     $db->busyTimeout(5000);
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
-        error_log("Notice: Attempted to enable foreign_keys for batch_blocks.php. Check SQLite logs if issues persist with FKs.");
+        // error_log("Notice: Attempted to enable foreign_keys for batch_blocks.php. Check SQLite logs if issues persist with FKs.");
     }
 
     if (!isset($_GET['ids']) || empty($_GET['ids'])) {

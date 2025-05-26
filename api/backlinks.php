@@ -20,7 +20,7 @@ ob_start(); // Start output buffering
 header('Content-Type: application/json');
 
 // Set error handling for this script
-error_reporting(E_ALL);
+error_reporting(E_ERROR);
 ini_set('display_errors', 0); // Errors should be logged, not displayed for API
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Consistent error logging
@@ -56,7 +56,7 @@ try {
         // For PDO, exec() returns the number of rows affected. For PRAGMA, this might be 0 or 1.
         // A failure here is unlikely to throw an exception unless ATTR_ERRMODE is set to ERRMODE_EXCEPTION and the PRAGMA itself is malformed.
         // If it returns false, it indicates failure.
-        error_log("Notice: Attempted to enable foreign_keys for backlinks.php. Check SQLite logs if issues persist with FKs.");
+        // error_log("Notice: Attempted to enable foreign_keys for backlinks.php. Check SQLite logs if issues persist with FKs.");
         // Depending on strictness, one might throw an exception here if exec returns false.
     }
 

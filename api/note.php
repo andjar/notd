@@ -32,7 +32,7 @@ if (php_sapi_name() == 'cli') {
 ob_start();
 
 // Set error handling
-error_reporting(E_ALL);
+error_reporting(E_ERROR);
 ini_set('display_errors', 0); // Display errors are off, check log file
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Use absolute path for log
@@ -60,7 +60,7 @@ try {
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
         // Log or handle error if PRAGMA command fails, though it usually doesn't throw on its own.
         // Check $db->lastErrorCode() or $db->lastErrorMsg() if needed, but for now, assume it works or rely on subsequent FK errors.
-        error_log("Notice: Attempted to enable foreign_keys. Check SQLite logs if issues persist with FKs.");
+        // error_log("Notice: Attempted to enable foreign_keys. Check SQLite logs if issues persist with FKs.");
     }
 
     // Helper function to ensure a page exists, creating it if not.
@@ -68,30 +68,30 @@ try {
         // Check for existing page
         $stmt = $db->prepare('SELECT id FROM pages WHERE id = :pageId');
         if (!$stmt) {
-            error_log("Error preparing statement to check page '{$pageId}': " . $db->lastErrorMsg());
+            // error_log("Error preparing statement to check page '{$pageId}': " . $db->lastErrorMsg());
             return false;
         }
         $stmt->bindValue(':pageId', $pageId, SQLITE3_TEXT);
         $result = $stmt->execute();
 
         if (!$result) {
-            error_log("Error checking existence of page '{$pageId}': " . $db->lastErrorMsg());
+            // error_log("Error checking existence of page '{$pageId}': " . $db->lastErrorMsg());
             $stmt->close();
             return false;
         }
 
         if ($result->fetchArray(SQLITE3_ASSOC)) {
-            error_log("Page '{$pageId}' already exists.");
+            // error_log("Page '{$pageId}' already exists.");
             $stmt->close();
             return true;
         }
         $stmt->close(); // Close select statement before preparing insert
 
         // Create new page if not found
-        error_log("Page '{$pageId}' not found, creating it.");
+        // error_log("Page '{$pageId}' not found, creating it.");
         $insertStmt = $db->prepare('INSERT INTO pages (id, title, type) VALUES (:id, :title, :type)');
         if (!$insertStmt) {
-            error_log("Error preparing statement to create page '{$pageId}': " . $db->lastErrorMsg());
+            // error_log("Error preparing statement to create page '{$pageId}': " . $db->lastErrorMsg());
             return false;
         }
         $insertStmt->bindValue(':id', $pageId, SQLITE3_TEXT);
@@ -99,11 +99,11 @@ try {
         $insertStmt->bindValue(':type', 'note', SQLITE3_TEXT);   // Default type
 
         if ($insertStmt->execute()) {
-            error_log("Page '{$pageId}' created successfully.");
+            // error_log("Page '{$pageId}' created successfully.");
             $insertStmt->close();
             return true;
         } else {
-            error_log("Error creating page '{$pageId}': " . $db->lastErrorMsg());
+            // error_log("Error creating page '{$pageId}': " . $db->lastErrorMsg());
             $insertStmt->close();
             return false;
         }
@@ -142,7 +142,7 @@ try {
 
                     // Ensure the target page exists or is created before adding the link
                     if (!_ensurePageExists($targetPageId, $db)) {
-                        error_log("Could not ensure page '{$targetPageId}' exists or be created. Skipping link from Note ID {$noteId}.");
+                        // error_log("Could not ensure page '{$targetPageId}' exists or be created. Skipping link from Note ID {$noteId}.");
                         continue; // Skip this link
                     }
                     
@@ -155,7 +155,7 @@ try {
                     if (!$stmt->execute()) {
                         // This should ideally not happen now if FKs are on and _ensurePageExists worked,
                         // but other errors could occur (e.g., unique constraint if re-adding same link, though unlikely here)
-                        error_log('Failed to insert page_link for Note ID {$noteId} to target "' . $targetPageId . '": ' . $db->lastErrorMsg());
+                        // error_log('Failed to insert page_link for Note ID {$noteId} to target "' . $targetPageId . '": ' . $db->lastErrorMsg());
                         // Decide if this should throw an exception or just log and continue
                         // For now, consistent with previous behavior of throwing on insert failure:
                         throw new Exception('Failed to insert page_link for target "' . $targetPageId . '": ' . $db->lastErrorMsg());
@@ -168,7 +168,7 @@ try {
     function createNote($data) {
         global $db;
         
-        error_log("Creating note with data: " . json_encode($data));
+        // error_log("Creating note with data: " . json_encode($data));
         
         $db->exec('BEGIN TRANSACTION');
         
@@ -246,7 +246,7 @@ try {
             }
             
             $db->exec('COMMIT');
-            error_log("Note created successfully with ID: " . $noteId);
+            // error_log("Note created successfully with ID: " . $noteId);
             return ['id' => $noteId, 'block_id' => $blockId];
         } catch (Exception $e) {
             $db->exec('ROLLBACK');
@@ -338,7 +338,7 @@ try {
             }
             
             $db->exec('COMMIT');
-            error_log("Note updated successfully with ID: " . $id);
+            // error_log("Note updated successfully with ID: " . $id);
             return ['success' => true];
         } catch (Exception $e) {
             $db->exec('ROLLBACK');
@@ -394,7 +394,7 @@ try {
             // and the DB supports it for recursive deletes (SQLite does).
             
             $db->exec('COMMIT');
-            error_log("Note(s) deleted successfully starting with ID: " . $id);
+            // error_log("Note(s) deleted successfully starting with ID: " . $id);
             return ['success' => true];
         } catch (Exception $e) {
             $db->exec('ROLLBACK');
@@ -407,22 +407,22 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
     $id = $_GET['id'] ?? null;
 
-    error_log("Request received - Method: $method, ID: $id");
+    // error_log("Request received - Method: $method, ID: $id");
 
     if ($method === 'POST') {
         $input = '';
         if (php_sapi_name() == 'cli' && isset($GLOBALS['cliInputPayload'])) {
             $input = $GLOBALS['cliInputPayload'];
-            error_log("api/note.php: Using PHP_INPUT_PAYLOAD (CLI mode) for POST data: " . $input);
+            // error_log("api/note.php: Using PHP_INPUT_PAYLOAD (CLI mode) for POST data: " . $input);
         } else {
             $input = file_get_contents('php://input');
         }
-        error_log('api/note.php: Raw POST input: ' . $input); // Log it
+        // error_log('api/note.php: Raw POST input: ' . $input); // Log it
         
         $data = json_decode($input, true);
-        error_log('api/note.php: Decoded data: ' . print_r($data, true));
+        // error_log('api/note.php: Decoded data: ' . print_r($data, true));
         if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log('api/note.php: JSON decode error: ' . json_last_error_msg());
+            // error_log('api/note.php: JSON decode error: ' . json_last_error_msg());
             throw new Exception('Invalid JSON: ' . json_last_error_msg());
         }
         
@@ -433,12 +433,12 @@ try {
             // Or if $input is an empty JSON object "{}", $data is an empty array.
             // Explicitly checking if $data is falsey (null, false, empty array if that's considered invalid) might be intended.
             // For now, the original logic is kept, but with added logging.
-            error_log('api/note.php: $data is empty or invalid after decoding. Input was: ' . $input);
+            // error_log('api/note.php: $data is empty or invalid after decoding. Input was: ' . $input);
             throw new Exception('Invalid data - POST data decoded to empty or invalid structure.');
         }
 
         $action = $data['action'] ?? 'create'; // Default to 'create' if no action specified
-        error_log('api/note.php: Action determined: ' . $action);
+        // error_log('api/note.php: Action determined: ' . $action);
         
         switch ($action) {
             case 'create':
@@ -473,14 +473,14 @@ try {
                 throw new Exception('Invalid action');
         }
         
-        error_log('api/note.php: Encoding SUCCESS response: ' . print_r($result, true));
+        // error_log('api/note.php: Encoding SUCCESS response: ' . print_r($result, true));
         echo json_encode($result);
     } else {
         // For GET or other methods not explicitly handled by POST logic
         // This path should ideally not be reached if specific handlers for GET, etc., are defined
         // or if a general "Method not allowed" is thrown earlier for non-POST requests.
         // However, if it's reached, it implies a logic flaw or unhandled method.
-        error_log('api/note.php: Reached unhandled method: ' . $method . ' in main try block.');
+        // error_log('api/note.php: Reached unhandled method: ' . $method . ' in main try block.');
         throw new Exception('Method not allowed: ' . $method);
     }
 } catch (Throwable $e) { // Changed from Exception to Throwable to catch Errors as well
@@ -516,7 +516,7 @@ try {
         http_response_code(500); 
     }
     
-    error_log('api/note.php: Encoding ERROR response: ' . print_r($errorResponseArray, true));
+    // error_log('api/note.php: Encoding ERROR response: ' . print_r($errorResponseArray, true));
     echo json_encode($errorResponseArray);
 } finally {
     if (isset($db)) {
@@ -534,7 +534,7 @@ try {
 
 function reorderNote($data) {
     global $db;
-    error_log("Reordering note with data: " . json_encode($data));
+    // error_log("Reordering note with data: " . json_encode($data));
 
     $note_id = $data['note_id'];
     $new_parent_id = $data['new_parent_id'];
@@ -595,7 +595,7 @@ function reorderNote($data) {
         if (!$stmt_update->execute()) throw new Exception('Failed to execute update: ' . $db->lastErrorMsg());
 
         $db->exec('COMMIT');
-        error_log("Note reordered successfully for note ID: " . $note_id);
+        // error_log("Note reordered successfully for note ID: " . $note_id);
         return ['success' => true];
     } catch (Exception $e) {
         $db->exec('ROLLBACK');

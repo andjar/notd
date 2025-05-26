@@ -16,7 +16,7 @@ if (php_sapi_name() == 'cli') {
 header('Content-Type: application/json');
 
 // Set error handling for this script (consistent with others)
-error_reporting(E_ALL);
+error_reporting(E_ERROR);
 ini_set('display_errors', 0); // Errors should be logged, not displayed for API
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/php_errors.log'); // Consistent error logging
@@ -32,7 +32,7 @@ $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
 
 // Enable foreign key constraints for this connection
 if (!$db->exec('PRAGMA foreign_keys = ON;')) {
-    error_log("Notice: Attempted to enable foreign_keys for search.php. Check SQLite logs if issues persist with FKs.");
+    // error_log("Notice: Attempted to enable foreign_keys for search.php. Check SQLite logs if issues persist with FKs.");
 }
 
 function searchNotes($query) {

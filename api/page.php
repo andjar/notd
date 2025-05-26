@@ -14,7 +14,7 @@ if (php_sapi_name() == 'cli') {
 }
 
 header('Content-Type: application/json');
-error_reporting(E_ALL);
+error_reporting(E_ERROR);
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 error_log(__DIR__ . '/../logs/php_errors.log');
@@ -27,13 +27,13 @@ try {
     $db->busyTimeout(5000); // Set busy timeout to 5000 milliseconds (5 seconds)
     // Enable foreign key constraints for this connection
     if (!$db->exec('PRAGMA foreign_keys = ON;')) {
-        error_log("Notice: Attempted to enable foreign_keys for page.php. Check SQLite logs if issues persist with FKs.");
+        // error_log("Notice: Attempted to enable foreign_keys for page.php. Check SQLite logs if issues persist with FKs.");
     }
 
     function getPage($id) {
         global $db;
         
-        error_log("Getting page with ID: " . $id);
+        // error_log("Getting page with ID: " . $id);
         
         // Get page details
         $stmt = $db->prepare('SELECT * FROM pages WHERE id = :id');
@@ -50,7 +50,7 @@ try {
         $page = $result->fetchArray(SQLITE3_ASSOC);
         
         if (!$page) {
-            error_log("Page not found, creating new page: " . $id);
+            // error_log("Page not found, creating new page: " . $id);
             // If page doesn't exist, create it
             $db->exec('BEGIN TRANSACTION');
             
@@ -118,7 +118,7 @@ try {
             }
         }
         
-        error_log("Page data retrieved: " . json_encode($page));
+        // error_log("Page data retrieved: " . json_encode($page));
         
         // Get page properties
         $stmt = $db->prepare('
@@ -142,7 +142,7 @@ try {
         }
         $page['properties'] = $properties;
         
-        error_log("Properties retrieved: " . json_encode($properties));
+        // error_log("Properties retrieved: " . json_encode($properties));
 
         // 1. Fetch all notes for the page
         $stmt = $db->prepare('
@@ -168,7 +168,7 @@ try {
             $allNotesFlat[$note['id']] = $note;
             $noteIds[] = $note['id'];
         }
-        error_log("All notes fetched. Count: " . count($allNotesFlat));
+        // error_log("All notes fetched. Count: " . count($allNotesFlat));
 
         if (!empty($noteIds)) {
             // Create a string of placeholders for the IN clause
@@ -196,7 +196,7 @@ try {
                     $allNotesFlat[$prop['note_id']]['properties'][$prop['property_key']] = $prop['property_value'];
                 }
             }
-            error_log("All properties for notes fetched and mapped.");
+            // error_log("All properties for notes fetched and mapped.");
 
             // 3. Fetch all attachments for these notes
             $sqlAttachments = "
@@ -226,7 +226,7 @@ try {
                     $allNotesFlat[$attachment['note_id']]['attachments'][] = $attachmentData;
                 }
             }
-            error_log("All attachments for notes fetched and mapped.");
+            // error_log("All attachments for notes fetched and mapped.");
         }
         
         // Helper function to build the tree and assign levels
@@ -268,7 +268,7 @@ try {
         $hierarchicalNotes = buildTreeWithLevels($allNotesFlat, null, 0);
         
         $page['notes'] = $hierarchicalNotes;
-        error_log("Notes retrieved and structured: " . json_encode($hierarchicalNotes));
+        // error_log("Notes retrieved and structured: " . json_encode($hierarchicalNotes));
         
         return $page;
     }
@@ -284,7 +284,7 @@ try {
         global $db;
         
         try {
-            error_log("Creating page with data: " . json_encode($data));
+            // error_log("Creating page with data: " . json_encode($data));
             
             $db->exec('BEGIN TRANSACTION');
             
@@ -302,11 +302,11 @@ try {
                 throw new Exception('Failed to create page: ' . $db->lastErrorMsg());
             }
             
-            error_log("Page created successfully");
+            // error_log("Page created successfully");
             
             // Insert properties if any
             if (isset($data['properties']) && !empty($data['properties'])) {
-                error_log("Properties to insert: " . json_encode($data['properties']));
+                // error_log("Properties to insert: " . json_encode($data['properties']));
                 
                 $stmt = $db->prepare('
                     INSERT INTO properties (page_id, property_key, property_value)
@@ -314,7 +314,7 @@ try {
                 ');
                 
                 foreach ($data['properties'] as $key => $value) {
-                    error_log("Inserting property - page_id: {$data['id']}, key: $key, value: $value");
+                    // error_log("Inserting property - page_id: {$data['id']}, key: $key, value: $value");
                     
                     $stmt->bindValue(':page_id', $data['id'], SQLITE3_TEXT);
                     $stmt->bindValue(':key', $key, SQLITE3_TEXT);
@@ -323,17 +323,17 @@ try {
                     if (!$stmt->execute()) {
                         throw new Exception('Failed to insert property ' . $key . ': ' . $db->lastErrorMsg());
                     }
-                    error_log("Property inserted successfully");
+                    // error_log("Property inserted successfully");
                 }
             } else {
-                error_log("No properties to insert");
+                // error_log("No properties to insert");
             }
             
             $db->exec('COMMIT');
-            error_log("Transaction committed successfully");
+            // error_log("Transaction committed successfully");
             
             $result = getPage($data['id']);
-            error_log("Final page data: " . json_encode($result));
+            // error_log("Final page data: " . json_encode($result));
             return $result;
         } catch (Exception $e) {
             $db->exec('ROLLBACK');
@@ -346,8 +346,8 @@ try {
         global $db;
         
         try {
-            error_log('Updating page: ' . $id);
-            error_log('Data received: ' . json_encode($data));
+            // error_log('Updating page: ' . $id);
+            // error_log('Data received: ' . json_encode($data));
             
             $db->exec('BEGIN TRANSACTION');
             
@@ -370,7 +370,7 @@ try {
             
             // Update properties if provided
             if (isset($data['properties'])) {
-                error_log('Updating properties: ' . json_encode($data['properties']));
+                // error_log('Updating properties: ' . json_encode($data['properties']));
                 
                 // Delete existing properties
                 $stmt = $db->prepare('DELETE FROM properties WHERE page_id = :page_id');
@@ -387,7 +387,7 @@ try {
                     ');
                     
                     foreach ($data['properties'] as $key => $value) {
-                        error_log("Inserting property: $key = $value");
+                        // error_log("Inserting property: $key = $value");
                         $stmt->bindValue(':page_id', $id, SQLITE3_TEXT);
                         $stmt->bindValue(':key', $key, SQLITE3_TEXT);
                         $stmt->bindValue(':value', $value, SQLITE3_TEXT);
@@ -400,7 +400,7 @@ try {
             }
             
             $db->exec('COMMIT');
-            error_log('Page update successful');
+            // error_log('Page update successful');
             return getPage($id);
         } catch (Exception $e) {
             $db->exec('ROLLBACK');
@@ -413,11 +413,11 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
     $id = $_GET['id'] ?? null;
 
-    error_log("Request received - Method: $method, ID: $id");
+    // error_log("Request received - Method: $method, ID: $id");
 
     if ($method === 'POST') {
         $input = file_get_contents('php://input');
-        error_log("Received input: " . $input);
+        // error_log("Received input: " . $input);
         
         $data = json_decode($input, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -446,14 +446,14 @@ try {
                 throw new Exception('Invalid action');
         }
         
-        error_log("Sending response: " . json_encode($result));
+        // error_log("Sending response: " . json_encode($result));
         echo json_encode($result);
     } else if ($method === 'GET') {
         if (!$id) {
             throw new Exception('Page ID required');
         }
         $result = getPage($id);
-        error_log("Sending response: " . json_encode($result));
+        // error_log("Sending response: " . json_encode($result));
         echo json_encode($result);
     } else {
         throw new Exception('Method not allowed');
