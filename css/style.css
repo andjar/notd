@@ -28,12 +28,13 @@
 
     /* --- Compact UI & Threading Variables --- */
     --indentation-unit: 1.8em; 
-    --control-icon-size: 16px;     
+    --control-icon-size: 1em;     
     --arrow-visual-size: 0.75em;   
-    --bullet-visual-size: 6px;     
-    --controls-top-offset: 0.75em; 
+    --bullet-visual-size: 7px;     
+    --controls-top-offset-level0: 1.25em;
+    --controls-top-offset-children: 1em;
     --arrow-left-indent: -1.7em;   
-    --bullet-left-indent: -0.7em;  
+    --bullet-left-indent: -0.65em;  
     --thread-line-width: 1px; 
     --note-compact-margin-bottom: 0.2rem;
     --note-content-compact-padding-y: 2px; 
@@ -192,10 +193,13 @@ body {
 .page-property .property-value { color: var(--text-color); }
 
 /* --- Outline Item & Content Structure --- */
-.outline-item { position: relative; margin-bottom: var(--note-compact-margin-bottom); }
+.outline-item { 
+    position: relative; 
+    margin-bottom: var(--note-compact-margin-bottom); 
+}
 .outline-children {
     padding-left: var(--indentation-unit);
-    position: relative; /* For thread line positioning if needed for children lines */
+    position: relative; 
 }
 
 .outline-content {  
@@ -203,20 +207,40 @@ body {
     padding: var(--note-content-compact-padding-y) 0 var(--note-content-compact-padding-y) 0.5em; 
     border: none; position: relative; color: var(--note-text-color);
     overflow: visible; 
-    min-height: calc(var(--controls-top-offset) + (var(--control-icon-size) / 2) + var(--note-content-compact-padding-y));
+    min-height: calc(var(--controls-top-offset-children) + (var(--control-icon-size) / 2) + var(--note-content-compact-padding-y));
 }
 .static-bullet, .hover-arrow-toggle {
-    position: absolute; top: var(--controls-top-offset); transform: translateY(-50%); 
-    width: var(--control-icon-size); height: var(--control-icon-size);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; z-index: 2; 
+    position: absolute; 
+    top: var(--controls-top-offset-children); /* Default to children's offset */
+    transform: translateY(-50%); 
+    width: var(--control-icon-size); 
+    height: var(--control-icon-size);
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    cursor: pointer; 
+    z-index: 2; 
     transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out;
     border-radius: 50%; 
 }
-.static-bullet { left: var(--bullet-left-indent); }
+
+/* Override bullet/arrow 'top' for level-0 items */
+#outline-container > .outline-item > .outline-content > .static-bullet,
+#outline-container > .outline-item > .outline-content > .hover-arrow-toggle {
+    top: var(--controls-top-offset-level0); /* Override for level 0 items */
+}
+
+.static-bullet { 
+    left: var(--bullet-left-indent); 
+}
 .static-bullet::before { 
-    content: ''; display: block; width: var(--bullet-visual-size); height: var(--bullet-visual-size);
-    background-color: var(--bullet-color); border-radius: 50%; transition: all 0.2s ease-in-out;
+    content: ''; 
+    display: block; 
+    width: var(--bullet-visual-size); 
+    height: var(--bullet-visual-size);
+    background-color: var(--bullet-color); 
+    border-radius: 50%; 
+    transition: all 0.2s ease-in-out;
 }
 .outline-item:hover > .outline-content .static-bullet::before,
 .static-bullet:hover::before { background-color: var(--accent-color); }
@@ -234,11 +258,23 @@ body {
 .outline-item.has-children.children-hidden > .outline-content .hover-arrow-toggle .arrow-svg { transform: rotate(0deg); }
 .outline-item {position: relative;}
 .outline-item.has-children::after {
-    content: ""; position: absolute;
+    content: ""; 
+    position: absolute;
+    /* Horizontal alignment for thread line - this should center it with the bullet's container */
     left: calc(var(--bullet-left-indent) + (var(--control-icon-size) / 2) - (var(--thread-line-width) / 2)); 
-    top: calc(var(--controls-top-offset) + (var(--bullet-visual-size) / 2) + 3px); 
+    /* Vertical alignment for thread line - uses children's offset */
+    top: calc(var(--controls-top-offset-children) + (var(--bullet-visual-size) / 2) + 3px); 
     bottom: calc( (var(--note-content-compact-padding-y) * -1) - (var(--note-compact-margin-bottom)/2) );
-    width: var(--thread-line-width); background-color: var(--thread-line-color); z-index: 5; 
+    width: var(--thread-line-width); 
+    background-color: var(--thread-line-color); 
+    z-index: 5; 
+}
+.outline-item.has-children:hover::after { background-color: var(--accent-color); }
+
+/* Override thread line 'top' for top-level items */
+#outline-container > .outline-item.has-children::after {
+    /* Vertical alignment for thread line on level-0 items - uses level0 offset */
+    top: calc(var(--controls-top-offset-level0) + (var(--bullet-visual-size) / 2) + 3px); 
 }
 .outline-item.has-children:hover::after { background-color: var(--accent-color); }
 .outline-item.children-hidden > .outline-children {
@@ -274,7 +310,11 @@ body {
 .note-actions button:hover { opacity: 1; background: var(--hover-color); color: var(--accent-color); }
 .note-actions button[data-action="delete"]:hover { color: #e74c3c; background-color: #fff0f0; }
 .note-actions .actions-separator { margin: 0 4px; color: var(--border-color); }
-.note-date { display: inline; font-size: 0.8em; color: var(--text-muted); }
+.note-actions .note-date {
+    color: #888; /* Example muted color */
+    font-size: 0.85em; /* Example smaller size */
+    margin-left: 5px; /* A little space after the "|" */
+}
 /* Tags #tag or property-tag */
 a.property-tag, span.property-tag {
     display: inline-flex; align-items: center; padding: 1px 5px; /* Slightly less padding */
@@ -553,19 +593,20 @@ a.block-ref-link:hover {
     display: flex; /* Added for alignment */
     align-items: center; /* Added for alignment */
 }
-.todo-checkbox { /* Will not be used if we follow Logseq's marker approach */
-    /* display: flex; align-items: center; cursor: pointer; */
-}
 .todo-checkbox input[type="checkbox"] {
-    margin-right: 0.4em; /* Space between checkbox and marker */
+    margin-right: 0.6em; /* Space between checkbox and marker */
     cursor: pointer;
-    transform: scale(1); /* Default size is fine */
+    transform: scale(1.5); /* Default size is fine */
     vertical-align: middle; /* Better alignment with text */
+    border-radius: 0px;
+    accent-color: var(--done-bg-color);
+    border: 1px solid var(--done-text-color);
 }
 .todo-marker {
     display: inline-block;
+    color: var(--done-text-color);
+    opacity: 0.8;
     padding: 1px 6px; /* Logseq-like padding */
-    border-radius: var(--radius-sm);
     font-weight: 500; 
     font-size: 0.75em; /* Smaller than main text */
     margin-right: 0.4em;
@@ -573,6 +614,9 @@ a.block-ref-link:hover {
     text-transform: uppercase;
     line-height: 1.4; /* Ensure it aligns well vertically */
     vertical-align: middle;
+}
+.todo-checkbox input[type="checkbox"]:checked {
+    border-color: var(--done-text-color); /* Match accent when checked */
 }
 .todo-marker.status-todo {
     background-color: var(--todo-bg-color);
@@ -592,10 +636,6 @@ a.block-ref-link:hover {
     text-decoration: line-through;
     color: var(--text-muted);
     opacity: 0.8; /* Slightly faded */
-}
-.todo-item .todo-checkbox .status-todo, 
-.todo-item .todo-checkbox .status-done {
-    /* These were for the old structure, might not be needed if text is in .todo-text */
 }
 
 /* Image Modal for full-size preview */
@@ -660,4 +700,16 @@ a.block-ref-link:hover {
     background-color: rgba(49, 130, 206, 0.05); /* Subtle blue, from accent */
     outline: 1px dashed var(--accent-color);
     outline-offset: -2px; /* Pull outline inwards */
+}
+
+.block-keyboard-focus > .outline-content {
+    /* Using a more distinct outline than just for hover */
+    outline: 2px solid var(--accent-color);
+    outline-offset: -1px; /* Pull it slightly inwards */
+    box-shadow: 0 0 5px rgba(49, 130, 206, 0.3); /* Subtle glow */
+}
+.block-keyboard-focus > .outline-children > .note-editor-wrapper > .note-editor {
+     /* If an editor is a direct child, don't let it get focus outline from parent */
+    outline: none;
+    box-shadow: var(--shadow-md); /* Keep its own shadow */
 }

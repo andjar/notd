@@ -13,6 +13,8 @@ let currentPage = null;
 let recentPages = [];
 let prefetchedBlocks = {}; // Cache for prefetched blocks for the current page load
 let noteTemplates = {};
+let activeBlockElement = null; // For keyboard navigation
+let isEditorOpen = false;      // To track if a textarea editor is active
 
 // Load templates
 async function loadTemplates() {
@@ -39,7 +41,7 @@ async function navigateToPage(pageId) {
     const currentHash = window.location.hash.substring(1);
 
     if (currentHash === targetHash) {
-        await loadPage(targetHash);
+        await loadPage(targetHash); // Reload if same page
     } else {
         window.location.hash = targetHash;
     }
@@ -60,7 +62,7 @@ document.getElementById('home-button').addEventListener('click', async (e) => {
     e.preventDefault();
     const today = new Date().toISOString().split('T')[0];
     if (document.body.classList.contains('logseq-focus-active')) {
-        await zoomOut(); 
+        await zoomOut();
     }
     navigateToPage(today);
 });
@@ -70,9 +72,10 @@ window.addEventListener('hashchange', () => {
     const pageId = window.location.hash.substring(1);
     if (pageId === 'search-results') {
         showSearchResults();
-    } else if (pageId) { 
+    } else if (pageId) {
+        clearActiveBlock(); // Clear active block on page change
         loadPage(pageId);
-    } else { 
+    } else {
         const today = new Date().toISOString().split('T')[0];
         navigateToPage(today);
     }
@@ -82,15 +85,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadTemplates();
     loadRecentPages();
     initCalendar();
+    document.addEventListener('keydown', handleGlobalKeyDown); // Add global keydown listener
     const initialHash = window.location.hash.substring(1);
     if (!initialHash) {
         const today = new Date().toISOString().split('T')[0];
-        navigateToPage(today); 
+        navigateToPage(today);
     } else {
         if (initialHash === 'search-results') {
             showSearchResults();
         } else {
-            navigateToPage(initialHash); 
+            navigateToPage(initialHash);
         }
     }
 });
@@ -108,21 +112,45 @@ function debounce(func, wait) {
     };
 }
 
+function setActiveBlock(element, scrollIntoView = true) {
+    if (activeBlockElement) {
+        activeBlockElement.classList.remove('block-keyboard-focus');
+    }
+    activeBlockElement = element;
+    if (activeBlockElement) {
+        activeBlockElement.classList.add('block-keyboard-focus');
+        if (scrollIntoView) {
+            // Check if the element is an editor wrapper or content and scroll appropriately
+            const targetToScroll = activeBlockElement.querySelector('.note-textarea') || activeBlockElement;
+            targetToScroll.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+}
+
+function clearActiveBlock() {
+    if (activeBlockElement) {
+        activeBlockElement.classList.remove('block-keyboard-focus');
+    }
+    activeBlockElement = null;
+}
+
+
 // API Functions & Page Rendering
 async function loadPage(pageId) {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
-    
+    clearActiveBlock(); // Clear active block when loading a new page
+
     try {
         document.getElementById('new-note').style.display = 'block';
         document.getElementById('backlinks-container').style.display = 'block';
-        
+
         const response = await fetch(`api/page.php?id=${pageId}`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const text = await response.text();
         if (!text) throw new Error('Empty response from server');
         const data = JSON.parse(text);
-        
+
         if (data.error) {
             console.error('Server error:', data.error);
             outlineContainer.innerHTML = `<div class="error-message"><h3>Error loading page</h3><p>${data.error}</p></div>`;
@@ -135,11 +163,20 @@ async function loadPage(pageId) {
         }
 
         currentPage = data;
-        await renderPage(data); 
+        await renderPage(data);
         updateRecentPages(pageId);
-        if (window.renderCalendarForCurrentPage) { 
-            window.renderCalendarForCurrentPage(); 
+        if (window.renderCalendarForCurrentPage) {
+            window.renderCalendarForCurrentPage();
         }
+
+        // Check for block to activate after reload (used by create/edit/indent operations)
+        const reActivateId = sessionStorage.getItem('lastActiveBlockIdBeforeReload');
+        if (reActivateId) {
+            const reActivatedBlock = document.querySelector(`.outline-item[data-note-id="${reActivateId}"]`);
+            if (reActivatedBlock) setActiveBlock(reActivatedBlock, true);
+            sessionStorage.removeItem('lastActiveBlockIdBeforeReload');
+        }
+
     } catch (error) {
         console.error('Error loading page:', error);
         outlineContainer.innerHTML = `
@@ -209,7 +246,7 @@ async function createNewPage() {
             const data = await response.json();
             if (data.error) throw new Error(data.error);
             document.body.removeChild(modal);
-            navigateToPage(encodeURIComponent(pageId)); 
+            navigateToPage(encodeURIComponent(pageId));
         } catch (error) { console.error('Error creating page:', error); alert('Error creating page: ' + error.message); }
     };
     cancelButton.onclick = () => document.body.removeChild(modal);
@@ -254,8 +291,8 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
                 content: prefetchedData.content,
                 id: prefetchedData.note_id,
                 block_id: blockId,
-                attachments: [], 
-                properties: {}
+                attachments: prefetchedData.attachments || [],
+                properties: prefetchedData.properties || {}
             };
             renderedBlockContent = await renderNoteContent(blockDataForRecursiveCall, prefetchedBlocks);
         } else {
@@ -268,10 +305,10 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
                 renderedBlockContent = `<span class="block-ref-brackets">{{</span><a href="#" class="block-ref-link" onclick="event.stopPropagation(); console.warn('Block not found: ${blockId}')">${blockId}</a><span class="block-ref-brackets">}}</span><span class="broken-transclusion"> (not found)</span>`;
                 // For "not found", we directly replace and skip placeholder logic for this item
                 processedContent = processedContent.replace(fullMatch, renderedBlockContent);
-                continue; 
+                continue;
             }
         }
-        
+
         const placeholderId = `%%TRANSCLUSION_PLACEHOLDER_${transclusionPlaceholders.length}%%`;
         transclusionPlaceholders.push({
             placeholder: placeholderId,
@@ -305,19 +342,17 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
     transclusionPlaceholders.forEach(item => {
         const finalTransclusionWrapperHtml = `
             <div class="transcluded-block" data-block-id="${item.blockId}">
-                ${item.html} 
+                ${item.html}
                 <div class="transclusion-source">
                     <a href="#${encodeURIComponent(item.sourcePageId)}" onclick="event.stopPropagation();">
                         Source: ${item.sourcePageTitle || item.sourcePageId}</a>
                 </div>
             </div>`;
-        // Ensure the placeholder is replaced globally in case it appears multiple times,
-        // though it shouldn't with unique placeholders.
         htmlContent = htmlContent.split(item.placeholder).join(finalTransclusionWrapperHtml);
     });
-    
+
     // 6. Post-Markdown Replacements
-    htmlContent = htmlContent.replace(/\[\[([^\]#]+?)\]\]/g, (match, pageName) => { 
+    htmlContent = htmlContent.replace(/\[\[([^\]#]+?)\]\]/g, (match, pageName) => {
         return `<span class="internal-link-brackets">[[</span><a href="#${encodeURIComponent(pageName.trim())}" class="internal-link" onclick="event.stopPropagation();">${pageName.trim()}</a><span class="internal-link-brackets">]]</span>`;
     });
     htmlContent = htmlContent.replace(/\[\[#(.*?)\]\]/g, (match, tagName) => {
@@ -329,14 +364,12 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
 
     htmlContent = htmlContent.replace(/%%TODO_ITEM%%(TODO|DONE)%%(.*?)%%/g, (match, status, taskTextHtml) => {
         const isDone = status === 'DONE';
-        // taskTextHtml here is already processed by marked.parse (as it was part of processedContent)
-        // and also had its own placeholders (if any) replaced.
         return `<div class="todo-item">
                     <label class="todo-checkbox">
-                        <input type="checkbox" ${isDone ? 'checked' : ''} 
-                            onclick="event.stopPropagation();" 
-                            onchange="toggleTodo('${note.block_id || note.id}', this.checked)"> 
-                        <span class="todo-marker status-${status.toLowerCase()}" 
+                        <input type="checkbox" ${isDone ? 'checked' : ''}
+                            onclick="event.stopPropagation();"
+                            onchange="toggleTodo('${note.block_id || note.id}', this.checked)">
+                        <span class="todo-marker status-${status.toLowerCase()}"
                               onclick="event.stopPropagation(); this.previousElementSibling.click();">${status}</span>
                         <span class="todo-text status-${status.toLowerCase()}">${taskTextHtml.trim()}</span>
                     </label>
@@ -346,7 +379,7 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
     htmlContent = htmlContent.replace(/<img src="([^"]+)" alt="([^"]*)"/g, (match, src, alt) => {
         return `<img src="${src}" alt="${alt}" class="note-image" onclick="event.stopPropagation(); showImageModal(this.src, this.alt)">`;
     });
-    
+
     if (note.attachments && note.attachments.length > 0) {
         htmlContent += '<div class="attachments">';
         note.attachments.forEach(attachment => {
@@ -358,7 +391,7 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
                 icon = '🎥'; previewHtml = `<div class="attachment-preview"><video src="uploads/${attachment.filename}" controls></video></div>`;
             } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
                 icon = '🎵'; previewHtml = `<div class="attachment-preview"><audio src="uploads/${attachment.filename}" controls></audio></div>`;
-            } 
+            }
             htmlContent += `<div class="attachment"><div class="attachment-info">
                         <span class="attachment-icon">${icon}</span>
                         <a href="uploads/${attachment.filename}" target="_blank" class="attachment-name" onclick="event.stopPropagation();">${attachment.original_name}</a>
@@ -378,19 +411,25 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-async function renderOutline(notes, level = 0, prefetchedBlocks = {}) { 
-    if (!notes || notes.length === 0) return ''; 
+async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
+    if (!notes || notes.length === 0) return '';
 
     let html = '';
     for (const note of notes) {
         const blockId = note.block_id;
-        const contentHtml = await renderNoteContent(note, prefetchedBlocks); 
+        const contentHtml = await renderNoteContent(note, prefetchedBlocks);
         let linkedPageType = null;
         // ... (your existing logic for linkedPageType) ...
 
         const hasChildren = note.children && note.children.length > 0;
         const hasChildrenClass = hasChildren ? 'has-children' : '';
         const linkedPageTypeClass = linkedPageType ? `linked-page-${linkedPageType.toLowerCase()}` : '';
+
+        // Date and Time Formatting
+        const createdAt = new Date(note.created_at);
+        const displayDate = createdAt.toLocaleDateString();
+        // Show time with hours and minutes, locale-dependent (e.g., 3:30 PM or 15:30)
+        const displayTime = createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         const controlsHtml = `
             <span class="static-bullet" data-action="zoom-in" title="Zoom in"></span>
@@ -411,26 +450,26 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
                         <button data-action="edit" title="Edit note">✎</button>
                         <button data-action="indent-note" title="Indent note (make child of item above)">→</button>
-                        <button data-action="upload" title="Upload file">↑</button>
+                        <button data-action="upload" title="Upload file">🗎</button>
                         <button data-action="delete" title="Delete note">×</button>
-                         | <span class="note-date" title="Created: ${new Date(note.created_at).toLocaleString()}">${new Date(note.created_at).toLocaleDateString()}</span>
+                        ︱<span class="note-date" title="Created: ${createdAt.toLocaleString()}">${displayDate} ${displayTime}</span>
                     </div>
-                </div>`; 
+                </div>`;
 
         if (hasChildren) {
             html += `<div class="outline-children">`;
-            html += await renderOutline(note.children, level + 1, prefetchedBlocks); 
-            html += `</div>`; 
+            html += await renderOutline(note.children, level + 1, prefetchedBlocks);
+            html += `</div>`;
         }
 
-        html += `</div>`; 
+        html += `</div>`;
     }
     return html;
 }
 
-function renderPropertiesInline(properties) { return ''; } 
+function renderPropertiesInline(properties) { return ''; }
 
-async function renderPage(page) { 
+async function renderPage(page) {
     pageTitle.innerHTML = `<span class="page-title-text">${page.title}</span>
                            <button class="edit-properties-button" title="Edit page properties"></button>`;
     if (page.properties && Object.keys(page.properties).length > 0) {
@@ -445,15 +484,14 @@ async function renderPage(page) {
     const editButton = pageTitle.querySelector('.edit-properties-button');
     if (editButton) editButton.onclick = editPageProperties;
 
-    // 1. Collect all blockIds for batch fetching
     const blockIdsToFetch = new Set();
-    function collectBlockIdsRecursive(notes) { 
+    function collectBlockIdsRecursive(notes) {
         if (!notes) return;
         for (const note of notes) {
             if (note.content) {
                 const matches = note.content.matchAll(/{{\s*([a-zA-Z0-9_-]+)\s*}}/g);
                 for (const match of matches) {
-                    blockIdsToFetch.add(match[1].trim()); 
+                    blockIdsToFetch.add(match[1].trim());
                 }
             }
             if (note.children) {
@@ -461,8 +499,8 @@ async function renderPage(page) {
             }
         }
     }
-    
-    prefetchedBlocks = {}; 
+
+    prefetchedBlocks = {};
     collectBlockIdsRecursive(page.notes);
 
     if (blockIdsToFetch.size > 0) {
@@ -479,8 +517,8 @@ async function renderPage(page) {
         }
     }
 
-    outlineContainer.innerHTML = await renderOutline(page.notes, 0, prefetchedBlocks); 
-    initSortable(outlineContainer); 
+    outlineContainer.innerHTML = await renderOutline(page.notes, 0, prefetchedBlocks);
+    initSortable(outlineContainer);
     const backlinksContainer = document.getElementById('backlinks-container');
     if (backlinksContainer) renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
 }
@@ -528,7 +566,7 @@ async function editPageProperties() {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            navigateToPage(currentPage.id); 
+            navigateToPage(currentPage.id);
         } catch (error) {
             console.error('Error updating properties:', error);
             propertiesContent.innerHTML = originalContent;
@@ -609,7 +647,7 @@ async function showAllPages() {
     } catch (error) { console.error('Error loading all pages:', error); }
 }
 
-function renderSearchResults(results) { 
+function renderSearchResults(results) {
     const searchResultsContainer = document.getElementById('search-results-container') || document.createElement('div');
     searchResultsContainer.id = 'search-results-container';
     searchResultsContainer.className = 'search-results-inline';
@@ -624,7 +662,7 @@ function renderSearchResults(results) {
         searchInput.parentNode.insertBefore(searchResultsContainer, searchInput.nextSibling);
     }
      document.addEventListener('click', function clearInlineSearch(event) {
-        if (searchResultsContainer.contains(event.target)) return; 
+        if (searchResultsContainer.contains(event.target)) return;
         if (!searchInput.contains(event.target) && !searchResultsContainer.contains(event.target)) {
             searchResultsContainer.remove();
             document.removeEventListener('click', clearInlineSearch);
@@ -647,7 +685,7 @@ async function uploadFile(noteId, file) {
         const response = await fetch('api/attachment.php', { method: 'POST', body: formData });
         const data = await response.json();
         if (data.error) throw new Error(data.error);
-        navigateToPage(currentPage.id); 
+        navigateToPage(currentPage.id);
     } catch (error) { console.error('Error uploading file:', error); alert('Error uploading file: ' + error.message); }
 }
 
@@ -668,12 +706,12 @@ async function deleteAttachment(id, event) {
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            document.body.removeChild(modal); 
-            navigateToPage(currentPage.id); 
-        } catch (error) { 
-            console.error('Error deleting attachment:', error); 
-            alert('Error deleting attachment: ' + error.message); 
-            document.body.removeChild(modal); 
+            document.body.removeChild(modal);
+            navigateToPage(currentPage.id);
+        } catch (error) {
+            console.error('Error deleting attachment:', error);
+            alert('Error deleting attachment: ' + error.message);
+            document.body.removeChild(modal);
         }
     };
     modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
@@ -682,7 +720,7 @@ async function deleteAttachment(id, event) {
 function initCalendar() {
     const calendar = document.getElementById('calendar');
     if (!calendar) return;
-    const todayDate = new Date(); 
+    const todayDate = new Date();
 
     let currentDisplayMonth = todayDate.getMonth();
     let currentDisplayYear = todayDate.getFullYear();
@@ -700,9 +738,9 @@ function initCalendar() {
                     <span><b>${monthNames[currentDisplayMonth]} ${currentDisplayYear}</b></span>
                     <button class="calendar-nav" onclick="nextMonth()">→</button></div>
                     <div class="calendar-grid">${dayNames.map(d => `<div class="calendar-weekday">${d}</div>`).join('')}`;
-        
+
         for (let i = 0; i < startingDay; i++) html += '<div class="calendar-day empty"></div>';
-        
+
         const todayString = todayDate.toISOString().split('T')[0];
         const currentPageId = currentPage ? currentPage.id : null;
 
@@ -710,35 +748,35 @@ function initCalendar() {
             const date = `${currentDisplayYear}-${String(currentDisplayMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             let dayClasses = 'calendar-day';
             if (date === todayString) {
-                dayClasses += ' today'; 
+                dayClasses += ' today';
             }
-            if (date === currentPageId) { 
-                dayClasses += ' selected-date'; 
+            if (date === currentPageId) {
+                dayClasses += ' selected-date';
             }
             html += `<div class="${dayClasses}" onclick="window.location.hash = '${date}'" data-date="${date}">${day}</div>`;
         }
-        
+
         const totalCells = startingDay + daysInMonth;
         const remainingCells = (totalCells % 7 === 0) ? 0 : 7 - (totalCells % 7);
         for (let i = 0; i < remainingCells; i++) html += '<div class="calendar-day empty"></div>';
-        
-        html += '</div>'; 
+
+        html += '</div>';
         calendar.innerHTML = html;
     }
 
-    window.renderCalendarForCurrentPage = renderCalendar; 
+    window.renderCalendarForCurrentPage = renderCalendar;
 
-    window.prevMonth = () => { 
-        currentDisplayMonth = (currentDisplayMonth === 0) ? 11 : currentDisplayMonth - 1; 
-        if (currentDisplayMonth === 11) currentDisplayYear--; 
-        renderCalendar(); 
+    window.prevMonth = () => {
+        currentDisplayMonth = (currentDisplayMonth === 0) ? 11 : currentDisplayMonth - 1;
+        if (currentDisplayMonth === 11) currentDisplayYear--;
+        renderCalendar();
     };
-    window.nextMonth = () => { 
-        currentDisplayMonth = (currentDisplayMonth === 11) ? 0 : currentDisplayMonth + 1; 
-        if (currentDisplayMonth === 0) currentDisplayYear++; 
-        renderCalendar(); 
+    window.nextMonth = () => {
+        currentDisplayMonth = (currentDisplayMonth === 11) ? 0 : currentDisplayMonth + 1;
+        if (currentDisplayMonth === 0) currentDisplayYear++;
+        renderCalendar();
     };
-    renderCalendar(); 
+    renderCalendar();
 }
 
 function showImageModal(src, alt) {
@@ -754,14 +792,19 @@ function handleOutlineClick(event) {
     const target = event.target;
     const breadcrumbItem = target.closest('.breadcrumb-item');
     const breadcrumbBar = target.closest('.breadcrumb-bar');
-    const noteElement = target.closest('.outline-item');
+    const noteElement = target.closest('.outline-item:not(.note-editor-wrapper .outline-item)'); // Ensure we don't select an item within an editor
 
     let action = target.dataset.action || target.closest('[data-action]')?.dataset.action;
     let noteIdForAction = null;
 
     if (noteElement) {
         noteIdForAction = noteElement.dataset.noteId;
+        // If a block (not an editor) is clicked, make it active for keyboard nav
+        if (!isEditorOpen && !action) { // Only if no specific action and editor is not open
+            setActiveBlock(noteElement);
+        }
     }
+
 
     if (breadcrumbItem && breadcrumbItem.dataset.action) {
         action = breadcrumbItem.dataset.action;
@@ -779,16 +822,19 @@ function handleOutlineClick(event) {
     }
 
     if (action === 'zoom-in') {
-        const targetId = noteIdForAction; 
+        const targetId = noteIdForAction;
         if (targetId) {
-            zoomInOnNote(targetId); 
+            zoomInOnNote(targetId);
         } else {
             console.warn("Zoom-in clicked, but no target ID found.");
         }
         return;
     }
-    
-    if (!noteElement || !noteIdForAction) {
+
+    if (!noteElement || !noteIdForAction) { // Clicks outside actionable items
+        if (!target.closest('.note-editor')) { // If click is not inside an editor
+             clearActiveBlock(); // Clear focus if clicking on empty space
+        }
         return;
     }
 
@@ -804,8 +850,10 @@ function handleOutlineClick(event) {
                     .catch(err => console.error('Failed to copy block ID:', err));
             }
             break;
-        case 'add-child': createNote(noteIdForAction, parseInt(noteElement.dataset.level) + 1); break;
-        case 'indent-note': 
+        case 'add-child': // This is the "+" button, it should always add a child
+            createNote(noteIdForAction, parseInt(noteElement.dataset.level) + 1);
+            break;
+        case 'indent-note':
             handleIndentNote(noteIdForAction, noteElement);
             break;
         case 'edit': editNote(noteIdForAction, noteElement.dataset.content); break;
@@ -849,12 +897,12 @@ async function handleIndentNote(noteId, noteElement) {
     if (newParentChildrenContainer) {
         newIndex = newParentChildrenContainer.querySelectorAll(':scope > .outline-item').length;
     }
-    
+
     const payload = {
         action: 'reorder_note',
         note_id: parseInt(noteId),
         new_parent_id: parseInt(newParentId),
-        new_order: newIndex, 
+        new_order: newIndex,
         page_id: currentPage.id
     };
 
@@ -868,30 +916,99 @@ async function handleIndentNote(noteId, noteElement) {
         if (data.error) {
             throw new Error(data.error);
         }
-        loadPage(currentPage.id); 
+        sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteId);
+        // loadPage will handle re-activation
+        loadPage(currentPage.id);
     } catch (error) {
         console.error('Error indenting note:', error);
         alert('Error indenting note: ' + error.message + '. Please refresh.');
-        loadPage(currentPage.id); 
+        loadPage(currentPage.id);
     }
 }
+
+async function handleOutdentNote(noteId, noteElement) {
+    if (!currentPage || !currentPage.id) {
+        console.error("Cannot outdent: Current page context lost.");
+        alert("Error: Current page context lost. Please refresh.");
+        return;
+    }
+
+    const currentParentContainer = noteElement.parentElement;
+    if (!currentParentContainer) return;
+
+    const currentParentItem = currentParentContainer.closest('.outline-item');
+
+    if (!currentParentItem) {
+        alert("Cannot outdent this note further: it's already a top-level item.");
+        return;
+    }
+
+    const newGrandparentId = currentParentItem.parentElement.closest('.outline-item')?.dataset.noteId || null;
+
+    let newIndex = 0;
+    // Find the position of currentParentItem among its siblings to insert the outdented note after it
+    const siblingsAndParent = Array.from(currentParentItem.parentElement.children).filter(el => el.classList.contains('outline-item'));
+    const parentIndexInSiblings = siblingsAndParent.indexOf(currentParentItem);
+
+    if (parentIndexInSiblings !== -1) {
+        newIndex = parentIndexInSiblings + 1; // Insert after the original parent
+    } else {
+        console.error("Could not determine new index for outdented note.");
+        return;
+    }
+
+    const payload = {
+        action: 'reorder_note',
+        note_id: parseInt(noteId),
+        new_parent_id: newGrandparentId ? parseInt(newGrandparentId) : null,
+        new_order: newIndex,
+        page_id: currentPage.id
+    };
+
+    try {
+        const response = await fetch('api/note.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteId);
+        // loadPage will handle re-activation
+        loadPage(currentPage.id);
+    } catch (error) {
+        console.error('Error outdenting note:', error);
+        alert('Error outdenting note: ' + error.message + '. Please refresh.');
+        loadPage(currentPage.id);
+    }
+}
+
 
 function toggleChildren(noteElement) {
     noteElement.classList.toggle('children-hidden');
     const childrenContainer = noteElement.querySelector('.outline-children');
     if (childrenContainer) {
         if (noteElement.classList.contains('children-hidden')) {
-            childrenContainer.style.display = 'none'; 
+            childrenContainer.style.display = 'none';
         } else {
-            childrenContainer.style.display = ''; 
+            childrenContainer.style.display = '';
         }
     }
 }
 
-function createNote(parentId = null, level = 0) {
+// MODIFIED createNote function
+function createNote(parentId = null, level = 0, insertAfterElement = null, intendedOrder = null) {
     if (!currentPage) return;
+    clearActiveBlock();
+    isEditorOpen = true;
+
     const noteEditorContainer = document.createElement('div');
-    if (parentId) noteEditorContainer.style.paddingLeft = `calc(var(--indentation-unit) * ${level > 0 ? 1 : 0})`;
+    // Basic indentation for children editor - final note relies on data-level and CSS
+    if (parentId && !insertAfterElement) {
+        noteEditorContainer.style.paddingLeft = `calc(var(--indentation-unit) * 1)`;
+    }
     noteEditorContainer.className = 'note-editor-wrapper';
     const noteElement = document.createElement('div');
     noteElement.className = 'note-editor';
@@ -911,7 +1028,16 @@ function createNote(parentId = null, level = 0) {
     const cancelButton = noteElement.querySelector('.cancel-note');
     const templateSelect = noteElement.querySelector('select');
 
-    if (parentId) {
+    // DOM PLACEMENT LOGIC for the editor
+    if (insertAfterElement) {
+        const container = insertAfterElement.parentElement;
+        if (container) {
+            container.insertBefore(noteEditorContainer, insertAfterElement.nextSibling);
+        } else {
+            console.warn("Could not find parent container for insertAfterElement. Appending to outlineContainer.");
+            outlineContainer.appendChild(noteEditorContainer);
+        }
+    } else if (parentId) {
         const parentNoteElement = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
         if (parentNoteElement) {
             let childrenContainer = parentNoteElement.querySelector('.outline-children');
@@ -920,19 +1046,28 @@ function createNote(parentId = null, level = 0) {
                 childrenContainer.className = 'outline-children';
                 parentNoteElement.appendChild(childrenContainer);
             }
-            childrenContainer.appendChild(noteEditorContainer); 
-    
+            childrenContainer.appendChild(noteEditorContainer);
             parentNoteElement.classList.add('has-children');
             if (parentNoteElement.classList.contains('children-hidden')) {
                 parentNoteElement.classList.remove('children-hidden');
-                childrenContainer.style.display = ''; 
+                if(childrenContainer) childrenContainer.style.display = '';
             }
-        } else { outlineContainer.appendChild(noteEditorContainer); }
+        } else {
+            outlineContainer.appendChild(noteEditorContainer);
+        }
     } else {
         outlineContainer.appendChild(noteEditorContainer);
     }
+
     textarea.focus();
-    textarea.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); } });
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            handleSnippetReplacement(e);
+        }
+        if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); }
+    });
+    textarea.addEventListener('input', handleSnippetReplacement);
+
     if (templateSelect) {
         templateSelect.addEventListener('change', (e) => {
             const templateKey = e.target.value;
@@ -942,39 +1077,108 @@ function createNote(parentId = null, level = 0) {
             }
         });
     }
+
     saveButton.onclick = async () => {
         const content = textarea.value.trim();
         const properties = {};
         const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match;
         let tempContent = content;
         while ((match = propertyRegex.exec(tempContent)) !== null) properties[match[1].trim()] = match[2].trim();
+
         try {
-            const response = await fetch('api/note.php', {
+            // Step 1: Create the note
+            const createResponse = await fetch('api/note.php', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ page_id: currentPage.id, content: content, level: level, parent_id: parentId, properties: properties })
+                body: JSON.stringify({
+                    page_id: currentPage.id,
+                    content: content,
+                    level: level, // Use the level determined by the caller
+                    parent_id: parentId, // Use the parentId determined by the caller
+                    properties: properties
+                })
             });
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-            navigateToPage(currentPage.id); 
-        } catch (error) { console.error('Error creating note:', error); alert('Error creating note: ' + error.message); }
-    };
-    cancelButton.onclick = () => {
-        noteEditorContainer.remove();
-        if (parentId) {
-            const parentNoteEl = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
-            if (parentNoteEl) {
-                const childrenContainer = parentNoteEl.querySelector('.outline-children');
-                if (childrenContainer && childrenContainer.children.length === 0) {
-                    parentNoteEl.classList.remove('has-children');
+            const createData = await createResponse.json();
+            isEditorOpen = false; // Set early, before potential errors in reorder
+            if (createData.error) throw new Error(`Create error: ${createData.error}`);
+            if (!createData.id) throw new Error('Note created but no ID returned.');
+
+            const newNoteId = createData.id;
+
+            // Step 2: If it was meant to be a sibling at a specific order, reorder it.
+            if (insertAfterElement && intendedOrder !== null) {
+                const reorderPayload = {
+                    action: 'reorder_note',
+                    note_id: parseInt(newNoteId),
+                    new_parent_id: parentId ? parseInt(parentId) : null,
+                    new_order: parseInt(intendedOrder),
+                    page_id: currentPage.id
+                };
+                const reorderResponse = await fetch('api/note.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reorderPayload)
+                });
+                const reorderData = await reorderResponse.json();
+                if (reorderData.error) {
+                    console.warn(`Note created (ID: ${newNoteId}), but reorder failed: ${reorderData.error}. The note might not be in the exact intended position.`);
                 }
             }
+
+            sessionStorage.setItem('lastActiveBlockIdBeforeReload', newNoteId.toString());
+            // loadPage will handle re-activation using the sessionStorage item
+            loadPage(currentPage.id);
+
+        } catch (error) {
+            isEditorOpen = false; // Ensure it's false on error too
+            console.error('Error creating note:', error); alert('Error creating note: ' + error.message);
+        }
+    };
+
+    cancelButton.onclick = () => {
+        noteEditorContainer.remove();
+        isEditorOpen = false;
+
+        let blockToReactivate = null;
+        if (insertAfterElement) { // Editor was for a new sibling
+            blockToReactivate = insertAfterElement;
+        } else if (parentId) {   // Editor was for a new child
+            blockToReactivate = document.querySelector(`.outline-item[data-note-id="${parentId}"]`);
+            if (blockToReactivate) {
+                // Clean up 'has-children' if parent is now empty
+                const childrenContainer = blockToReactivate.querySelector('.outline-children');
+                if (childrenContainer && childrenContainer.children.length === 0) {
+                     // Check if there are no actual .outline-item children left
+                    if (!Array.from(childrenContainer.children).some(childEl => childEl.matches('.outline-item'))) {
+                        blockToReactivate.classList.remove('has-children');
+                        // Optionally, remove the childrenContainer if it's truly empty of persistent items.
+                        // childrenContainer.remove(); // Or let CSS handle display:none for empty ones.
+                    }
+                }
+            }
+        } else { // Editor was for a new top-level note
+            const prevSibling = noteEditorContainer.previousElementSibling;
+            if (prevSibling && prevSibling.matches('.outline-item')) {
+                blockToReactivate = prevSibling;
+            }
+        }
+
+        if (blockToReactivate) {
+            setActiveBlock(blockToReactivate, false);
+        } else if (outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)')) { // Fallback to first item
+            setActiveBlock(outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)'), false);
         }
     };
 }
 
+
 function editNote(id, currentContentText) {
     const noteElement = document.querySelector(`.outline-item[data-note-id="${id}"]`);
-    if (!noteElement) return;
+    if (!noteElement || noteElement.querySelector('.note-editor-wrapper')) return; // Already editing or element not found
+
+    clearActiveBlock();
+    isEditorOpen = true;
+    const noteIdBeingEdited = id;
+
     const contentElement = noteElement.querySelector('.outline-content');
     if (!contentElement) return;
     const originalDisplay = contentElement.style.display;
@@ -986,12 +1190,23 @@ function editNote(id, currentContentText) {
     noteEditorDiv.innerHTML = `<textarea class="note-textarea">${currentContentText}</textarea>
         <div class="note-editor-actions"><button class="btn-primary save-note">Save</button><button class="btn-secondary cancel-note">Cancel</button></div>`;
     editorWrapper.appendChild(noteEditorDiv);
-    noteElement.insertBefore(editorWrapper, contentElement);
+    noteElement.insertBefore(editorWrapper, contentElement); // Insert editor before the content div
+
     const textarea = noteEditorDiv.querySelector('.note-textarea');
     const saveButton = noteEditorDiv.querySelector('.save-note');
     const cancelButton = noteEditorDiv.querySelector('.cancel-note');
-    textarea.focus(); textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
-    textarea.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); } });
+
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            handleSnippetReplacement(e);
+        }
+        if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); saveButton.click(); }
+    });
+    textarea.addEventListener('input', handleSnippetReplacement);
+
     saveButton.onclick = async () => {
         const newContent = textarea.value.trim();
         const properties = {}; const propertyRegex = /\{([^:]+)::([^}]+)\}/g; let match; let tempContent = newContent;
@@ -1002,11 +1217,23 @@ function editNote(id, currentContentText) {
                 body: JSON.stringify({ action: 'update', content: newContent, properties: properties, level: parseInt(noteElement.dataset.level) || 0 })
             });
             const data = await response.json();
+            isEditorOpen = false;
             if (data.error) throw new Error(data.error);
-            navigateToPage(currentPage.id); 
-        } catch (error) { console.error('Error updating note:', error); alert('Error updating note: ' + error.message); }
+            sessionStorage.setItem('lastActiveBlockIdBeforeReload', noteIdBeingEdited);
+            // loadPage will handle re-activation
+            loadPage(currentPage.id);
+        } catch (error) {
+            isEditorOpen = false;
+            console.error('Error updating note:', error); alert('Error updating note: ' + error.message);
+        }
     };
-    cancelButton.onclick = () => { editorWrapper.remove(); contentElement.style.display = originalDisplay; };
+    cancelButton.onclick = () => {
+        editorWrapper.remove();
+        contentElement.style.display = originalDisplay;
+        isEditorOpen = false;
+        const originalBlock = document.querySelector(`.outline-item[data-note-id="${noteIdBeingEdited}"]`);
+        if (originalBlock) setActiveBlock(originalBlock, false);
+    };
 }
 
 async function deleteNote(id) {
@@ -1022,21 +1249,22 @@ async function deleteNote(id) {
             const response = await fetch(`api/note.php?id=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete' }) });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
-            document.body.removeChild(modal); 
-            navigateToPage(currentPage.id); 
+            document.body.removeChild(modal);
+            clearActiveBlock();
+            navigateToPage(currentPage.id);
         } catch (error) { console.error('Error deleting note:', error); alert('Error deleting note: ' + error.message); document.body.removeChild(modal); }
     };
     modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
-async function showSearchResults() { 
+async function showSearchResults() {
     const results = JSON.parse(sessionStorage.getItem('searchResults') || '[]');
     const query = sessionStorage.getItem('searchQuery') || '';
     document.getElementById('new-note').style.display = 'none';
     document.getElementById('backlinks-container').style.display = 'none';
     pageProperties.style.display = 'none';
     const renderedResultsPromises = results.map(async result => {
-        const content = await renderNoteContent(result, prefetchedBlocks); 
+        const content = await renderNoteContent(result, prefetchedBlocks);
         return `<div class="search-result-item"><div class="result-header">
                     <a href="#${encodeURIComponent(result.page_id)}" onclick="event.stopPropagation();">${result.page_title || result.page_id}</a>
                     <span class="result-date">${new Date(result.created_at).toLocaleDateString()}</span></div>
@@ -1054,7 +1282,7 @@ function copySearchLink() {
     const query = sessionStorage.getItem('searchQuery') || '';
     navigator.clipboard.writeText(`<<${query}>>`).then(() => alert('Search link copied!')).catch(err => alert('Failed to copy: ' + err));
 }
-async function executeSearchLink(query) { 
+async function executeSearchLink(query) {
     try {
         const response = await fetch('api/advanced_search.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -1062,7 +1290,7 @@ async function executeSearchLink(query) {
         if (results.error) throw new Error(results.error);
         sessionStorage.setItem('searchResults', JSON.stringify(results));
         sessionStorage.setItem('searchQuery', query);
-        window.location.hash = 'search-results'; 
+        window.location.hash = 'search-results';
     } catch (error) { console.error('Error executing search link:', error); alert('Error executing search: ' + error.message); }
 }
 
@@ -1071,20 +1299,20 @@ async function toggleTodo(blockId, isDone) {
         let currentNoteData;
         if (prefetchedBlocks && prefetchedBlocks[blockId]) {
             const prefetched = prefetchedBlocks[blockId];
-            currentNoteData = { 
-                id: prefetched.note_id, 
+            currentNoteData = {
+                id: prefetched.note_id,
                 content: prefetched.content,
                 block_id: blockId,
-                properties: {}, 
-                level: 0,       
-                parent_id: null 
+                properties: {},
+                level: 0,
+                parent_id: null
             };
         } else {
-            currentNoteData = await findBlockById(blockId); 
+            currentNoteData = await findBlockById(blockId);
         }
 
         if (!currentNoteData) throw new Error('Note not found for toggling TODO');
-        
+
         let rawContent = currentNoteData.content;
         let taskTextWithProperties = "";
 
@@ -1095,50 +1323,50 @@ async function toggleTodo(blockId, isDone) {
         } else {
             taskTextWithProperties = rawContent;
         }
-        
+
         const taskSpecificProperties = {};
         let cleanTaskDescription = taskTextWithProperties.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
             taskSpecificProperties[key.trim()] = value.trim();
-            return ''; 
+            return '';
         }).trim();
 
         let newStatusPrefix = isDone ? 'DONE ' : 'TODO ';
-        let newContentString = newStatusPrefix + cleanTaskDescription; 
+        let newContentString = newStatusPrefix + cleanTaskDescription;
 
-        const updatedNoteProperties = { ...(currentNoteData.properties || {}) }; 
-        
+        const updatedNoteProperties = { ...(currentNoteData.properties || {}) };
+
         if (isDone) {
             taskSpecificProperties['done-at'] = new Date().toISOString();
         } else {
-            delete taskSpecificProperties['done-at']; 
+            delete taskSpecificProperties['done-at'];
         }
-        
+
         for (const [key, value] of Object.entries(taskSpecificProperties)) {
             newContentString += ` {${key}::${value}}`;
-            updatedNoteProperties[key] = value; 
+            updatedNoteProperties[key] = value;
         }
         if (!isDone) {
-            delete updatedNoteProperties['done-at']; 
+            delete updatedNoteProperties['done-at'];
         }
-        
+
         const response = await fetch(`api/note.php?id=${currentNoteData.id}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                action: 'update', 
-                content: newContentString.trim(), 
-                properties: updatedNoteProperties, 
-                level: currentNoteData.level, 
-                parent_id: currentNoteData.parent_id 
+            body: JSON.stringify({
+                action: 'update',
+                content: newContentString.trim(),
+                properties: updatedNoteProperties,
+                level: currentNoteData.level,
+                parent_id: currentNoteData.parent_id
             })
         });
         const data = await response.json();
         if (data.error) throw new Error(data.error);
-        navigateToPage(currentPage.id); 
+        navigateToPage(currentPage.id);
     } catch (error) {
-        console.error('Error updating todo status:', error); 
+        console.error('Error updating todo status:', error);
         alert('Error updating task: ' + error.message);
         const checkbox = document.querySelector(`input[type="checkbox"][onchange*="'${blockId}'"]`);
-        if (checkbox) checkbox.checked = !isDone; 
+        if (checkbox) checkbox.checked = !isDone;
     }
 }
 
@@ -1181,7 +1409,7 @@ async function executeAdvancedSearch() {
         return;
     }
     const query = queryInput.value.trim();
-    
+
     if (!query) {
         return;
     }
@@ -1254,15 +1482,15 @@ function renderBreadcrumbs(path) {
     if (!path || path.length === 0 || !currentPage) return '';
 
     let breadcrumbHtml = '<div class="breadcrumb-bar" data-action="zoom-out" title="Click to zoom out">';
-    
+
     breadcrumbHtml += `<span class="breadcrumb-item page-link" data-action="zoom-out">${currentPage.title}</span>`;
 
     path.forEach((note, index) => {
         let plainContent = note.content.replace(/<\/?[^>]+(>|$)/g, " ").replace(/\s+/g, ' ').trim();
-        const contentSnippet = plainContent.length > 30 
-            ? plainContent.substring(0, 27) + '...' 
+        const contentSnippet = plainContent.length > 30
+            ? plainContent.substring(0, 27) + '...'
             : (plainContent || 'Untitled Note');
-            
+
         const isLast = index === path.length - 1;
         breadcrumbHtml += `<span class="breadcrumb-separator">»</span>`;
         if (isLast) {
@@ -1299,35 +1527,37 @@ async function zoomInOnNote(targetNoteReference) {
 
     if (!noteDataWithPath || !noteDataWithPath.note) {
         console.error("Note to zoom (ID: " + noteIdToZoom + ") not found in current page data. Zooming out.");
-        await zoomOut(); 
+        await zoomOut();
         return;
     }
 
     const { note: noteInFullTree, path } = noteDataWithPath;
-    window.breadcrumbPath = path; 
+    window.breadcrumbPath = path;
+    clearActiveBlock(); // Clear focus before re-rendering
 
     document.body.classList.add('logseq-focus-active');
     outlineContainer.classList.add('focused');
 
     const clonedFocusedNote = JSON.parse(JSON.stringify(noteInFullTree));
-    clonedFocusedNote.level = 0; 
+    clonedFocusedNote.level = 0;
     if (clonedFocusedNote.children) {
-        adjustLevels(clonedFocusedNote.children, 1); 
+        adjustLevels(clonedFocusedNote.children, 1);
     }
-    const focusedNotesArray = [clonedFocusedNote]; 
+    const focusedNotesArray = [clonedFocusedNote];
 
     pageProperties.style.display = 'none';
     document.getElementById('new-note').style.display = 'none';
     document.getElementById('backlinks-container').style.display = 'none';
 
-    const breadcrumbsHtml = renderBreadcrumbs(path); 
+    const breadcrumbsHtml = renderBreadcrumbs(path);
     outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0, prefetchedBlocks));
-    initSortable(outlineContainer); 
+    initSortable(outlineContainer);
 
     const focusedDomNote = outlineContainer.querySelector('.outline-item[data-level="0"]');
     if (focusedDomNote) {
         setTimeout(() => {
              focusedDomNote.scrollIntoView({ behavior: 'smooth', block: 'start' });
+             setActiveBlock(focusedDomNote, false); // Set active without re-scrolling
         }, 0);
     }
 }
@@ -1338,7 +1568,7 @@ function initSortable(containerElement) {
         animation: 150,
         fallbackOnBody: true,
         swapThreshold: 0.65,
-        handle: '.static-bullet', 
+        handle: '.static-bullet',
         onEnd: function(evt) {
             handleNoteDrop(evt);
         }
@@ -1366,7 +1596,7 @@ function updateDraggedItemLevel(draggedItem, newBaseLevel) {
 
     const childrenContainer = draggedItem.querySelector('.outline-children');
     if (childrenContainer) {
-        const childItems = childrenContainer.querySelectorAll(':scope > .outline-item'); 
+        const childItems = childrenContainer.querySelectorAll(':scope > .outline-item');
         childItems.forEach(child => {
             updateDraggedItemLevel(child, newBaseLevel + 1);
         });
@@ -1380,8 +1610,8 @@ function handleNoteDrop(evt) {
 
     const oldParentItem = evt.from.closest('.outline-item');
     const oldParentId = oldParentItem ? oldParentItem.dataset.noteId : null;
-    const oldLevel = parseInt(draggedItem.dataset.level); 
-    const oldIndex = evt.oldIndex; 
+    const oldLevel = parseInt(draggedItem.dataset.level);
+    const oldIndex = evt.oldIndex;
 
     let newParentIdCandidateEl = evt.to.closest('.outline-item');
     let newParentId = newParentIdCandidateEl ? newParentIdCandidateEl.dataset.noteId : null;
@@ -1391,16 +1621,16 @@ function handleNoteDrop(evt) {
     const dropTargetItemElement = evt.originalEvent.target.closest('.outline-item');
 
     if (dropTargetItemElement && dropTargetItemElement !== draggedItem) {
-        const parentListOfDropTarget = dropTargetItemElement.parentElement; 
+        const parentListOfDropTarget = dropTargetItemElement.parentElement;
 
         if (evt.to === parentListOfDropTarget &&
             parentListOfDropTarget.children[evt.newIndex - 1] === dropTargetItemElement) {
-            newParentId = dropTargetItemElement.dataset.noteId; 
-            newIndex = 0; 
+            newParentId = dropTargetItemElement.dataset.noteId;
+            newIndex = 0;
         }
     }
 
-    if (newParentId === null) { 
+    if (newParentId === null) {
         newLevel = 0;
     } else {
         const finalNewParentDomItem = outlineContainer.querySelector(`.outline-item[data-note-id="${newParentId}"]`);
@@ -1408,22 +1638,12 @@ function handleNoteDrop(evt) {
             newLevel = parseInt(finalNewParentDomItem.dataset.level) + 1;
         } else {
             console.error("Error: Could not find the final new parent DOM element for level calculation. Reloading page.");
-            loadPage(currentPage.id); 
+            loadPage(currentPage.id);
             return;
         }
     }
 
     updateDraggedItemLevel(draggedItem, newLevel);
-
-    const updateData = {
-        noteId: draggedNoteId,
-        newParentId: newParentId,
-        newIndex: newIndex,
-        oldParentId: oldParentId, 
-        oldIndex: oldIndex,       
-        oldLevel: oldLevel        
-    };
-
 
     if (!currentPage || !currentPage.id) {
         console.error("Current page information is not available. Cannot save reorder changes.");
@@ -1437,7 +1657,7 @@ function handleNoteDrop(evt) {
         action: 'reorder_note',
         note_id: parseInt(draggedNoteId),
         new_parent_id: newParentId ? parseInt(newParentId) : null,
-        new_order: parseInt(newIndex), 
+        new_order: parseInt(newIndex),
         page_id: currentPage.id
     };
 
@@ -1451,15 +1671,17 @@ function handleNoteDrop(evt) {
         if (data.error) {
             console.error('Error reordering note:', data.error);
             alert('Error saving changes: ' + data.error + '. Please refresh.');
-            loadPage(currentPage.id); 
+            loadPage(currentPage.id);
         } else {
+            sessionStorage.setItem('lastActiveBlockIdBeforeReload', draggedNoteId);
+            // loadPage will handle re-activation
             loadPage(currentPage.id);
         }
     })
     .catch(error => {
         console.error('Fetch error during reorder:', error);
         alert('Network error while saving changes. Please refresh.');
-        loadPage(currentPage.id); 
+        loadPage(currentPage.id);
     });
 }
 
@@ -1467,16 +1689,229 @@ function handleNoteDrop(evt) {
 async function zoomOut() {
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
-    window.breadcrumbPath = null; 
-    
+    window.breadcrumbPath = null;
+    clearActiveBlock();
+
     document.getElementById('new-note').style.display = 'block';
     document.getElementById('backlinks-container').style.display = 'block';
-    
+
     if (currentPage && currentPage.id) {
-        await loadPage(currentPage.id); 
+        await loadPage(currentPage.id);
     } else {
         console.warn("Zooming out but currentPage is not fully defined. Reloading to today's page.");
         const today = new Date().toISOString().split('T')[0];
         navigateToPage(today);
     }
+}
+
+// MODIFIED handleGlobalKeyDown function
+function handleGlobalKeyDown(event) {
+    if (document.querySelector('.modal')) {
+        return;
+    }
+
+    if (isEditorOpen) {
+        if (event.key === 'Escape') {
+            const cancelButton = document.querySelector('.note-editor .cancel-note');
+            if (cancelButton) {
+                cancelButton.click();
+                event.preventDefault();
+            }
+        }
+        // Ctrl+Enter for saving is handled by individual editor instances
+        return;
+    }
+
+    if (!activeBlockElement && (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === ' ')) {
+        const firstBlock = outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)');
+        if (firstBlock) {
+            setActiveBlock(firstBlock);
+             if (event.key === ' ') event.preventDefault();
+        } else if (event.key === ' ' && currentPage && (!currentPage.notes || currentPage.notes.length === 0)) {
+            createNote(null, 0); // Create new top-level note
+            event.preventDefault();
+            return;
+        } else {
+            return;
+        }
+    }
+
+    if (!activeBlockElement) return;
+
+    switch (event.key) {
+        case 'ArrowUp':
+            navigateBlocks(-1);
+            event.preventDefault();
+            break;
+        case 'ArrowDown':
+            navigateBlocks(1);
+            event.preventDefault();
+            break;
+        case ' ':
+            if (activeBlockElement) {
+                const noteId = activeBlockElement.dataset.noteId;
+                const content = activeBlockElement.dataset.content;
+                editNote(noteId, content);
+                event.preventDefault();
+            }
+            break;
+        case 'Enter':
+            if (activeBlockElement) {
+                if (event.ctrlKey || event.metaKey) { // Ctrl+Enter or Cmd+Enter for child
+                    const parentId = activeBlockElement.dataset.noteId;
+                    const currentLevel = parseInt(activeBlockElement.dataset.level) || 0;
+                    createNote(parentId, currentLevel + 1, null, null); // Last two args null for child
+                } else { // Enter for sibling
+                    const currentLevel = parseInt(activeBlockElement.dataset.level) || 0;
+                    const parentOfActiveElement = activeBlockElement.parentElement.closest('.outline-item');
+                    const siblingParentId = parentOfActiveElement ? parentOfActiveElement.dataset.noteId : null;
+
+                    let intendedOrderForSibling = 0;
+                    const siblingsContainer = activeBlockElement.parentElement;
+                    const actualSiblings = Array.from(siblingsContainer.children)
+                                               .filter(el => el.matches('.outline-item'));
+                    const activeBlockIndexInActualSiblings = actualSiblings.indexOf(activeBlockElement);
+
+                    if (activeBlockIndexInActualSiblings !== -1) {
+                        intendedOrderForSibling = activeBlockIndexInActualSiblings + 1;
+                    } else {
+                        intendedOrderForSibling = actualSiblings.length; // Fallback: append
+                        console.warn("Active block not found among its actual siblings for order calculation. Appending.");
+                    }
+                    createNote(siblingParentId, currentLevel, activeBlockElement, intendedOrderForSibling);
+                }
+                event.preventDefault();
+            }
+            break;
+        case 'Tab':
+            if (activeBlockElement) {
+                if (event.shiftKey) {
+                    handleOutdentNote(activeBlockElement.dataset.noteId, activeBlockElement);
+                } else {
+                    handleIndentNote(activeBlockElement.dataset.noteId, activeBlockElement);
+                }
+                event.preventDefault();
+            }
+            break;
+        case 'Escape':
+            clearActiveBlock();
+            event.preventDefault();
+            break;
+    }
+}
+
+
+function navigateBlocks(direction) {
+    if (!activeBlockElement && direction === 1) {
+        const firstBlock = outlineContainer.querySelector('.outline-item:not(.note-editor-wrapper .outline-item)');
+        if (firstBlock) setActiveBlock(firstBlock);
+        return;
+    }
+    if (!activeBlockElement) return;
+
+    let allItems = Array.from(outlineContainer.querySelectorAll('.outline-item'));
+
+    // Filter out items that are part of an editor, unless it's the active block itself (if editor is open)
+    allItems = allItems.filter(item => !item.closest('.note-editor-wrapper') || item === activeBlockElement);
+
+    // Create a flat list of only VISIBLE items in their DOM order
+    const trulyVisibleItems = [];
+    function getVisibleItemsRecursive(element) {
+        if (element.matches('.outline-item') && getComputedStyle(element).display !== 'none') {
+            trulyVisibleItems.push(element);
+            if (!element.classList.contains('children-hidden')) {
+                const childrenContainer = element.querySelector(':scope > .outline-children');
+                if (childrenContainer) {
+                    Array.from(childrenContainer.children).forEach(child => getVisibleItemsRecursive(child));
+                }
+            }
+        } else if(element.matches('.outline-children') && getComputedStyle(element).display !== 'none'){
+             Array.from(element.children).forEach(child => getVisibleItemsRecursive(child));
+        }
+    }
+    // If focused, start from the focused element's direct children or siblings
+    if (document.body.classList.contains('logseq-focus-active')) {
+        const focusedRootItem = outlineContainer.querySelector('.outline-item[data-level="0"]');
+        if (focusedRootItem) {
+            if (trulyVisibleItems.indexOf(focusedRootItem) === -1) { // Add root if not already added (e.g. if it has no children)
+                 if (getComputedStyle(focusedRootItem).display !== 'none') trulyVisibleItems.push(focusedRootItem);
+            }
+            const childrenContainerOfFocused = focusedRootItem.querySelector(':scope > .outline-children');
+            if (childrenContainerOfFocused && !focusedRootItem.classList.contains('children-hidden')) {
+                 Array.from(childrenContainerOfFocused.children).forEach(child => getVisibleItemsRecursive(child));
+            }
+        }
+    } else {
+        Array.from(outlineContainer.children).forEach(child => getVisibleItemsRecursive(child));
+    }
+
+
+    if (trulyVisibleItems.length === 0) return;
+
+    let currentIndex = trulyVisibleItems.indexOf(activeBlockElement);
+
+    if (currentIndex === -1) {
+        if (trulyVisibleItems.length > 0) {
+            currentIndex = (direction === 1) ? -1 : trulyVisibleItems.length;
+        } else {
+            return;
+        }
+    }
+
+    const nextIndex = currentIndex + direction;
+
+    if (nextIndex >= 0 && nextIndex < trulyVisibleItems.length) {
+        setActiveBlock(trulyVisibleItems[nextIndex]);
+    } else if (nextIndex < 0 && trulyVisibleItems.length > 0) {
+        setActiveBlock(trulyVisibleItems[0]); // Go to first
+    } else if (nextIndex >= trulyVisibleItems.length && trulyVisibleItems.length > 0) {
+        setActiveBlock(trulyVisibleItems[trulyVisibleItems.length - 1]); // Go to last
+    }
+}
+
+// Snippet Replacement Logic
+function handleSnippetReplacement(event) {
+    const textarea = event.target;
+    setTimeout(() => {
+        const cursorPos = textarea.selectionStart;
+        const text = textarea.value;
+        let textBeforeCursor = text.substring(0, cursorPos);
+        let replacementMade = false;
+        let triggerChar = '';
+
+        if(event.key === ' ' || event.key === 'Enter' || (event.data === ' ' && event.type === 'input')) {
+             triggerChar = ' ';
+        } else if (event.type === 'input' && event.data !== null) {
+            return;
+        } else {
+            return;
+        }
+
+        if (textBeforeCursor.endsWith(':t' + triggerChar)) {
+            const replacement = '{tag::}';
+            const triggerFull = ':t' + triggerChar;
+            textarea.value = textBeforeCursor.slice(0, -triggerFull.length) + replacement + text.substring(cursorPos);
+            textarea.selectionStart = textarea.selectionEnd = cursorPos - triggerFull.length + replacement.length - 1;
+            replacementMade = true;
+        }
+        else if (textBeforeCursor.endsWith(':r' + triggerChar)) {
+            const now = new Date();
+            const timeString = now.toISOString();
+            const replacement = `{time::${timeString}} `;
+            const triggerFull = ':r' + triggerChar;
+            textarea.value = textBeforeCursor.slice(0, -triggerFull.length) + replacement + text.substring(cursorPos);
+            textarea.selectionStart = textarea.selectionEnd = cursorPos - triggerFull.length + replacement.length;
+            replacementMade = true;
+        }
+        else if (textBeforeCursor.endsWith(':d' + triggerChar)) {
+            const now = new Date();
+            const dateString = now.toISOString().split('T')[0];
+            const replacement = `{date::${dateString}} `;
+            const triggerFull = ':d' + triggerChar;
+            textarea.value = textBeforeCursor.slice(0, -triggerFull.length) + replacement + text.substring(cursorPos);
+            textarea.selectionStart = textarea.selectionEnd = cursorPos - triggerFull.length + replacement.length;
+            replacementMade = true;
+        }
+
+    }, 0);
 }
