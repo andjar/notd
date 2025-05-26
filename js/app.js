@@ -118,18 +118,26 @@ function insertSuggestion(textarea, title) {
         }
     }
 
-    const textBeforeLink = currentValue.substring(0, startIndex);
-    // The text to be replaced is from `startIndex` up to `cursorPos`
-    // const textToReplace = currentValue.substring(startIndex, cursorPos); 
-    const textAfterInsertionPoint = currentValue.substring(cursorPos);
+    const textBeforeLinkStart = currentValue.substring(0, startIndex);
 
-    const newLink = `[[${title}]]`;
-    textarea.value = textBeforeLink + newLink + textAfterInsertionPoint;
+    // Determine endIndex for replacement
+    let endIndex = cursorPos;
+    if (currentValue.substring(cursorPos, cursorPos + 2) === ']]') {
+        endIndex = cursorPos + 2;
+    }
 
-    const newCursorPos = startIndex + newLink.length;
+    const newLinkContent = `[[${title}]]`;
+    const textAfterReplacedPart = currentValue.substring(endIndex);
+
+    textarea.value = textBeforeLinkStart + newLinkContent + textAfterReplacedPart;
+
+    const newCursorPos = startIndex + newLinkContent.length;
     textarea.selectionStart = textarea.selectionEnd = newCursorPos;
     textarea.focus();
 
+    // It's important to dispatch an input event if other listeners might depend on it,
+    // but be cautious if this could re-trigger the suggestion logic unnecessarily.
+    // For now, keeping it as it might be used for other features or by `handleAutoCloseBrackets` logic.
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
@@ -1226,13 +1234,10 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
     textarea.addEventListener('input', (event) => {
         const currentTextarea = event.target;
         const cursorPos = currentTextarea.selectionStart;
+        const currentTextarea = event.target;
+        const cursorPos = currentTextarea.selectionStart;
         const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
-        const textAfterCursor = currentTextarea.value.substring(cursorPos);
-
-        if (textAfterCursor.startsWith(']]')) {
-            closeSuggestionsPopup();
-            return;
-        }
+        // const textAfterCursor = currentTextarea.value.substring(cursorPos); // Not strictly needed for the revised logic
 
         const linkPattern = /\[\[([a-zA-Z0-9_-\s]{2,})$/;
         const match = textBeforeCursor.match(linkPattern);
@@ -1253,15 +1258,21 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
                     closeSuggestionsPopup();
                 });
         } else {
-            // More refined closing: only close if we are not within a potential link pattern
-            // e.g. if user types space after [[ or deletes text
-             const justBeforeCursor = textBeforeCursor.slice(-2);
-             const twoCharsBefore = textBeforeCursor.slice(-3, -1); //e.g. "[[a" -> "[[", " [[" -> " ["
-             if (justBeforeCursor !== '[[' && !textBeforeCursor.match(/\[\[[^\]]*$/) && twoCharsBefore !== '[[') {
-                 closeSuggestionsPopup();
-             } else if (textBeforeCursor.endsWith(' ') && textBeforeCursor.slice(-3).startsWith('[[')){ // Close if space after [[
-                 closeSuggestionsPopup();
-             }
+            // If the pattern [[search_term is not before the cursor,
+            // or if the link is fully formed like [[search_term]] by manual typing, then close.
+            if (textBeforeCursor.endsWith(']]')) { // User manually typed closing brackets
+                closeSuggestionsPopup();
+            } else {
+                // This part handles closing when the user moves cursor away or deletes text
+                // such that [[pattern is no longer met.
+                // Check if the cursor is still within a potential link context that just doesn't meet min length yet
+                const potentialLinkPattern = /\[\[([a-zA-Z0-9_-\s]*)$/;
+                if (!textBeforeCursor.match(potentialLinkPattern)) {
+                     closeSuggestionsPopup();
+                }
+                // If it matches potentialLinkPattern but not linkPattern (e.g. "[[a"), do nothing, wait for more input.
+                // If it does not match potentialLinkPattern (e.g. "[[a] b" or "x [[a"), close.
+            }
         }
     });
 
@@ -1440,13 +1451,10 @@ function editNote(id, currentContentText) {
     textarea.addEventListener('input', (event) => {
         const currentTextarea = event.target;
         const cursorPos = currentTextarea.selectionStart;
+        const currentTextarea = event.target;
+        const cursorPos = currentTextarea.selectionStart;
         const textBeforeCursor = currentTextarea.value.substring(0, cursorPos);
-        const textAfterCursor = currentTextarea.value.substring(cursorPos);
-
-        if (textAfterCursor.startsWith(']]')) {
-            closeSuggestionsPopup();
-            return;
-        }
+        // const textAfterCursor = currentTextarea.value.substring(cursorPos); // Not strictly needed
 
         const linkPattern = /\[\[([a-zA-Z0-9_-\s]{2,})$/;
         const match = textBeforeCursor.match(linkPattern);
@@ -1467,13 +1475,21 @@ function editNote(id, currentContentText) {
                     closeSuggestionsPopup();
                 });
         } else {
-             const justBeforeCursor = textBeforeCursor.slice(-2);
-             const twoCharsBefore = textBeforeCursor.slice(-3, -1);
-             if (justBeforeCursor !== '[[' && !textBeforeCursor.match(/\[\[[^\]]*$/) && twoCharsBefore !== '[[') {
-                 closeSuggestionsPopup();
-             } else if (textBeforeCursor.endsWith(' ') && textBeforeCursor.slice(-3).startsWith('[[')){
-                 closeSuggestionsPopup();
-             }
+            // If the pattern [[search_term is not before the cursor,
+            // or if the link is fully formed like [[search_term]] by manual typing, then close.
+            if (textBeforeCursor.endsWith(']]')) { // User manually typed closing brackets
+                closeSuggestionsPopup();
+            } else {
+                // This part handles closing when the user moves cursor away or deletes text
+                // such that [[pattern is no longer met.
+                // Check if the cursor is still within a potential link context that just doesn't meet min length yet
+                const potentialLinkPattern = /\[\[([a-zA-Z0-9_-\s]*)$/;
+                if (!textBeforeCursor.match(potentialLinkPattern)) {
+                     closeSuggestionsPopup();
+                }
+                // If it matches potentialLinkPattern but not linkPattern (e.g. "[[a"), do nothing, wait for more input.
+                // If it does not match potentialLinkPattern (e.g. "[[a] b" or "x [[a"), close.
+            }
         }
     });
 
