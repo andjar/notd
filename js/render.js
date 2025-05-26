@@ -257,7 +257,7 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
             <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}"
                  data-note-id="${note.id}" 
                  data-level="${level}" 
-                 data-content="${note.content.replace(/"/g, '&quot;')}"> {/* Store raw content for editing */}
+                 data-content="${note.content.replace(/"/g, '&quot;')}">
                 <div class="outline-content" ${blockId ? `data-block-id="${blockId}"` : ''}>
                     ${controlsHtml}
                     ${contentHtml}
