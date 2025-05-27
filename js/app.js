@@ -141,7 +141,6 @@ async function loadPage(pageId) {
 
     try {
         document.getElementById('new-note').style.display = 'block';
-        document.getElementById('backlinks-container').style.display = 'block';
 
         // Use fetchPageData from api.js
         const data = await fetchPageData(pageId);
@@ -1234,7 +1233,6 @@ async function zoomInOnNote(targetNoteReference) {
 
     pageProperties.style.display = 'none';
     document.getElementById('new-note').style.display = 'none';
-    document.getElementById('backlinks-container').style.display = 'none';
 
     const breadcrumbsHtml = renderBreadcrumbs(path);
     outlineContainer.innerHTML = breadcrumbsHtml + (await renderOutline(focusedNotesArray, 0, prefetchedBlocks));
@@ -1370,7 +1368,6 @@ async function zoomOut() {
     clearActiveBlock(); // clearActiveBlock is in ui.js
 
     document.getElementById('new-note').style.display = 'block';
-    document.getElementById('backlinks-container').style.display = 'block';
 
     if (currentPage && currentPage.id) {
         await loadPage(currentPage.id); // loadPage is in app.js (coordination)

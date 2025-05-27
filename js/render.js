@@ -222,10 +222,11 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
  * @param {Array<Object>} notes - An array of note objects to render.
  * @param {number} [level=0] - The current indentation level for rendering.
  * @param {Object} [prefetchedBlocks={}] - A cache of prefetched block data for transclusions.
+ * @param {boolean} [showControls=true] - Whether to show bullet points and collapse arrows.
  * @returns {Promise<string>} A promise that resolves with the HTML string representing the rendered outline.
  * Depends on `renderNoteContent` and `renderPropertiesInline` (this file).
  */
-async function renderOutline(notes, level = 0, prefetchedBlocks = {}) { 
+async function renderOutline(notes, level = 0, prefetchedBlocks = {}, showControls = true) { 
     if (!notes || notes.length === 0) return ''; // Base case for recursion or empty notes list
 
     let html = '';
@@ -238,28 +239,28 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
         const hasChildren = note.children && note.children.length > 0;
         const hasChildrenClass = hasChildren ? 'has-children' : '';
         const linkedPageTypeClass = linkedPageType ? `linked-page-${linkedPageType.toLowerCase()}` : '';
+        const controlsClass = showControls ? '' : 'no-controls';
 
         // Format creation date and time for display
         const createdAt = new Date(note.created_at);
         const displayDate = createdAt.toLocaleDateString();
         const displayTime = createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // HTML for note controls (bullet, toggle arrow)
-        const controlsHtml = `
+        // HTML for note controls (bullet, toggle arrow) - only if showControls is true
+        const controlsHtml = showControls ? `
             <span class="static-bullet" data-action="zoom-in" title="Zoom in"></span>
             ${hasChildren ? 
                 `<span class="hover-arrow-toggle" data-action="toggle-children" title="Toggle children">
                      <svg class="arrow-svg" viewBox="0 0 192 512"><path d="M0 384.662V127.338c0-17.818 21.543-26.741 34.142-14.142l128.662 128.662c7.81 7.81 7.81 20.474 0 28.284L34.142 398.804C21.543 411.404 0 402.48 0 384.662z"></path></svg>
-                 </span>` : '' }`;
+                 </span>` : '' }` : '';
 
         // Main HTML structure for a single outline item
         const starClass = note.is_favorite ? 'active' : '';
         console.log('Initial render - Note ID:', note.id, 'is_favorite:', note.is_favorite, 'Has "active" class in HTML:', (note.is_favorite ? 'yes' : 'no'));
         const starButtonHtml = `<button class="favorite-star ${starClass}" data-action="toggle-favorite" title="Toggle favorite">★</button>`;
-        // console.log('Rendered star HTML for note ' + note.id + ':', starButtonHtml); // Optional: Log the full star HTML
 
         html += `
-            <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}"
+            <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass} ${controlsClass}"
                  data-note-id="${note.id}" 
                  data-level="${level}" 
                  data-content="${note.content.replace(/"/g, '&quot;')}">
@@ -282,7 +283,7 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
         // If the note has children, recursively render them within a nested container
         if (hasChildren) {
             html += `<div class="outline-children">`;
-            html += await renderOutline(note.children, level + 1, prefetchedBlocks); // Recursive call for children
+            html += await renderOutline(note.children, level + 1, prefetchedBlocks, showControls); // Pass showControls to children
             html += `</div>`;
         }
         html += `</div>`;
@@ -391,7 +392,7 @@ async function renderBacklinks(threads, containerId, pageId, isInitialLoad = tru
     for (const thread of threads) {
         const hierarchicalNotes = buildNoteTree(thread.notes);
         const threadContentHtml = hierarchicalNotes.length > 0
-            ? await renderOutline(hierarchicalNotes, 0, prefetchedBlocks) // `prefetchedBlocks` from state.js
+            ? await renderOutline(hierarchicalNotes, 0, prefetchedBlocks, true) // Keep controls for backlinks
             : '<p>Linked content is empty or could not be loaded.</p>';
         htmlFragment += `
             <div class="backlink-thread-item">

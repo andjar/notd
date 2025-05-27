@@ -2,14 +2,22 @@
 
 declare(strict_types=1);
 
+// Start output buffering at the very beginning of the file
+ob_start();
+
 /**
  * Initializes API request environment: output buffering, error handling, and content type.
  */
 function handle_api_request_start(): void {
-    ob_start();
+    // Set error handling before any potential errors
     error_reporting(E_ALL);
     ini_set('display_errors', '0');
     ini_set('log_errors', '1');
+
+    // Set headers before any output
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+    }
 
     // Ensure the logs directory exists
     $log_dir = __DIR__ . '/../logs';
@@ -25,7 +33,6 @@ function handle_api_request_start(): void {
     } else {
         ini_set('error_log', $log_dir . '/php_errors.log');
     }
-    
 
     set_error_handler(function($errno, $errstr, $errfile, $errline) {
         if (!(error_reporting() & $errno)) {
@@ -34,8 +41,6 @@ function handle_api_request_start(): void {
         }
         throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
     });
-
-    header('Content-Type: application/json');
 }
 
 /**
@@ -127,19 +132,18 @@ function execute_select_query(SQLite3 $db, string $sql, array $params = []): arr
  * @param int $http_status_code The HTTP status code to send (default is 200).
  */
 function send_json_response($data, int $http_status_code = 200): void {
-    if (headers_sent()) {
-        error_log("Warning: Headers already sent. Cannot set HTTP status code to {$http_status_code}.");
-    } else {
+    // Clean any output buffer before sending response
+    if (ob_get_length()) {
+        ob_clean();
+    }
+
+    if (!headers_sent()) {
         http_response_code($http_status_code);
     }
-    // Clear any previously buffered content if this is meant to be the final output
-    // and ob_start was called.
-    if (ob_get_length() > 0 && $http_status_code !== 200) { // Be cautious about clearing successful output
-         // ob_clean(); // Decided against auto-cleaning here, should be handled by error handler or main script.
-    }
+
     echo json_encode($data);
-    // Consider calling ob_end_flush() or exit here if this function always terminates the script.
-    // For now, it just sends the response.
+    ob_end_flush();
+    exit;
 }
 
 /**
@@ -156,36 +160,33 @@ function handle_api_error(Throwable $e, ?SQLite3 $db = null, ?SQLite3Stmt $stmt 
     $error_line = $e->getLine();
     
     error_log("API Error: {$error_message} in {$error_file} on line {$error_line}");
-    // For more detailed logging, you could include $e->getTraceAsString()
 
     $status_code = 500; // Default to Internal Server Error
 
-    if ($e instanceof InvalidArgumentException) { // Or any custom exception for client errors
+    if ($e instanceof InvalidArgumentException) {
         $status_code = 400; // Bad Request
-    } elseif ($e instanceof ErrorException && str_contains($e->getMessage(), "ailed to connect")) { // Example specific error
-        $status_code = 503; // Service Unavailable (e.g. DB down)
+    } elseif ($e instanceof ErrorException && str_contains($e->getMessage(), "ailed to connect")) {
+        $status_code = 503; // Service Unavailable
     } else {
-        // Use exception code if it's a valid HTTP status code
         $exception_code = $e->getCode();
         if (is_int($exception_code) && $exception_code >= 400 && $exception_code < 600) {
             $status_code = $exception_code;
         }
     }
-    
-    // Clean any output buffer that might have started before the error occurred
+
+    // Clean output buffer
     if (ob_get_length()) {
         ob_clean();
     }
 
-    // Ensure headers are not already sent before trying to set new ones
+    // Send error response
     if (!headers_sent()) {
         http_response_code($status_code);
-        // header('Content-Type: application/json'); // This should be set by handle_api_request_start
     }
 
     echo json_encode(['error' => $error_message]);
 
-    // Attempt to close resources
+    // Close resources
     if ($stmt !== null) {
         try {
             $stmt->close();
@@ -200,8 +201,8 @@ function handle_api_error(Throwable $e, ?SQLite3 $db = null, ?SQLite3Stmt $stmt 
             error_log("Error closing SQLite3 connection: " . $close_db_ex->getMessage());
         }
     }
-    
-    // Terminate script execution after handling the error
+
+    ob_end_flush();
     exit;
 }
 

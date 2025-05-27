@@ -582,8 +582,14 @@ function clearActiveBlock() {
  */
 function handleGlobalKeyDown(event) {
     console.log('Global keydown listener triggered by key:', event.key, 'Ctrl:', event.ctrlKey, 'Shift:', event.shiftKey, 'Target:', event.target.tagName, 'at:', new Date().toLocaleTimeString());
+    
     // Ignore keydowns if a modal is active (e.g. search modal, image modal)
     if (document.querySelector('.modal')) {
+        return;
+    }
+
+    // Ignore keydowns if user is typing in a textarea or input field
+    if (event.target.tagName === 'TEXTAREA' || event.target.tagName === 'INPUT') {
         return;
     }
 
@@ -798,13 +804,13 @@ function initializeSidebarToggle() {
     if (isInitiallyMobile) {
         sidebar.classList.add('collapsed');
         mainContent.classList.remove('main-content-shifted-right');
-        toggleButton.innerHTML = '✕';
+        toggleButton.innerHTML = '☰';
         isCollapsed = true;
     } else {
         // Default to open on wide screens
         sidebar.classList.remove('collapsed');
         mainContent.classList.add('main-content-shifted-right');
-        toggleButton.innerHTML = '☰';
+        toggleButton.innerHTML = '✕';
         isCollapsed = false;
     }
     toggleButton.style.display = 'flex'; // Always visible
@@ -812,7 +818,7 @@ function initializeSidebarToggle() {
     function toggleSidebar() {
         isCollapsed = sidebar.classList.toggle('collapsed'); // State determined by class presence
         mainContent.classList.toggle('main-content-shifted-right');
-        toggleButton.innerHTML = isCollapsed ? '✕' : '☰';
+        toggleButton.innerHTML = isCollapsed ? '☰' : '✕';
     }
 
     toggleButton.addEventListener('click', toggleSidebar);
@@ -863,7 +869,7 @@ function initializeRightSidebarToggle() {
 
     // Set initial button text based on the (now JS-enforced) initial state
     // The 'collapsed' class is now definitely on rightSidebar.
-    toggleButton.innerHTML = 'SQL'; // Or some icon indicating "open"
+    toggleButton.innerHTML = '☰'; // Or some icon indicating "open"
     // This 'else' branch for button text is now effectively dead code due to explicit collapsing,
     // but kept for logical completeness if the explicit add('collapsed') was ever removed.
     // if (rightSidebar.classList.contains('collapsed')) {
@@ -877,7 +883,7 @@ function initializeRightSidebarToggle() {
         mainContent.classList.toggle('main-content-shifted-left');
 
         if (isCollapsed) {
-            toggleButton.innerHTML = 'SQL'; // Text when sidebar is collapsed (prompt to open)
+            toggleButton.innerHTML = '☰'; // Text when sidebar is collapsed (prompt to open)
         } else {
             toggleButton.innerHTML = '✕';   // Text when sidebar is open (prompt to close)
         }
@@ -1466,8 +1472,53 @@ async function fetchAndRenderCustomNotes(query, containerElement, runButton) {
     runButton.textContent = 'Running...';
 
     try {
-        const notes = await fetchCustomQueryNotes(query); // Assumes fetchCustomQueryNotes is in js/api.js
-        renderCustomNotes(notes, containerElement);
+        const response = await fetch('api/query_notes.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: query })
+        });
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Server returned non-JSON response');
+        }
+
+        const data = await response.json();
+        console.log('API Response:', data); // Debug log
+        
+        // Handle both array and object responses
+        const notes = Array.isArray(data) ? data : (data.notes || []);
+        
+        if (data.error) {
+            throw new Error(data.message || 'Unknown error occurred');
+        }
+
+        if (!notes || notes.length === 0) {
+            console.log('No notes found in response'); // Debug log
+            containerElement.innerHTML = '<p style="padding:10px;">No notes found for this query.</p>';
+            return;
+        }
+
+        console.log('Number of notes received:', notes.length); // Debug log
+
+        // Create a flat list of notes without children
+        const flatNotes = notes.map(note => ({
+            ...note,
+            children: [] // Ensure no children are included
+        }));
+
+        // Render the notes using renderOutline with showControls: false
+        const renderedHtml = await renderOutline(flatNotes, 0, prefetchedBlocks, false);
+        console.log('Rendered HTML length:', renderedHtml.length); // Debug log
+        
+        // Set the rendered content directly in the container with padding
+        containerElement.innerHTML = `
+            <div style="padding: 0 15px;">
+                ${renderedHtml}
+            </div>`;
+
     } catch (error) {
         console.error('Error fetching or rendering custom notes:', error);
         containerElement.innerHTML = `<p style="padding:10px; color:red;">Error: ${error.message}</p>`;
@@ -1478,8 +1529,62 @@ async function fetchAndRenderCustomNotes(query, containerElement, runButton) {
 }
 
 /**
+ * Shows the query editor modal for the right sidebar.
+ */
+function showQueryEditorModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="query-editor-modal">
+            <h3>Edit Query</h3>
+            <textarea id="query-editor-input" placeholder="Enter your SQL query...">${localStorage.getItem('customSQLQuery') || ''}</textarea>
+            <div class="button-group">
+                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
+                <button class="btn-primary" onclick="saveAndRunQuery()">Save & Run</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close modal on click outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+/**
+ * Saves the current query and runs it.
+ */
+function saveAndRunQuery() {
+    const queryInput = document.getElementById('query-editor-input');
+    const query = queryInput.value.trim();
+    
+    if (!query) {
+        alert('Please enter a query');
+        return;
+    }
+    
+    localStorage.setItem('customSQLQuery', query);
+    
+    // Close the modal
+    const modal = queryInput.closest('.modal');
+    if (modal) {
+        modal.remove();
+    }
+    
+    // Run the query
+    const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
+    const runButton = document.getElementById('edit-query-button');
+    if (notesDisplayContainer && runButton) {
+        fetchAndRenderCustomNotes(query, notesDisplayContainer, runButton);
+    }
+}
+
+/**
  * Initializes the functionality for the right sidebar's custom notes query section.
- * Sets up element selections, loads saved queries, and attaches event listeners.
  */
 function initializeRightSidebarNotes() {
     const queryInput = document.getElementById('sql-query-input');
@@ -1497,6 +1602,28 @@ function initializeRightSidebarNotes() {
         queryInput.value = savedQuery;
     }
 
+    // Add edit button next to the title
+    const titleElement = document.querySelector('.sql-query-container h3');
+    if (titleElement) {
+        const editButton = document.createElement('button');
+        editButton.id = 'edit-query-button';
+        editButton.className = 'btn-secondary';
+        editButton.style.marginLeft = '10px';
+        editButton.style.fontSize = '0.8em';
+        editButton.textContent = 'Edit';
+        titleElement.appendChild(editButton);
+
+        // Add click handler for edit button
+        editButton.addEventListener('click', () => {
+            showQueryEditorModal();
+            // Hide the query input container
+            const queryContainer = document.querySelector('.sql-query-container');
+            if (queryContainer) {
+                queryContainer.style.display = 'none';
+            }
+        });
+    }
+
     runQueryButton.addEventListener('click', () => {
         const query = queryInput.value.trim();
         localStorage.setItem('customSQLQuery', query); // Save current query
@@ -1507,11 +1634,11 @@ function initializeRightSidebarNotes() {
         }
         fetchAndRenderCustomNotes(query, notesDisplayContainer, runQueryButton);
     });
-    
-    // Optionally, run the saved query automatically on load if it exists.
-    // if (savedQuery && savedQuery.trim()) {
-    //     fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
-    // }
+
+    // Run the saved query if it exists
+    if (savedQuery && savedQuery.trim()) {
+        fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
+    }
 
     // Auto-update logic
     let rightSidebarAutoUpdateInterval = null;
@@ -1521,27 +1648,20 @@ function initializeRightSidebarNotes() {
 
     if (rightSidebarEl && queryInput && notesDisplayContainer && runQueryButton) {
         rightSidebarAutoUpdateInterval = setInterval(() => {
-            // Re-check elements inside interval in case they become unavailable
             const currentQueryInput = document.getElementById('sql-query-input');
             const currentNotesDisplayContainer = document.getElementById('right-sidebar-notes-content');
             const currentRunQueryButton = document.getElementById('run-sql-query');
             const currentRightSidebarEl = document.querySelector('.right-sidebar');
 
             if (!currentQueryInput || !currentNotesDisplayContainer || !currentRunQueryButton || !currentRightSidebarEl) {
-                // console.warn('Auto-update: One or more elements missing, skipping update.');
                 return;
             }
 
             const currentQuery = currentQueryInput.value.trim();
             if (!currentRightSidebarEl.classList.contains('collapsed') && currentQuery) {
-                // console.log('Auto-updating right sidebar notes...'); // For debugging
-                // Ensure fetchAndRenderCustomNotes doesn't show 'Loading...' or disable button if it's an auto-update
-                // For now, it will behave the same as a manual click. This can be refined later if needed.
                 fetchAndRenderCustomNotes(currentQuery, currentNotesDisplayContainer, currentRunQueryButton);
             }
         }, updateFrequencyMs);
-    } else {
-        console.error("Could not initialize right sidebar auto-update: one or more key elements not found initially.");
     }
 }
 

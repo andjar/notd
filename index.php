@@ -18,8 +18,8 @@ if (!file_exists($dbPath)) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
 </head>
 <body>
-    <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
-    <button id="right-sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Right Sidebar">SQL</button>
+    <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar"></button>
+    <button id="right-sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Right Sidebar"></button>
     <div class="container">
         <div class="sidebar">
             <a href="#" id="home-button" class="home-link">notd</a>

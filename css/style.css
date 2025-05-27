@@ -68,7 +68,8 @@ body {
     top: 0; 
     height: 100vh; 
     overflow-y: auto;
-    transition: transform 0.3s ease, width 0.3s ease;
+    transform: translateX(0);
+    transition: transform 0.2s ease;
 }
 
 .sidebar.collapsed {
@@ -79,29 +80,29 @@ body {
     border-right: none;
 }
 
-.sidebar-toggle { /* Generic styles for both toggles */
+.sidebar-toggle {
     position: fixed;
     top: 20px;
     z-index: 1000;
-    background: var(--accent-color);
-    color: white;
+    background: none;
+    color: var(--text-muted);
     border: none;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.3s ease, background-color 0.3s ease;
-    box-shadow: var(--shadow-md);
+    transition: color 0.2s ease;
+    font-size: 1.2em;
 }
 
 .sidebar-toggle:hover {
-    transform: scale(1.1);
+    color: var(--text-color);
+    transform: none;
 }
 
-#sidebar-toggle { /* Specific to left sidebar toggle */
+#sidebar-toggle {
     left: 20px;
 }
 
@@ -119,7 +120,8 @@ body {
     top: 0;
     height: 100vh;
     overflow-y: auto;
-    transition: transform 0.3s ease, width 0.3s ease, padding 0.3s ease;
+    transform: translateX(0);
+    transition: transform 0.2s ease;
 }
 
 .right-sidebar.collapsed {
@@ -135,27 +137,43 @@ body {
     /* Additional specific styles if needed, defaults are from .sidebar-toggle */
 }
 
-
 @media (max-width: 768px) {
-    .sidebar { /* Left sidebar */
+    .sidebar, .right-sidebar {
         position: fixed;
-        z-index: 999; /* Ensure it's above main content but below toggle */
+        z-index: 999;
     }
+    
     .right-sidebar {
-        position: fixed;
-        right: 0; /* Stick to the right edge */
-        z-index: 998; /* Slightly lower than left, if both could be open, or manage via JS */
+        right: 0;
     }
-    /* On smaller screens, toggles are always visible */
-    /* #sidebar-toggle, #right-sidebar-toggle {
-        display: flex !important; 
-    } */
-    /* This !important might be too strong if we want JS to handle it based on state.
-       The default for .sidebar-toggle is display: flex, so it should be visible.
-       The JS handleResize currently does show/hide for #sidebar-toggle based on width.
-       We will adjust JS to make #sidebar-toggle always flex.
-       And #right-sidebar-toggle is always flex by default.
-    */
+    
+    .main-content {
+        margin: 0;
+    }
+    
+    .main-content-shifted-right,
+    .main-content-shifted-left,
+    .main-content-shifted-both {
+        margin: 0;
+    }
+    
+    /* Hide sidebars by default on mobile */
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .right-sidebar {
+        transform: translateX(100%);
+    }
+    
+    /* Show sidebars when not collapsed */
+    .sidebar:not(.collapsed) {
+        transform: translateX(0);
+    }
+    
+    .right-sidebar:not(.collapsed) {
+        transform: translateX(0);
+    }
 }
 
 /* 
@@ -168,27 +186,28 @@ The JS logic in handleResize will be updated to keep it visible.
     flex: 1;
     padding: 2rem;
     max-width: 100ch;   /* Sets a comfortable reading width */
-    margin-left: auto; /* Centers the content block when screen is wider than 100ch + sidebar(s) */
-    margin-right: auto;/* Centers the content block */
+    margin: 0 auto;
     overflow-y: auto;
     background: var(--bg-color);
     width: 100%;       /* Ensures it tries to fill available space up to max-width */
-    transition: margin-left 0.3s ease, margin-right 0.3s ease; /* Smooth transition for margin changes */
+    transition: margin 0.2s ease;
 }
 
-/* When left sidebar is open (default state on desktop), push main content */
-/* This might need to be dynamically applied by JS if left sidebar can also collapse on desktop */
-@media (min-width: 769px) {
-    .main-content-shifted-right { /* If left sidebar is open */
-        margin-left: var(--sidebar-width);
-    }
+/* When left sidebar is open */
+.main-content-shifted-right {
+    margin-left: var(--sidebar-width);
 }
 
-/* When right sidebar is open, push main content */
-.main-content-shifted-left { /* If right sidebar is open */
-    margin-right: var(--sidebar-width); /* Adjust based on actual right sidebar width */
+/* When right sidebar is open */
+.main-content-shifted-left {
+    margin-right: var(--sidebar-width);
 }
 
+/* When both sidebars are open */
+.main-content-shifted-both {
+    margin-left: var(--sidebar-width);
+    margin-right: var(--sidebar-width);
+}
 
 .calendar-panel { background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 12px; }
 .search-box { margin-bottom: 0px; }
@@ -316,6 +335,15 @@ The JS logic in handleResize will be updated to keep it visible.
     position: relative; 
     margin-bottom: var(--note-compact-margin-bottom); 
 }
+
+.outline-item.no-controls > .outline-content {
+    padding-left: 0; /* Remove left padding when no controls are shown */
+}
+
+.outline-item.no-controls .outline-children {
+    padding-left: 1.5em; /* Standard indentation for children without controls */
+}
+
 .outline-children {
     padding-left: var(--indentation-unit);
     position: relative; 
@@ -328,6 +356,66 @@ The JS logic in handleResize will be updated to keep it visible.
     overflow: visible; 
     min-height: calc(var(--controls-top-offset-children) + (var(--control-icon-size) / 2) + var(--note-content-compact-padding-y));
 }
+
+/* Hide controls when no-controls class is present */
+.outline-item.no-controls .static-bullet,
+.outline-item.no-controls .hover-arrow-toggle {
+    display: none;
+}
+
+/* Adjust spacing for todo items when no controls */
+.outline-item.no-controls .todo-item {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+/* Adjust spacing for lists when no controls */
+.outline-item.no-controls .outline-content ul,
+.outline-item.no-controls .outline-content ol {
+    padding-left: 1.5em; /* Standard list indentation */
+}
+
+/* Adjust spacing for blockquotes when no controls */
+.outline-item.no-controls .outline-content blockquote {
+    margin-left: 0;
+}
+
+/* Adjust spacing for code blocks when no controls */
+.outline-item.no-controls .outline-content pre {
+    margin-left: 0;
+}
+
+/* Adjust spacing for tables when no controls */
+.outline-item.no-controls .outline-content table {
+    margin-left: 0;
+}
+
+/* Adjust spacing for images when no controls */
+.outline-item.no-controls .outline-content img.note-image {
+    margin-left: 0;
+}
+
+/* Adjust spacing for horizontal rules when no controls */
+.outline-item.no-controls .outline-content hr {
+    margin-left: 0;
+}
+
+/* Adjust spacing for attachments when no controls */
+.outline-item.no-controls .outline-content .attachments {
+    margin-left: 0;
+}
+
+/* Adjust spacing for property tags when no controls */
+.outline-item.no-controls .outline-content .property-tag {
+    margin-left: 0;
+}
+
+/* Adjust spacing for block refs when no controls */
+.outline-item.no-controls .outline-content .block-ref-brackets,
+.outline-item.no-controls .outline-content .block-ref-link {
+    margin-left: 0;
+}
+
 .static-bullet, .hover-arrow-toggle {
     position: absolute; 
     top: var(--controls-top-offset-children); /* Default to children's offset */
@@ -552,7 +640,7 @@ a.property-tag:hover {
 .calendar-day.empty { cursor: default; background: transparent !important; }
 
 /* Backlinks Styling */
-#backlinks-container { margin-top: 2rem; padding: 1rem; background: var(--sidebar-bg); border-radius: var(--radius-md); }
+#backlinks-container { margin-top: 0; padding: 1rem; background: var(--sidebar-bg); border-radius: var(--radius-md); }
 .backlink-thread-item {
     margin-bottom: 1rem; padding: 1rem; background: var(--note-bg-color);
     border: 1px solid var(--border-color); border-radius: var(--radius-md);
@@ -566,6 +654,7 @@ a.property-tag:hover {
 .backlink-thread-content .outline-content { 
     font-size: 0.9em; color: var(--text-color); line-height: 1.6;
     word-wrap: break-word; overflow-wrap: break-word; white-space: normal;
+    padding-left: 1.5em; /* Add padding to prevent content overlap with bullets */
 }
 .backlink-thread-content .note-actions { display: none; } 
 
@@ -576,6 +665,152 @@ a.property-tag:hover {
 
 .backlink-thread-content .outline-content .hover-arrow-toggle {
     left: -0.7em; /* Adjust relative to the new bullet position, keeping it to the left */
+}
+
+/* Right Sidebar Note Styling */
+.right-sidebar-note-item {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: var(--note-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.right-sidebar-note-item .outline-content {
+    padding: 0; /* Remove default padding since we don't need space for bullets */
+    margin: 0;
+}
+
+.right-sidebar-note-item .outline-content p {
+    margin-bottom: 0.5rem;
+}
+
+.right-sidebar-note-item .outline-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Hide bullets and arrows in right sidebar */
+.right-sidebar-note-item .static-bullet,
+.right-sidebar-note-item .hover-arrow-toggle {
+    display: none;
+}
+
+/* Ensure proper spacing for todo items in right sidebar */
+.right-sidebar-note-item .todo-item {
+    margin: 0.5rem 0;
+    padding-left: 0; /* Remove left padding since we don't have bullets */
+}
+
+.right-sidebar-note-item .todo-checkbox {
+    margin-right: 0.5rem;
+}
+
+/* Ensure proper spacing for lists in right sidebar */
+.right-sidebar-note-item .outline-content ul,
+.right-sidebar-note-item .outline-content ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem; /* Standard list indentation */
+}
+
+.right-sidebar-note-item .outline-content li {
+    margin: 0.25rem 0;
+}
+
+/* Ensure proper spacing for blockquotes in right sidebar */
+.right-sidebar-note-item .outline-content blockquote {
+    margin: 0.5rem 0;
+    padding: 0.5rem 1rem;
+    border-left: 3px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+/* Ensure proper spacing for code blocks in right sidebar */
+.right-sidebar-note-item .outline-content pre {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+}
+
+/* Ensure proper spacing for tables in right sidebar */
+.right-sidebar-note-item .outline-content table {
+    width: 100%;
+    margin: 0.5rem 0;
+    border-collapse: collapse;
+}
+
+.right-sidebar-note-item .outline-content th,
+.right-sidebar-note-item .outline-content td {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+/* Ensure proper spacing for images in right sidebar */
+.right-sidebar-note-item .outline-content img.note-image {
+    max-width: 100%;
+    height: auto;
+    margin: 0.5rem 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+/* Ensure proper spacing for horizontal rules in right sidebar */
+.right-sidebar-note-item .outline-content hr {
+    margin: 0.5rem 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Ensure proper spacing for attachments in right sidebar */
+.right-sidebar-note-item .outline-content .attachments {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Ensure proper spacing for links in right sidebar */
+.right-sidebar-note-item .outline-content a {
+    color: var(--accent-color);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.right-sidebar-note-item .outline-content a:hover {
+    text-decoration: underline;
+}
+
+/* Ensure proper spacing for property tags in right sidebar */
+.right-sidebar-note-item .outline-content .property-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.8em;
+    color: var(--text-color);
+    margin: 2px;
+    white-space: nowrap;
+}
+
+/* Ensure proper spacing for block refs in right sidebar */
+.right-sidebar-note-item .outline-content .block-ref-brackets {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.right-sidebar-note-item .outline-content .block-ref-link {
+    color: var(--accent-color);
+    text-decoration: none;
+    font-family: monospace;
+    border-bottom: 1px dotted var(--border-color);
+}
+
+.right-sidebar-note-item .outline-content .block-ref-link:hover {
+    border-bottom-color: var(--accent-color);
 }
 
 /* All Pages (Sidebar & Modal) */
