@@ -57,7 +57,7 @@ body {
 .container { display: flex; min-height: 100vh; position: relative; }
 .sidebar {
     width: var(--sidebar-width); 
-    min-width: 280px;
+    min-width: 300px;
     background: var(--sidebar-bg); 
     padding: 20px;
     border-right: 1px solid var(--border-color); 
@@ -905,7 +905,6 @@ a.block-ref-link:hover {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
     z-index: 1000;
 }
 

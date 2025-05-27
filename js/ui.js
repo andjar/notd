@@ -1028,8 +1028,14 @@ async function toggleFavorite(noteId, starButton) {
  * Shows the favorites modal with all favorited notes.
  */
 async function showFavoritesModal() {
-    console.log('showFavoritesModal CALLED at:', new Date().toLocaleTimeString());
-    if (favoritesModal) return;
+    // First ensure any existing modal is properly removed
+    if (favoritesModal) {
+        const existingModal = document.querySelector('.page-search-overlay');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        favoritesModal = null;
+    }
     
     try {
         const response = await fetch('api/get_favorites.php');
@@ -1045,19 +1051,16 @@ async function showFavoritesModal() {
         modal.className = 'favorites-modal';
         
         let favoritesListHtml;
-        // Ensure favorites is an array before trying to access its length or map over it.
         if (Array.isArray(favorites) && favorites.length > 0) {
-            favoritesListHtml = favorites.map(note => {
-                console.log('Favorites Modal: Setting up View button for page_id:', note.page_id, 'Processed page_id for onclick:', String(note.page_id).replace(/'/g, "\\'"));
-                return `
+            favoritesListHtml = favorites.map(note => `
                 <div class="favorite-item">
                     <div class="note-content">${note.content}</div>
                     <div class="note-actions">
                         <button class="btn-secondary" onclick="navigateToPage('${String(note.page_id).replace(/'/g, "\\'")}')">View</button>
                         <button class="btn-secondary" onclick="removeFavorite('${String(note.id).replace(/'/g, "\\'")}', this)">Remove</button>
                     </div>
-                </div>`;
-            }).join('');
+                </div>
+            `).join('');
         } else {
             favoritesListHtml = '<div class="favorites-empty-message" style="padding: 10px; text-align: center; color: #555;">No favorite notes yet</div>';
         }
@@ -1067,71 +1070,50 @@ async function showFavoritesModal() {
             <div class="favorites-list">
                 ${favoritesListHtml}
             </div>
-            <button class="btn-secondary" style="margin-top:15px;" onclick="closeFavoritesModal()">Close</button>
+            <button class="btn-secondary close-favorites-btn" style="margin-top:15px;">Close</button>
         `;
         
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         
-        favoritesModal = overlay; // Assign the created overlay to the global variable
+        favoritesModal = overlay;
         
-        // Close on overlay click - Listener attached to the global favoritesModal reference
-        favoritesModal.addEventListener('click', (e) => {
-            // Check if the direct target of the click is the overlay itself
-            if (e.target === favoritesModal) { 
+        // Create a single close handler function
+        const closeHandler = (e) => {
+            if (e.target === overlay || e.target.classList.contains('close-favorites-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
                 closeFavoritesModal();
             }
-        });
+        };
+        
+        // Add event listener for both overlay and close button
+        overlay.addEventListener('click', closeHandler);
         
     } catch (error) {
         console.error('Error showing favorites:', error);
-
-        // Ensure any existing modal is closed before showing an error modal
-        if (favoritesModal) { // If a modal (potentially broken) exists
-            closeFavoritesModal(); // Attempt to close it and nullify the global reference
-        }
-
-        // Now create and show the error modal
-        favoritesModal = document.createElement('div'); // Assign to the global var
-        favoritesModal.className = 'page-search-overlay'; // Or a more specific 'favorites-overlay' class
-
-        let modalContentDiv = document.createElement('div');
-        modalContentDiv.className = 'favorites-modal'; // Or your specific class for the content part
-
-        modalContentDiv.innerHTML = `
-            <h3>Favorite Notes</h3>
-            <p class="error-message" style="color: red; padding: 10px;">Failed to load favorites: ${error.message}</p>
-            <button class="btn-secondary" style="margin-top:15px;" onclick="closeFavoritesModal()">Close</button>
-        `;
-        favoritesModal.appendChild(modalContentDiv);
-        document.body.appendChild(favoritesModal);
-
-        // Add click listener for this new error overlay to close it
-        favoritesModal.addEventListener('click', (e) => {
-            if (e.target === favoritesModal) { // Only close if the overlay backdrop is clicked
-                closeFavoritesModal();
-            }
-        });
+        alert('Failed to load favorites');
     }
 }
 
-/**
- * Closes the favorites modal.
- */
 function closeFavoritesModal() {
-    console.log('Attempting to close favorites modal. Current favoritesModal:', favoritesModal);
-    if (favoritesModal) {
-        if (favoritesModal.parentNode) { // Check if it's actually in the DOM
-            favoritesModal.parentNode.removeChild(favoritesModal);
-        }
-        // Alternatively, if you are sure favoritesModal is always the overlay element and directly under body:
-        // if (document.body.contains(favoritesModal)) {
-        //     favoritesModal.remove(); // Modern browsers
-        // }
-        favoritesModal = null; // Crucially, always nullify the global reference
-        console.log('Favorites modal reference set to null.');
-    } else {
-        console.log('favoritesModal was already null or undefined, nothing to close.');
+    if (!favoritesModal) return;
+    
+    // Store reference to the modal
+    const modalToRemove = favoritesModal;
+    
+    // Clear the global reference first to prevent multiple close attempts
+    favoritesModal = null;
+    
+    // Remove the modal from DOM
+    if (modalToRemove && modalToRemove.parentNode) {
+        modalToRemove.parentNode.removeChild(modalToRemove);
+    }
+    
+    // Double-check if any modal is still in the DOM and remove it
+    const remainingModal = document.querySelector('.page-search-overlay');
+    if (remainingModal) {
+        remainingModal.remove();
     }
 }
 

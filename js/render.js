@@ -441,7 +441,7 @@ function renderSearchResults(results) {
             <div class="search-result-inline-item" 
                  onclick="navigateToPage('${result.page_id}'); searchInput.value=''; this.parentElement.remove();">
                 <strong>${result.page_title || result.page_id}</strong>: 
-                ${result.content.substring(0, 100)}... {/* Show a snippet of content */}
+                ${result.content.substring(0, 100)}...
             </div>
         `).join('');
         // `navigateToPage` is from app.js.
