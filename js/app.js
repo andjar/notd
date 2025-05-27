@@ -1,9 +1,10 @@
 marked.setOptions({
     highlight: function(code, lang) {
+        const currentCode = (typeof code === 'string') ? code : ''; // Ensure code is a string
         if (lang && hljs.getLanguage(lang)) {
-            return hljs.highlight(code, { language: lang }).value;
+            return hljs.highlight(currentCode, { language: lang }).value;
         }
-        return hljs.highlightAuto(code).value;
+        return hljs.highlightAuto(currentCode).value;
     }
 });
 
@@ -19,6 +20,7 @@ marked.setOptions({
 // (searchInput, recentPagesList, newPageButton, pageTitle, pageProperties, outlineContainer)
 
 async function navigateToPage(pageId) {
+    console.log('navigateToPage called with pageId:', pageId); // Log pageId
     const targetHash = String(pageId).startsWith('#') ? String(pageId).substring(1) : String(pageId);
     const currentHash = window.location.hash.substring(1);
 
@@ -510,6 +512,11 @@ function handleOutlineClick(event) {
             fileInput.click();
             break;
         case 'delete': deleteNote(noteIdForAction); break;
+        case 'toggle-favorite':
+            if (target.classList.contains('favorite-star')) {
+                toggleFavorite(noteIdForAction, target); // toggleFavorite is in ui.js
+            }
+            break;
         default:
             break;
     }

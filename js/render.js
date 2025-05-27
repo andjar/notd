@@ -253,6 +253,11 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
                  </span>` : '' }`;
 
         // Main HTML structure for a single outline item
+        const starClass = note.is_favorite ? 'active' : '';
+        console.log('Initial render - Note ID:', note.id, 'is_favorite:', note.is_favorite, 'Has "active" class in HTML:', (note.is_favorite ? 'yes' : 'no'));
+        const starButtonHtml = `<button class="favorite-star ${starClass}" data-action="toggle-favorite" title="Toggle favorite">★</button>`;
+        // console.log('Rendered star HTML for note ' + note.id + ':', starButtonHtml); // Optional: Log the full star HTML
+
         html += `
             <div class="outline-item ${linkedPageTypeClass} ${hasChildrenClass}"
                  data-note-id="${note.id}" 
@@ -263,7 +268,7 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
                     ${contentHtml}
                     ${note.properties && Object.keys(note.properties).length > 0 ? renderPropertiesInline(note.properties) : ''}
                     <div class="note-actions">
-                        <button class="favorite-star ${note.favorite ? 'active' : ''}" data-action="toggle-favorite" title="Toggle favorite">★</button>
+                        ${starButtonHtml}
                         <button data-action="add-child" title="Add child note">+</button>
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
                         <button data-action="edit" title="Edit note">✎</button>
@@ -618,7 +623,12 @@ function renderNote(note, level = 0, parentId = null) {
     noteElement.className = 'outline-item';
     noteElement.dataset.noteId = note.id;
     noteElement.dataset.level = level;
-    noteElement.dataset.content = note.content;
+    noteElement.dataset.content = note.content; // Ensure raw content is stored
+    // Add is_favorite to dataset if needed for other JS, though classList.toggle is primary for UI
+    if (note.is_favorite) {
+        noteElement.dataset.isFavorite = "true";
+    }
+
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'outline-content';
@@ -647,7 +657,9 @@ function renderNote(note, level = 0, parentId = null) {
     
     // Add favorite star
     const starButton = document.createElement('button');
-    starButton.className = 'favorite-star' + (note.favorite ? ' active' : '');
+    // Use note.is_favorite (boolean expected from API)
+    console.log('Initial render (renderNote) - Note ID:', note.id, 'is_favorite:', note.is_favorite, 'Has "active" class:', (note.is_favorite ? 'yes' : 'no'));
+    starButton.className = 'favorite-star' + (note.is_favorite ? ' active' : ''); 
     starButton.innerHTML = '★';
     starButton.onclick = (e) => {
         e.stopPropagation();

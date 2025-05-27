@@ -886,7 +886,7 @@ a.block-ref-link:hover {
     color: var(--text-muted);
     transition: all 0.2s;
     cursor: pointer;
-    font-size: 1.2em;
+    font-size: var(--note-actions-icon-size); /* Adjusted to match other icons */
     padding: var(--note-actions-button-padding);
     background: none;
     border: none;
@@ -903,8 +903,8 @@ a.block-ref-link:hover {
 }
 
 .note-actions .favorite-star.active {
-    color: #f59e0b;
-    opacity: 1;
+    color: #f59e0b; /* Gold or yellow */
+    opacity: 1; /* Assuming full opacity for active state is desired */
 }
 
 /* Favorites Modal Styles */

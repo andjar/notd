@@ -52,8 +52,8 @@ if (!file_exists($dbPath)) {
     <script src="js/state.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/api.js"></script>
-    <script src="js/render.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/render.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html> 

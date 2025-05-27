@@ -2,11 +2,8 @@
 // (e.g., event handlers, DOM manipulation, modal logic)
 
 // Initialize highlight.js
-document.addEventListener('DOMContentLoaded', () => {
-    if (typeof hljs !== 'undefined') {
-        hljs.highlightAll();
-    }
-});
+// Removed hljs.highlightAll() from here as content is loaded dynamically.
+// Highlighting is handled by the marked.setOptions in app.js for dynamic content.
 
 // --- DOM Element Selections ---
 // These constants store references to frequently used DOM elements.
@@ -406,6 +403,7 @@ function clearActiveBlock() {
  * Calls UI functions from this file: `setActiveBlock`, `clearActiveBlock`, `navigateBlocks`.
  */
 function handleGlobalKeyDown(event) {
+    console.log('Global keydown listener triggered by key:', event.key, 'Ctrl:', event.ctrlKey, 'Shift:', event.shiftKey, 'Target:', event.target.tagName, 'at:', new Date().toLocaleTimeString());
     // Ignore keydowns if a modal is active (e.g. search modal, image modal)
     if (document.querySelector('.modal')) {
         return;
@@ -828,6 +826,7 @@ let favoritesModal = null;
  * @param {HTMLElement} starButton - The star button element.
  */
 async function toggleFavorite(noteId, starButton) {
+    console.log('Toggling favorite for note ID:', noteId); // Log API Request
     try {
         const response = await fetch('api/toggle_favorite.php', {
             method: 'POST',
@@ -840,9 +839,13 @@ async function toggleFavorite(noteId, starButton) {
         if (!response.ok) throw new Error('Failed to toggle favorite');
         
         const result = await response.json();
+        console.log('API response for toggle favorite:', result); // Log API Response
         if (result.error) throw new Error(result.error);
         
+        console.log('toggleFavorite API response - result.is_favorite:', result.is_favorite); // Added log
         starButton.classList.toggle('active', result.is_favorite);
+        console.log('Star button classList after toggle (noteId: ' + noteId + '):', starButton.classList);
+        console.log('Raw starButton element:', starButton); // To inspect its properties in console
         
     } catch (error) {
         console.error('Error toggling favorite:', error);
@@ -854,6 +857,7 @@ async function toggleFavorite(noteId, starButton) {
  * Shows the favorites modal with all favorited notes.
  */
 async function showFavoritesModal() {
+    console.log('showFavoritesModal CALLED at:', new Date().toLocaleTimeString());
     if (favoritesModal) return;
     
     try {
@@ -868,18 +872,29 @@ async function showFavoritesModal() {
         
         const modal = document.createElement('div');
         modal.className = 'favorites-modal';
+        
+        let favoritesListHtml;
+        // Ensure favorites is an array before trying to access its length or map over it.
+        if (Array.isArray(favorites) && favorites.length > 0) {
+            favoritesListHtml = favorites.map(note => {
+                console.log('Favorites Modal: Setting up View button for page_id:', note.page_id, 'Processed page_id for onclick:', String(note.page_id).replace(/'/g, "\\'"));
+                return `
+                <div class="favorite-item">
+                    <div class="note-content">${note.content}</div>
+                    <div class="note-actions">
+                        <button class="btn-secondary" onclick="navigateToPage('${String(note.page_id).replace(/'/g, "\\'")}')">View</button>
+                        <button class="btn-secondary" onclick="removeFavorite('${String(note.id).replace(/'/g, "\\'")}', this)">Remove</button>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            favoritesListHtml = '<div class="favorites-empty-message" style="padding: 10px; text-align: center; color: #555;">No favorite notes yet</div>';
+        }
+        
         modal.innerHTML = `
             <h3>Favorite Notes</h3>
             <div class="favorites-list">
-                ${favorites.length ? favorites.map(note => `
-                    <div class="favorite-item">
-                        <div class="note-content">${note.content}</div>
-                        <div class="note-actions">
-                            <button class="btn-secondary" onclick="navigateToPage('${note.page_id}')">View</button>
-                            <button class="btn-secondary" onclick="removeFavorite('${note.id}', this)">Remove</button>
-                        </div>
-                    </div>
-                `).join('') : '<div class="favorite-item">No favorite notes yet</div>'}
+                ${favoritesListHtml}
             </div>
             <button class="btn-secondary" style="margin-top:15px;" onclick="closeFavoritesModal()">Close</button>
         `;
@@ -887,18 +902,45 @@ async function showFavoritesModal() {
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         
-        favoritesModal = overlay;
+        favoritesModal = overlay; // Assign the created overlay to the global variable
         
-        // Close on overlay click
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
+        // Close on overlay click - Listener attached to the global favoritesModal reference
+        favoritesModal.addEventListener('click', (e) => {
+            // Check if the direct target of the click is the overlay itself
+            if (e.target === favoritesModal) { 
                 closeFavoritesModal();
             }
         });
         
     } catch (error) {
         console.error('Error showing favorites:', error);
-        alert('Failed to load favorites');
+        
+        // Ensure a modal structure exists to display the error
+        if (!favoritesModal) {
+            favoritesModal = document.createElement('div');
+            favoritesModal.className = 'page-search-overlay'; // Use the same class as successful path for consistency
+            document.body.appendChild(favoritesModal);
+            // Add click listener for this new overlay
+            favoritesModal.addEventListener('click', (e) => {
+                if (e.target === favoritesModal) {
+                    closeFavoritesModal();
+                }
+            });
+        }
+
+        let modalContentDiv = favoritesModal.querySelector('.favorites-modal');
+        if (!modalContentDiv) {
+            modalContentDiv = document.createElement('div');
+            modalContentDiv.className = 'favorites-modal';
+            favoritesModal.innerHTML = ''; // Clear any partial content from the overlay
+            favoritesModal.appendChild(modalContentDiv);
+        }
+        
+        modalContentDiv.innerHTML = `
+            <h3>Favorite Notes</h3>
+            <p class="error-message" style="color: red; padding: 10px;">Failed to load favorites: ${error.message}</p>
+            <button class="btn-secondary" style="margin-top:15px;" onclick="closeFavoritesModal()">Close</button>
+        `;
     }
 }
 
@@ -906,10 +948,36 @@ async function showFavoritesModal() {
  * Closes the favorites modal.
  */
 function closeFavoritesModal() {
-    if (!favoritesModal) return;
-    
+    console.log('Attempting to close favorites modal NOW. Current favoritesModal:', favoritesModal);
+    if (!favoritesModal) {
+        console.log('favoritesModal is null or undefined, cannot remove.');
+        return;
+    }
+
+    console.log('Before removing favoritesModal. Parent node:', favoritesModal.parentNode);
+    // Try the standard .remove() first
     favoritesModal.remove();
-    favoritesModal = null;
+    console.log('After favoritesModal.remove(). Is it still in DOM (document.body.contains)?:', document.body.contains(favoritesModal));
+
+    // If .remove() failed, try parentNode.removeChild() as a fallback
+    if (document.body.contains(favoritesModal)) {
+        console.warn('favoritesModal.remove() did not remove the element from document.body. Trying parentNode.removeChild().');
+        if (favoritesModal.parentNode) {
+            console.log('Parent node exists. Attempting parentNode.removeChild().');
+            favoritesModal.parentNode.removeChild(favoritesModal);
+            console.log('After parentNode.removeChild(). Is it still in DOM?:', document.body.contains(favoritesModal));
+        } else {
+            console.error('Cannot use parentNode.removeChild() because favoritesModal.parentNode is null.');
+        }
+    }
+
+    // Only set to null if successfully removed or if it's already not in DOM
+    if (!document.body.contains(favoritesModal)) {
+        console.log('Modal successfully removed from DOM (or was already gone). Setting favoritesModal to null.');
+        favoritesModal = null;
+    } else {
+        console.error('Modal is STILL in the DOM after all removal attempts!');
+    }
 }
 
 /**
@@ -933,17 +1001,20 @@ async function removeFavorite(noteId, button) {
         if (result.error) throw new Error(result.error);
         
         // Remove the item from the list
-        button.closest('.favorite-item').remove();
+        const favoriteItem = button.closest('.favorite-item');
+        if (favoriteItem) {
+            favoriteItem.remove();
+        }
         
         // If no favorites left, show message
-        const list = document.querySelector('.favorites-list');
-        if (!list.children.length) {
-            list.innerHTML = '<div class="favorite-item">No favorite notes yet</div>';
+        const list = document.querySelector('.favorites-modal .favorites-list');
+        if (list && list.children.length === 0) {
+            list.innerHTML = '<div class="favorites-empty-message" style="padding: 10px; text-align: center; color: #555;">No favorite notes yet</div>';
         }
         
     } catch (error) {
         console.error('Error removing favorite:', error);
-        alert('Failed to remove favorite');
+        alert('Failed to remove favorite: ' + error.message);
     }
 }
 
