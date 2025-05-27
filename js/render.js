@@ -268,9 +268,9 @@ async function renderOutline(notes, level = 0, prefetchedBlocks = {}) {
                     ${contentHtml}
                     ${note.properties && Object.keys(note.properties).length > 0 ? renderPropertiesInline(note.properties) : ''}
                     <div class="note-actions">
-                        ${starButtonHtml}
                         <button data-action="add-child" title="Add child note">+</button>
                         ${blockId ? `<button data-action="copy-block-id" title="Copy block ID">#</button>` : ''}
+                        ${starButtonHtml}
                         <button data-action="edit" title="Edit note">✎</button>
                         <button data-action="indent-note" title="Indent note (make child of item above)">→</button>
                         <button data-action="upload" title="Upload file">🗎</button>
