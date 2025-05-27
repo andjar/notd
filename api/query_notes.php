@@ -1,34 +1,13 @@
 <?php
 
-error_reporting(E_ALL);
-ini_set('display_errors', 0); // Do not display errors to the client
-ini_set('log_errors', 1);     // Log errors
-ini_set('error_log', __DIR__.'/../php-error.log'); // Specify error log file
+require_once __DIR__ . '/api_common.php';
 
-header('Content-Type: application/json');
+handle_api_request_start();
 
-// Custom error handler to convert PHP errors to ErrorExceptions
-set_error_handler(function($severity, $message, $file, $line) {
-    if (!(error_reporting() & $severity)) {
-        // This error code is not included in error_reporting
-        return;
-    }
-    throw new ErrorException($message, 0, $severity, $file, $line);
-});
-
-$db = null; // Initialize $db to null for the finally block
+$db = null; // Initialize $db to null
 
 try {
-    // Connect to the database
-    $dbPath = __DIR__ . '/../db/notes.db';
-    $db = new SQLite3($dbPath);
-
-    if (!$db) {
-        throw new Exception("Could not connect to the database.");
-    }
-
-    // Set a busy timeout of 5 seconds
-    $db->busyTimeout(5000);
+    $db = get_db_connection();
 
     $sqlQuery = null;
 
@@ -45,55 +24,30 @@ try {
     }
 
     if (empty($sqlQuery)) {
-        http_response_code(400); // Bad Request
-        echo json_encode(['error' => 'No SQL query provided.']);
-        exit;
+        // Let handle_api_error manage the response and exit
+        throw new InvalidArgumentException("SQL query cannot be empty.", 400);
     }
 
-    // Prepare and execute the SQL query
     // SECURITY NOTE: Directly executing user-provided SQL is dangerous.
     // This is done here based on the assumption of a trusted user environment.
-    $stmt = $db->prepare($sqlQuery);
-    if (!$stmt) {
-        throw new Exception("Failed to prepare SQL query: " . $db->lastErrorMsg());
-    }
+    // The execute_select_query function itself does not sanitize the SQL string,
+    // but can handle parameterized queries if params were passed (not in this case).
+    $results = execute_select_query($db, $sqlQuery);
 
-    $result = $stmt->execute();
-    if (!$result) {
-        throw new Exception("Failed to execute SQL query: " . $db->lastErrorMsg());
-    }
+    send_json_response($results);
 
-    $notes = [];
-    while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
-        // Sanitize or process row data if necessary, though SQL output is generally direct.
-        // Example: Convert boolean-like integers to actual booleans if needed by the frontend.
-        // foreach ($row as $key => $value) {
-        //     if ($value === '0' || $value === '1') { // Example: Convert string '0'/'1' to int 0/1
-        //         $row[$key] = (int)$value;
-        //     }
-        // }
-        $notes[] = $row;
-    }
-
-    echo json_encode($notes);
-
-} catch (ErrorException $e) {
-    http_response_code(500);
-    error_log("ErrorException in query_notes.php: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
-    echo json_encode(['error' => 'A server error occurred: ' . $e->getMessage()]);
-} catch (Exception $e) {
-    http_response_code(500); // Internal Server Error for general exceptions
-    // Check if it's a "Bad Request" type error based on the message
-    if (strpos($e->getMessage(), 'No SQL query provided') !== false || strpos($e->getMessage(), 'Failed to prepare SQL query') !== false) {
-        http_response_code(400); // Bad Request for specific query errors
-    }
-    error_log("Exception in query_notes.php: " . $e->getMessage());
-    echo json_encode(['error' => $e->getMessage()]);
+} catch (Throwable $e) {
+    // $db might be null if get_db_connection() failed.
+    // handle_api_error will attempt to close $db if it's not null.
+    // It also exits the script.
+    handle_api_error($e, $db);
 } finally {
-    if ($stmt ?? null) {
-        $stmt->close();
-    }
-    if ($db) {
+    // This finally block will only be reached if no exception occurred in the try block,
+    // or if an exception occurred and handle_api_error did NOT exit (which it does).
+    // So, this is primarily for closing the DB on successful execution.
+    // If get_db_connection() failed, $db would be null.
+    // If an error occurs after $db is established, handle_api_error closes it.
+    if ($db && !(isset($e))) { // Only close if $db is set and no exception was caught and handled by handle_api_error
         $db->close();
     }
 }
