@@ -333,66 +333,141 @@ async function renderPage(page) {
     // Initialize sortable functionality for the outline
     initSortable(outlineContainer); // `initSortable` is expected in app.js or ui.js
 
-    // Render backlinks
-    const backlinksContainer = document.getElementById('backlinks-container'); 
-    if (backlinksContainer) {
-        // `renderBacklinks` (this file) fetches its own data via `fetchBacklinksAPI`.
-        renderBacklinks(page.id).then(html => { backlinksContainer.innerHTML = html; });
-    }
+    // Backlinks are now loaded on demand by the toggle button in ui.js
+    // Reset the backlinks loaded flag for the new page in ui.js or app.js
+    // Example: if (typeof resetBacklinksLoadedFlag === 'function') resetBacklinksLoadedFlag();
 }
+
 
 /**
- * Fetches and renders backlinks for a given page.
+ * Renders a list of backlink threads into a specified container.
  * @async
- * @param {string} pageId - The ID of the page for which to render backlinks.
- * @returns {Promise<string>} A promise that resolves with the HTML string for backlinks, or an error message.
- * Depends on `fetchBacklinksAPI` (api.js) and `renderOutline` (this file).
+ * @param {Array<Object>} threads - Array of backlink thread objects. Each thread should have `linking_page_id`, `linking_page_title`, and `notes`.
+ * @param {string} containerId - The ID of the HTML element where backlinks should be rendered.
+ * @param {string} pageId - The ID of the current page (used for context, e.g. if linking to it).
+ * @param {boolean} [isInitialLoad=true] - If true, clears the container first. Otherwise, appends.
+ * @returns {Promise<void>}
+ * Depends on `renderOutline` (this file).
  * Uses global state `prefetchedBlocks` (state.js).
  */
-async function renderBacklinks(pageId) { 
-    try {
-        const threads = await fetchBacklinksAPI(pageId); // API call
+async function renderBacklinks(threads, containerId, pageId, isInitialLoad = true) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`Backlinks container with ID '${containerId}' not found.`);
+        return;
+    }
 
-        if (!threads || threads.length === 0) return '<h3>Backlinks</h3><p>No backlinks found</p>';
-        
-        let html = '<h3>Backlinks</h3><div class="backlinks-list">';
-        
-        // Helper function to structure notes hierarchically for rendering with renderOutline
-        const buildNoteTree = (notesList) => { 
-            if (!notesList || notesList.length === 0) return [];
-            const noteMap = {};
-            notesList.forEach(note => { noteMap[note.id] = { ...note, children: [] }; });
-            const rootNotes = [];
-            notesList.forEach(noteData => {
-                const currentMappedNote = noteMap[noteData.id];
-                if (noteData.parent_id && noteMap[noteData.parent_id]) {
-                    noteMap[noteData.parent_id].children.push(currentMappedNote);
-                } else { 
-                    rootNotes.push(currentMappedNote); 
-                }
-            });
-            return rootNotes;
-        };
+    if (isInitialLoad) {
+        container.innerHTML = ''; // Clear for initial load or refresh
+    }
 
-        for (const thread of threads) {
-            const hierarchicalNotes = buildNoteTree(thread.notes);
-            // Render the content of each backlink thread using the existing outline renderer
-            const threadContentHtml = hierarchicalNotes.length > 0 
-                ? await renderOutline(hierarchicalNotes, 0, prefetchedBlocks) // `prefetchedBlocks` from state.js
-                : ''; 
-            html += `<div class="backlink-thread-item">
-                        <a href="#${encodeURIComponent(thread.linking_page_id)}" onclick="event.stopPropagation();">
-                            ${thread.linking_page_title || thread.linking_page_id}</a>
-                        <div class="backlink-thread-content">${threadContentHtml}</div>
-                    </div>`;
+    if (!threads || threads.length === 0) {
+        if (isInitialLoad) { // Show "No backlinks" only if it's the first load and nothing came back
+            container.innerHTML = '<p>No backlinks found for this page.</p>';
         }
-        html += '</div>'; 
-        return html;
-    } catch (error) {
-        console.error('Error loading backlinks:', error);
-        return `<h3>Backlinks</h3><p>Error loading backlinks: ${error.message}</p>`; // Return error message as HTML
+        // If not initial load and no more threads, the "Load More" button will likely be hidden by calling logic.
+        return;
+    }
+    
+    let htmlFragment = '';
+    
+    // Helper function to structure notes hierarchically for rendering with renderOutline
+    const buildNoteTree = (notesList) => {
+        if (!notesList || notesList.length === 0) return [];
+        const noteMap = {};
+        notesList.forEach(note => { noteMap[note.id] = { ...note, children: [] }; });
+        const rootNotes = [];
+        notesList.forEach(noteData => {
+            const currentMappedNote = noteMap[noteData.id];
+            if (noteData.parent_id && noteMap[noteData.parent_id]) {
+                noteMap[noteData.parent_id].children.push(currentMappedNote);
+            } else {
+                rootNotes.push(currentMappedNote);
+            }
+        });
+        return rootNotes;
+    };
+
+    for (const thread of threads) {
+        const hierarchicalNotes = buildNoteTree(thread.notes);
+        const threadContentHtml = hierarchicalNotes.length > 0
+            ? await renderOutline(hierarchicalNotes, 0, prefetchedBlocks) // `prefetchedBlocks` from state.js
+            : '<p>Linked content is empty or could not be loaded.</p>';
+        htmlFragment += `
+            <div class="backlink-thread-item">
+                <a href="#${encodeURIComponent(thread.linking_page_id)}" onclick="event.stopPropagation(); navigateToPage('${thread.linking_page_id}');">
+                    ${thread.linking_page_title || thread.linking_page_id}
+                </a>
+                <div class="backlink-thread-content">${threadContentHtml}</div>
+            </div>`;
+    }
+    
+    // Append the new fragment to the container
+    // Using DOM manipulation to append to avoid re-parsing existing HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlFragment;
+    while (tempDiv.firstChild) {
+        container.appendChild(tempDiv.firstChild);
     }
 }
+
+
+/**
+ * Loads backlink data from the API and renders it into the backlinks container.
+ * @async
+ * @param {string} pageId - The ID of the page for which to load backlinks.
+ * @param {number} limit - The number of backlink threads to fetch.
+ * @param {number} offset - The offset from which to start fetching threads.
+ * @param {boolean} [isInitialLoad=true] - Passed to renderBacklinks to determine if container should be cleared.
+ * Depends on `fetchBacklinksAPI` (api.js) and `renderBacklinks` (this file).
+ */
+async function loadAndRenderBacklinks(pageId, limit, offset, isInitialLoad = true) {
+    const container = document.getElementById('backlinks-container');
+    if (!container) {
+        console.error("Backlinks container not found for loading.");
+        return;
+    }
+
+    if (isInitialLoad) {
+        container.innerHTML = '<p>Loading backlinks...</p>';
+    }
+    // Placeholder for "Load More" button management can go here in future steps
+
+    try {
+        const data = await fetchBacklinksAPI(pageId, limit, offset); // API call
+        // data is expected to be { threads: [], total_threads: X, limit: Y, offset: Z }
+
+        if (!data || !data.threads) { // Check if data.threads is available
+             if (isInitialLoad) { // Only show "No backlinks" if it's the initial load attempt
+                container.innerHTML = '<p>No backlinks found or error in response.</p>';
+            }
+            // Handle "Load More" button visibility if applicable in future steps
+            return;
+        }
+        
+        // Render the fetched threads
+        await renderBacklinks(data.threads, 'backlinks-container', pageId, isInitialLoad);
+
+        // Call updateBacklinksMeta from ui.js to handle the count text and "Load More" button
+        if (typeof updateBacklinksMeta === 'function') {
+            updateBacklinksMeta(data.threads.length, data.total_threads);
+        } else {
+            console.warn('updateBacklinksMeta function is not defined. UI for backlinks pagination will not be updated.');
+        }
+
+    } catch (error) {
+        console.error('Error loading and rendering backlinks:', error);
+        // If there's an error, try to clean up the "Load More" button and count if they exist
+        if (typeof updateBacklinksMeta === 'function') {
+            // Pass 0,0 to indicate an error state or clear the meta section
+            updateBacklinksMeta(0, 0); 
+        }
+        if (container && isInitialLoad) { // Only reset if it was the initial attempt to load
+            container.innerHTML = `<p>Error loading backlinks: ${error.message}</p>`;
+        }
+    }
+}
+
 
 /**
  * Renders the list of recent pages in the UI.
