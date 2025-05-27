@@ -20,7 +20,7 @@
     --bullet-color: #a0aec0;        /* Medium Gray - for bullets (was semi-transparent) */
     --thread-line-color: #cbd5e0;   /* Light Gray - for thread lines (was semi-transparent) */
 
-    --sidebar-width: 280px;
+    --sidebar-width: 320px;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.05);
     --radius-sm: 0;
@@ -59,7 +59,7 @@ body {
     width: var(--sidebar-width); 
     min-width: 300px;
     background: var(--sidebar-bg); 
-    padding: 20px;
+    padding: 10px;
     border-right: 1px solid var(--border-color); 
     display: flex; 
     flex-direction: column;
