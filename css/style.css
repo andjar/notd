@@ -563,11 +563,27 @@ a.property-tag:hover {
 }
 .attachment-actions button:hover { opacity: 1; color: var(--accent-color); }
 .attachment-preview { margin-top: 6px; width: 100%; }
-.attachment-preview img, .attachment-preview video, .attachment-preview audio {
-    max-width: 100%; border-radius: var(--radius-sm); display: block;
+.attachment-preview video,
+.attachment-preview audio {
+    max-width: 100%; /* Ensure they don't overflow their container */
+    height: auto;    /* Maintain aspect ratio for video */
+    display: block;
+    margin-top: 5px;
+    border-radius: var(--radius-sm);
 }
-.attachment-preview img { border: 1px solid var(--border-color); object-fit: cover; max-height: 120px; }
-.attachment-preview audio { width: 100%; }
+.attachment-preview audio {
+    width: 100%; /* Ensure audio player takes full width of its container */
+}
+.attachment-image { /* This class is on the img tag directly if it's an image attachment */
+    cursor: pointer;
+    max-width: 200px; /* Constrain preview size */
+    max-height: 150px;
+    border: 1px solid #ddd;
+    margin-top: 5px;
+    border-radius: var(--radius-sm);
+    display: block; /* Ensure it behaves as a block for margin and sizing */
+    object-fit: cover; /* Ensure the image covers the area without distortion */
+}
 .outline-content .attachment.broken { background: #fff0f0; border-color: #e74c3c; color: #e74c3c; }
 .outline-content .attachment.broken:hover { background: #ffe0e0; border-color: #c0392b; color: #c0392b; }
 
@@ -746,4 +762,17 @@ a.block-ref-link:hover {
 .suggestion-item.highlighted {
     background-color: var(--accent-color, #3182ce);
     color: white;
+}
+
+/* Drag and Drop File Upload Styles */
+#outline-container.drag-over {
+  /* General indication on the whole container */
+  border: 2px dashed var(--accent-color);
+  background-color: rgba(49, 130, 206, 0.05); /* Subtle blue from accent */
+}
+
+.outline-item.drag-over-item > .outline-content {
+  /* Indication on the specific item being hovered over */
+  background-color: rgba(49, 130, 206, 0.15); /* Slightly more prominent blue */
+  box-shadow: 0 0 0 2px var(--accent-color) inset; /* Inner border to highlight */
 }
