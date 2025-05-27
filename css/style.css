@@ -503,6 +503,15 @@ a.property-tag:hover {
 }
 .backlink-thread-content .note-actions { display: none; } 
 
+/* Specific adjustments for bullets and arrows within backlinks */
+.backlink-thread-content .outline-content .static-bullet {
+    left: 0.5em; /* Adjust to be inside the backlink item padding */
+}
+
+.backlink-thread-content .outline-content .hover-arrow-toggle {
+    left: -0.7em; /* Adjust relative to the new bullet position, keeping it to the left */
+}
+
 /* All Pages (Sidebar & Modal) */
 .recent-pages-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .recent-pages-header h3 { margin: 0; font-size: 1em; color: var(--text-color); }
@@ -980,4 +989,73 @@ a.block-ref-link:hover {
 .favorite-item .note-actions button {
     padding: 5px 10px;
     font-size: 0.9em;
+}
+
+/* Backlinks Collapsible Section */
+.backlinks-section {
+    margin-top: 2rem; /* Matches old #backlinks-container margin */
+}
+
+.backlinks-toggle-button {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 0.5em 1em;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.5em; /* Space between button and content */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1em; /* Ensure it's not too small */
+    color: var(--text-color);
+}
+
+.backlinks-toggle-button .toggle-arrow {
+    transition: transform 0.2s ease-in-out;
+    display: inline-block; /* Allows transform */
+}
+
+.backlinks-toggle-button[aria-expanded="true"] .toggle-arrow {
+    transform: rotate(90deg);
+}
+
+#backlinks-container {
+    /* margin-top: 0; Reset from previous direct styling if any */
+    /* background: var(--sidebar-bg); Already set in previous step, kept for reference */
+    /* border-radius: var(--radius-md); Already set */
+    /* padding: 1rem; Already set */
+    /* Ensure it takes full width if needed, or specific styling */
+}
+
+/* Meta information for backlinks (count, load more button) */
+.backlinks-meta {
+    margin-top: 1em;
+    padding-top: 0.5em;
+    border-top: 1px solid var(--border-color);
+    text-align: center; 
+    display: flex; /* For better alignment of text and button */
+    flex-direction: column; /* Stack text and button vertically */
+    align-items: center; /* Center items */
+    gap: 0.5em; /* Space between text and button */
+}
+
+#backlinks-count-text {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+#load-more-backlinks {
+    padding: 6px 12px;
+    font-size: 0.9em;
+    background-color: var(--bg-secondary); /* Example style, adjust as needed */
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#load-more-backlinks:hover {
+    background-color: var(--hover-color);
 }

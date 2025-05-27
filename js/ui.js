@@ -1,6 +1,11 @@
 // Functions and variables related to UI interactions
 // (e.g., event handlers, DOM manipulation, modal logic)
 
+// --- Global State for UI related to Backlinks ---
+let backlinksDataLoadedForCurrentPage = false;
+let currentBacklinksOffset = 0;
+const backlinksPerPage = 5; // Number of backlinks to load per page/batch
+
 // Initialize highlight.js
 // Removed hljs.highlightAll() from here as content is loaded dynamically.
 // Highlighting is handled by the marked.setOptions in app.js for dynamic content.
@@ -21,6 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     pageTitle = document.getElementById('page-title');
     pageProperties = document.getElementById('page-properties');
     outlineContainer = document.getElementById('outline-container');
+
+    initializeBacklinksToggle(); // Initialize the backlinks toggle functionality
 
     // Attach drag and drop handlers here!
     if (outlineContainer) {
@@ -1162,3 +1169,139 @@ document.addEventListener('keydown', (event) => {
         showFavoritesModal();
     }
 });
+
+// --- Backlinks Section Toggle and Lazy Loading ---
+
+/**
+ * Initializes the event listener and functionality for the collapsible backlinks section.
+ */
+function initializeBacklinksToggle() {
+    const toggleButton = document.getElementById('backlinks-toggle');
+    const backlinksContainer = document.getElementById('backlinks-container');
+    const toggleArrow = toggleButton ? toggleButton.querySelector('.toggle-arrow') : null;
+
+    if (!toggleButton || !backlinksContainer || !toggleArrow) {
+        console.warn('Backlinks toggle elements not found. Feature will not be initialized.');
+        return;
+    }
+
+    toggleButton.addEventListener('click', async () => {
+        const isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+        
+        if (isExpanded) {
+            // Collapse the section
+            toggleButton.setAttribute('aria-expanded', 'false');
+            backlinksContainer.style.display = 'none';
+            toggleArrow.style.transform = 'rotate(0deg)';
+        } else {
+            // Expand the section
+            toggleButton.setAttribute('aria-expanded', 'true');
+            backlinksContainer.style.display = 'block';
+            toggleArrow.style.transform = 'rotate(90deg)';
+
+            if (!backlinksDataLoadedForCurrentPage && currentPage && currentPage.id) {
+                currentBacklinksOffset = 0; // Reset offset for initial load
+                // Call loadAndRenderBacklinks from render.js
+                // Assumes currentPage is accessible from state.js (e.g., window.currentPage or a state object)
+                await loadAndRenderBacklinks(currentPage.id, backlinksPerPage, currentBacklinksOffset, true); 
+                backlinksDataLoadedForCurrentPage = true;
+            } else if (!currentPage || !currentPage.id) {
+                console.warn("Cannot load backlinks: currentPage or currentPage.id is not defined.");
+                backlinksContainer.innerHTML = "<p>Could not load backlinks: Page context is missing.</p>";
+            }
+        }
+    });
+}
+
+/**
+ * Updates the backlinks meta information (count and "Load More" button).
+ * @param {number} newlyLoadedCount - The number of items just loaded.
+ * @param {number} totalThreads - The total number of backlink threads available.
+ */
+function updateBacklinksMeta(newlyLoadedCount, totalThreads) {
+    const backlinksContainer = document.getElementById('backlinks-container');
+    if (!backlinksContainer) return;
+
+    let metaContainer = document.getElementById('backlinks-meta-container');
+    if (!metaContainer) {
+        metaContainer = document.createElement('div');
+        metaContainer.id = 'backlinks-meta-container';
+        metaContainer.className = 'backlinks-meta';
+        // Insert meta container after the main content of backlinks, but before it's potentially closed.
+        // If backlinksContainer directly holds items, this will append. If it has a sub-list div, adjust.
+        backlinksContainer.appendChild(metaContainer);
+    }
+
+    let countTextElement = document.getElementById('backlinks-count-text');
+    if (!countTextElement) {
+        countTextElement = document.createElement('span');
+        countTextElement.id = 'backlinks-count-text';
+        metaContainer.appendChild(countTextElement);
+    }
+
+    let loadMoreButton = document.getElementById('load-more-backlinks');
+    if (!loadMoreButton) {
+        loadMoreButton = document.createElement('button');
+        loadMoreButton.id = 'load-more-backlinks';
+        loadMoreButton.textContent = 'Load More';
+        // Event listener will be set (or re-set) below
+        metaContainer.appendChild(loadMoreButton);
+    }
+    
+    // Calculate the total number of backlinks currently shown
+    // currentBacklinksOffset was the offset *before* this load.
+    // So, new total shown = old offset + newlyLoadedCount
+    const currentlyShownCount = currentBacklinksOffset + newlyLoadedCount;
+    countTextElement.textContent = `Showing ${currentlyShownCount} out of ${totalThreads} backlinks`;
+
+    if (currentlyShownCount < totalThreads) {
+        loadMoreButton.style.display = 'block'; // Or 'inline-block' based on styling
+        currentBacklinksOffset = currentlyShownCount; // Update offset for the *next* load
+        
+        // Remove old listener before adding new one to prevent duplicates if this function is called multiple times
+        const newLoadMoreButton = loadMoreButton.cloneNode(true);
+        loadMoreButton.parentNode.replaceChild(newLoadMoreButton, loadMoreButton);
+        newLoadMoreButton.addEventListener('click', async () => {
+            if (currentPage && currentPage.id) {
+                // Disable button temporarily to prevent multiple clicks
+                newLoadMoreButton.disabled = true; 
+                newLoadMoreButton.textContent = 'Loading...';
+                await loadAndRenderBacklinks(currentPage.id, backlinksPerPage, currentBacklinksOffset, false);
+                // Re-enable should happen after loadAndRenderBacklinks calls updateBacklinksMeta again,
+                // which will recreate the button or update its state.
+            }
+        });
+
+    } else {
+        loadMoreButton.style.display = 'none';
+        currentBacklinksOffset = currentlyShownCount; // All items are loaded
+    }
+}
+
+
+/**
+ * Resets the state of the backlinks section.
+ * This should be called when navigating to a new page.
+ */
+function resetBacklinksState() {
+    backlinksDataLoadedForCurrentPage = false;
+    currentBacklinksOffset = 0; // Reset offset
+
+    const toggleButton = document.getElementById('backlinks-toggle');
+    const backlinksContainer = document.getElementById('backlinks-container');
+    const toggleArrow = toggleButton ? toggleButton.querySelector('.toggle-arrow') : null;
+
+    if (toggleButton) {
+        toggleButton.setAttribute('aria-expanded', 'false');
+    }
+    if (backlinksContainer) {
+        backlinksContainer.style.display = 'none';
+        backlinksContainer.innerHTML = ''; // Clear previous backlinks and meta container
+    }
+    if (toggleArrow) {
+        toggleArrow.style.transform = 'rotate(0deg)';
+    }
+    console.log("Backlinks state reset for new page.");
+}
+// Note: `resetBacklinksState()` needs to be called from `app.js` when a new page is loaded,
+// for example, at the beginning of `navigateToPage(pageId)` or `loadPage(pageId)`.

@@ -43,8 +43,15 @@ if (!file_exists($dbPath)) {
                 <!-- Notes will be rendered here -->
             </div>
             <button id="new-note" class="btn-primary" onclick="createNote()">Add New Note</button>
-            <div id="backlinks-container" class="backlinks-container">
-                <!-- Backlinks will be rendered here -->
+            
+            <div id="backlinks-section" class="backlinks-section">
+                <button id="backlinks-toggle" class="backlinks-toggle-button" aria-expanded="false">
+                    Backlinks <span class="toggle-arrow">▶</span>
+                </button>
+                <div id="backlinks-container" class="backlinks-container" style="display: none;">
+                    <!-- Backlinks will be rendered here by renderBacklinks -->
+                    <!-- Placeholder for "Showing X out of Y" and "Load More" will be added in a later step -->
+                </div>
             </div>
         </div>
     </div>
