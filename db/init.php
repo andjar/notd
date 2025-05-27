@@ -40,6 +40,7 @@ if (!file_exists($dbPath)) {
             parent_id INTEGER,
             block_id TEXT,
             "order" INTEGER DEFAULT 0,
+            is_favorite INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
