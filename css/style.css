@@ -1006,7 +1006,7 @@ a.block-ref-link:hover {
     border-radius: var(--radius-sm);
     margin-bottom: 0.5em; /* Space between button and content */
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start; /* Align items to the start */
     align-items: center;
     font-size: 1em; /* Ensure it's not too small */
     color: var(--text-color);
@@ -1015,6 +1015,7 @@ a.block-ref-link:hover {
 .backlinks-toggle-button .toggle-arrow {
     transition: transform 0.2s ease-in-out;
     display: inline-block; /* Allows transform */
+    margin-right: 0.5em; /* Add space between arrow and text */
 }
 
 .backlinks-toggle-button[aria-expanded="true"] .toggle-arrow {

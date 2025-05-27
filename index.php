@@ -46,7 +46,7 @@ if (!file_exists($dbPath)) {
             
             <div id="backlinks-section" class="backlinks-section">
                 <button id="backlinks-toggle" class="backlinks-toggle-button" aria-expanded="false">
-                    Backlinks <span class="toggle-arrow">▶</span>
+                    <span class="toggle-arrow">▶</span> Backlinks
                 </button>
                 <div id="backlinks-container" class="backlinks-container" style="display: none;">
                     <!-- Backlinks will be rendered here by renderBacklinks -->

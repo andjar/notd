@@ -125,6 +125,13 @@ function handleAutoCloseBrackets(event) {
  * @returns {Promise<void>} A promise that resolves when the page is loaded and rendered, or rejects on error.
  */
 async function loadPage(pageId) {
+    // Reset backlinks state at the very beginning of loading a new page
+    if (typeof resetBacklinksState === 'function') {
+        resetBacklinksState();
+    } else {
+        console.warn('resetBacklinksState function is not defined. Backlinks UI may not reset correctly on page navigation.');
+    }
+
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
     clearActiveBlock();
