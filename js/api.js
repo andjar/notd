@@ -207,7 +207,7 @@ async function uploadFileAPI(noteId, file) {
     if (!response.ok) throw new Error(`HTTP error uploading file! status: ${response.status}`);
     const data = await response.json();
     if (data.error) throw new Error(data.error);
-    return data;
+    return { ...data, success: true }; // Add success flag to response
 }
 
 /**

@@ -238,11 +238,6 @@ function setActiveBlock(element, scrollIntoView = true) {
 // --- Paste Image Handling ---
 window.handlePastedImage = async function(event, noteId) {
     if (!noteId) {
-        // This case should ideally be prevented by only adding the listener for existing notes,
-        // but as a safeguard:
-        // console.warn("handlePastedImage called without a noteId. Pasting images is only supported for existing notes being edited.");
-        // alert("Pasting images is only supported for existing notes that are being edited.");
-        // Allowing paste to proceed normally if no noteId (e.g. for new notes not yet saved)
         return;
     }
 
@@ -260,53 +255,68 @@ window.handlePastedImage = async function(event, noteId) {
         return; // No image file found in paste items, let default paste action proceed.
     }
 
-    event.preventDefault(); // Prevent default paste action (e.g., inserting raw file path or base64)
+    event.preventDefault(); // Prevent default paste action
 
-    // Optional: give the file a more descriptive name (server will still make it unique)
-    // The server (api/image.php) generates a unique name, so client-side name is mostly for local reference.
-    const extension = imageFile.type.split('/')[1] || 'png'; // Get extension from MIME type
-    const tempFilename = `pasted_image_${Date.now()}.${extension}`;
+    // Generate a temporary unique ID for this upload
+    const tempId = 'temp_' + Date.now();
+    const extension = imageFile.type.split('/')[1] || 'png';
+    const tempFilename = `${tempId}.${extension}`;
+    
+    // Insert temporary markdown immediately
+    const tempMarkdown = `![Uploading...](uploads/temp/${tempFilename})`;
+    const textarea = event.target;
+    
+    // Use document.execCommand for inserting text to support undo/redo and better cursor handling
+    if (!document.execCommand("insertText", false, tempMarkdown)) {
+        // Fallback if execCommand fails
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        textarea.value = textarea.value.substring(0, start) + tempMarkdown + textarea.value.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + tempMarkdown.length;
+    }
+
+    // Trigger input event for any frameworks/listeners that depend on it
+    textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
 
     try {
-        // uploadFileAPI is expected to be in js/api.js
-        // It should return a promise with { success: true, filename: "YYYY-MM-DD/unique_name.ext", ... }
-        // The third argument (tempFilename) is passed to uploadFileAPI, which in turn passes it to api/image.php
-        // if api/image.php is modified to use it as 'original_name' or part of its naming logic.
-        // Current uploadFileAPI calls api/image.php which doesn't use the client's suggested filename for storage path,
-        // but it might use it for the 'original_name' DB field.
-        const responseData = await uploadFileAPI(noteId, imageFile, tempFilename); 
+        // Upload the file in the background
+        const responseData = await uploadFileAPI(noteId, imageFile);
 
         if (!responseData || !responseData.success || !responseData.filename) {
-            console.error("Upload response missing success flag or filename.", responseData);
             throw new Error("Upload response did not include a filename or indicate success.");
         }
+
+        // Replace the temporary markdown with the actual one
+        const finalMarkdown = `![Pasted Image](uploads/${responseData.filename})`;
+        const currentValue = textarea.value;
+        const tempMarkdownIndex = currentValue.indexOf(tempMarkdown);
         
-        // responseData.filename is expected to be "YYYY-MM-DD/unique_server_generated_name.ext"
-        const imageMarkdown = `![Pasted Image](uploads/${responseData.filename})`;
-        
-        const textarea = event.target;
-        // const start = textarea.selectionStart;
-        // const end = textarea.selectionEnd;
-        
-        // Use document.execCommand for inserting text to support undo/redo and better cursor handling.
-        if (!document.execCommand("insertText", false, imageMarkdown)) {
-            // Fallback if execCommand fails or is not supported for some reason (though unlikely for 'insertText')
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            textarea.value = textarea.value.substring(0, start) + imageMarkdown + textarea.value.substring(end);
-            textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+        if (tempMarkdownIndex !== -1) {
+            textarea.value = currentValue.substring(0, tempMarkdownIndex) + 
+                           finalMarkdown + 
+                           currentValue.substring(tempMarkdownIndex + tempMarkdown.length);
+            
+            // Trigger input event again for the final update
+            textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
         }
 
-        // Trigger input event for any frameworks/listeners that depend on it
-        textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-
         console.log(`Image pasted and uploaded as ${responseData.filename} to note ${noteId}`);
-        // The image markdown is now in the textarea. The user needs to save the note
-        // for this change to persist and for the image to be rendered on next load.
 
     } catch (error) {
         console.error('Error uploading pasted image:', error);
-        alert(`Error uploading pasted image: ${error.message || 'Unknown error'}`);
+        // Replace the temporary markdown with an error message
+        const errorMarkdown = `[Error uploading image: ${error.message}]`;
+        const currentValue = textarea.value;
+        const tempMarkdownIndex = currentValue.indexOf(tempMarkdown);
+        
+        if (tempMarkdownIndex !== -1) {
+            textarea.value = currentValue.substring(0, tempMarkdownIndex) + 
+                           errorMarkdown + 
+                           currentValue.substring(tempMarkdownIndex + tempMarkdown.length);
+            
+            // Trigger input event for the error update
+            textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        }
     }
 };
 

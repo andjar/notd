@@ -69,6 +69,7 @@ try {
         }
 
         return [
+            'success' => true,
             'id' => $db->lastInsertRowID(),
             'filename' => $relativePath,
             'original_name' => $file['name']
