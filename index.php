@@ -19,6 +19,7 @@ if (!file_exists($dbPath)) {
 </head>
 <body>
     <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
+    <button id="right-sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Right Sidebar">SQL</button>
     <div class="container">
         <div class="sidebar">
             <a href="#" id="home-button" class="home-link">notd</a>
@@ -45,6 +46,19 @@ if (!file_exists($dbPath)) {
             <button id="new-note" class="btn-primary" onclick="createNote()">Add New Note</button>
             <div id="backlinks-container" class="backlinks-container">
                 <!-- Backlinks will be rendered here -->
+            </div>
+        </div>
+        <div class="right-sidebar collapsed">
+            <div class="sql-query-container">
+                <h3>Custom Query</h3>
+                <textarea id="sql-query-input" placeholder="Enter your SQL query here... e.g., SELECT id, content, page_id FROM notes WHERE content LIKE '%important%' ORDER BY updated_at DESC"></textarea>
+                <small class="sql-limit-tip" style="display: block; margin-top: 4px; margin-bottom: 8px; font-size: 0.85em; color: #555;">
+                    Tip: Add 'LIMIT 10' to your query for faster results and to display up to 10 notes.
+                </small>
+                <button id="run-sql-query" class="btn-primary">Run Query</button>
+            </div>
+            <div id="right-sidebar-notes-content">
+                <!-- Notes fetched by the query will be displayed here -->
             </div>
         </div>
     </div>
