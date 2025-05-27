@@ -146,7 +146,7 @@ try {
 
         // 1. Fetch all notes for the page
         $stmt = $db->prepare('
-            SELECT id, page_id, content, parent_id, block_id, created_at, updated_at, "order"
+            SELECT id, page_id, content, parent_id, block_id, created_at, updated_at, "order", is_favorite
             FROM notes
             WHERE page_id = :page_id
             ORDER BY "order", id

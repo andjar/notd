@@ -1,9 +1,10 @@
 marked.setOptions({
     highlight: function(code, lang) {
+        const currentCode = (typeof code === 'string') ? code : ''; // Ensure code is a string
         if (lang && hljs.getLanguage(lang)) {
-            return hljs.highlight(code, { language: lang }).value;
+            return hljs.highlight(currentCode, { language: lang }).value;
         }
-        return hljs.highlightAuto(code).value;
+        return hljs.highlightAuto(currentCode).value;
     }
 });
 
@@ -19,6 +20,7 @@ marked.setOptions({
 // (searchInput, recentPagesList, newPageButton, pageTitle, pageProperties, outlineContainer)
 
 async function navigateToPage(pageId) {
+    console.log('navigateToPage called with pageId:', pageId); // Log pageId
     const targetHash = String(pageId).startsWith('#') ? String(pageId).substring(1) : String(pageId);
     const currentHash = window.location.hash.substring(1);
 
@@ -29,24 +31,43 @@ async function navigateToPage(pageId) {
     }
 }
 
-searchInput.addEventListener('input', debounce(handleSearch, 300));
-newPageButton.addEventListener('click', createNewPage);
-outlineContainer.addEventListener('click', handleOutlineClick);
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadTemplates();
+    loadRecentPages();
+    initCalendar();
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    
+    // Add event listeners after DOM is loaded
+    searchInput.addEventListener('input', debounce(handleSearch, 300));
+    newPageButton.addEventListener('click', createNewPage);
+    outlineContainer.addEventListener('click', handleOutlineClick);
 
-document.getElementById('advanced-search-link').addEventListener('click', (e) => {
-    e.preventDefault();
-    showAdvancedSearch();
-});
+    document.getElementById('advanced-search-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        showAdvancedSearch();
+    });
 
-document.getElementById('home-button').addEventListener('click', async (e) => {
-    e.preventDefault();
-    const today = new Date().toISOString().split('T')[0];
-    if (document.body.classList.contains('logseq-focus-active')) {
-        await zoomOut();
+    document.getElementById('home-button').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const today = new Date().toISOString().split('T')[0];
+        if (document.body.classList.contains('logseq-focus-active')) {
+            await zoomOut();
+        }
+        navigateToPage(today);
+    });
+
+    const initialHash = window.location.hash.substring(1);
+    if (!initialHash) {
+        const today = new Date().toISOString().split('T')[0];
+        navigateToPage(today);
+    } else {
+        if (initialHash === 'search-results') {
+            showSearchResults();
+        } else {
+            navigateToPage(initialHash);
+        }
     }
-    navigateToPage(today);
 });
-
 
 window.addEventListener('hashchange', () => {
     const pageId = window.location.hash.substring(1);
@@ -58,24 +79,6 @@ window.addEventListener('hashchange', () => {
     } else {
         const today = new Date().toISOString().split('T')[0];
         navigateToPage(today);
-    }
-});
-
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadTemplates();
-    loadRecentPages();
-    initCalendar();
-    document.addEventListener('keydown', handleGlobalKeyDown);
-    const initialHash = window.location.hash.substring(1);
-    if (!initialHash) {
-        const today = new Date().toISOString().split('T')[0];
-        navigateToPage(today);
-    } else {
-        if (initialHash === 'search-results') {
-            showSearchResults();
-        } else {
-            navigateToPage(initialHash);
-        }
     }
 });
 
@@ -509,6 +512,11 @@ function handleOutlineClick(event) {
             fileInput.click();
             break;
         case 'delete': deleteNote(noteIdForAction); break;
+        case 'toggle-favorite':
+            if (target.classList.contains('favorite-star')) {
+                toggleFavorite(noteIdForAction, target); // toggleFavorite is in ui.js
+            }
+            break;
         default:
             break;
     }
