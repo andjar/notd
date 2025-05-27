@@ -783,11 +783,28 @@ function navigateBlocks(direction) {
 function initializeSidebarToggle() {
     const sidebar = document.querySelector('.sidebar');
     const toggleButton = document.getElementById('sidebar-toggle');
-    let isCollapsed = false;
+    const mainContent = document.querySelector('.main-content'); // Get main content
+    let isCollapsed; // Will be determined by initial state
+
+    // Initial state setup
+    const isInitiallyMobile = window.innerWidth <= 768;
+    if (isInitiallyMobile) {
+        sidebar.classList.add('collapsed');
+        mainContent.classList.remove('main-content-shifted-right');
+        toggleButton.innerHTML = '✕';
+        isCollapsed = true;
+    } else {
+        // Default to open on wide screens
+        sidebar.classList.remove('collapsed');
+        mainContent.classList.add('main-content-shifted-right');
+        toggleButton.innerHTML = '☰';
+        isCollapsed = false;
+    }
+    toggleButton.style.display = 'flex'; // Always visible
 
     function toggleSidebar() {
-        isCollapsed = !isCollapsed;
-        sidebar.classList.toggle('collapsed');
+        isCollapsed = sidebar.classList.toggle('collapsed'); // State determined by class presence
+        mainContent.classList.toggle('main-content-shifted-right');
         toggleButton.innerHTML = isCollapsed ? '✕' : '☰';
     }
 
@@ -795,25 +812,74 @@ function initializeSidebarToggle() {
 
     // Handle window resize
     function handleResize() {
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-            sidebar.classList.add('collapsed');
-            toggleButton.innerHTML = '✕';
-            toggleButton.style.display = 'flex';
-        } else {
-            sidebar.classList.remove('collapsed');
-            toggleButton.innerHTML = '☰';
-            toggleButton.style.display = 'none';
-        }
+        // const isMobile = window.innerWidth <= 768;
+        // The behavior of collapsing/uncollapsing based on resize is removed.
+        // Sidebar state is now independent of window width after initial load.
+        // Toggle button is always visible.
+        toggleButton.style.display = 'flex';
+        
+        // This part ensures that if the screen becomes small, and the sidebar was open,
+        // it visually makes sense. If it's mobile, and sidebar is open, main content should not be shifted.
+        // However, the requirement is to maintain state.
+        // A better approach might be to let the user toggle it themselves if the screen becomes small.
+        // For now, we only ensure the button is visible.
+        // The classes on sidebar and main-content remain as toggled by the user.
     }
 
-    // Initial setup
-    handleResize();
-    window.addEventListener('resize', handleResize);
+    // Initial setup for button visibility (already done above)
+    // handleResize(); // Call to set initial button visibility and state
+    window.addEventListener('resize', handleResize); // Only for button visibility if needed, or other resize adjustments.
 }
 
 // Initialize sidebar toggle when the DOM is loaded
-document.addEventListener('DOMContentLoaded', initializeSidebarToggle);
+// document.addEventListener('DOMContentLoaded', initializeSidebarToggle); 
+// Call to initializeSidebarToggle will be moved to app.js
+
+/**
+ * Initializes the toggle functionality for the right sidebar.
+ * Handles class changes for visibility and main content margin adjustment.
+ */
+function initializeRightSidebarToggle() {
+    const rightSidebar = document.querySelector('.right-sidebar');
+    const toggleButton = document.getElementById('right-sidebar-toggle');
+    const mainContent = document.querySelector('.main-content');
+
+    if (!rightSidebar || !toggleButton || !mainContent) {
+        console.warn('Right sidebar toggle elements not found. Skipping initialization.');
+        return;
+    }
+
+    // Ensure initial state is collapsed (already set in HTML, but good practice)
+    // JS explicitly sets the initial state for robustness, as per subtask instructions.
+    rightSidebar.classList.add('collapsed'); 
+    mainContent.classList.remove('main-content-shifted-left'); // Ensure main content is not shifted initially
+
+    // Set initial button text based on the (now JS-enforced) initial state
+    // The 'collapsed' class is now definitely on rightSidebar.
+    toggleButton.innerHTML = 'SQL'; // Or some icon indicating "open"
+    // This 'else' branch for button text is now effectively dead code due to explicit collapsing,
+    // but kept for logical completeness if the explicit add('collapsed') was ever removed.
+    // if (rightSidebar.classList.contains('collapsed')) {
+    //     toggleButton.innerHTML = 'SQL'; 
+    // } else {
+    //     toggleButton.innerHTML = '✕'; 
+    // }
+
+    toggleButton.addEventListener('click', () => {
+        const isCollapsed = rightSidebar.classList.toggle('collapsed');
+        mainContent.classList.toggle('main-content-shifted-left');
+
+        if (isCollapsed) {
+            toggleButton.innerHTML = 'SQL'; // Text when sidebar is collapsed (prompt to open)
+        } else {
+            toggleButton.innerHTML = '✕';   // Text when sidebar is open (prompt to close)
+        }
+    });
+}
+
+// Call to initializeRightSidebarToggle will be moved to app.js
+// document.addEventListener('DOMContentLoaded', initializeRightSidebarToggle);
+
 
 // --- Page Search Functionality ---
 
@@ -1162,3 +1228,147 @@ document.addEventListener('keydown', (event) => {
         showFavoritesModal();
     }
 });
+
+// --- Right Sidebar Custom Notes Functionality ---
+
+/**
+ * Renders custom notes fetched by a SQL query into the specified container.
+ * @param {Array<Object>} notesArray - An array of note objects to render.
+ * @param {HTMLElement} containerElement - The DOM element to render the notes into.
+ */
+function renderCustomNotes(notesArray, containerElement) {
+    containerElement.innerHTML = ''; // Clear previous results
+
+    if (!notesArray || notesArray.length === 0) {
+        const noResultsMessage = document.createElement('p');
+        noResultsMessage.textContent = 'No notes found for this query, or query returned no results.';
+        noResultsMessage.style.padding = '10px';
+        containerElement.appendChild(noResultsMessage);
+        return;
+    }
+
+    notesArray.forEach(note => {
+        const noteDiv = document.createElement('div');
+        noteDiv.className = 'right-sidebar-note-item'; // Use class from CSS for styling
+
+        const titleSpan = document.createElement('span');
+        titleSpan.style.fontWeight = 'bold';
+        
+        let contentPreview = note.content ? (note.content.substring(0, 100) + (note.content.length > 100 ? '...' : '')) : '(No content)';
+        
+        if (note.page_id) {
+            const pageLink = document.createElement('a');
+            pageLink.href = `#${note.page_id}`;
+            pageLink.textContent = `Page: ${note.page_id}`;
+            pageLink.title = `Go to page ${note.page_id}`;
+            pageLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                navigateToPage(note.page_id); // navigateToPage is in app.js
+                // Optionally close right sidebar if desired UX
+                // document.querySelector('.right-sidebar').classList.add('collapsed');
+                // document.querySelector('.main-content').classList.remove('main-content-shifted-left');
+                // document.getElementById('right-sidebar-toggle').innerHTML = 'SQL';
+            });
+            noteDiv.appendChild(pageLink);
+            
+            const contentLink = document.createElement('a');
+            contentLink.href = `#${note.page_id}`; // Could be more specific if block_id is available and navigation supports it
+            contentLink.textContent = contentPreview;
+            contentLink.title = `View note on page ${note.page_id}`;
+            contentLink.style.display = 'block';
+            contentLink.style.marginTop = '5px';
+            contentLink.addEventListener('click', (e) => {
+                 e.preventDefault();
+                 navigateToPage(note.page_id);
+                 // Potentially add logic here to scroll to the specific note/block if block_id is available in `note`
+            });
+            noteDiv.appendChild(contentLink);
+
+        } else {
+            titleSpan.textContent = `ID: ${note.id || 'N/A'}`;
+            noteDiv.appendChild(titleSpan);
+            const contentP = document.createElement('p');
+            contentP.textContent = contentPreview;
+            contentP.style.marginTop = '5px';
+            noteDiv.appendChild(contentP);
+        }
+
+        // Display other relevant fields safely
+        Object.keys(note).forEach(key => {
+            if (key !== 'page_id' && key !== 'content' && key !== 'id' && note[key] !== null && note[key] !== undefined) {
+                const fieldP = document.createElement('p');
+                fieldP.style.fontSize = '0.8em';
+                fieldP.style.color = '#555';
+                fieldP.textContent = `${key}: ${note[key]}`;
+                noteDiv.appendChild(fieldP);
+            }
+        });
+        
+        containerElement.appendChild(noteDiv);
+    });
+}
+
+/**
+ * Fetches notes based on the provided SQL query and renders them in the sidebar.
+ * @async
+ * @param {string} query - The SQL query to execute.
+ * @param {HTMLElement} containerElement - The DOM element to display notes/errors.
+ * @param {HTMLButtonElement} runButton - The button that triggered the query.
+ */
+async function fetchAndRenderCustomNotes(query, containerElement, runButton) {
+    containerElement.innerHTML = '<p style="padding:10px;">Loading...</p>'; // Show loading indicator
+    const originalButtonText = runButton.textContent;
+    runButton.disabled = true;
+    runButton.textContent = 'Running...';
+
+    try {
+        const notes = await fetchCustomQueryNotes(query); // Assumes fetchCustomQueryNotes is in js/api.js
+        renderCustomNotes(notes, containerElement);
+    } catch (error) {
+        console.error('Error fetching or rendering custom notes:', error);
+        containerElement.innerHTML = `<p style="padding:10px; color:red;">Error: ${error.message}</p>`;
+    } finally {
+        runButton.disabled = false;
+        runButton.textContent = originalButtonText;
+    }
+}
+
+/**
+ * Initializes the functionality for the right sidebar's custom notes query section.
+ * Sets up element selections, loads saved queries, and attaches event listeners.
+ */
+function initializeRightSidebarNotes() {
+    const queryInput = document.getElementById('sql-query-input');
+    const runQueryButton = document.getElementById('run-sql-query');
+    const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
+
+    if (!queryInput || !runQueryButton || !notesDisplayContainer) {
+        console.warn('Right sidebar notes elements not found. Skipping initialization.');
+        return;
+    }
+
+    // Load saved query from localStorage
+    const savedQuery = localStorage.getItem('customSQLQuery');
+    if (savedQuery) {
+        queryInput.value = savedQuery;
+    }
+
+    runQueryButton.addEventListener('click', () => {
+        const query = queryInput.value.trim();
+        localStorage.setItem('customSQLQuery', query); // Save current query
+
+        if (!query) {
+            notesDisplayContainer.innerHTML = '<p style="padding:10px;">Please enter a SQL query.</p>';
+            return;
+        }
+        fetchAndRenderCustomNotes(query, notesDisplayContainer, runQueryButton);
+    });
+    
+    // Optionally, run the saved query automatically on load if it exists.
+    // if (savedQuery && savedQuery.trim()) {
+    //     fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
+    // }
+}
+
+// Call to initializeRightSidebarNotes will be in app.js
+// document.addEventListener('DOMContentLoaded', initializeRightSidebarNotes);

@@ -19,6 +19,7 @@ if (!file_exists($dbPath)) {
 </head>
 <body>
     <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
+    <button id="right-sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Right Sidebar">SQL</button>
     <div class="container">
         <div class="sidebar">
             <a href="#" id="home-button" class="home-link">notd</a>
@@ -45,6 +46,16 @@ if (!file_exists($dbPath)) {
             <button id="new-note" class="btn-primary" onclick="createNote()">Add New Note</button>
             <div id="backlinks-container" class="backlinks-container">
                 <!-- Backlinks will be rendered here -->
+            </div>
+        </div>
+        <div class="right-sidebar collapsed">
+            <div class="sql-query-container">
+                <h3>Custom Query</h3>
+                <textarea id="sql-query-input" placeholder="Enter your SQL query here..."></textarea>
+                <button id="run-sql-query">Run Query</button>
+            </div>
+            <div id="right-sidebar-notes-content">
+                <!-- Notes fetched by the query will be displayed here -->
             </div>
         </div>
     </div>

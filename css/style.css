@@ -76,12 +76,12 @@ body {
     width: 0;
     min-width: 0;
     padding: 0;
+    border-right: none;
 }
 
-.sidebar-toggle {
+.sidebar-toggle { /* Generic styles for both toggles */
     position: fixed;
     top: 20px;
-    left: 20px;
     z-index: 1000;
     background: var(--accent-color);
     color: white;
@@ -93,7 +93,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, background-color 0.3s ease;
     box-shadow: var(--shadow-md);
 }
 
@@ -101,29 +101,95 @@ body {
     transform: scale(1.1);
 }
 
-@media (max-width: 768px) {
-    .sidebar {
-        position: fixed;
-        z-index: 999;
-    }
+#sidebar-toggle { /* Specific to left sidebar toggle */
+    left: 20px;
 }
 
-@media (min-width: 769px) {
-    .sidebar-toggle {
-        display: none;
-    }
+/* Right Sidebar Styles */
+.right-sidebar {
+    width: var(--sidebar-width, 320px);
+    min-width: 300px;
+    background: var(--sidebar-bg);
+    padding: 10px;
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* For spacing between query container and results */
+    position: sticky; 
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    transition: transform 0.3s ease, width 0.3s ease, padding 0.3s ease;
 }
+
+.right-sidebar.collapsed {
+    transform: translateX(100%);
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    border-left: none;
+}
+
+#right-sidebar-toggle {
+    right: 20px; /* Position on the right */
+    /* Additional specific styles if needed, defaults are from .sidebar-toggle */
+}
+
+
+@media (max-width: 768px) {
+    .sidebar { /* Left sidebar */
+        position: fixed;
+        z-index: 999; /* Ensure it's above main content but below toggle */
+    }
+    .right-sidebar {
+        position: fixed;
+        right: 0; /* Stick to the right edge */
+        z-index: 998; /* Slightly lower than left, if both could be open, or manage via JS */
+    }
+    /* On smaller screens, toggles are always visible */
+    /* #sidebar-toggle, #right-sidebar-toggle {
+        display: flex !important; 
+    } */
+    /* This !important might be too strong if we want JS to handle it based on state.
+       The default for .sidebar-toggle is display: flex, so it should be visible.
+       The JS handleResize currently does show/hide for #sidebar-toggle based on width.
+       We will adjust JS to make #sidebar-toggle always flex.
+       And #right-sidebar-toggle is always flex by default.
+    */
+}
+
+/* 
+The block that previously hid #sidebar-toggle on min-width: 769px has been removed.
+#sidebar-toggle will now be visible by default unless JS hides it.
+The JS logic in handleResize will be updated to keep it visible.
+*/
+
 .main-content {
     flex: 1;
     padding: 2rem;
-    /* max-width: calc(100vw - var(--sidebar-width)); /* REPLACED by below for better readability on wide screens */
     max-width: 100ch;   /* Sets a comfortable reading width */
-    margin-left: auto; /* Centers the content block when screen is wider than 75ch */
-    margin-right: auto;/* Centers the content block when screen is wider than 75ch */
+    margin-left: auto; /* Centers the content block when screen is wider than 100ch + sidebar(s) */
+    margin-right: auto;/* Centers the content block */
     overflow-y: auto;
     background: var(--bg-color);
     width: 100%;       /* Ensures it tries to fill available space up to max-width */
+    transition: margin-left 0.3s ease, margin-right 0.3s ease; /* Smooth transition for margin changes */
 }
+
+/* When left sidebar is open (default state on desktop), push main content */
+/* This might need to be dynamically applied by JS if left sidebar can also collapse on desktop */
+@media (min-width: 769px) {
+    .main-content-shifted-right { /* If left sidebar is open */
+        margin-left: var(--sidebar-width);
+    }
+}
+
+/* When right sidebar is open, push main content */
+.main-content-shifted-left { /* If right sidebar is open */
+    margin-right: var(--sidebar-width); /* Adjust based on actual right sidebar width */
+}
+
+
 .calendar-panel { background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 12px; }
 .search-box { margin-bottom: 0px; }
 .search-box input {
@@ -979,5 +1045,64 @@ a.block-ref-link:hover {
 
 .favorite-item .note-actions button {
     padding: 5px 10px;
+    font-size: 0.9em;
+}
+
+/* Right Sidebar Specific Component Styles */
+.sql-query-container {
+    margin-bottom: 15px;
+    padding: 10px; /* Added padding for better spacing */
+    background-color: var(--bg-secondary); /* Optional: to visually group query elements */
+    border-radius: var(--radius-sm);
+}
+
+.sql-query-container h3 {
+    margin-top: 0;
+    margin-bottom: 10px; /* Space below heading */
+    font-size: 1.1em;
+    color: var(--primary-color);
+}
+
+#sql-query-input {
+    width: 100%;
+    min-height: 100px; /* Increased min-height */
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 0.9em;
+    resize: vertical; /* Allow vertical resizing */
+}
+
+#sql-query-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.1); /* Using accent color from variable */
+}
+
+#run-sql-query {
+    /* Leverages .btn-primary styles via JS or by adding class directly */
+    /* Specific styles if needed: */
+    margin-top: 10px; /* Increased margin-top */
+    width: 100%;
+    padding: 10px 16px; /* Slightly larger padding */
+}
+
+#right-sidebar-notes-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 5px; /* Padding for the content area itself */
+    background-color: var(--bg-color); /* Ensure it has a background */
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+}
+
+/* Styling for individual notes within the right sidebar (example) */
+.right-sidebar-note-item {
+    padding: 8px;
+    margin-bottom: 8px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
     font-size: 0.9em;
 }
