@@ -21,6 +21,92 @@ document.addEventListener('DOMContentLoaded', () => {
     pageTitle = document.getElementById('page-title');
     pageProperties = document.getElementById('page-properties');
     outlineContainer = document.getElementById('outline-container');
+
+    // Attach drag and drop handlers here!
+    if (outlineContainer) {
+        outlineContainer.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            // Check if items being dragged are files
+            if (event.dataTransfer.types.includes('Files')) {
+                // Check if the drag is over a valid drop target (an outline item or the container itself if empty)
+                const potentialTarget = event.target.closest('.outline-item');
+                if (potentialTarget || outlineContainer.children.length === 0 || event.target === outlineContainer) {
+                     outlineContainer.classList.add('drag-over');
+                } else {
+                    // If dragging over gaps between items, don't show global drag-over
+                    outlineContainer.classList.remove('drag-over');
+                }
+                // Optionally, add class to specific item being hovered over
+                if(potentialTarget) {
+                    potentialTarget.classList.add('drag-over-item');
+                }
+            }
+        });
+
+        outlineContainer.addEventListener('dragleave', (event) => {
+            // Remove global drag-over indicator
+            outlineContainer.classList.remove('drag-over');
+            // Remove specific item drag-over indicator
+            const potentialTarget = event.target.closest('.outline-item');
+            if (potentialTarget) {
+                potentialTarget.classList.remove('drag-over-item');
+            }
+            // More robust check if leaving the container or entering a child that is not a drop target
+            if (!outlineContainer.contains(event.relatedTarget) || event.relatedTarget === null) {
+                 outlineContainer.classList.remove('drag-over');
+            }
+            // Clean up any item-specific highlights if we truly left the container
+            const highlightedItems = outlineContainer.querySelectorAll('.drag-over-item');
+            highlightedItems.forEach(item => item.classList.remove('drag-over-item'));
+        });
+
+        outlineContainer.addEventListener('drop', async (event) => {
+            event.preventDefault();
+            outlineContainer.classList.remove('drag-over');
+            const highlightedItems = outlineContainer.querySelectorAll('.drag-over-item');
+            highlightedItems.forEach(item => item.classList.remove('drag-over-item'));
+
+            const files = event.dataTransfer.files;
+            if (files.length === 0) {
+                return;
+            }
+
+            let targetNoteElement = null;
+            // Attempt to find the specific outline item the drop occurred on
+            let droppedOnItem = event.target.closest('.outline-item');
+
+            if (droppedOnItem) {
+                targetNoteElement = droppedOnItem;
+            } else if (activeBlockElement && activeBlockElement.matches('.outline-item')) {
+                // Fallback to the globally active block element if the drop was not on a specific item
+                // but an item is active.
+                targetNoteElement = activeBlockElement;
+            }
+
+            if (targetNoteElement && targetNoteElement.dataset.noteId) {
+                const noteId = targetNoteElement.dataset.noteId;
+                if (typeof window.handleDroppedFiles === 'function') {
+                    console.log(`Drop successful on noteId: ${noteId}. Passing to handleDroppedFiles.`);
+                    window.handleDroppedFiles(noteId, files);
+                } else {
+                    console.error('handleDroppedFiles function is not available.');
+                    alert('File drop handling is not properly configured.');
+                }
+            } else {
+                let message = 'To attach files, please drop them directly onto a specific note block.';
+                if (!droppedOnItem && !activeBlockElement) {
+                    message += ' No note is currently active or was directly targeted by the drop.';
+                } else if (!droppedOnItem && activeBlockElement) {
+                    // This case means the drop was in an empty area, but a block was "active" elsewhere.
+                    // You might want to confirm if the user wants to attach to this active block.
+                    message += ` The drop was not on a specific note. The currently active note is "${activeBlockElement.dataset.noteId}". Consider dropping directly onto the desired note.`;
+                    // Example: if (confirm(message + "\n\nAttach to active note?")) { /* proceed with activeBlockElement */ }
+                }
+                console.warn('File drop failed to identify target note. Alerting user.');
+                alert(message);
+            }
+        });
+    }
 });
 
 // Placeholder for UI functions that will be moved here
@@ -223,81 +309,6 @@ window.handlePastedImage = async function(event, noteId) {
         alert(`Error uploading pasted image: ${error.message || 'Unknown error'}`);
     }
 };
-
-// --- Drag and Drop File Upload Logic ---
-if (outlineContainer) {
-    outlineContainer.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        // Check if items being dragged are files
-        if (event.dataTransfer.types.includes('Files')) {
-            // Check if the drag is over a valid drop target (an outline item or the container itself if empty)
-            const potentialTarget = event.target.closest('.outline-item');
-            if (potentialTarget || outlineContainer.children.length === 0 || event.target === outlineContainer) {
-                 outlineContainer.classList.add('drag-over');
-            } else {
-                // If dragging over gaps between items, don't show global drag-over
-                outlineContainer.classList.remove('drag-over');
-            }
-            // Optionally, add class to specific item being hovered over
-            if(potentialTarget) {
-                potentialTarget.classList.add('drag-over-item');
-            }
-        }
-    });
-
-    outlineContainer.addEventListener('dragleave', (event) => {
-        // Remove global drag-over indicator
-        outlineContainer.classList.remove('drag-over');
-        // Remove specific item drag-over indicator
-        const potentialTarget = event.target.closest('.outline-item');
-        if (potentialTarget) {
-            potentialTarget.classList.remove('drag-over-item');
-        }
-        // More robust check if leaving the container or entering a child that is not a drop target
-        if (!outlineContainer.contains(event.relatedTarget) || event.relatedTarget === null) {
-             outlineContainer.classList.remove('drag-over');
-        }
-        // Clean up any item-specific highlights if we truly left the container
-        const highlightedItems = outlineContainer.querySelectorAll('.drag-over-item');
-        highlightedItems.forEach(item => item.classList.remove('drag-over-item'));
-    });
-
-    outlineContainer.addEventListener('drop', async (event) => {
-        event.preventDefault();
-        outlineContainer.classList.remove('drag-over');
-        const highlightedItems = outlineContainer.querySelectorAll('.drag-over-item');
-        highlightedItems.forEach(item => item.classList.remove('drag-over-item'));
-
-        const files = event.dataTransfer.files;
-        if (files.length === 0) {
-            return;
-        }
-
-        let targetNoteElement = null;
-        // Attempt to find the specific outline item the drop occurred on
-        let droppedOnItem = event.target.closest('.outline-item');
-
-        if (droppedOnItem) {
-            targetNoteElement = droppedOnItem;
-        } else if (activeBlockElement && activeBlockElement.matches('.outline-item')) {
-            // Fallback to the globally active block element if the drop was not on a specific item
-            // but an item is active.
-            targetNoteElement = activeBlockElement;
-        }
-
-        if (targetNoteElement && targetNoteElement.dataset.noteId) {
-            const noteId = targetNoteElement.dataset.noteId;
-            if (typeof window.handleDroppedFiles === 'function') {
-                window.handleDroppedFiles(noteId, files);
-            } else {
-                console.error('handleDroppedFiles function is not available.');
-                alert('File drop handling is not properly configured.');
-            }
-        } else {
-            alert('Please select a specific note block or drop directly onto a note block to attach files.');
-        }
-    });
-}
 
 // --- Modal and Direct UI Interaction Functions ---
 
@@ -1064,33 +1075,33 @@ async function showFavoritesModal() {
         
     } catch (error) {
         console.error('Error showing favorites:', error);
-        
-        // Ensure a modal structure exists to display the error
-        if (!favoritesModal) {
-            favoritesModal = document.createElement('div');
-            favoritesModal.className = 'page-search-overlay'; // Use the same class as successful path for consistency
-            document.body.appendChild(favoritesModal);
-            // Add click listener for this new overlay
-            favoritesModal.addEventListener('click', (e) => {
-                if (e.target === favoritesModal) {
-                    closeFavoritesModal();
-                }
-            });
+
+        // Ensure any existing modal is closed before showing an error modal
+        if (favoritesModal) { // If a modal (potentially broken) exists
+            closeFavoritesModal(); // Attempt to close it and nullify the global reference
         }
 
-        let modalContentDiv = favoritesModal.querySelector('.favorites-modal');
-        if (!modalContentDiv) {
-            modalContentDiv = document.createElement('div');
-            modalContentDiv.className = 'favorites-modal';
-            favoritesModal.innerHTML = ''; // Clear any partial content from the overlay
-            favoritesModal.appendChild(modalContentDiv);
-        }
-        
+        // Now create and show the error modal
+        favoritesModal = document.createElement('div'); // Assign to the global var
+        favoritesModal.className = 'page-search-overlay'; // Or a more specific 'favorites-overlay' class
+
+        let modalContentDiv = document.createElement('div');
+        modalContentDiv.className = 'favorites-modal'; // Or your specific class for the content part
+
         modalContentDiv.innerHTML = `
             <h3>Favorite Notes</h3>
             <p class="error-message" style="color: red; padding: 10px;">Failed to load favorites: ${error.message}</p>
             <button class="btn-secondary" style="margin-top:15px;" onclick="closeFavoritesModal()">Close</button>
         `;
+        favoritesModal.appendChild(modalContentDiv);
+        document.body.appendChild(favoritesModal);
+
+        // Add click listener for this new error overlay to close it
+        favoritesModal.addEventListener('click', (e) => {
+            if (e.target === favoritesModal) { // Only close if the overlay backdrop is clicked
+                closeFavoritesModal();
+            }
+        });
     }
 }
 
@@ -1098,35 +1109,19 @@ async function showFavoritesModal() {
  * Closes the favorites modal.
  */
 function closeFavoritesModal() {
-    console.log('Attempting to close favorites modal NOW. Current favoritesModal:', favoritesModal);
-    if (!favoritesModal) {
-        console.log('favoritesModal is null or undefined, cannot remove.');
-        return;
-    }
-
-    console.log('Before removing favoritesModal. Parent node:', favoritesModal.parentNode);
-    // Try the standard .remove() first
-    favoritesModal.remove();
-    console.log('After favoritesModal.remove(). Is it still in DOM (document.body.contains)?:', document.body.contains(favoritesModal));
-
-    // If .remove() failed, try parentNode.removeChild() as a fallback
-    if (document.body.contains(favoritesModal)) {
-        console.warn('favoritesModal.remove() did not remove the element from document.body. Trying parentNode.removeChild().');
-        if (favoritesModal.parentNode) {
-            console.log('Parent node exists. Attempting parentNode.removeChild().');
+    console.log('Attempting to close favorites modal. Current favoritesModal:', favoritesModal);
+    if (favoritesModal) {
+        if (favoritesModal.parentNode) { // Check if it's actually in the DOM
             favoritesModal.parentNode.removeChild(favoritesModal);
-            console.log('After parentNode.removeChild(). Is it still in DOM?:', document.body.contains(favoritesModal));
-        } else {
-            console.error('Cannot use parentNode.removeChild() because favoritesModal.parentNode is null.');
         }
-    }
-
-    // Only set to null if successfully removed or if it's already not in DOM
-    if (!document.body.contains(favoritesModal)) {
-        console.log('Modal successfully removed from DOM (or was already gone). Setting favoritesModal to null.');
-        favoritesModal = null;
+        // Alternatively, if you are sure favoritesModal is always the overlay element and directly under body:
+        // if (document.body.contains(favoritesModal)) {
+        //     favoritesModal.remove(); // Modern browsers
+        // }
+        favoritesModal = null; // Crucially, always nullify the global reference
+        console.log('Favorites modal reference set to null.');
     } else {
-        console.error('Modal is STILL in the DOM after all removal attempts!');
+        console.log('favoritesModal was already null or undefined, nothing to close.');
     }
 }
 
