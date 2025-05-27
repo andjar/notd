@@ -482,3 +482,24 @@ async function fetchPageSuggestionsAPI(searchTerm) {
     // if (suggestions.error) throw new Error(suggestions.error);
     return suggestions;
 }
+
+/**
+ * Fetches notes based on a custom SQL query.
+ * @async
+ * @param {string} sqlQuery - The SQL query to execute.
+ * @returns {Promise<Array<Object>>} A promise that resolves with an array of note objects.
+ * @throws {Error} If the fetch operation fails or the server returns an error.
+ */
+async function fetchCustomQueryNotes(sqlQuery) {
+    const response = await fetch('api/query_notes.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: sqlQuery })
+    });
+    if (!response.ok) {
+        // Try to parse error JSON, but provide a fallback error message
+        const errorData = await response.json().catch(() => ({ error: 'Network response was not ok and failed to parse error JSON.' }));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+    return response.json(); // This will be an array of note objects
+}

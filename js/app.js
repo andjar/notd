@@ -35,6 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadTemplates();
     loadRecentPages();
     initCalendar();
+    initializeSidebarToggle(); // For the left sidebar
+    initializeRightSidebarToggle(); // For the new right sidebar
+    initializeRightSidebarNotes(); // For the new right sidebar's notes query functionality
     document.addEventListener('keydown', handleGlobalKeyDown);
     
     // Add event listeners after DOM is loaded
