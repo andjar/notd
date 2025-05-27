@@ -149,6 +149,156 @@ function setActiveBlock(element, scrollIntoView = true) {
     }
 }
 
+// --- Paste Image Handling ---
+window.handlePastedImage = async function(event, noteId) {
+    if (!noteId) {
+        // This case should ideally be prevented by only adding the listener for existing notes,
+        // but as a safeguard:
+        // console.warn("handlePastedImage called without a noteId. Pasting images is only supported for existing notes being edited.");
+        // alert("Pasting images is only supported for existing notes that are being edited.");
+        // Allowing paste to proceed normally if no noteId (e.g. for new notes not yet saved)
+        return;
+    }
+
+    const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+    let imageFile = null;
+
+    for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+            imageFile = item.getAsFile();
+            break; // Handle first image found
+        }
+    }
+
+    if (!imageFile) {
+        return; // No image file found in paste items, let default paste action proceed.
+    }
+
+    event.preventDefault(); // Prevent default paste action (e.g., inserting raw file path or base64)
+
+    // Optional: give the file a more descriptive name (server will still make it unique)
+    // The server (api/image.php) generates a unique name, so client-side name is mostly for local reference.
+    const extension = imageFile.type.split('/')[1] || 'png'; // Get extension from MIME type
+    const tempFilename = `pasted_image_${Date.now()}.${extension}`;
+
+    try {
+        // uploadFileAPI is expected to be in js/api.js
+        // It should return a promise with { success: true, filename: "YYYY-MM-DD/unique_name.ext", ... }
+        // The third argument (tempFilename) is passed to uploadFileAPI, which in turn passes it to api/image.php
+        // if api/image.php is modified to use it as 'original_name' or part of its naming logic.
+        // Current uploadFileAPI calls api/image.php which doesn't use the client's suggested filename for storage path,
+        // but it might use it for the 'original_name' DB field.
+        const responseData = await uploadFileAPI(noteId, imageFile, tempFilename); 
+
+        if (!responseData || !responseData.success || !responseData.filename) {
+            console.error("Upload response missing success flag or filename.", responseData);
+            throw new Error("Upload response did not include a filename or indicate success.");
+        }
+        
+        // responseData.filename is expected to be "YYYY-MM-DD/unique_server_generated_name.ext"
+        const imageMarkdown = `![Pasted Image](uploads/${responseData.filename})`;
+        
+        const textarea = event.target;
+        // const start = textarea.selectionStart;
+        // const end = textarea.selectionEnd;
+        
+        // Use document.execCommand for inserting text to support undo/redo and better cursor handling.
+        if (!document.execCommand("insertText", false, imageMarkdown)) {
+            // Fallback if execCommand fails or is not supported for some reason (though unlikely for 'insertText')
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            textarea.value = textarea.value.substring(0, start) + imageMarkdown + textarea.value.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+        }
+
+        // Trigger input event for any frameworks/listeners that depend on it
+        textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+
+        console.log(`Image pasted and uploaded as ${responseData.filename} to note ${noteId}`);
+        // The image markdown is now in the textarea. The user needs to save the note
+        // for this change to persist and for the image to be rendered on next load.
+
+    } catch (error) {
+        console.error('Error uploading pasted image:', error);
+        alert(`Error uploading pasted image: ${error.message || 'Unknown error'}`);
+    }
+};
+
+// --- Drag and Drop File Upload Logic ---
+if (outlineContainer) {
+    outlineContainer.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        // Check if items being dragged are files
+        if (event.dataTransfer.types.includes('Files')) {
+            // Check if the drag is over a valid drop target (an outline item or the container itself if empty)
+            const potentialTarget = event.target.closest('.outline-item');
+            if (potentialTarget || outlineContainer.children.length === 0 || event.target === outlineContainer) {
+                 outlineContainer.classList.add('drag-over');
+            } else {
+                // If dragging over gaps between items, don't show global drag-over
+                outlineContainer.classList.remove('drag-over');
+            }
+            // Optionally, add class to specific item being hovered over
+            if(potentialTarget) {
+                potentialTarget.classList.add('drag-over-item');
+            }
+        }
+    });
+
+    outlineContainer.addEventListener('dragleave', (event) => {
+        // Remove global drag-over indicator
+        outlineContainer.classList.remove('drag-over');
+        // Remove specific item drag-over indicator
+        const potentialTarget = event.target.closest('.outline-item');
+        if (potentialTarget) {
+            potentialTarget.classList.remove('drag-over-item');
+        }
+        // More robust check if leaving the container or entering a child that is not a drop target
+        if (!outlineContainer.contains(event.relatedTarget) || event.relatedTarget === null) {
+             outlineContainer.classList.remove('drag-over');
+        }
+        // Clean up any item-specific highlights if we truly left the container
+        const highlightedItems = outlineContainer.querySelectorAll('.drag-over-item');
+        highlightedItems.forEach(item => item.classList.remove('drag-over-item'));
+    });
+
+    outlineContainer.addEventListener('drop', async (event) => {
+        event.preventDefault();
+        outlineContainer.classList.remove('drag-over');
+        const highlightedItems = outlineContainer.querySelectorAll('.drag-over-item');
+        highlightedItems.forEach(item => item.classList.remove('drag-over-item'));
+
+        const files = event.dataTransfer.files;
+        if (files.length === 0) {
+            return;
+        }
+
+        let targetNoteElement = null;
+        // Attempt to find the specific outline item the drop occurred on
+        let droppedOnItem = event.target.closest('.outline-item');
+
+        if (droppedOnItem) {
+            targetNoteElement = droppedOnItem;
+        } else if (activeBlockElement && activeBlockElement.matches('.outline-item')) {
+            // Fallback to the globally active block element if the drop was not on a specific item
+            // but an item is active.
+            targetNoteElement = activeBlockElement;
+        }
+
+        if (targetNoteElement && targetNoteElement.dataset.noteId) {
+            const noteId = targetNoteElement.dataset.noteId;
+            if (typeof window.handleDroppedFiles === 'function') {
+                window.handleDroppedFiles(noteId, files);
+            } else {
+                console.error('handleDroppedFiles function is not available.');
+                alert('File drop handling is not properly configured.');
+            }
+        } else {
+            alert('Please select a specific note block or drop directly onto a note block to attach files.');
+        }
+    });
+}
+
 // --- Modal and Direct UI Interaction Functions ---
 
 /**

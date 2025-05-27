@@ -194,10 +194,10 @@ async function renderNoteContent(note, prefetchedBlocks = {}) {
             // Determine icon and preview based on file type
             if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
                 icon = '🖼️'; 
-                previewHtml = `<img src="uploads/${attachment.filename}" class="attachment-image" alt="${attachment.original_name}">`;
+                previewHtml = `<img src="uploads/${attachment.filename}" class="attachment-image" alt="${attachment.original_name}" onclick="event.stopPropagation(); showImageModal(this.src, this.alt);">`;
             } else if (['mp4', 'webm', 'mov'].includes(fileExtension)) {
                 icon = '🎥'; 
-                previewHtml = `<div class="attachment-preview"><video src="uploads/${attachment.filename}" controls></video></div>`;
+                previewHtml = `<div class="attachment-preview"><video src="uploads/${attachment.filename}" controls width="100%"></video></div>`;
             } else if (['mp3', 'wav', 'ogg'].includes(fileExtension)) {
                 icon = '🎵'; 
                 previewHtml = `<div class="attachment-preview"><audio src="uploads/${attachment.filename}" controls></audio></div>`;

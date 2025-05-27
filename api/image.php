@@ -31,15 +31,22 @@ if (!in_array($file['type'], $allowedTypes)) {
 }
 
 // Create uploads directory if it doesn't exist
-$uploadDir = __DIR__ . '/../uploads/';
+$uploadDir = __DIR__ . '/../uploads/'; // Ends with a slash
 if (!file_exists($uploadDir)) {
     mkdir($uploadDir, 0777, true);
 }
 
+// Create dated subfolder
+$dateFolder = date('Y-m-d');
+$targetDir = $uploadDir . $dateFolder; // $uploadDir already has a trailing slash
+if (!file_exists($targetDir)) {
+    mkdir($targetDir, 0777, true); // Create the dated subfolder
+}
+
 // Generate unique filename
 $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-$filename = uniqid() . '.' . $extension;
-$filepath = $uploadDir . $filename;
+$actualDiskFilename = uniqid() . '.' . $extension; // Filename on disk
+$filepath = $targetDir . '/' . $actualDiskFilename; // Full path to save the file
 
 // Move uploaded file
 if (!move_uploaded_file($file['tmp_name'], $filepath)) {
@@ -69,21 +76,29 @@ if ($noteId) {
         if (!$stmt) {
             throw new Exception('Failed to prepare statement: ' . $db->lastErrorMsg());
         }
+
+        // Define filename for database storage and JSON response
+        $dbStoredFilename = $dateFolder . '/' . $actualDiskFilename;
+        $dbStoredFilepath = 'uploads/' . $dbStoredFilename;
         
         $stmt->bindValue(':note_id', $noteId, SQLITE3_INTEGER);
-        $stmt->bindValue(':filename', $filename, SQLITE3_TEXT); // The new unique filename
+        $stmt->bindValue(':filename', $dbStoredFilename, SQLITE3_TEXT); // The new unique filename including date folder
         $stmt->bindValue(':original_name', $file['name'], SQLITE3_TEXT); // The original uploaded filename
-        $stmt->bindValue(':file_path', 'uploads/' . $filename, SQLITE3_TEXT); // Relative path to the file
+        $stmt->bindValue(':file_path', $dbStoredFilepath, SQLITE3_TEXT); // Relative path to the file including date folder
         $stmt->bindValue(':mime_type', $file['type'], SQLITE3_TEXT);
         $stmt->bindValue(':size', $file['size'], SQLITE3_INTEGER);
 
         if (!$stmt->execute()) {
+            // If DB operation fails, try to delete the uploaded file
+            if (file_exists($filepath)) {
+                unlink($filepath);
+            }
             throw new Exception('Failed to execute statement: ' . $db->lastErrorMsg());
         }
         
         echo json_encode([
             'success' => true,
-            'filename' => $filename, // unique filename
+            'filename' => $dbStoredFilename, // unique filename including date folder
             'original_name' => $file['name'],
             'attachment_id' => $db->lastInsertRowID()
         ]);
@@ -98,9 +113,12 @@ if ($noteId) {
     }
 } else {
     // If no note_id, just return the success of upload without DB interaction for attachment
+    // The returned filename in this case should be the path relative to 'uploads/'
+    // so the client can potentially still use it if it knows how to prefix with 'uploads/'
+    $clientFilename = isset($dateFolder) ? $dateFolder . '/' . $actualDiskFilename : $actualDiskFilename;
     echo json_encode([
         'success' => true,
-        'filename' => $filename,
+        'filename' => $clientFilename, // Filename including date folder if created
         'original_name' => $file['name']
     ]);
 } 

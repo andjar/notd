@@ -906,6 +906,13 @@ function editNote(id, currentContentText) {
     textarea.addEventListener('input', handleSnippetReplacement);
     textarea.addEventListener('input', handleAutoCloseBrackets);
 
+    // Add paste event listener for handling image pastes
+    textarea.addEventListener('paste', (event) => {
+        if (typeof window.handlePastedImage === 'function') {
+            window.handlePastedImage(event, id); // 'id' is the noteId in editNote
+        }
+    });
+
     // Link autosuggestion event listeners (same as in createNote)
     textarea.addEventListener('input', (event) => {
         const currentTextarea = event.target;
@@ -1412,3 +1419,44 @@ function handleSnippetReplacement(event) {
 
     }, 0);
 }
+
+// --- Drag and Drop File Upload Handler ---
+// Attached to window for now, assuming no ES6 modules for simplicity.
+window.handleDroppedFiles = async function(noteId, files) {
+    if (!files || files.length === 0) {
+        return;
+    }
+
+    let allUploadsSuccessful = true;
+    // Use a for...of loop to allow await within the loop
+    for (const file of files) {
+        try {
+            // uploadFileAPI is defined in js/api.js and should return a promise.
+            // It typically handles creating FormData and making the fetch request.
+            await uploadFileAPI(noteId, file);
+            console.log(`File ${file.name} uploaded successfully to note ${noteId}`);
+        } catch (error) {
+            allUploadsSuccessful = false;
+            console.error('Error uploading file:', file.name, error);
+            alert(`Error uploading file: ${file.name}\n${error.message || 'Unknown error'}`);
+            // Continue to try uploading other files even if one fails.
+        }
+    }
+
+    // Refresh the page to show new attachments, regardless of individual failures,
+    // so successful uploads are displayed.
+    // This matches the behavior of the single file upload via button.
+    if (currentPage && currentPage.id) {
+        navigateToPage(currentPage.id);
+    } else {
+        console.warn("Current page context lost after file drop. Cannot auto-refresh.");
+        // If all uploads were intended to be successful before refresh, this alert might change.
+        // But since we refresh even on partial success, this specific alert might only be relevant
+        // if currentPage.id is truly lost for other reasons.
+        if (allUploadsSuccessful) {
+             alert("File(s) uploaded, but couldn't automatically refresh the page. Please refresh manually.");
+        } else {
+             alert("Some files uploaded, but couldn't automatically refresh. Please refresh manually to see changes.");
+        }
+    }
+};

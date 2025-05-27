@@ -38,7 +38,7 @@ try {
         }
 
         // Create dated subfolder
-        $dateFolder = date('Y/m');
+        $dateFolder = date('Y-m-d');
         $targetDir = $uploadsDir . '/' . $dateFolder;
         if (!file_exists($targetDir)) {
             mkdir($targetDir, 0777, true);
