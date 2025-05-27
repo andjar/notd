@@ -1368,6 +1368,37 @@ function initializeRightSidebarNotes() {
     // if (savedQuery && savedQuery.trim()) {
     //     fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
     // }
+
+    // Auto-update logic
+    let rightSidebarAutoUpdateInterval = null;
+    const updateFrequencyMs = 60000; // 60 seconds
+
+    const rightSidebarEl = document.querySelector('.right-sidebar'); 
+
+    if (rightSidebarEl && queryInput && notesDisplayContainer && runQueryButton) {
+        rightSidebarAutoUpdateInterval = setInterval(() => {
+            // Re-check elements inside interval in case they become unavailable
+            const currentQueryInput = document.getElementById('sql-query-input');
+            const currentNotesDisplayContainer = document.getElementById('right-sidebar-notes-content');
+            const currentRunQueryButton = document.getElementById('run-sql-query');
+            const currentRightSidebarEl = document.querySelector('.right-sidebar');
+
+            if (!currentQueryInput || !currentNotesDisplayContainer || !currentRunQueryButton || !currentRightSidebarEl) {
+                // console.warn('Auto-update: One or more elements missing, skipping update.');
+                return;
+            }
+
+            const currentQuery = currentQueryInput.value.trim();
+            if (!currentRightSidebarEl.classList.contains('collapsed') && currentQuery) {
+                // console.log('Auto-updating right sidebar notes...'); // For debugging
+                // Ensure fetchAndRenderCustomNotes doesn't show 'Loading...' or disable button if it's an auto-update
+                // For now, it will behave the same as a manual click. This can be refined later if needed.
+                fetchAndRenderCustomNotes(currentQuery, currentNotesDisplayContainer, currentRunQueryButton);
+            }
+        }, updateFrequencyMs);
+    } else {
+        console.error("Could not initialize right sidebar auto-update: one or more key elements not found initially.");
+    }
 }
 
 // Call to initializeRightSidebarNotes will be in app.js
