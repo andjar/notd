@@ -58,8 +58,10 @@ if (!file_exists($dbPath)) {
         <div class="right-sidebar collapsed">
             <div class="sql-query-container">
                 <h3>Custom Query</h3>
-                <button id="edit-query-btn" class="btn-secondary" aria-label="Edit Query"><i class="fas fa-pen"></i></button>
-                <button id="run-sql-query" class="btn-primary">Run Query</button>
+                <div class = "sql-query-button-container">
+                    <button id="edit-query-btn" class="btn-secondary" aria-label="Edit Query">✎</button>
+                    <button id="run-sql-query" class="btn-secondary">Run Query</button>
+                </div>
                 <div class="query-frequency-container"></div>
             </div>
             <div id="right-sidebar-notes-content">

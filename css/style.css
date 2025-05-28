@@ -31,7 +31,7 @@
     --control-icon-size: 1em;     
     --arrow-visual-size: 0.75em;   
     --bullet-visual-size: 7px;     
-    --controls-top-offset-level0: 1.25em;
+    --controls-top-offset-level0: 1em;
     --controls-top-offset-children: 1em;
     --arrow-left-indent: -1.7em;   
     --bullet-left-indent: -0.65em;  
@@ -193,21 +193,6 @@ The JS logic in handleResize will be updated to keep it visible.
     transition: margin 0.2s ease;
 }
 
-/* When left sidebar is open */
-.main-content-shifted-right {
-    margin-left: var(--sidebar-width);
-}
-
-/* When right sidebar is open */
-.main-content-shifted-left {
-    margin-right: var(--sidebar-width);
-}
-
-/* When both sidebars are open */
-.main-content-shifted-both {
-    margin-left: var(--sidebar-width);
-    margin-right: var(--sidebar-width);
-}
 
 .calendar-panel { background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 12px; }
 .search-box { margin-bottom: 0px; }
@@ -306,8 +291,7 @@ The JS logic in handleResize will be updated to keep it visible.
 #page-title:hover .edit-properties-button { opacity: 0.7; }
 .edit-properties-button:hover { opacity: 1 !important; background: var(--hover-color); }
 #page-properties {
-    background: var(--sidebar-bg); padding: 12px 16px; margin-bottom: 24px;
-    border: 1px solid var(--border-color); max-width: 100%;
+    margin-bottom: 24px;
 }
 .page-properties-content { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .property-tag {
@@ -1376,6 +1360,12 @@ a.block-ref-link:hover {
     color: var(--primary-color);
 }
 
+.sql-query-button-container {
+    display: grid;
+    grid-template-columns: 1fr 5fr;
+    margin-bottom: 5px;
+}
+
 #sql-query-input {
     width: 100%;
     min-height: 100px; /* Increased min-height */
@@ -1394,6 +1384,14 @@ a.block-ref-link:hover {
 }
 
 #run-sql-query {
+    /* Leverages .btn-primary styles via JS or by adding class directly */
+    /* Specific styles if needed: */
+    margin-top: 10px; /* Increased margin-top */
+    width: 100%;
+    padding: 10px 16px; /* Slightly larger padding */
+}
+
+#edit-query-btn {
     /* Leverages .btn-primary styles via JS or by adding class directly */
     /* Specific styles if needed: */
     margin-top: 10px; /* Increased margin-top */
