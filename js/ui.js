@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     outlineContainer = document.getElementById('outline-container');
 
     initializeBacklinksToggle(); // Initialize the backlinks toggle functionality
+    initializeNoteActions(); // Add this line
 
     // Attach drag and drop handlers here!
     if (outlineContainer) {
@@ -1465,11 +1466,14 @@ function renderCustomNotes(notesArray, containerElement) {
  * @param {HTMLElement} containerElement - The DOM element to display notes/errors.
  * @param {HTMLButtonElement} runButton - The button that triggered the query.
  */
-async function fetchAndRenderCustomNotes(query, containerElement, runButton) {
+async function fetchAndRenderCustomNotes(query, containerElement, runButton = null) { // Made runButton optional
     containerElement.innerHTML = '<p style="padding:10px;">Loading...</p>'; // Show loading indicator
-    const originalButtonText = runButton.textContent;
-    runButton.disabled = true;
-    runButton.textContent = 'Running...';
+    let originalButtonText = '';
+    if (runButton) {
+        originalButtonText = runButton.textContent;
+        runButton.disabled = true;
+        runButton.textContent = 'Running...';
+    }
 
     try {
         const response = await fetch('api/query_notes.php', {
@@ -1510,21 +1514,23 @@ async function fetchAndRenderCustomNotes(query, containerElement, runButton) {
         }));
 
         // Render the notes using renderOutline with showControls: false
-        const renderedHtml = await renderOutline(flatNotes, 0, prefetchedBlocks, false);
+        // Pass an empty object for prefetchedBlocks as these notes are from a custom query
+        // and should not rely on the main page's prefetchedBlocks context.
+        const renderedHtml = await renderOutline(flatNotes, 0, {}, false);
         console.log('Rendered HTML length:', renderedHtml.length); // Debug log
         
-        // Set the rendered content directly in the container with padding
-        containerElement.innerHTML = `
-            <div style="padding: 0 15px;">
-                ${renderedHtml}
-            </div>`;
+        // Set the rendered content directly in the container
+        // Padding is now handled by the CSS rule for #right-sidebar-notes-content
+        containerElement.innerHTML = renderedHtml;
 
     } catch (error) {
         console.error('Error fetching or rendering custom notes:', error);
         containerElement.innerHTML = `<p style="padding:10px; color:red;">Error: ${error.message}</p>`;
     } finally {
-        runButton.disabled = false;
-        runButton.textContent = originalButtonText;
+        if (runButton) {
+            runButton.disabled = false;
+            runButton.textContent = originalButtonText;
+        }
     }
 }
 
@@ -1532,22 +1538,67 @@ async function fetchAndRenderCustomNotes(query, containerElement, runButton) {
  * Shows the query editor modal for the right sidebar.
  */
 function showQueryEditorModal() {
+    // Check if a modal already exists and remove it to prevent multiple modals
+    const existingModal = document.querySelector('.modal.query-editor-dynamic-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
     const modal = document.createElement('div');
-    modal.className = 'modal';
+    modal.className = 'modal query-editor-dynamic-modal';
     modal.innerHTML = `
-        <div class="query-editor-modal">
+        <div class="query-editor-modal-content">
             <h3>Edit Query</h3>
-            <textarea id="query-editor-input" placeholder="Enter your SQL query...">${localStorage.getItem('customSQLQuery') || ''}</textarea>
+            <div class="help-text">
+                Enter a SQL query to search based on block properties. Example:<br>
+                <code>SELECT * FROM notes WHERE id IN (SELECT note_id FROM properties WHERE property_key = 'status' AND property_value = 'done')</code>
+            </div>
+            <textarea id="query-editor-input" placeholder="Enter your SQL query here...">${localStorage.getItem('customSQLQuery') || ''}</textarea>
             <div class="button-group">
-                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
-                <button class="btn-primary" onclick="saveAndRunQuery()">Save & Run</button>
+                <button id="cancel-query-modal-btn" class="btn-secondary">Cancel</button>
+                <button id="save-query-modal-btn" class="btn-primary">Save</button>
             </div>
         </div>
     `;
     
     document.body.appendChild(modal);
     
-    // Close modal on click outside
+    const queryInput = modal.querySelector('#query-editor-input');
+    const saveButton = modal.querySelector('#save-query-modal-btn');
+    const cancelButton = modal.querySelector('#cancel-query-modal-btn');
+
+    // Populate textarea
+    queryInput.value = localStorage.getItem('customSQLQuery') || '';
+    queryInput.focus();
+
+    // Save button functionality
+    saveButton.addEventListener('click', () => {
+        const queryValue = queryInput.value.trim();
+        localStorage.setItem('customSQLQuery', queryValue);
+        modal.remove();
+
+        // Also trigger the execution of the new query
+        const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
+        const runQueryButton = document.getElementById('run-sql-query');
+        
+        if (notesDisplayContainer && runQueryButton) {
+            // Update the main query input in the sidebar as well, if it exists
+            const mainQueryInput = document.getElementById('sql-query-input');
+            if (mainQueryInput) {
+                mainQueryInput.value = queryValue;
+            }
+            fetchAndRenderCustomNotes(queryValue, notesDisplayContainer, runQueryButton);
+        } else {
+            console.warn('Could not find notes display container or run query button to refresh results after save.');
+        }
+    });
+
+    // Cancel button functionality
+    cancelButton.addEventListener('click', () => {
+        modal.remove();
+    });
+    
+    // Close modal on click outside (on the modal backdrop)
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.remove();
@@ -1555,115 +1606,282 @@ function showQueryEditorModal() {
     });
 }
 
+// --- Query Execution Frequency Selector ---
+
 /**
- * Saves the current query and runs it.
+ * Creates and appends the query execution frequency selector to the DOM.
  */
-function saveAndRunQuery() {
-    const queryInput = document.getElementById('query-editor-input');
-    const query = queryInput.value.trim();
-    
-    if (!query) {
-        alert('Please enter a query');
+function createExecutionFrequencySelector() {
+    const container = document.querySelector('.query-frequency-container');
+    if (!container) {
+        console.warn('Query frequency container not found. Skipping selector creation.');
         return;
     }
+    container.innerHTML = ''; // Clear any existing content
+
+    const selectLabel = document.createElement('label');
+    selectLabel.setAttribute('for', 'query-frequency-select');
+    selectLabel.textContent = 'Refresh:';
+    selectLabel.style.marginRight = '5px'; // Add some spacing
+
+    const select = document.createElement('select');
+    select.id = 'query-frequency-select';
+
+    const options = [
+        { value: 'manual', text: 'Manual' },
+        { value: '5', text: 'Every 5 minutes' },
+        { value: '15', text: 'Every 15 minutes' },
+        { value: '60', text: 'Every 60 minutes' }
+    ];
+
+    options.forEach(opt => {
+        const optionElement = document.createElement('option');
+        optionElement.value = opt.value;
+        optionElement.textContent = opt.text;
+        select.appendChild(optionElement);
+    });
+
+    const savedFrequency = localStorage.getItem('queryExecutionFrequency') || 'manual';
+    select.value = savedFrequency;
+
+    select.addEventListener('change', (event) => {
+        localStorage.setItem('queryExecutionFrequency', event.target.value);
+        setupAutoQueryExecution();
+    });
     
-    localStorage.setItem('customSQLQuery', query);
-    
-    // Close the modal
-    const modal = queryInput.closest('.modal');
-    if (modal) {
-        modal.remove();
-    }
-    
-    // Run the query
-    const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
-    const runButton = document.getElementById('edit-query-button');
-    if (notesDisplayContainer && runButton) {
-        fetchAndRenderCustomNotes(query, notesDisplayContainer, runButton);
-    }
+    container.appendChild(selectLabel);
+    container.appendChild(select);
 }
+
+/**
+ * Sets up or clears the interval for automatic query execution based on saved frequency.
+ */
+function setupAutoQueryExecution() {
+    if (window.autoQueryInterval) {
+        clearInterval(window.autoQueryInterval);
+        window.autoQueryInterval = null;
+    }
+
+    const frequency = localStorage.getItem('queryExecutionFrequency') || 'manual';
+    if (frequency === 'manual') {
+        console.log("Query execution set to manual. No interval started.");
+        return;
+    }
+
+    const intervalMinutes = parseInt(frequency);
+    if (isNaN(intervalMinutes) || intervalMinutes <= 0) {
+        console.error('Invalid query execution frequency:', frequency);
+        return;
+    }
+
+    const intervalMs = intervalMinutes * 60 * 1000;
+    const query = localStorage.getItem('customSQLQuery');
+
+    if (!query || !query.trim()) {
+        console.log('No custom query saved. Auto execution not started.');
+        return;
+    }
+
+    const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
+    if (!notesDisplayContainer) {
+        console.error('Notes display container for auto query execution not found.');
+        return;
+    }
+
+    // Initial execution if sidebar is open and query exists for non-manual frequencies
+    const rightSidebarEl = document.querySelector('.right-sidebar');
+    if (rightSidebarEl && !rightSidebarEl.classList.contains('collapsed')) {
+         // Run immediately, but without a button, so pass null.
+        fetchAndRenderCustomNotes(query, notesDisplayContainer, null);
+    }
+
+
+    window.autoQueryInterval = setInterval(() => {
+        const currentQuery = localStorage.getItem('customSQLQuery'); // Re-fetch query in case it changed
+        const currentRightSidebarEl = document.querySelector('.right-sidebar');
+        if (currentRightSidebarEl && !currentRightSidebarEl.classList.contains('collapsed') && currentQuery && currentQuery.trim()) {
+            console.log(`Auto-executing query every ${intervalMinutes} minutes.`);
+            fetchAndRenderCustomNotes(currentQuery, notesDisplayContainer, null); // Pass null for runButton
+        } else {
+            console.log(`Skipping auto-execution: Sidebar collapsed or no query.`);
+        }
+    }, intervalMs);
+
+    console.log(`Query auto-execution set up for every ${intervalMinutes} minutes.`);
+}
+
 
 /**
  * Initializes the functionality for the right sidebar's custom notes query section.
  */
 function initializeRightSidebarNotes() {
-    const queryInput = document.getElementById('sql-query-input');
+    // const queryInput = document.getElementById('sql-query-input'); // This is the textarea in the main sidebar UI
     const runQueryButton = document.getElementById('run-sql-query');
     const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
+    const editQueryPenButton = document.getElementById('edit-query-btn'); // The static pen button from index.php
 
-    if (!queryInput || !runQueryButton || !notesDisplayContainer) {
-        console.warn('Right sidebar notes elements not found. Skipping initialization.');
+    // Ensure essential elements for the right sidebar query functionality are present
+    if (!runQueryButton || !notesDisplayContainer || !editQueryPenButton) {
+        console.warn('Essential right sidebar query elements (run button, display container, or edit pen button) not found. Skipping initialization of custom notes section.');
         return;
     }
-
-    // Load saved query from localStorage
-    const savedQuery = localStorage.getItem('customSQLQuery');
-    if (savedQuery) {
-        queryInput.value = savedQuery;
-    }
-
-    // Add edit button next to the title
-    const titleElement = document.querySelector('.sql-query-container h3');
-    if (titleElement) {
-        const editButton = document.createElement('button');
-        editButton.id = 'edit-query-button';
-        editButton.className = 'btn-secondary';
-        editButton.style.marginLeft = '10px';
-        editButton.style.fontSize = '0.8em';
-        editButton.textContent = 'Edit';
-        titleElement.appendChild(editButton);
-
-        // Add click handler for edit button
-        editButton.addEventListener('click', () => {
-            showQueryEditorModal();
-            // Hide the query input container
-            const queryContainer = document.querySelector('.sql-query-container');
-            if (queryContainer) {
-                queryContainer.style.display = 'none';
-            }
-        });
-    }
-
-    runQueryButton.addEventListener('click', () => {
-        const query = queryInput.value.trim();
-        localStorage.setItem('customSQLQuery', query); // Save current query
-
-        if (!query) {
-            notesDisplayContainer.innerHTML = '<p style="padding:10px;">Please enter a SQL query.</p>';
-            return;
-        }
-        fetchAndRenderCustomNotes(query, notesDisplayContainer, runQueryButton);
+    
+    // Listener for the static "Edit Query" pen button (from index.php)
+    editQueryPenButton.addEventListener('click', () => {
+        showQueryEditorModal(); 
+        // No need to hide any query input container here, as the main textarea was removed from index.php.
+        // The modal is self-contained for editing.
     });
 
-    // Run the saved query if it exists
+    // Listener for the "Run Query" button
+    runQueryButton.addEventListener('click', () => {
+        const currentQuery = localStorage.getItem('customSQLQuery') || ''; 
+        if (!currentQuery) {
+            // Display a message if no query is saved.
+            // The padding here is acceptable as it's a direct message within the container.
+            notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query saved. Click the "Edit" (pen) button to set a query.</p>';
+            return;
+        }
+        fetchAndRenderCustomNotes(currentQuery, notesDisplayContainer, runQueryButton);
+    });
+
+    // Initial load: Run the saved query if it exists
+    const savedQuery = localStorage.getItem('customSQLQuery');
     if (savedQuery && savedQuery.trim()) {
         fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
+    } else {
+        // Display a message if no query is set on initial load.
+        notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query set. Click the "Edit" (pen) button to create a custom query.</p>';
     }
 
-    // Auto-update logic
-    let rightSidebarAutoUpdateInterval = null;
-    const updateFrequencyMs = 60000; // 60 seconds
-
-    const rightSidebarEl = document.querySelector('.right-sidebar'); 
-
-    if (rightSidebarEl && queryInput && notesDisplayContainer && runQueryButton) {
-        rightSidebarAutoUpdateInterval = setInterval(() => {
-            const currentQueryInput = document.getElementById('sql-query-input');
-            const currentNotesDisplayContainer = document.getElementById('right-sidebar-notes-content');
-            const currentRunQueryButton = document.getElementById('run-sql-query');
-            const currentRightSidebarEl = document.querySelector('.right-sidebar');
-
-            if (!currentQueryInput || !currentNotesDisplayContainer || !currentRunQueryButton || !currentRightSidebarEl) {
-                return;
-            }
-
-            const currentQuery = currentQueryInput.value.trim();
-            if (!currentRightSidebarEl.classList.contains('collapsed') && currentQuery) {
-                fetchAndRenderCustomNotes(currentQuery, currentNotesDisplayContainer, currentRunQueryButton);
-            }
-        }, updateFrequencyMs);
-    }
+    // Initialize and set up the execution frequency selector and auto-execution
+    createExecutionFrequencySelector(); 
+    setupAutoQueryExecution(); 
 }
 
 // Call to initializeRightSidebarNotes will be in app.js
 // document.addEventListener('DOMContentLoaded', initializeRightSidebarNotes);
+
+function initializeLeftSidebar() {
+    const toolbarToggle = document.getElementById('toolbar-toggle');
+
+    if (toolbarToggle) {
+        // Set initial state based on localStorage
+        const isVisible = localStorage.getItem('toolbarVisible') !== 'false';
+        const noteActions = document.querySelectorAll('.note-actions');
+        
+        noteActions.forEach(action => {
+            action.style.display = isVisible ? 'flex' : 'none';
+        });
+        toolbarToggle.textContent = isVisible ? 'Hide toolbar' : 'Show toolbar';
+
+        toolbarToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            const noteActions = document.querySelectorAll('.note-actions');
+            const isVisible = noteActions[0]?.style.display !== 'none';
+            
+            noteActions.forEach(action => {
+                action.style.display = isVisible ? 'none' : 'flex';
+            });
+            
+            toolbarToggle.textContent = isVisible ? 'Show toolbar' : 'Hide toolbar';
+            localStorage.setItem('toolbarVisible', !isVisible);
+        });
+    }
+}
+
+// Add this function after the DOMContentLoaded event listener
+function initializeNoteActions() {
+    if (outlineContainer) {
+        outlineContainer.addEventListener('click', async (event) => {
+            const actionButton = event.target.closest('[data-action]');
+            if (!actionButton) return;
+
+            const action = actionButton.dataset.action;
+            const noteElement = actionButton.closest('.outline-item');
+            if (!noteElement) return;
+
+            const noteId = noteElement.dataset.noteId;
+            if (!noteId) return;
+
+            switch (action) {
+                case 'add-child':
+                    // Add a new child note
+                    const newNote = await createNote('', noteId);
+                    if (newNote) {
+                        const newNoteElement = document.createElement('div');
+                        newNoteElement.className = 'outline-item';
+                        newNoteElement.dataset.noteId = newNote.id;
+                        newNoteElement.innerHTML = await renderOutline([newNote], parseInt(noteElement.dataset.level) + 1);
+                        const childrenContainer = noteElement.querySelector('.outline-children') || 
+                            (() => {
+                                const container = document.createElement('div');
+                                container.className = 'outline-children';
+                                noteElement.appendChild(container);
+                                return container;
+                            })();
+                        childrenContainer.appendChild(newNoteElement);
+                        setActiveBlock(newNoteElement);
+                    }
+                    break;
+
+                case 'edit':
+                    setActiveBlock(noteElement);
+                    break;
+
+                case 'delete':
+                    if (confirm('Are you sure you want to delete this note?')) {
+                        await deleteNote(noteId);
+                        noteElement.remove();
+                    }
+                    break;
+
+                case 'indent-note':
+                    const prevNote = noteElement.previousElementSibling;
+                    if (prevNote && prevNote.classList.contains('outline-item')) {
+                        const prevNoteId = prevNote.dataset.noteId;
+                        await updateNoteParent(noteId, prevNoteId);
+                        const childrenContainer = prevNote.querySelector('.outline-children') || 
+                            (() => {
+                                const container = document.createElement('div');
+                                container.className = 'outline-children';
+                                prevNote.appendChild(container);
+                                return container;
+                            })();
+                        childrenContainer.appendChild(noteElement);
+                    }
+                    break;
+
+                case 'upload':
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.multiple = true;
+                    fileInput.onchange = async (e) => {
+                        const files = Array.from(e.target.files);
+                        if (files.length > 0) {
+                            await handleDroppedFiles(noteId, files);
+                        }
+                    };
+                    fileInput.click();
+                    break;
+
+                case 'copy-block-id':
+                    const blockId = noteElement.querySelector('.outline-content').dataset.blockId;
+                    if (blockId) {
+                        await navigator.clipboard.writeText(blockId);
+                        const originalText = actionButton.textContent;
+                        actionButton.textContent = '✓';
+                        setTimeout(() => {
+                            actionButton.textContent = originalText;
+                        }, 1000);
+                    }
+                    break;
+
+                case 'toggle-favorite':
+                    await toggleFavorite(noteId, actionButton);
+                    break;
+            }
+        });
+    }
+}

@@ -729,7 +729,8 @@ function renderNote(note, level = 0, parentId = null) {
 
     // Add note actions
     const actions = document.createElement('div');
-    actions.className = 'note-actions';
+    actions.className = 'note-action'; // Changed from note-actions to note-action
+    console.log('Created note-action element:', actions); // Debug log
     
     // Add favorite star
     const starButton = document.createElement('button');

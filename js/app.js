@@ -32,12 +32,16 @@ async function navigateToPage(pageId) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('DOMContentLoaded event fired'); // Debug log
     await loadTemplates();
     loadRecentPages();
     initCalendar();
     initializeSidebarToggle(); // For the left sidebar
     initializeRightSidebarToggle(); // For the new right sidebar
     initializeRightSidebarNotes(); // For the new right sidebar's notes query functionality
+    console.log('About to initialize left sidebar'); // Debug log
+    initializeLeftSidebar();
+    console.log('Left sidebar initialized'); // Debug log
     document.addEventListener('keydown', handleGlobalKeyDown);
     
     // Add event listeners after DOM is loaded
