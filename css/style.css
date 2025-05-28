@@ -1408,11 +1408,12 @@ a.block-ref-link:hover {
     background-color: var(--bg-color); /* Ensure it has a background */
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-color);
+    padding: 1rem; /* Consistent padding for the notes content area */
 }
 
 /* Styling for individual notes within the right sidebar (example) */
 .right-sidebar-note-item {
-    padding: 8px;
+    padding: 8px; /* This is for items *within* #right-sidebar-notes-content */
     margin-bottom: 8px;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);

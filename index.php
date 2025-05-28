@@ -58,11 +58,9 @@ if (!file_exists($dbPath)) {
         <div class="right-sidebar collapsed">
             <div class="sql-query-container">
                 <h3>Custom Query</h3>
-                <textarea id="sql-query-input" placeholder="Enter your SQL query here... e.g., SELECT id, content, page_id FROM notes WHERE content LIKE '%important%' ORDER BY updated_at DESC"></textarea>
-                <small class="sql-limit-tip" style="display: block; margin-top: 4px; margin-bottom: 8px; font-size: 0.85em; color: #555;">
-                    Tip: Add 'LIMIT 10' to your query for faster results and to display up to 10 notes.
-                </small>
+                <button id="edit-query-btn" class="btn-secondary" aria-label="Edit Query"><i class="fas fa-pen"></i></button>
                 <button id="run-sql-query" class="btn-primary">Run Query</button>
+                <div class="query-frequency-container"></div>
             </div>
             <div id="right-sidebar-notes-content">
                 <!-- Notes fetched by the query will be displayed here -->
