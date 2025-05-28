@@ -28,7 +28,10 @@ if (!file_exists($dbPath)) {
             </div>
             <div class="search-box">
                 <input type="text" id="search" placeholder="Search...">
-                <a href="#" id="advanced-search-link">Advanced search</a>
+                <div class="search-links">
+                    <a href="#" id="advanced-search-link">Advanced search</a>
+                    <a href="#" id="toolbar-toggle">Hide toolbar</a>
+                </div>
             </div>
             <div class="recent-pages">
                 <ul id="recent-pages-list"></ul>

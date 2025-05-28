@@ -194,8 +194,10 @@ The JS logic in handleResize will be updated to keep it visible.
 }
 
 
-.calendar-panel { background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 12px; }
-.search-box { margin-bottom: 0px; }
+.calendar-panel { background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 10px; }
+.search-box {
+    border-bottom: 1px solid var(--border-color);
+}
 .search-box input {
     width: 100%; padding: 8px 12px; border: 1px solid var(--border-color);
     border-radius: var(--radius-sm); font-size: 0.9em; transition: all 0.2s;
@@ -203,9 +205,14 @@ The JS logic in handleResize will be updated to keep it visible.
 .search-box input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(16, 107, 163, 0.1); } /* Updated accent color alpha */
 #advanced-search-link {
     display: block; margin-top: 5px; color: var(--accent-color);
-    text-decoration: none; font-size: 0.9em; text-align: right;
+    text-decoration: none; font-size: 0.9em;
 }
 #advanced-search-link:hover { text-decoration: underline; }
+#toolbar-toggle {
+    display: block; margin-top: 5px; color: var(--accent-color);
+    text-decoration: none; font-size: 0.9em; text-align: right;
+}
+#toolbar-toggle:hover { text-decoration: underline; }
 .search-link {
     color: var(--accent-color); text-decoration: none; font-family: monospace;
     background: var(--bg-secondary); padding: 2px 4px; border-radius: 3px;
@@ -1417,4 +1424,68 @@ a.block-ref-link:hover {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     font-size: 0.9em;
+}
+
+/* Edit Query Modal Styles */
+.query-editor-modal-content {
+    background: var(--bg-color);
+    padding: 20px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    width: 90%;
+    max-width: 600px;
+    margin: 20px auto;
+}
+
+.query-editor-modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
+
+.query-editor-modal-content .help-text {
+    margin-bottom: 15px;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.query-editor-modal-content .help-text code {
+    display: block;
+    margin-top: 8px;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.query-editor-modal-content textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 0.9em;
+    resize: vertical;
+}
+
+.query-editor-modal-content textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.1);
+}
+
+.query-editor-modal-content .button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Toolbar Toggle Styles */
+.search-links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
 }

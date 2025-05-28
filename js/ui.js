@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     outlineContainer = document.getElementById('outline-container');
 
     initializeBacklinksToggle(); // Initialize the backlinks toggle functionality
+    initializeNoteActions(); // Add this line
 
     // Attach drag and drop handlers here!
     if (outlineContainer) {
@@ -1544,10 +1545,14 @@ function showQueryEditorModal() {
     }
 
     const modal = document.createElement('div');
-    modal.className = 'modal query-editor-dynamic-modal'; // Added a specific class for this modal
+    modal.className = 'modal query-editor-dynamic-modal';
     modal.innerHTML = `
         <div class="query-editor-modal-content">
             <h3>Edit Query</h3>
+            <div class="help-text">
+                Enter a SQL query to search based on block properties. Example:<br>
+                <code>SELECT * FROM notes WHERE id IN (SELECT note_id FROM properties WHERE property_key = 'status' AND property_value = 'done')</code>
+            </div>
             <textarea id="query-editor-input" placeholder="Enter your SQL query here...">${localStorage.getItem('customSQLQuery') || ''}</textarea>
             <div class="button-group">
                 <button id="cancel-query-modal-btn" class="btn-secondary">Cancel</button>
@@ -1564,28 +1569,17 @@ function showQueryEditorModal() {
 
     // Populate textarea
     queryInput.value = localStorage.getItem('customSQLQuery') || '';
-    queryInput.focus(); // Auto-focus the textarea
+    queryInput.focus();
 
     // Save button functionality
     saveButton.addEventListener('click', () => {
         const queryValue = queryInput.value.trim();
-        // Although the subtask doesn't explicitly ask for validation, it's good practice.
-        // However, the original saveAndRunQuery had an alert, so keeping it simple.
-        // if (!queryValue) {
-        //     alert('Please enter a query.');
-        //     queryInput.focus();
-        //     return;
-        // }
         localStorage.setItem('customSQLQuery', queryValue);
         modal.remove();
 
         // Also trigger the execution of the new query
-        // The original runButton for fetchAndRenderCustomNotes was 'edit-query-button'
-        // but that button *opens* this modal. The actual "Run Query" button in the sidebar
-        // is 'run-sql-query'. We should use that or ensure the correct one is passed.
-        // For now, let's assume there's a general "Run Query" button that should reflect the new query.
         const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
-        const runQueryButton = document.getElementById('run-sql-query'); // This is the main "Run Query" button in the sidebar
+        const runQueryButton = document.getElementById('run-sql-query');
         
         if (notesDisplayContainer && runQueryButton) {
             // Update the main query input in the sidebar as well, if it exists
@@ -1611,36 +1605,6 @@ function showQueryEditorModal() {
         }
     });
 }
-
-// saveAndRunQuery function is now integrated into the Save button's event listener in showQueryEditorModal.
-// It can be removed if no other part of the application uses it.
-// For safety, I will comment it out instead of removing it completely in this step.
-/*
-function saveAndRunQuery() {
-    const queryInput = document.getElementById('query-editor-input');
-    const query = queryInput.value.trim();
-    
-    if (!query) {
-        alert('Please enter a query');
-        return;
-    }
-    
-    localStorage.setItem('customSQLQuery', query);
-    
-    // Close the modal
-    const modal = queryInput.closest('.modal');
-    if (modal) {
-        modal.remove();
-    }
-    
-    // Run the query
-    const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
-    const runButton = document.getElementById('edit-query-button'); // This might need to be 'run-sql-query'
-    if (notesDisplayContainer && runButton) {
-        fetchAndRenderCustomNotes(query, notesDisplayContainer, runButton);
-    }
-}
-*/
 
 // --- Query Execution Frequency Selector ---
 
@@ -1797,3 +1761,127 @@ function initializeRightSidebarNotes() {
 
 // Call to initializeRightSidebarNotes will be in app.js
 // document.addEventListener('DOMContentLoaded', initializeRightSidebarNotes);
+
+function initializeLeftSidebar() {
+    const toolbarToggle = document.getElementById('toolbar-toggle');
+
+    if (toolbarToggle) {
+        // Set initial state based on localStorage
+        const isVisible = localStorage.getItem('toolbarVisible') !== 'false';
+        const noteActions = document.querySelectorAll('.note-actions');
+        
+        noteActions.forEach(action => {
+            action.style.display = isVisible ? 'flex' : 'none';
+        });
+        toolbarToggle.textContent = isVisible ? 'Hide toolbar' : 'Show toolbar';
+
+        toolbarToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            const noteActions = document.querySelectorAll('.note-actions');
+            const isVisible = noteActions[0]?.style.display !== 'none';
+            
+            noteActions.forEach(action => {
+                action.style.display = isVisible ? 'none' : 'flex';
+            });
+            
+            toolbarToggle.textContent = isVisible ? 'Show toolbar' : 'Hide toolbar';
+            localStorage.setItem('toolbarVisible', !isVisible);
+        });
+    }
+}
+
+// Add this function after the DOMContentLoaded event listener
+function initializeNoteActions() {
+    if (outlineContainer) {
+        outlineContainer.addEventListener('click', async (event) => {
+            const actionButton = event.target.closest('[data-action]');
+            if (!actionButton) return;
+
+            const action = actionButton.dataset.action;
+            const noteElement = actionButton.closest('.outline-item');
+            if (!noteElement) return;
+
+            const noteId = noteElement.dataset.noteId;
+            if (!noteId) return;
+
+            switch (action) {
+                case 'add-child':
+                    // Add a new child note
+                    const newNote = await createNote('', noteId);
+                    if (newNote) {
+                        const newNoteElement = document.createElement('div');
+                        newNoteElement.className = 'outline-item';
+                        newNoteElement.dataset.noteId = newNote.id;
+                        newNoteElement.innerHTML = await renderOutline([newNote], parseInt(noteElement.dataset.level) + 1);
+                        const childrenContainer = noteElement.querySelector('.outline-children') || 
+                            (() => {
+                                const container = document.createElement('div');
+                                container.className = 'outline-children';
+                                noteElement.appendChild(container);
+                                return container;
+                            })();
+                        childrenContainer.appendChild(newNoteElement);
+                        setActiveBlock(newNoteElement);
+                    }
+                    break;
+
+                case 'edit':
+                    setActiveBlock(noteElement);
+                    break;
+
+                case 'delete':
+                    if (confirm('Are you sure you want to delete this note?')) {
+                        await deleteNote(noteId);
+                        noteElement.remove();
+                    }
+                    break;
+
+                case 'indent-note':
+                    const prevNote = noteElement.previousElementSibling;
+                    if (prevNote && prevNote.classList.contains('outline-item')) {
+                        const prevNoteId = prevNote.dataset.noteId;
+                        await updateNoteParent(noteId, prevNoteId);
+                        const childrenContainer = prevNote.querySelector('.outline-children') || 
+                            (() => {
+                                const container = document.createElement('div');
+                                container.className = 'outline-children';
+                                prevNote.appendChild(container);
+                                return container;
+                            })();
+                        childrenContainer.appendChild(noteElement);
+                    }
+                    break;
+
+                case 'upload':
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.multiple = true;
+                    fileInput.onchange = async (e) => {
+                        const files = Array.from(e.target.files);
+                        if (files.length > 0) {
+                            await handleDroppedFiles(noteId, files);
+                        }
+                    };
+                    fileInput.click();
+                    break;
+
+                case 'copy-block-id':
+                    const blockId = noteElement.querySelector('.outline-content').dataset.blockId;
+                    if (blockId) {
+                        await navigator.clipboard.writeText(blockId);
+                        const originalText = actionButton.textContent;
+                        actionButton.textContent = '✓';
+                        setTimeout(() => {
+                            actionButton.textContent = originalText;
+                        }, 1000);
+                    }
+                    break;
+
+                case 'toggle-favorite':
+                    await toggleFavorite(noteId, actionButton);
+                    break;
+            }
+        });
+    }
+}

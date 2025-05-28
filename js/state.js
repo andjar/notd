@@ -5,6 +5,7 @@ let prefetchedBlocks = {}; // Cache for prefetched blocks for the current page l
 let noteTemplates = {};
 let activeBlockElement = null; // For keyboard navigation
 let isEditorOpen = false;      // To track if a textarea editor is active
+let isToolbarVisible = true;   // To track if the note-action bar is visible
 
 let suggestionsPopup = null;
 let activeSuggestionIndex = -1;
