@@ -941,6 +941,27 @@ async function initializeLeftSidebar() {
     });
 }
 
+function applyToolbarVisibilityToActions() {
+    // Ensure UIState is available, or handle potential errors if it's not.
+    if (typeof UIState === 'undefined' || !UIState.get) {
+        console.error("UIState not available to applyToolbarVisibilityToActions");
+        return;
+    }
+    const isVisible = UIState.get('toolbarVisible');
+    const noteActions = document.querySelectorAll('.note-actions');
+    noteActions.forEach(action => {
+        action.style.display = isVisible ? 'flex' : 'none';
+    });
+
+    // Optional: Also update the main toggle button text, though this should also
+    // be handled by the subscription in initializeLeftSidebar.
+    // This is a good safeguard.
+    const toolbarToggle = document.getElementById('toolbar-toggle');
+    if (toolbarToggle) {
+        toolbarToggle.textContent = isVisible ? 'Hide toolbar' : 'Show toolbar';
+    }
+}
+
 // --- Page Search Functionality ---
 
 let pageSearchModal = null;

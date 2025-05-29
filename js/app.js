@@ -176,7 +176,12 @@ async function loadPage(pageId) {
         }
 
         currentPage = data;
-        await renderPage(data);
+        await renderPage(data); // Existing line
+        if (typeof applyToolbarVisibilityToActions === 'function') { // Add a check
+            applyToolbarVisibilityToActions(); // New line
+        } else {
+            console.error("applyToolbarVisibilityToActions function is not defined.");
+        }
 
         // UI components are now initialized once or update reactively.
         // General UI re-initialization is removed from here.
