@@ -803,6 +803,12 @@ async function initializeSidebarToggle() {
         return;
     }
 
+    // Idempotency check for event listener
+    if (toggleButton.dataset.initialized === 'true') {
+        return;
+    }
+    toggleButton.dataset.initialized = 'true';
+
     // Subscribe to state changes
     UIState.subscribe('leftSidebarCollapsed', (isCollapsed) => {
         if (isCollapsed) {
@@ -858,6 +864,12 @@ async function initializeRightSidebarToggle() {
         console.warn('Right sidebar toggle elements not found. Skipping initialization.');
         return;
     }
+
+    // Idempotency check for event listener
+    if (toggleButton.dataset.initialized === 'true') {
+        return;
+    }
+    toggleButton.dataset.initialized = 'true';
 
     // Subscribe to state changes
     UIState.subscribe('rightSidebarCollapsed', (isCollapsed) => {
@@ -1602,26 +1614,22 @@ async function showQueryEditorModal() { // Make async
     const cancelButton = modal.querySelector('#cancel-query-modal-btn');
 
     // Populate textarea
-    // Populate textarea
-    // Assuming fetchToolbarVisibilityAPI is adapted or a new function is made for string values.
-    // If it returns boolean true on error/default, we need to convert.
-    let fetchedQuery = await fetchToolbarVisibilityAPI('customSQLQuery');
-    if (typeof fetchedQuery !== 'string') {
-        fetchedQuery = ''; // Default to empty string if not a string (e.g. boolean true on error)
+    let fetchedQuery = UIState.get('customSQLQuery');
+    if (typeof fetchedQuery !== 'string' || fetchedQuery === null || typeof fetchedQuery === 'boolean') { // Check for boolean if UIState.get might return true on error
+        fetchedQuery = ''; 
     }
     queryInput.value = fetchedQuery;
     queryInput.focus();
 
     // Save button functionality
-    saveButton.addEventListener('click', async () => { // Make async
+    saveButton.addEventListener('click', async () => { 
         const queryValue = queryInput.value.trim();
-        // OLD: localStorage.setItem('customSQLQuery', queryValue);
-        const success = await updateToolbarVisibilityAPI('customSQLQuery', queryValue); // NEW
+        const success = await UIState.set('customSQLQuery', queryValue); 
         if (!success) {
-            console.error("Failed to save custom SQL query to backend.");
-            // Optionally alert the user or handle error
-            // For now, we'll still remove the modal and try to refresh,
-            // but the change won't persist if the API call failed.
+            console.error("Failed to save custom SQL query using UIState.set.");
+            alert("Failed to save your custom query. Please try again.");
+            // Modal remains open for user to try again or cancel
+            return; 
         }
         modal.remove();
 
@@ -1689,27 +1697,26 @@ async function createExecutionFrequencySelector() { // Make async
         select.appendChild(optionElement);
     });
 
-    // const savedFrequency = localStorage.getItem('queryExecutionFrequency') || 'manual'; // OLD
-    let savedFrequency = await fetchToolbarVisibilityAPI('queryExecutionFrequency'); // NEW
-    if (typeof savedFrequency !== 'string' || savedFrequency === '') {
-        savedFrequency = 'manual'; // Default if not a string or empty
+    let savedFrequency = UIState.get('queryExecutionFrequency'); 
+    if (typeof savedFrequency !== 'string' || savedFrequency === null || savedFrequency === '' || typeof savedFrequency === 'boolean') {
+        savedFrequency = 'manual'; 
     }
     select.value = savedFrequency;
 
-    select.addEventListener('change', async (event) => { // Make async
-        // localStorage.setItem('queryExecutionFrequency', event.target.value); // OLD
-        const success = await updateToolbarVisibilityAPI('queryExecutionFrequency', event.target.value); // NEW
-        if (!success) {
-            console.error("Failed to save query execution frequency to backend.");
-            // Optionally alert the user or handle error
-        }
-        // setupAutoQueryExecution is now async, so await it if this function needs to wait for it.
-        // However, createExecutionFrequencySelector itself is called without await from an async function,
-        // so direct await here might not change overall flow unless setupAutoQueryExecution has critical
-        // side effects needed immediately. For now, just calling it as it was.
-        setupAutoQueryExecution(); // This needs to be called as it's async, but its return value isn't used here.
-                                   // If setupAutoQueryExecution needs to complete before further action here, then await.
-    });
+    // Idempotency: Check if listener already attached
+    if (select.dataset.listenerAttached !== 'true') {
+        select.addEventListener('change', async (event) => { 
+            const success = await UIState.set('queryExecutionFrequency', event.target.value); 
+            if (!success) {
+                console.error("Failed to save query execution frequency using UIState.set.");
+                alert("Failed to save query execution frequency. Please try again.");
+                select.value = UIState.get('queryExecutionFrequency') || 'manual'; // Revert
+                return;
+            }
+            await setupAutoQueryExecution(); 
+        });
+        select.dataset.listenerAttached = 'true';
+    }
     
     container.appendChild(selectLabel);
     container.appendChild(select);
@@ -1724,33 +1731,31 @@ async function setupAutoQueryExecution() { // Make async
         window.autoQueryInterval = null;
     }
 
-    // const frequency = localStorage.getItem('queryExecutionFrequency') || 'manual'; // OLD
-    let frequency = await fetchToolbarVisibilityAPI('queryExecutionFrequency'); // NEW
-    if (typeof frequency !== 'string' || frequency === '') {
-        frequency = 'manual'; // Default if not a string or empty
+    let frequency = UIState.get('queryExecutionFrequency'); 
+    if (typeof frequency !== 'string' || frequency === null || frequency === '' || typeof frequency === 'boolean') {
+        frequency = 'manual'; 
     }
 
     if (frequency === 'manual') {
-        console.log("Query execution set to manual (fetched from API). No interval started.");
+        console.log("Query execution set to manual (from UIState). No interval started.");
         return;
     }
 
     const intervalMinutes = parseInt(frequency);
     if (isNaN(intervalMinutes) || intervalMinutes <= 0) {
-        console.error('Invalid query execution frequency:', frequency);
+        console.error('Invalid query execution frequency from UIState:', frequency);
         return;
     }
 
     const intervalMs = intervalMinutes * 60 * 1000;
-    // const query = localStorage.getItem('customSQLQuery'); // OLD
-    let query = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
-    if (typeof query !== 'string') {
-        query = ''; // Default if not a string
+    let query = UIState.get('customSQLQuery'); 
+    if (typeof query !== 'string' || query === null || typeof query === 'boolean') {
+        query = ''; 
     }
 
 
     if (!query || !query.trim()) {
-        console.log('No custom query saved (fetched from API). Auto execution not started.');
+        console.log('No custom query saved (from UIState). Auto execution not started.');
         return;
     }
 
@@ -1768,22 +1773,21 @@ async function setupAutoQueryExecution() { // Make async
     }
 
 
-    window.autoQueryInterval = setInterval(async () => { // Make callback async (or use async IIFE)
-        // const currentQuery = localStorage.getItem('customSQLQuery'); // OLD
-        let currentQuery = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
-        if (typeof currentQuery !== 'string') {
-            currentQuery = ''; // Default if not a string
+    window.autoQueryInterval = setInterval(async () => { 
+        let currentQuery = UIState.get('customSQLQuery'); 
+        if (typeof currentQuery !== 'string' || currentQuery === null || typeof currentQuery === 'boolean') {
+            currentQuery = ''; 
         }
         const currentRightSidebarEl = document.querySelector('.right-sidebar');
         if (currentRightSidebarEl && !currentRightSidebarEl.classList.contains('collapsed') && currentQuery && currentQuery.trim()) {
-            console.log(`Auto-executing query every ${intervalMinutes} minutes.`);
-            fetchAndRenderCustomNotes(currentQuery, notesDisplayContainer, null); // Pass null for runButton
+            console.log(`Auto-executing query every ${intervalMinutes} minutes (query from UIState).`);
+            fetchAndRenderCustomNotes(currentQuery, notesDisplayContainer, null); 
         } else {
-            console.log(`Skipping auto-execution: Sidebar collapsed or no query (fetched from API).`);
+            console.log(`Skipping auto-execution: Sidebar collapsed or no query (from UIState).`);
         }
     }, intervalMs);
 
-    console.log(`Query auto-execution set up for every ${intervalMinutes} minutes (query fetched from API).`);
+    console.log(`Query auto-execution set up for every ${intervalMinutes} minutes (query from UIState).`);
 }
 
 
@@ -1791,98 +1795,61 @@ async function setupAutoQueryExecution() { // Make async
  * Initializes the functionality for the right sidebar's custom notes query section.
  */
 async function initializeRightSidebarNotes() { // Make async
-    // const queryInput = document.getElementById('sql-query-input'); // This is the textarea in the main sidebar UI
     const runQueryButton = document.getElementById('run-sql-query');
     const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
-    const editQueryPenButton = document.getElementById('edit-query-btn'); // The static pen button from index.php
+    const editQueryPenButton = document.getElementById('edit-query-btn'); 
 
-    // Ensure essential elements for the right sidebar query functionality are present
     if (!runQueryButton || !notesDisplayContainer || !editQueryPenButton) {
-        console.warn('Essential right sidebar query elements (run button, display container, or edit pen button) not found. Skipping initialization of custom notes section.');
+        console.warn('Essential right sidebar query elements not found. Skipping initialization.');
         return;
     }
     
-    // Listener for the static "Edit Query" pen button (from index.php)
-    editQueryPenButton.addEventListener('click', async () => { // Make async if showQueryEditorModal is async
-        await showQueryEditorModal(); 
-        // No need to hide any query input container here, as the main textarea was removed from index.php.
-        // The modal is self-contained for editing.
-    });
+    // Idempotency checks for event listeners
+    if (editQueryPenButton.dataset.initialized !== 'true') {
+        editQueryPenButton.addEventListener('click', async () => { 
+            await showQueryEditorModal(); 
+        });
+        editQueryPenButton.dataset.initialized = 'true';
+    }
 
-    // Listener for the "Run Query" button
-    runQueryButton.addEventListener('click', async () => { // Make async
-        // const currentQuery = localStorage.getItem('customSQLQuery') || '';  // OLD
-        let currentQuery = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
-        if (typeof currentQuery !== 'string') {
-            currentQuery = ''; // Default if not a string
-        }
-        if (!currentQuery) {
-            // Display a message if no query is saved.
-            // The padding here is acceptable as it's a direct message within the container.
-            notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query saved. Click the "Edit" (pen) button to set a query.</p>';
-            return;
-        }
-        fetchAndRenderCustomNotes(currentQuery, notesDisplayContainer, runQueryButton);
-    });
+    if (runQueryButton.dataset.initialized !== 'true') {
+        runQueryButton.addEventListener('click', async () => { 
+            let currentQuery = UIState.get('customSQLQuery'); 
+            if (typeof currentQuery !== 'string' || currentQuery === null || typeof currentQuery === 'boolean') {
+                currentQuery = ''; 
+            }
+            if (!currentQuery) {
+                notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query saved. Click the "Edit" (pen) button to set a query.</p>';
+                return;
+            }
+            fetchAndRenderCustomNotes(currentQuery, notesDisplayContainer, runQueryButton);
+        });
+        runQueryButton.dataset.initialized = 'true';
+    }
 
-    // Initial load: Run the saved query if it exists
-    // const savedQuery = localStorage.getItem('customSQLQuery'); // OLD
-    let savedQuery = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
-    if (typeof savedQuery !== 'string') {
-        savedQuery = ''; // Default if not a string
+    let savedQuery = UIState.get('customSQLQuery'); 
+    if (typeof savedQuery !== 'string' || savedQuery === null || typeof savedQuery === 'boolean') {
+        savedQuery = ''; 
     }
 
     if (savedQuery && savedQuery.trim()) {
-        fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
+        // Initial run if sidebar is open, otherwise it will run when opened or via auto-refresh if configured
+        const rightSidebarEl = document.querySelector('.right-sidebar');
+        if (rightSidebarEl && !rightSidebarEl.classList.contains('collapsed')) {
+            fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
+        } else {
+             notesDisplayContainer.innerHTML = '<p style="padding:10px;">Query loaded. Expand sidebar to view, or it will refresh automatically if configured.</p>';
+        }
     } else {
-        // Display a message if no query is set on initial load.
-        notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query set (fetched from API). Click the "Edit" (pen) button to create a custom query.</p>';
+        notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query set (from UIState). Click the "Edit" (pen) button to create a custom query.</p>';
     }
 
-    // Initialize and set up the execution frequency selector and auto-execution
-    createExecutionFrequencySelector(); // This one doesn't need to be async itself
-    await setupAutoQueryExecution(); // Call await as setupAutoQueryExecution is now async
+    await createExecutionFrequencySelector(); 
+    await setupAutoQueryExecution(); 
 }
 
 // Call to initializeRightSidebarNotes will be in app.js
 // document.addEventListener('DOMContentLoaded', initializeRightSidebarNotes);
-
-async function initializeLeftSidebar() {
-    const toolbarToggle = document.getElementById('toolbar-toggle');
-
-    if (toolbarToggle) {
-        // Set initial state based on API
-        const isVisible = await fetchToolbarVisibilityAPI();
-        const noteActions = document.querySelectorAll('.note-actions');
-        
-        noteActions.forEach(action => {
-            action.style.display = isVisible ? 'flex' : 'none';
-        });
-        toolbarToggle.textContent = isVisible ? 'Hide toolbar' : 'Show toolbar';
-
-        toolbarToggle.addEventListener('click', async (e) => {
-            e.preventDefault();
-            
-            const noteActions = document.querySelectorAll('.note-actions');
-            // Determine newVisibility based on the button's current text
-            const isCurrentlyVisibleAccordingToButton = toolbarToggle.textContent === 'Hide toolbar';
-            const newVisibility = !isCurrentlyVisibleAccordingToButton;
-            
-            noteActions.forEach(action => {
-                action.style.display = newVisibility ? 'flex' : 'none';
-            });
-            
-            toolbarToggle.textContent = newVisibility ? 'Hide toolbar' : 'Show toolbar';
-            
-            // Update backend
-            const success = await updateToolbarVisibilityAPI(newVisibility);
-            if (!success) {
-                console.error("Failed to update toolbar visibility on the backend.");
-                // Optionally, revert UI changes here or notify the user
-            }
-        });
-    }
-}
 
 // Add this function after the DOMContentLoaded event listener
 function initializeNoteActions() {

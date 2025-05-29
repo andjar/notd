@@ -32,52 +32,30 @@ async function navigateToPage(pageId) {
 }
 
 // --- Centralized UI Initializer ---
-async function runUIInitializers(settings) {
-    console.log('runUIInitializers called with settings:', settings);
+async function runUIInitializers() {
+    console.log('runUIInitializers called');
     // Boolean conversions are done here based on the string values from settings
-    await initializeLeftSidebar(settings.toolbarVisible === 'true');
-    await initializeSidebarToggle(settings.leftSidebarCollapsed === 'true');
-    await initializeRightSidebarToggle(settings.rightSidebarCollapsed === 'true');
+    await initializeLeftSidebar();
+    await initializeSidebarToggle();
+    await initializeRightSidebarToggle();
     // These expect strings, so pass directly
-    await initializeRightSidebarNotes(settings.customSQLQuery, settings.queryExecutionFrequency);
+    await initializeRightSidebarNotes();
     console.log('All UI initializers called by runUIInitializers');
 }
 // --- END Centralized UI Initializer ---
 
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOMContentLoaded event fired'); // Debug log
+    await UIState.initialize(); // Initialize UIState first
     await loadTemplates(); 
-
-    // Fetch all initial settings in a batch
-    const initialSettingKeys = [
-        'toolbarVisible', 
-        'leftSidebarCollapsed', 
-        'rightSidebarCollapsed', 
-        'customSQLQuery', 
-        'queryExecutionFrequency'
-    ];
-    let allSettings = await fetchSettings(initialSettingKeys); 
-
-    if (!allSettings || Object.keys(allSettings).length === 0) {
-        console.warn('Failed to fetch initial settings or no settings returned; UI components will use client-side defaults.');
-        allSettings = {}; 
-        // Populate with client-side defaults for robustness if API fails completely
-        initialSettingKeys.forEach(key => {
-            if (key === 'toolbarVisible') allSettings[key] = 'true'; 
-            else if (key === 'leftSidebarCollapsed') allSettings[key] = 'false'; 
-            else if (key === 'rightSidebarCollapsed') allSettings[key] = 'true'; 
-            else if (key === 'customSQLQuery') allSettings[key] = ''; 
-            else if (key === 'queryExecutionFrequency') allSettings[key] = 'manual'; 
-        });
-    }
     
-    // Initialize UI components with fetched settings
+    // Initialize UI components
     // Call general initializers that don't depend on these specific settings first
     initCalendar();    
     loadRecentPages(); 
 
-    // Now call the centralized UI initializer with all fetched/defaulted settings
-    await runUIInitializers(allSettings);
+    // Now call the centralized UI initializer
+    await runUIInitializers();
     
     console.log('All initial UI components initialized via runUIInitializers.');
 
@@ -200,27 +178,8 @@ async function loadPage(pageId) {
         currentPage = data;
         await renderPage(data);
 
-        console.log('Re-initializing UI components after page load/navigation...');
-        const initialSettingKeys = [
-            'toolbarVisible', 
-            'leftSidebarCollapsed', 
-            'rightSidebarCollapsed', 
-            'customSQLQuery', 
-            'queryExecutionFrequency'
-        ];
-        let freshSettings = await fetchSettings(initialSettingKeys);
-        if (!freshSettings || Object.keys(freshSettings).length === 0) {
-            console.warn('Failed to fetch fresh settings in loadPage; UI components might use stale or client-side defaults.');
-            freshSettings = {}; // Prevent errors
-            initialSettingKeys.forEach(key => { // Apply same defaults as in DOMContentLoaded
-                if (key === 'toolbarVisible') freshSettings[key] = 'true';
-                else if (key === 'leftSidebarCollapsed') freshSettings[key] = 'false';
-                else if (key === 'rightSidebarCollapsed') freshSettings[key] = 'true';
-                else if (key === 'customSQLQuery') freshSettings[key] = '';
-                else if (key === 'queryExecutionFrequency') freshSettings[key] = 'manual';
-            });
-        }
-        await runUIInitializers(freshSettings);
+        // UI components are now initialized once or update reactively.
+        // General UI re-initialization is removed from here.
         
         // Re-run other UI initializers that might be page-dependent or need refresh
         // if they were not included in runUIInitializers or depend on page content from renderPage
