@@ -843,33 +843,112 @@ a.property-tag:hover {
     padding: 2px 4px; border-radius: var(--radius-sm); border: 1px solid #e74c3c;
 }
 
-/* Note Editor Styling */
-.note-editor-wrapper { margin-bottom: var(--note-compact-margin-bottom); }
-.note-editor {
-    background: var(--note-bg-color); border: 1px solid var(--accent-color); 
-    border-radius: var(--radius-md); box-shadow: var(--shadow-md); 
+/* --- Enhanced Note Editor Styling --- */
+.note-editor-wrapper { 
+    margin-bottom: var(--note-compact-margin-bottom); 
+    position: relative; /* For positioning new buttons */
+    padding-left: 30px; /* Space for new buttons */
 }
+
+/* New Editor Control Buttons */
+.editor-control-save,
+.editor-control-cancel {
+    position: absolute;
+    left: 0; /* Adjust as needed */
+    top: 0;  /* Adjust for vertical alignment; aligns to top of wrapper */
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    background-color: transparent;
+    color: var(--text-muted);
+    border: none; 
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    z-index: 10; /* Ensure they are above textarea, etc. */
+}
+
+.editor-control-cancel {
+    top: 30px; /* Position cancel button below save button */
+}
+
+.editor-control-save::before {
+    content: '✓'; /* Unicode CHECK MARK */
+}
+
+.editor-control-cancel::before {
+    content: '✕'; /* Unicode MULTIPLICATION X */
+}
+
+.editor-control-save:hover {
+    background-color: var(--hover-color);
+    color: var(--accent-color);
+}
+
+.editor-control-cancel:hover {
+    background-color: var(--hover-color);
+    color: #e74c3c; /* Red shade for cancel */
+}
+
+/* Adjusted Note Editor Core Styles */
+.note-editor {
+    background: var(--note-bg-color); 
+    border: none; /* Removed border for a more seamless look */
+    border-radius: var(--radius-md); 
+    box-shadow: none; /* Removed shadow-md */
+    /* The padding-left on note-editor-wrapper handles space for buttons */
+}
+
 .note-textarea {
-    width: 100%; min-height: 60px; padding: 0.75rem 1rem; 
-    border: none; border-radius: var(--radius-md) var(--radius-md) 0 0;
-    font-family: inherit; font-size: 1em; line-height: 1.6; resize: vertical;
+    width: 100%; 
+    min-height: 60px; 
+    padding: 0.4rem 0.6rem; /* Reduced padding for a more direct feel */
+    border: none; 
+    /* border-radius: var(--radius-md) var(--radius-md) 0 0; */ /* Full radius now on .note-editor */
+    font-family: inherit; 
+    font-size: 1em; 
+    line-height: 1.6; 
+    resize: vertical;
     background: transparent; 
 }
 .note-textarea:focus { outline: none; }
+
+/* Styling for the actions div when it only holds the template selector */
 .note-editor-actions {
-    display: flex; gap: 8px; padding: 0.5rem 1rem;
-    border-top: 1px solid var(--border-color); background: var(--bg-secondary);
-    border-radius: 0 0 var(--radius-md) var(--radius-md); align-items: center;
+    display: flex; 
+    gap: 8px; 
+    padding: 0.25rem 0.5rem; /* Reduced padding */
+    border-top: none; /* Ensure no top border for cleaner look */
+    background: transparent; /* Was --bg-secondary, make it less prominent */
+    /* border-radius: 0 0 var(--radius-md) var(--radius-md); */ /* Full radius now on .note-editor */
+    align-items: center;
 }
-.template-selector { margin-left: auto; }
+
+/* If note-editor-actions is truly empty (e.g. in edit mode), it shouldn't take space. */
+/* This might be handled by JS removing it, or CSS if it's empty and has no padding/border. */
+.note-editor-actions:empty {
+    padding: 0;
+    border-top: none;
+}
+
+.template-selector { 
+    margin-left: auto; /* Pushes to the right if it's the only item or among others */
+}
 .template-selector select {
-    padding: 4px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
-    background: var(--note-bg-color); font-size: 0.9em; color: var(--text-color);
+    padding: 4px 8px; 
+    border: 1px solid var(--border-color); 
+    border-radius: var(--radius-sm);
+    background: var(--note-bg-color); 
+    font-size: 0.9em; 
+    color: var(--text-color);
 }
-.template-selector select:focus { outline: none; border-color: var(--accent-color); }
-.note-editor-actions .btn-primary, .note-editor-actions .btn-secondary {
-    padding: 4px 12px; font-size: 0.9em; border-radius: var(--radius-sm);
+.template-selector select:focus { 
+    outline: none; 
+    border-color: var(--accent-color); 
 }
+
+/* Remove old button styling if they were specifically targetted within note-editor-actions */
+/* .note-editor-actions .btn-primary, .note-editor-actions .btn-secondary {} */
+/* No specific styles to remove here based on provided CSS, but good to keep in mind. */
 
 .home-link { 
     color: var(--accent-color); text-decoration: none; font-size: 2.5em; 

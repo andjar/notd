@@ -268,8 +268,8 @@ async function editPageProperties() {
     const editorHtml = `<div class="properties-editor">
             <textarea class="properties-textarea" placeholder="Enter properties (one per line, format: key::value)">${propertyList}</textarea>
             <div class="properties-editor-actions">
-                <button class="btn-primary save-properties">Save</button>
-                <button class="btn-secondary cancel-properties">Cancel</button>
+                <button class="btn-primary save-properties"></button>
+                <button class="btn-secondary cancel-properties"></button>
             </div></div>`;
     let propertiesContent = pageProperties.querySelector('.page-properties-content');
     const originalContent = propertiesContent ? propertiesContent.innerHTML : '';
@@ -676,17 +676,32 @@ function createNote(parentId = null, level = 0, insertAfterElement = null, inten
     if (noteTemplates && Object.keys(noteTemplates).length > 0) {
         templateOptions += Object.entries(noteTemplates).map(([key, _]) => `<option value="${key}">${key.charAt(0).toUpperCase() + key.slice(1)}</option>`).join('');
     }
-    noteElement.innerHTML = `<textarea class="note-textarea" placeholder="Enter note content... (Ctrl+Enter to save)"></textarea>
+    // Keep template selector if it exists, but remove buttons from note-editor-actions
+    const templateSelectorHTML = Object.keys(noteTemplates).length > 0 ? `<div class="template-selector"><select>${templateOptions}</select></div>` : '';
+    if (templateSelectorHTML) {
+        noteElement.innerHTML = `<textarea class="note-textarea" placeholder="Enter note content... (Ctrl+Enter to save)"></textarea>
         <div class="note-editor-actions">
-            <button class="btn-primary save-note">Save</button>
-            <button class="btn-secondary cancel-note">Cancel</button>
-            ${Object.keys(noteTemplates).length > 0 ? `<div class="template-selector"><select>${templateOptions}</select></div>` : ''}
+            ${templateSelectorHTML}
         </div>`;
+    } else {
+        noteElement.innerHTML = `<textarea class="note-textarea" placeholder="Enter note content... (Ctrl+Enter to save)"></textarea>`;
+    }
     noteEditorContainer.appendChild(noteElement);
+
     const textarea = noteElement.querySelector('.note-textarea');
-    const saveButton = noteElement.querySelector('.save-note');
-    const cancelButton = noteElement.querySelector('.cancel-note');
     const templateSelect = noteElement.querySelector('select');
+
+    // Create Save button
+    const saveButton = document.createElement('button');
+    saveButton.className = 'btn-primary editor-control-save';
+    saveButton.textContent = '';
+    noteEditorContainer.appendChild(saveButton); // Append to editorWrapper (noteEditorContainer)
+
+    // Create Cancel button
+    const cancelButton = document.createElement('button');
+    cancelButton.className = 'btn-secondary editor-control-cancel';
+    cancelButton.textContent = '';
+    noteEditorContainer.appendChild(cancelButton); // Append to editorWrapper (noteEditorContainer)
 
     // DOM PLACEMENT LOGIC for the editor
     if (insertAfterElement) {
@@ -898,14 +913,24 @@ function editNote(id, currentContentText) {
     editorWrapper.className = 'note-editor-wrapper edit-mode';
     const noteEditorDiv = document.createElement('div');
     noteEditorDiv.className = 'note-editor';
-    noteEditorDiv.innerHTML = `<textarea class="note-textarea">${currentContentText}</textarea>
-        <div class="note-editor-actions"><button class="btn-primary save-note">Save</button><button class="btn-secondary cancel-note">Cancel</button></div>`;
+    noteEditorDiv.innerHTML = `<textarea class="note-textarea">${currentContentText}</textarea>`;
+    // Action buttons are now created separately and appended to editorWrapper
     editorWrapper.appendChild(noteEditorDiv);
     noteElement.insertBefore(editorWrapper, contentElement);
 
     const textarea = noteEditorDiv.querySelector('.note-textarea');
-    const saveButton = noteEditorDiv.querySelector('.save-note');
-    const cancelButton = noteEditorDiv.querySelector('.cancel-note');
+
+    // Create Save button
+    const saveButton = document.createElement('button');
+    saveButton.className = 'btn-primary editor-control-save';
+    saveButton.textContent = 'Save';
+    editorWrapper.appendChild(saveButton);
+
+    // Create Cancel button
+    const cancelButton = document.createElement('button');
+    cancelButton.className = 'btn-secondary editor-control-cancel';
+    cancelButton.textContent = 'Cancel';
+    editorWrapper.appendChild(cancelButton);
 
     textarea.focus();
     textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
