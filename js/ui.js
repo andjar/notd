@@ -791,7 +791,7 @@ function navigateBlocks(direction) {
 // --- Sidebar Toggle Functionality ---
 
 /**
- * Toggles the sidebar visibility and handles the collapse state, persisting to backend.
+ * Initializes the left sidebar toggle functionality.
  */
 async function initializeSidebarToggle() {
     const sidebar = document.querySelector('.sidebar');
@@ -803,16 +803,21 @@ async function initializeSidebarToggle() {
         return;
     }
 
-    // Fetch initial state from API
-    // Assumes fetchToolbarVisibilityAPI can take a key or a more generic version exists.
-    // Backend default for 'leftSidebarCollapsed' is 'false' (not collapsed).
-    // Note: The prompt uses fetchToolbarVisibilityAPI, but the key 'leftSidebarCollapsed' returns 'false' for not collapsed.
-    // So, isInitiallyCollapsed = await fetchToolbarVisibilityAPI('leftSidebarCollapsed') means:
-    // if API returns 'true' (string), then isInitiallyCollapsed = true.
-    // if API returns 'false' (string), then isInitiallyCollapsed = false.
-    const isInitiallyCollapsed = await fetchToolbarVisibilityAPI('leftSidebarCollapsed'); 
+    // Subscribe to state changes
+    UIState.subscribe('leftSidebarCollapsed', (isCollapsed) => {
+        if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.remove('main-content-shifted-right');
+            toggleButton.innerHTML = '☰';
+        } else {
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.add('main-content-shifted-right');
+            toggleButton.innerHTML = '✕';
+        }
+    });
 
     // Apply initial state
+    const isInitiallyCollapsed = UIState.get('leftSidebarCollapsed');
     if (isInitiallyCollapsed) {
         sidebar.classList.add('collapsed');
         mainContent.classList.remove('main-content-shifted-right');
@@ -825,43 +830,24 @@ async function initializeSidebarToggle() {
 
     toggleButton.style.display = 'flex'; // Always visible
 
-    toggleButton.addEventListener('click', async () => { // Make listener async
-        // The toggle method returns true if the class was added (i.e., now collapsed), 
-        // and false if it was removed (i.e., now not collapsed).
-        const newIsCollapsed = sidebar.classList.toggle('collapsed');
-        mainContent.classList.toggle('main-content-shifted-right'); // This toggles based on its current state, which is fine.
-        toggleButton.innerHTML = newIsCollapsed ? '☰' : '✕';
-
-        // Save new state to API
-        // Assumes updateToolbarVisibilityAPI can take a key or a more generic version exists.
-        const success = await updateToolbarVisibilityAPI('leftSidebarCollapsed', newIsCollapsed);
+    toggleButton.addEventListener('click', async () => {
+        const newIsCollapsed = !UIState.get('leftSidebarCollapsed');
+        const success = await UIState.set('leftSidebarCollapsed', newIsCollapsed);
         if (!success) {
-            console.error("Failed to update left sidebar collapsed state on the backend.");
-            // Optional: revert UI changes or notify user by toggling back
-            // sidebar.classList.toggle('collapsed'); // Revert sidebar
-            // mainContent.classList.toggle('main-content-shifted-right'); // Revert main content
-            // toggleButton.innerHTML = sidebar.classList.contains('collapsed') ? '☰' : '✕'; // Revert button
-            // alert("Failed to save sidebar preference. Please try again.");
+            // State update failed, UI will be reverted by the state system
+            alert("Failed to save sidebar preference. Please try again.");
         }
     });
 
-    // Handle window resize - this part seems fine as is
+    // Handle window resize
     function handleResize() {
-        // Ensure the button remains visible, other aspects of responsiveness
-        // are handled by CSS or the state persistence.
         toggleButton.style.display = 'flex';
     }
     window.addEventListener('resize', handleResize);
 }
 
-// Initialize sidebar toggle when the DOM is loaded
-// document.addEventListener('DOMContentLoaded', initializeSidebarToggle); 
-// Call to initializeSidebarToggle will be moved to app.js
-
 /**
-/**
- * Initializes the toggle functionality for the right sidebar.
- * Handles class changes for visibility and main content margin adjustment, persisting to backend.
+ * Initializes the right sidebar toggle functionality.
  */
 async function initializeRightSidebarToggle() {
     const rightSidebar = document.querySelector('.right-sidebar');
@@ -873,47 +859,75 @@ async function initializeRightSidebarToggle() {
         return;
     }
 
-    // Fetch initial state from API
-    // Assumes fetchToolbarVisibilityAPI can take a key.
-    // Backend default for 'rightSidebarCollapsed' is 'true'.
-    const isInitiallyCollapsed = await fetchToolbarVisibilityAPI('rightSidebarCollapsed');
+    // Subscribe to state changes
+    UIState.subscribe('rightSidebarCollapsed', (isCollapsed) => {
+        if (isCollapsed) {
+            rightSidebar.classList.add('collapsed');
+            mainContent.classList.remove('main-content-shifted-left');
+            toggleButton.innerHTML = '☰';
+        } else {
+            rightSidebar.classList.remove('collapsed');
+            mainContent.classList.add('main-content-shifted-left');
+            toggleButton.innerHTML = '✕';
+        }
+    });
 
     // Apply initial state
+    const isInitiallyCollapsed = UIState.get('rightSidebarCollapsed');
     if (isInitiallyCollapsed) {
         rightSidebar.classList.add('collapsed');
         mainContent.classList.remove('main-content-shifted-left');
-        toggleButton.innerHTML = '☰'; // Or your preferred icon/text for "open me"
+        toggleButton.innerHTML = '☰';
     } else {
         rightSidebar.classList.remove('collapsed');
         mainContent.classList.add('main-content-shifted-left');
-        toggleButton.innerHTML = '✕'; // Or your preferred icon/text for "close me"
+        toggleButton.innerHTML = '✕';
     }
 
-    toggleButton.addEventListener('click', async () => { // Make listener async
-        // The toggle method itself returns true if the class is added (i.e. now collapsed), 
-        // and false if it's removed (i.e. now expanded).
-        const isNowCollapsed = rightSidebar.classList.toggle('collapsed');
-        mainContent.classList.toggle('main-content-shifted-left');
-
-        if (isNowCollapsed) {
-            toggleButton.innerHTML = '☰';
-        } else {
-            toggleButton.innerHTML = '✕';
-        }
-
-        // Save new state to API
-        // Assumes updateToolbarVisibilityAPI can take a key.
-        const success = await updateToolbarVisibilityAPI('rightSidebarCollapsed', isNowCollapsed);
+    toggleButton.addEventListener('click', async () => {
+        const newIsCollapsed = !UIState.get('rightSidebarCollapsed');
+        const success = await UIState.set('rightSidebarCollapsed', newIsCollapsed);
         if (!success) {
-            console.error("Failed to update right sidebar collapsed state on the backend.");
-            // Optional: revert UI changes or notify user
+            // State update failed, UI will be reverted by the state system
+            alert("Failed to save sidebar preference. Please try again.");
         }
     });
 }
 
-// Call to initializeRightSidebarToggle will be moved to app.js
-// document.addEventListener('DOMContentLoaded', initializeRightSidebarToggle);
+/**
+ * Initializes the toolbar visibility functionality.
+ */
+async function initializeLeftSidebar() {
+    const toolbarToggle = document.getElementById('toolbar-toggle');
+    if (!toolbarToggle) return;
 
+    // Subscribe to state changes
+    UIState.subscribe('toolbarVisible', (isVisible) => {
+        const noteActions = document.querySelectorAll('.note-actions');
+        noteActions.forEach(action => {
+            action.style.display = isVisible ? 'flex' : 'none';
+        });
+        toolbarToggle.textContent = isVisible ? 'Hide toolbar' : 'Show toolbar';
+    });
+
+    // Apply initial state
+    const isInitiallyVisible = UIState.get('toolbarVisible');
+    const noteActions = document.querySelectorAll('.note-actions');
+    noteActions.forEach(action => {
+        action.style.display = isInitiallyVisible ? 'flex' : 'none';
+    });
+    toolbarToggle.textContent = isInitiallyVisible ? 'Hide toolbar' : 'Show toolbar';
+
+    toolbarToggle.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const newVisibility = !UIState.get('toolbarVisible');
+        const success = await UIState.set('toolbarVisible', newVisibility);
+        if (!success) {
+            // State update failed, UI will be reverted by the state system
+            alert("Failed to save toolbar preference. Please try again.");
+        }
+    });
+}
 
 // --- Page Search Functionality ---
 

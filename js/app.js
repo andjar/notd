@@ -31,6 +31,19 @@ async function navigateToPage(pageId) {
     }
 }
 
+// --- Centralized UI Initializer ---
+async function runUIInitializers(settings) {
+    console.log('runUIInitializers called with settings:', settings);
+    // Boolean conversions are done here based on the string values from settings
+    await initializeLeftSidebar(settings.toolbarVisible === 'true');
+    await initializeSidebarToggle(settings.leftSidebarCollapsed === 'true');
+    await initializeRightSidebarToggle(settings.rightSidebarCollapsed === 'true');
+    // These expect strings, so pass directly
+    await initializeRightSidebarNotes(settings.customSQLQuery, settings.queryExecutionFrequency);
+    console.log('All UI initializers called by runUIInitializers');
+}
+// --- END Centralized UI Initializer ---
+
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOMContentLoaded event fired'); // Debug log
     await loadTemplates(); 
@@ -59,17 +72,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Initialize UI components with fetched settings
-    loadRecentPages(); 
+    // Call general initializers that don't depend on these specific settings first
     initCalendar();    
+    loadRecentPages(); 
 
-    // Pass settings to UI initializers.
-    await initializeSidebarToggle(allSettings.leftSidebarCollapsed === 'true'); 
-    await initializeRightSidebarToggle(allSettings.rightSidebarCollapsed === 'true'); 
-    await initializeRightSidebarNotes(allSettings.customSQLQuery, allSettings.queryExecutionFrequency); // These are strings
+    // Now call the centralized UI initializer with all fetched/defaulted settings
+    await runUIInitializers(allSettings);
     
-    console.log('About to initialize left sidebar (toolbar visibility)'); 
-    await initializeLeftSidebar(allSettings.toolbarVisible === 'true'); 
-    console.log('Left sidebar (toolbar visibility) initialized'); 
+    console.log('All initial UI components initialized via runUIInitializers.');
 
     document.addEventListener('keydown', handleGlobalKeyDown);
     
@@ -189,10 +199,40 @@ async function loadPage(pageId) {
 
         currentPage = data;
         await renderPage(data);
-        updateRecentPages(pageId);
-        if (window.renderCalendarForCurrentPage) {
-            window.renderCalendarForCurrentPage();
+
+        console.log('Re-initializing UI components after page load/navigation...');
+        const initialSettingKeys = [
+            'toolbarVisible', 
+            'leftSidebarCollapsed', 
+            'rightSidebarCollapsed', 
+            'customSQLQuery', 
+            'queryExecutionFrequency'
+        ];
+        let freshSettings = await fetchSettings(initialSettingKeys);
+        if (!freshSettings || Object.keys(freshSettings).length === 0) {
+            console.warn('Failed to fetch fresh settings in loadPage; UI components might use stale or client-side defaults.');
+            freshSettings = {}; // Prevent errors
+            initialSettingKeys.forEach(key => { // Apply same defaults as in DOMContentLoaded
+                if (key === 'toolbarVisible') freshSettings[key] = 'true';
+                else if (key === 'leftSidebarCollapsed') freshSettings[key] = 'false';
+                else if (key === 'rightSidebarCollapsed') freshSettings[key] = 'true';
+                else if (key === 'customSQLQuery') freshSettings[key] = '';
+                else if (key === 'queryExecutionFrequency') freshSettings[key] = 'manual';
+            });
         }
+        await runUIInitializers(freshSettings);
+        
+        // Re-run other UI initializers that might be page-dependent or need refresh
+        // if they were not included in runUIInitializers or depend on page content from renderPage
+        if (window.renderCalendarForCurrentPage) { // This one updates based on currentPage
+             window.renderCalendarForCurrentPage(); // So it should run after renderPage
+        }
+        // loadRecentPages() is also likely fine to run here if it refreshes the recent pages list.
+        await loadRecentPages(); 
+
+        updateRecentPages(pageId); // This seems to just call the API and then loadRecentPages again.
+                                   // The loadRecentPages call above might make this specific call redundant or it could be part of a sequence.
+                                   // For now, keeping it as per existing structure.
 
         const reActivateId = sessionStorage.getItem('lastActiveBlockIdBeforeReload');
         if (reActivateId) {
