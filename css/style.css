@@ -58,7 +58,7 @@ body {
 .sidebar {
     width: var(--sidebar-width); 
     min-width: 300px;
-    background: var(--sidebar-bg); 
+    background: var(--bg-secondary); 
     padding: 10px;
     border-right: 1px solid var(--border-color); 
     display: flex; 
@@ -244,11 +244,17 @@ The JS logic in handleResize will be updated to keep it visible.
 }
 .advanced-search-content .help-text {
     font-size: 0.9em; color: var(--text-muted); margin-bottom: 15px;
-    background: var(--bg-secondary); padding: 10px; border-radius: var(--radius-sm);
+    padding: 10px; border-radius: var(--radius-sm);
 }
 .advanced-search-content .help-text code {
-    display: block; margin-top: 8px; padding: 8px; background: var(--text-color); color: var(--bg-color); /* Inverted for code block */
-    border-radius: var(--radius-sm); font-family: monospace;
+    display: block;
+    margin-top: 8px;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 .advanced-search-content .button-group, .delete-confirmation-modal .button-group { display: flex; justify-content: flex-end; gap: 10px; }
 .search-results-page { padding: 20px; max-width: 800px; margin: 0 auto; }
@@ -1074,9 +1080,7 @@ a.block-ref-link:hover {
 
 .block-keyboard-focus > .outline-content {
     /* Using a more distinct outline than just for hover */
-    outline: 2px solid var(--accent-color);
-    outline-offset: -1px; /* Pull it slightly inwards */
-    box-shadow: 0 0 5px rgba(49, 130, 206, 0.3); /* Subtle glow */
+    background:var(--bg-secondary);
 }
 .block-keyboard-focus > .outline-children > .note-editor-wrapper > .note-editor {
      /* If an editor is a direct child, don't let it get focus outline from parent */
@@ -1314,13 +1318,6 @@ a.block-ref-link:hover {
     transform: rotate(90deg);
 }
 
-#backlinks-container {
-    /* margin-top: 0; Reset from previous direct styling if any */
-    /* background: var(--sidebar-bg); Already set in previous step, kept for reference */
-    /* border-radius: var(--radius-md); Already set */
-    /* padding: 1rem; Already set */
-    /* Ensure it takes full width if needed, or specific styling */
-}
 
 /* Meta information for backlinks (count, load more button) */
 .backlinks-meta {
