@@ -175,9 +175,20 @@ if (!file_exists($dbPath)) {
             throw new Exception('Failed to create index idx_page_links_source_note_id: ' . $db->lastErrorMsg());
         }
 
+        // Create user_settings table
+        echo "Creating user_settings table...\n";
+        $result = $db->exec('CREATE TABLE IF NOT EXISTS user_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            setting_key TEXT UNIQUE NOT NULL,
+            setting_value TEXT
+        )');
+        if (!$result) {
+            throw new Exception('Failed to create user_settings table: ' . $db->lastErrorMsg());
+        }
+
         // Verify tables were created
         echo "Verifying tables...\n";
-        $tables = ['pages', 'notes', 'attachments', 'properties', 'notes_fts', 'recent_pages', 'page_links']; // Added notes_fts
+        $tables = ['pages', 'notes', 'attachments', 'properties', 'notes_fts', 'recent_pages', 'page_links', 'user_settings']; // Added notes_fts
         foreach ($tables as $table) {
             $result = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='$table'");
             if (!$result || !$result->fetchArray()) {
@@ -198,7 +209,7 @@ if (!file_exists($dbPath)) {
 // If the database exists, verify tables
 try {
     $db = new SQLite3($dbPath);
-    $tables = ['pages', 'notes', 'attachments', 'properties', 'notes_fts', 'recent_pages', 'page_links']; // Added notes_fts
+    $tables = ['pages', 'notes', 'attachments', 'properties', 'notes_fts', 'recent_pages', 'page_links', 'user_settings']; // Added notes_fts
     $missing = [];
     
     foreach ($tables as $table) {

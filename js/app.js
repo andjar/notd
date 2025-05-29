@@ -31,17 +31,34 @@ async function navigateToPage(pageId) {
     }
 }
 
+// --- Centralized UI Initializer ---
+async function runUIInitializers() {
+    console.log('runUIInitializers called');
+    // Boolean conversions are done here based on the string values from settings
+    await initializeLeftSidebar();
+    await initializeSidebarToggle();
+    await initializeRightSidebarToggle();
+    // These expect strings, so pass directly
+    await initializeRightSidebarNotes();
+    console.log('All UI initializers called by runUIInitializers');
+}
+// --- END Centralized UI Initializer ---
+
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOMContentLoaded event fired'); // Debug log
-    await loadTemplates();
-    loadRecentPages();
-    initCalendar();
-    initializeSidebarToggle(); // For the left sidebar
-    initializeRightSidebarToggle(); // For the new right sidebar
-    initializeRightSidebarNotes(); // For the new right sidebar's notes query functionality
-    console.log('About to initialize left sidebar'); // Debug log
-    initializeLeftSidebar();
-    console.log('Left sidebar initialized'); // Debug log
+    await UIState.initialize(); // Initialize UIState first
+    await loadTemplates(); 
+    
+    // Initialize UI components
+    // Call general initializers that don't depend on these specific settings first
+    initCalendar();    
+    loadRecentPages(); 
+
+    // Now call the centralized UI initializer
+    await runUIInitializers();
+    
+    console.log('All initial UI components initialized via runUIInitializers.');
+
     document.addEventListener('keydown', handleGlobalKeyDown);
     
     // Add event listeners after DOM is loaded
@@ -159,11 +176,27 @@ async function loadPage(pageId) {
         }
 
         currentPage = data;
-        await renderPage(data);
-        updateRecentPages(pageId);
-        if (window.renderCalendarForCurrentPage) {
-            window.renderCalendarForCurrentPage();
+        await renderPage(data); // Existing line
+        if (typeof applyToolbarVisibilityToActions === 'function') { // Add a check
+            applyToolbarVisibilityToActions(); // New line
+        } else {
+            console.error("applyToolbarVisibilityToActions function is not defined.");
         }
+
+        // UI components are now initialized once or update reactively.
+        // General UI re-initialization is removed from here.
+        
+        // Re-run other UI initializers that might be page-dependent or need refresh
+        // if they were not included in runUIInitializers or depend on page content from renderPage
+        if (window.renderCalendarForCurrentPage) { // This one updates based on currentPage
+             window.renderCalendarForCurrentPage(); // So it should run after renderPage
+        }
+        // loadRecentPages() is also likely fine to run here if it refreshes the recent pages list.
+        await loadRecentPages(); 
+
+        updateRecentPages(pageId); // This seems to just call the API and then loadRecentPages again.
+                                   // The loadRecentPages call above might make this specific call redundant or it could be part of a sequence.
+                                   // For now, keeping it as per existing structure.
 
         const reActivateId = sessionStorage.getItem('lastActiveBlockIdBeforeReload');
         if (reActivateId) {
