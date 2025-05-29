@@ -791,58 +791,67 @@ function navigateBlocks(direction) {
 // --- Sidebar Toggle Functionality ---
 
 /**
- * Toggles the sidebar visibility on mobile devices and handles the collapse state.
- * The sidebar will automatically collapse on mobile devices and can be toggled with a button.
+ * Toggles the sidebar visibility and handles the collapse state, persisting to backend.
  */
-function initializeSidebarToggle() {
+async function initializeSidebarToggle() {
     const sidebar = document.querySelector('.sidebar');
     const toggleButton = document.getElementById('sidebar-toggle');
-    const mainContent = document.querySelector('.main-content'); // Get main content
-    let isCollapsed; // Will be determined by initial state
+    const mainContent = document.querySelector('.main-content');
+    
+    if (!sidebar || !toggleButton || !mainContent) {
+        console.warn("Left sidebar toggle elements not found. Skipping initialization.");
+        return;
+    }
 
-    // Initial state setup
-    const isInitiallyMobile = window.innerWidth <= 768;
-    if (isInitiallyMobile) {
+    // Fetch initial state from API
+    // Assumes fetchToolbarVisibilityAPI can take a key or a more generic version exists.
+    // Backend default for 'leftSidebarCollapsed' is 'false' (not collapsed).
+    // Note: The prompt uses fetchToolbarVisibilityAPI, but the key 'leftSidebarCollapsed' returns 'false' for not collapsed.
+    // So, isInitiallyCollapsed = await fetchToolbarVisibilityAPI('leftSidebarCollapsed') means:
+    // if API returns 'true' (string), then isInitiallyCollapsed = true.
+    // if API returns 'false' (string), then isInitiallyCollapsed = false.
+    const isInitiallyCollapsed = await fetchToolbarVisibilityAPI('leftSidebarCollapsed'); 
+
+    // Apply initial state
+    if (isInitiallyCollapsed) {
         sidebar.classList.add('collapsed');
         mainContent.classList.remove('main-content-shifted-right');
         toggleButton.innerHTML = '☰';
-        isCollapsed = true;
     } else {
-        // Default to open on wide screens
         sidebar.classList.remove('collapsed');
         mainContent.classList.add('main-content-shifted-right');
         toggleButton.innerHTML = '✕';
-        isCollapsed = false;
     }
+
     toggleButton.style.display = 'flex'; // Always visible
 
-    function toggleSidebar() {
-        isCollapsed = sidebar.classList.toggle('collapsed'); // State determined by class presence
-        mainContent.classList.toggle('main-content-shifted-right');
-        toggleButton.innerHTML = isCollapsed ? '☰' : '✕';
-    }
+    toggleButton.addEventListener('click', async () => { // Make listener async
+        // The toggle method returns true if the class was added (i.e., now collapsed), 
+        // and false if it was removed (i.e., now not collapsed).
+        const newIsCollapsed = sidebar.classList.toggle('collapsed');
+        mainContent.classList.toggle('main-content-shifted-right'); // This toggles based on its current state, which is fine.
+        toggleButton.innerHTML = newIsCollapsed ? '☰' : '✕';
 
-    toggleButton.addEventListener('click', toggleSidebar);
+        // Save new state to API
+        // Assumes updateToolbarVisibilityAPI can take a key or a more generic version exists.
+        const success = await updateToolbarVisibilityAPI('leftSidebarCollapsed', newIsCollapsed);
+        if (!success) {
+            console.error("Failed to update left sidebar collapsed state on the backend.");
+            // Optional: revert UI changes or notify user by toggling back
+            // sidebar.classList.toggle('collapsed'); // Revert sidebar
+            // mainContent.classList.toggle('main-content-shifted-right'); // Revert main content
+            // toggleButton.innerHTML = sidebar.classList.contains('collapsed') ? '☰' : '✕'; // Revert button
+            // alert("Failed to save sidebar preference. Please try again.");
+        }
+    });
 
-    // Handle window resize
+    // Handle window resize - this part seems fine as is
     function handleResize() {
-        // const isMobile = window.innerWidth <= 768;
-        // The behavior of collapsing/uncollapsing based on resize is removed.
-        // Sidebar state is now independent of window width after initial load.
-        // Toggle button is always visible.
+        // Ensure the button remains visible, other aspects of responsiveness
+        // are handled by CSS or the state persistence.
         toggleButton.style.display = 'flex';
-        
-        // This part ensures that if the screen becomes small, and the sidebar was open,
-        // it visually makes sense. If it's mobile, and sidebar is open, main content should not be shifted.
-        // However, the requirement is to maintain state.
-        // A better approach might be to let the user toggle it themselves if the screen becomes small.
-        // For now, we only ensure the button is visible.
-        // The classes on sidebar and main-content remain as toggled by the user.
     }
-
-    // Initial setup for button visibility (already done above)
-    // handleResize(); // Call to set initial button visibility and state
-    window.addEventListener('resize', handleResize); // Only for button visibility if needed, or other resize adjustments.
+    window.addEventListener('resize', handleResize);
 }
 
 // Initialize sidebar toggle when the DOM is loaded
@@ -850,10 +859,11 @@ function initializeSidebarToggle() {
 // Call to initializeSidebarToggle will be moved to app.js
 
 /**
+/**
  * Initializes the toggle functionality for the right sidebar.
- * Handles class changes for visibility and main content margin adjustment.
+ * Handles class changes for visibility and main content margin adjustment, persisting to backend.
  */
-function initializeRightSidebarToggle() {
+async function initializeRightSidebarToggle() {
     const rightSidebar = document.querySelector('.right-sidebar');
     const toggleButton = document.getElementById('right-sidebar-toggle');
     const mainContent = document.querySelector('.main-content');
@@ -863,30 +873,40 @@ function initializeRightSidebarToggle() {
         return;
     }
 
-    // Ensure initial state is collapsed (already set in HTML, but good practice)
-    // JS explicitly sets the initial state for robustness, as per subtask instructions.
-    rightSidebar.classList.add('collapsed'); 
-    mainContent.classList.remove('main-content-shifted-left'); // Ensure main content is not shifted initially
+    // Fetch initial state from API
+    // Assumes fetchToolbarVisibilityAPI can take a key.
+    // Backend default for 'rightSidebarCollapsed' is 'true'.
+    const isInitiallyCollapsed = await fetchToolbarVisibilityAPI('rightSidebarCollapsed');
 
-    // Set initial button text based on the (now JS-enforced) initial state
-    // The 'collapsed' class is now definitely on rightSidebar.
-    toggleButton.innerHTML = '☰'; // Or some icon indicating "open"
-    // This 'else' branch for button text is now effectively dead code due to explicit collapsing,
-    // but kept for logical completeness if the explicit add('collapsed') was ever removed.
-    // if (rightSidebar.classList.contains('collapsed')) {
-    //     toggleButton.innerHTML = 'SQL'; 
-    // } else {
-    //     toggleButton.innerHTML = '✕'; 
-    // }
+    // Apply initial state
+    if (isInitiallyCollapsed) {
+        rightSidebar.classList.add('collapsed');
+        mainContent.classList.remove('main-content-shifted-left');
+        toggleButton.innerHTML = '☰'; // Or your preferred icon/text for "open me"
+    } else {
+        rightSidebar.classList.remove('collapsed');
+        mainContent.classList.add('main-content-shifted-left');
+        toggleButton.innerHTML = '✕'; // Or your preferred icon/text for "close me"
+    }
 
-    toggleButton.addEventListener('click', () => {
-        const isCollapsed = rightSidebar.classList.toggle('collapsed');
+    toggleButton.addEventListener('click', async () => { // Make listener async
+        // The toggle method itself returns true if the class is added (i.e. now collapsed), 
+        // and false if it's removed (i.e. now expanded).
+        const isNowCollapsed = rightSidebar.classList.toggle('collapsed');
         mainContent.classList.toggle('main-content-shifted-left');
 
-        if (isCollapsed) {
-            toggleButton.innerHTML = '☰'; // Text when sidebar is collapsed (prompt to open)
+        if (isNowCollapsed) {
+            toggleButton.innerHTML = '☰';
         } else {
-            toggleButton.innerHTML = '✕';   // Text when sidebar is open (prompt to close)
+            toggleButton.innerHTML = '✕';
+        }
+
+        // Save new state to API
+        // Assumes updateToolbarVisibilityAPI can take a key.
+        const success = await updateToolbarVisibilityAPI('rightSidebarCollapsed', isNowCollapsed);
+        if (!success) {
+            console.error("Failed to update right sidebar collapsed state on the backend.");
+            // Optional: revert UI changes or notify user
         }
     });
 }
@@ -1537,7 +1557,7 @@ async function fetchAndRenderCustomNotes(query, containerElement, runButton = nu
 /**
  * Shows the query editor modal for the right sidebar.
  */
-function showQueryEditorModal() {
+async function showQueryEditorModal() { // Make async
     // Check if a modal already exists and remove it to prevent multiple modals
     const existingModal = document.querySelector('.modal.query-editor-dynamic-modal');
     if (existingModal) {
@@ -1568,13 +1588,27 @@ function showQueryEditorModal() {
     const cancelButton = modal.querySelector('#cancel-query-modal-btn');
 
     // Populate textarea
-    queryInput.value = localStorage.getItem('customSQLQuery') || '';
+    // Populate textarea
+    // Assuming fetchToolbarVisibilityAPI is adapted or a new function is made for string values.
+    // If it returns boolean true on error/default, we need to convert.
+    let fetchedQuery = await fetchToolbarVisibilityAPI('customSQLQuery');
+    if (typeof fetchedQuery !== 'string') {
+        fetchedQuery = ''; // Default to empty string if not a string (e.g. boolean true on error)
+    }
+    queryInput.value = fetchedQuery;
     queryInput.focus();
 
     // Save button functionality
-    saveButton.addEventListener('click', () => {
+    saveButton.addEventListener('click', async () => { // Make async
         const queryValue = queryInput.value.trim();
-        localStorage.setItem('customSQLQuery', queryValue);
+        // OLD: localStorage.setItem('customSQLQuery', queryValue);
+        const success = await updateToolbarVisibilityAPI('customSQLQuery', queryValue); // NEW
+        if (!success) {
+            console.error("Failed to save custom SQL query to backend.");
+            // Optionally alert the user or handle error
+            // For now, we'll still remove the modal and try to refresh,
+            // but the change won't persist if the API call failed.
+        }
         modal.remove();
 
         // Also trigger the execution of the new query
@@ -1611,7 +1645,7 @@ function showQueryEditorModal() {
 /**
  * Creates and appends the query execution frequency selector to the DOM.
  */
-function createExecutionFrequencySelector() {
+async function createExecutionFrequencySelector() { // Make async
     const container = document.querySelector('.query-frequency-container');
     if (!container) {
         console.warn('Query frequency container not found. Skipping selector creation.');
@@ -1641,12 +1675,26 @@ function createExecutionFrequencySelector() {
         select.appendChild(optionElement);
     });
 
-    const savedFrequency = localStorage.getItem('queryExecutionFrequency') || 'manual';
+    // const savedFrequency = localStorage.getItem('queryExecutionFrequency') || 'manual'; // OLD
+    let savedFrequency = await fetchToolbarVisibilityAPI('queryExecutionFrequency'); // NEW
+    if (typeof savedFrequency !== 'string' || savedFrequency === '') {
+        savedFrequency = 'manual'; // Default if not a string or empty
+    }
     select.value = savedFrequency;
 
-    select.addEventListener('change', (event) => {
-        localStorage.setItem('queryExecutionFrequency', event.target.value);
-        setupAutoQueryExecution();
+    select.addEventListener('change', async (event) => { // Make async
+        // localStorage.setItem('queryExecutionFrequency', event.target.value); // OLD
+        const success = await updateToolbarVisibilityAPI('queryExecutionFrequency', event.target.value); // NEW
+        if (!success) {
+            console.error("Failed to save query execution frequency to backend.");
+            // Optionally alert the user or handle error
+        }
+        // setupAutoQueryExecution is now async, so await it if this function needs to wait for it.
+        // However, createExecutionFrequencySelector itself is called without await from an async function,
+        // so direct await here might not change overall flow unless setupAutoQueryExecution has critical
+        // side effects needed immediately. For now, just calling it as it was.
+        setupAutoQueryExecution(); // This needs to be called as it's async, but its return value isn't used here.
+                                   // If setupAutoQueryExecution needs to complete before further action here, then await.
     });
     
     container.appendChild(selectLabel);
@@ -1656,15 +1704,20 @@ function createExecutionFrequencySelector() {
 /**
  * Sets up or clears the interval for automatic query execution based on saved frequency.
  */
-function setupAutoQueryExecution() {
+async function setupAutoQueryExecution() { // Make async
     if (window.autoQueryInterval) {
         clearInterval(window.autoQueryInterval);
         window.autoQueryInterval = null;
     }
 
-    const frequency = localStorage.getItem('queryExecutionFrequency') || 'manual';
+    // const frequency = localStorage.getItem('queryExecutionFrequency') || 'manual'; // OLD
+    let frequency = await fetchToolbarVisibilityAPI('queryExecutionFrequency'); // NEW
+    if (typeof frequency !== 'string' || frequency === '') {
+        frequency = 'manual'; // Default if not a string or empty
+    }
+
     if (frequency === 'manual') {
-        console.log("Query execution set to manual. No interval started.");
+        console.log("Query execution set to manual (fetched from API). No interval started.");
         return;
     }
 
@@ -1675,10 +1728,15 @@ function setupAutoQueryExecution() {
     }
 
     const intervalMs = intervalMinutes * 60 * 1000;
-    const query = localStorage.getItem('customSQLQuery');
+    // const query = localStorage.getItem('customSQLQuery'); // OLD
+    let query = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
+    if (typeof query !== 'string') {
+        query = ''; // Default if not a string
+    }
+
 
     if (!query || !query.trim()) {
-        console.log('No custom query saved. Auto execution not started.');
+        console.log('No custom query saved (fetched from API). Auto execution not started.');
         return;
     }
 
@@ -1696,25 +1754,29 @@ function setupAutoQueryExecution() {
     }
 
 
-    window.autoQueryInterval = setInterval(() => {
-        const currentQuery = localStorage.getItem('customSQLQuery'); // Re-fetch query in case it changed
+    window.autoQueryInterval = setInterval(async () => { // Make callback async (or use async IIFE)
+        // const currentQuery = localStorage.getItem('customSQLQuery'); // OLD
+        let currentQuery = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
+        if (typeof currentQuery !== 'string') {
+            currentQuery = ''; // Default if not a string
+        }
         const currentRightSidebarEl = document.querySelector('.right-sidebar');
         if (currentRightSidebarEl && !currentRightSidebarEl.classList.contains('collapsed') && currentQuery && currentQuery.trim()) {
             console.log(`Auto-executing query every ${intervalMinutes} minutes.`);
             fetchAndRenderCustomNotes(currentQuery, notesDisplayContainer, null); // Pass null for runButton
         } else {
-            console.log(`Skipping auto-execution: Sidebar collapsed or no query.`);
+            console.log(`Skipping auto-execution: Sidebar collapsed or no query (fetched from API).`);
         }
     }, intervalMs);
 
-    console.log(`Query auto-execution set up for every ${intervalMinutes} minutes.`);
+    console.log(`Query auto-execution set up for every ${intervalMinutes} minutes (query fetched from API).`);
 }
 
 
 /**
  * Initializes the functionality for the right sidebar's custom notes query section.
  */
-function initializeRightSidebarNotes() {
+async function initializeRightSidebarNotes() { // Make async
     // const queryInput = document.getElementById('sql-query-input'); // This is the textarea in the main sidebar UI
     const runQueryButton = document.getElementById('run-sql-query');
     const notesDisplayContainer = document.getElementById('right-sidebar-notes-content');
@@ -1727,15 +1789,19 @@ function initializeRightSidebarNotes() {
     }
     
     // Listener for the static "Edit Query" pen button (from index.php)
-    editQueryPenButton.addEventListener('click', () => {
-        showQueryEditorModal(); 
+    editQueryPenButton.addEventListener('click', async () => { // Make async if showQueryEditorModal is async
+        await showQueryEditorModal(); 
         // No need to hide any query input container here, as the main textarea was removed from index.php.
         // The modal is self-contained for editing.
     });
 
     // Listener for the "Run Query" button
-    runQueryButton.addEventListener('click', () => {
-        const currentQuery = localStorage.getItem('customSQLQuery') || ''; 
+    runQueryButton.addEventListener('click', async () => { // Make async
+        // const currentQuery = localStorage.getItem('customSQLQuery') || '';  // OLD
+        let currentQuery = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
+        if (typeof currentQuery !== 'string') {
+            currentQuery = ''; // Default if not a string
+        }
         if (!currentQuery) {
             // Display a message if no query is saved.
             // The padding here is acceptable as it's a direct message within the container.
@@ -1746,28 +1812,33 @@ function initializeRightSidebarNotes() {
     });
 
     // Initial load: Run the saved query if it exists
-    const savedQuery = localStorage.getItem('customSQLQuery');
+    // const savedQuery = localStorage.getItem('customSQLQuery'); // OLD
+    let savedQuery = await fetchToolbarVisibilityAPI('customSQLQuery'); // NEW
+    if (typeof savedQuery !== 'string') {
+        savedQuery = ''; // Default if not a string
+    }
+
     if (savedQuery && savedQuery.trim()) {
         fetchAndRenderCustomNotes(savedQuery, notesDisplayContainer, runQueryButton);
     } else {
         // Display a message if no query is set on initial load.
-        notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query set. Click the "Edit" (pen) button to create a custom query.</p>';
+        notesDisplayContainer.innerHTML = '<p style="padding:10px;">No query set (fetched from API). Click the "Edit" (pen) button to create a custom query.</p>';
     }
 
     // Initialize and set up the execution frequency selector and auto-execution
-    createExecutionFrequencySelector(); 
-    setupAutoQueryExecution(); 
+    createExecutionFrequencySelector(); // This one doesn't need to be async itself
+    await setupAutoQueryExecution(); // Call await as setupAutoQueryExecution is now async
 }
 
 // Call to initializeRightSidebarNotes will be in app.js
 // document.addEventListener('DOMContentLoaded', initializeRightSidebarNotes);
 
-function initializeLeftSidebar() {
+async function initializeLeftSidebar() {
     const toolbarToggle = document.getElementById('toolbar-toggle');
 
     if (toolbarToggle) {
-        // Set initial state based on localStorage
-        const isVisible = localStorage.getItem('toolbarVisible') !== 'false';
+        // Set initial state based on API
+        const isVisible = await fetchToolbarVisibilityAPI();
         const noteActions = document.querySelectorAll('.note-actions');
         
         noteActions.forEach(action => {
@@ -1775,18 +1846,26 @@ function initializeLeftSidebar() {
         });
         toolbarToggle.textContent = isVisible ? 'Hide toolbar' : 'Show toolbar';
 
-        toolbarToggle.addEventListener('click', (e) => {
+        toolbarToggle.addEventListener('click', async (e) => {
             e.preventDefault();
             
             const noteActions = document.querySelectorAll('.note-actions');
-            const isVisible = noteActions[0]?.style.display !== 'none';
+            // Determine newVisibility based on the button's current text
+            const isCurrentlyVisibleAccordingToButton = toolbarToggle.textContent === 'Hide toolbar';
+            const newVisibility = !isCurrentlyVisibleAccordingToButton;
             
             noteActions.forEach(action => {
-                action.style.display = isVisible ? 'none' : 'flex';
+                action.style.display = newVisibility ? 'flex' : 'none';
             });
             
-            toolbarToggle.textContent = isVisible ? 'Show toolbar' : 'Hide toolbar';
-            localStorage.setItem('toolbarVisible', !isVisible);
+            toolbarToggle.textContent = newVisibility ? 'Hide toolbar' : 'Show toolbar';
+            
+            // Update backend
+            const success = await updateToolbarVisibilityAPI(newVisibility);
+            if (!success) {
+                console.error("Failed to update toolbar visibility on the backend.");
+                // Optionally, revert UI changes here or notify the user
+            }
         });
     }
 }

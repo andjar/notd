@@ -33,15 +33,44 @@ async function navigateToPage(pageId) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOMContentLoaded event fired'); // Debug log
-    await loadTemplates();
-    loadRecentPages();
-    initCalendar();
-    initializeSidebarToggle(); // For the left sidebar
-    initializeRightSidebarToggle(); // For the new right sidebar
-    initializeRightSidebarNotes(); // For the new right sidebar's notes query functionality
-    console.log('About to initialize left sidebar'); // Debug log
-    initializeLeftSidebar();
-    console.log('Left sidebar initialized'); // Debug log
+    await loadTemplates(); 
+
+    // Fetch all initial settings in a batch
+    const initialSettingKeys = [
+        'toolbarVisible', 
+        'leftSidebarCollapsed', 
+        'rightSidebarCollapsed', 
+        'customSQLQuery', 
+        'queryExecutionFrequency'
+    ];
+    let allSettings = await fetchSettings(initialSettingKeys); 
+
+    if (!allSettings || Object.keys(allSettings).length === 0) {
+        console.warn('Failed to fetch initial settings or no settings returned; UI components will use client-side defaults.');
+        allSettings = {}; 
+        // Populate with client-side defaults for robustness if API fails completely
+        initialSettingKeys.forEach(key => {
+            if (key === 'toolbarVisible') allSettings[key] = 'true'; 
+            else if (key === 'leftSidebarCollapsed') allSettings[key] = 'false'; 
+            else if (key === 'rightSidebarCollapsed') allSettings[key] = 'true'; 
+            else if (key === 'customSQLQuery') allSettings[key] = ''; 
+            else if (key === 'queryExecutionFrequency') allSettings[key] = 'manual'; 
+        });
+    }
+    
+    // Initialize UI components with fetched settings
+    loadRecentPages(); 
+    initCalendar();    
+
+    // Pass settings to UI initializers.
+    await initializeSidebarToggle(allSettings.leftSidebarCollapsed === 'true'); 
+    await initializeRightSidebarToggle(allSettings.rightSidebarCollapsed === 'true'); 
+    await initializeRightSidebarNotes(allSettings.customSQLQuery, allSettings.queryExecutionFrequency); // These are strings
+    
+    console.log('About to initialize left sidebar (toolbar visibility)'); 
+    await initializeLeftSidebar(allSettings.toolbarVisible === 'true'); 
+    console.log('Left sidebar (toolbar visibility) initialized'); 
+
     document.addEventListener('keydown', handleGlobalKeyDown);
     
     // Add event listeners after DOM is loaded

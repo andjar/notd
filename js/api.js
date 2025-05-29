@@ -40,6 +40,9 @@ async function fetchPageData(pageId) {
     return data;
 }
 
+// ... (other existing API functions like fetchRecentPages, searchPages, etc. remain unchanged) ...
+// Assume all functions up to executeCustomQueryNotes are here and unchanged.
+
 /**
  * Fetches the list of recent pages from the server.
  * @async
@@ -68,8 +71,6 @@ async function searchPages(query) {
     const response = await fetch(`api/search.php?q=${encodeURIComponent(query)}`);
     if (!response.ok) throw new Error(`HTTP error during page search! status: ${response.status}`);
     const results = await response.json();
-    // Assuming results do not contain an 'error' field in the same way other endpoints do.
-    // If they might, add error checking here: if (results.error) throw new Error(results.error);
     return results;
 }
 
@@ -79,7 +80,7 @@ async function searchPages(query) {
  * @param {string} pageId - The desired ID for the new page.
  * @param {string} type - The type of the page (e.g., 'note', 'journal').
  * @param {Object} properties - An object containing page properties.
- * @returns {Promise<Object>} A promise that resolves with the server's response data (usually includes the created page info).
+ * @returns {Promise<Object>} A promise that resolves with the server's response data.
  * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function createNewPageAPI(pageId, type, properties) {
@@ -109,7 +110,7 @@ async function findBlockByIdAPI(blockId) {
         return data;
     } catch (error) {
         console.error('Error finding block by ID:', blockId, error);
-        return null; // Return null to indicate failure, allowing caller to handle.
+        return null; 
     }
 }
 
@@ -117,33 +118,27 @@ async function findBlockByIdAPI(blockId) {
  * Fetches data for multiple blocks in a batch.
  * @async
  * @param {Array<string>} blockIdsArray - An array of block IDs to fetch.
- * @returns {Promise<Object>} A promise that resolves with an object mapping block IDs to their data. Returns empty object on failure or if input array is empty.
+ * @returns {Promise<Object>} A promise that resolves with an object mapping block IDs to their data.
  */
 async function fetchBatchBlocksAPI(blockIdsArray) {
-    if (!blockIdsArray || blockIdsArray.length === 0) return {}; // No IDs to fetch.
+    if (!blockIdsArray || blockIdsArray.length === 0) return {}; 
     try {
         const response = await fetch(`api/batch_blocks.php?ids=${blockIdsArray.join(',')}`);
         if (response.ok) {
             return await response.json();
         } else {
             console.error('Failed to fetch batch blocks:', response.status, await response.text());
-            return {}; // Return empty object on HTTP error.
+            return {}; 
         }
     } catch (error) {
         console.error('Error fetching batch blocks:', error);
-        return {}; // Return empty object on network or other errors.
+        return {}; 
     }
 }
 
 /**
  * Updates the properties of an existing page.
  * @async
- * @param {string} pageId - The ID of the page to update.
- * @param {string} title - The new title for the page.
- * @param {string} type - The new type for the page.
- * @param {Object} properties - An object containing the new page properties.
- * @returns {Promise<Object>} A promise that resolves with the server's response.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function updatePagePropertiesAPI(pageId, title, type, properties) {
     const response = await fetch(`api/page.php?id=${pageId}`, {
@@ -160,9 +155,6 @@ async function updatePagePropertiesAPI(pageId, title, type, properties) {
 /**
  * Fetches backlinks for a given page ID.
  * @async
- * @param {string} pageId - The ID of the page for which to fetch backlinks.
- * @returns {Promise<Array<Object>>} A promise that resolves with an array of backlink thread objects.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function fetchBacklinksAPI(pageId) {
     const response = await fetch(`api/backlinks.php?page_id=${pageId}`);
@@ -175,9 +167,6 @@ async function fetchBacklinksAPI(pageId) {
 /**
  * Updates the server-side list of recent pages by adding the given pageId.
  * @async
- * @param {string} pageId - The ID of the page to add to recent pages.
- * @returns {Promise<void>}
- * @throws {Error} If the fetch operation fails.
  */
 async function updateRecentPagesAPI(pageId) {
     const response = await fetch('api/recent_pages.php', {
@@ -186,19 +175,14 @@ async function updateRecentPagesAPI(pageId) {
         body: JSON.stringify({ page_id: pageId })
     });
     if (!response.ok) throw new Error(`HTTP error updating recent pages! status: ${response.status}`);
-    // No specific JSON data is expected on success, but one might check response.ok or similar.
 }
 
 /**
  * Uploads a file as an attachment to a specific note.
  * @async
- * @param {string} noteId - The ID of the note to attach the file to.
- * @param {File} file - The file object to upload.
- * @returns {Promise<Object|undefined>} A promise that resolves with server response data, or undefined if no file is provided.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function uploadFileAPI(noteId, file) {
-    if (!file) return; // Early exit if no file provided.
+    if (!file) return; 
     const formData = new FormData();
     formData.append('file', file); 
     formData.append('note_id', noteId);
@@ -207,15 +191,12 @@ async function uploadFileAPI(noteId, file) {
     if (!response.ok) throw new Error(`HTTP error uploading file! status: ${response.status}`);
     const data = await response.json();
     if (data.error) throw new Error(data.error);
-    return { ...data, success: true }; // Add success flag to response
+    return { ...data, success: true };
 }
 
 /**
  * Deletes an attachment by its ID.
  * @async
- * @param {number} attachmentId - The ID of the attachment to delete.
- * @returns {Promise<Object>} A promise that resolves with the server's response.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function deleteAttachmentAPI(attachmentId) {
     const response = await fetch(`api/attachment.php`, {
@@ -230,62 +211,38 @@ async function deleteAttachmentAPI(attachmentId) {
 }
 
 /**
- * Toggles the TODO state of a note/block and updates its content and properties on the server.
- * This function includes logic to parse and reconstruct the note content with TODO markers and properties.
+ * Toggles the TODO state of a note/block.
  * @async
- * @param {string} noteId - The main ID of the note item to update.
- * @param {string} blockId - The specific block ID (might be same as noteId or a sub-block).
- * @param {string} currentContent - The current raw content of the note/block.
- * @param {boolean} isDone - The new TODO state (true for DONE, false for TODO).
- * @param {Object} currentProperties - The current properties object of the note/block.
- * @param {number} level - The indentation level of the note/block.
- * @param {string|null} parentId - The ID of the parent note, if any.
- * @returns {Promise<Object>} A promise that resolves with the server's response.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function toggleTodoAPI(noteId, blockId, currentContent, isDone, currentProperties, level, parentId) {
-    // Logic to parse current content and extract task description vs. inline properties
     let taskTextWithProperties = "";
     if (currentContent.startsWith('TODO ')) {
         taskTextWithProperties = currentContent.substring(5);
     } else if (currentContent.startsWith('DONE ')) {
         taskTextWithProperties = currentContent.substring(5);
     } else {
-        // If no TODO/DONE prefix, assume the whole content is the task.
         taskTextWithProperties = currentContent;
     }
-
-    const taskSpecificProperties = {}; // To store properties found within the task text itself
-    // Regex to find {key::value} properties within the task description
+    const taskSpecificProperties = {};
     let cleanTaskDescription = taskTextWithProperties.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
         taskSpecificProperties[key.trim()] = value.trim();
-        return ''; // Remove the property from the task description
+        return '';
     }).trim();
-
-    // Construct the new content string
     let newStatusPrefix = isDone ? 'DONE ' : 'TODO ';
     let newContentString = newStatusPrefix + cleanTaskDescription;
-
-    // Merge existing properties with any task-specific ones found and the new 'done-at' property
     const updatedNoteProperties = { ...(currentProperties || {}) };
-
     if (isDone) {
-        taskSpecificProperties['done-at'] = new Date().toISOString(); // Add 'done-at' timestamp
+        taskSpecificProperties['done-at'] = new Date().toISOString();
     } else {
-        delete taskSpecificProperties['done-at']; // Remove 'done-at' if unchecking
+        delete taskSpecificProperties['done-at'];
     }
-
-    // Append task-specific properties back to the content string and update the main properties object
     for (const [key, value] of Object.entries(taskSpecificProperties)) {
-        newContentString += ` {${key}::${value}}`; // Add back to content string
-        updatedNoteProperties[key] = value;      // Ensure it's in the main properties object
+        newContentString += ` {${key}::${value}}`;
+        updatedNoteProperties[key] = value;
     }
-    // If unchecking, ensure 'done-at' is also removed from the main properties object
     if (!isDone) {
         delete updatedNoteProperties['done-at'];
     }
-
-    // API call to update the note
     const response = await fetch(`api/note.php?id=${noteId}`, {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
@@ -304,11 +261,8 @@ async function toggleTodoAPI(noteId, blockId, currentContent, isDone, currentPro
 }
 
 /**
- * Executes a search based on a "search link" query (e.g., "<<query>>").
+ * Executes a search based on a "search link" query.
  * @async
- * @param {string} query - The search query extracted from the link.
- * @returns {Promise<Array<Object>>} A promise that resolves with an array of search result objects.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function executeSearchLinkAPI(query) {
     const response = await fetch('api/advanced_search.php', { 
@@ -325,9 +279,6 @@ async function executeSearchLinkAPI(query) {
 /**
  * Executes an advanced search using a raw SQL-like query.
  * @async
- * @param {string} query - The SQL-like query string.
- * @returns {Promise<Array<Object>>} A promise that resolves with an array of search result objects.
- * @throws {Error} If the fetch operation fails, the server returns an error, or the response is not ok.
  */
 async function executeAdvancedSearchAPI(query) {
     const response = await fetch('api/advanced_search.php', {
@@ -338,10 +289,9 @@ async function executeAdvancedSearchAPI(query) {
     if (!response.ok) {
         let errorMsg = `HTTP error during advanced search! status: ${response.status}`;
         try {
-            // Attempt to parse error from JSON response if available
             const errorData = await response.json();
             if (errorData && errorData.error) { errorMsg = errorData.error; }
-        } catch (e) { /* Ignore parsing error if response is not JSON */ }
+        } catch (e) { /* Ignore */ }
         throw new Error(errorMsg);
     }
     const results = await response.json();
@@ -350,14 +300,8 @@ async function executeAdvancedSearchAPI(query) {
 }
 
 /**
- * Reorders a note (changes its parent or position among siblings).
+ * Reorders a note.
  * @async
- * @param {number} noteId - The ID of the note to reorder.
- * @param {number|null} newParentId - The ID of the new parent note, or null for top-level.
- * @param {number} newOrder - The new 0-indexed position of the note among its siblings.
- * @param {string} pageId - The ID of the page where the reordering is happening.
- * @returns {Promise<Object>} A promise that resolves with the server's response.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function reorderNoteAPI(noteId, newParentId, newOrder, pageId) {
     const payload = {
@@ -365,7 +309,7 @@ async function reorderNoteAPI(noteId, newParentId, newOrder, pageId) {
         note_id: parseInt(noteId),
         new_parent_id: newParentId ? parseInt(newParentId) : null,
         new_order: parseInt(newOrder),
-        page_id: pageId // Current page context for the operation
+        page_id: pageId
     };
     const response = await fetch('api/note.php', {
         method: 'POST',
@@ -379,20 +323,10 @@ async function reorderNoteAPI(noteId, newParentId, newOrder, pageId) {
 }
 
 /**
- * Creates a new note on the server. If `intendedOrder` is provided, it subsequently
- * attempts to reorder the note to that position.
+ * Creates a new note.
  * @async
- * @param {string} pageId - The ID of the page where the note will be created.
- * @param {string} content - The content of the new note.
- * @param {number} level - The indentation level of the new note.
- * @param {string|null} parentId - The ID of the parent note, or null if top-level.
- * @param {Object} properties - An object containing properties for the new note.
- * @param {number|null} intendedOrder - The desired 0-indexed position among siblings after creation.
- * @returns {Promise<Object>} A promise that resolves with the created note data (including its new ID).
- * @throws {Error} If the note creation fetch operation fails or the server returns an error.
  */
 async function createNoteAPI(pageId, content, level, parentId, properties, intendedOrder) {
-    // Initial request to create the note
      const createResponse = await fetch('api/note.php', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -406,34 +340,21 @@ async function createNoteAPI(pageId, content, level, parentId, properties, inten
     if (!createResponse.ok) throw new Error(`HTTP error creating note! status: ${createResponse.status}`);
     const createData = await createResponse.json();
     if (createData.error) throw new Error(`Create error: ${createData.error}`);
-    if (!createData.id) throw new Error('Note created but no ID returned.'); // Essential for further operations
-    
+    if (!createData.id) throw new Error('Note created but no ID returned.');
     const newNoteId = createData.id;
-
-    // If an intendedOrder is specified, make a second call to reorder the newly created note.
     if (intendedOrder !== null && intendedOrder !== undefined) {
         try {
-            // Call reorderNoteAPI to place the note correctly.
-            // This implicitly uses another fetch call.
             await reorderNoteAPI(newNoteId, parentId, intendedOrder, pageId);
         } catch (reorderError) {
-            // Log a warning if reordering fails, but the note was still created.
-            console.warn(`Note created (ID: ${newNoteId}), but reorder failed: ${reorderError.message}. The note might not be in the exact intended position.`);
-            // Depending on requirements, this could be escalated or handled more gracefully.
+            console.warn(`Note created (ID: ${newNoteId}), but reorder failed: ${reorderError.message}.`);
         }
     }
-    return { id: newNoteId, ...createData }; // Return all data from the initial creation response.
+    return { id: newNoteId, ...createData };
 }
 
 /**
- * Updates an existing note on the server.
+ * Updates an existing note.
  * @async
- * @param {string} noteId - The ID of the note to update.
- * @param {string} content - The new content for the note.
- * @param {Object} properties - The new properties object for the note.
- * @param {number} level - The (potentially new) indentation level of the note.
- * @returns {Promise<Object>} A promise that resolves with the server's response.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function updateNoteAPI(noteId, content, properties, level) {
     const response = await fetch(`api/note.php?id=${noteId}`, {
@@ -448,11 +369,8 @@ async function updateNoteAPI(noteId, content, properties, level) {
 }
 
 /**
- * Deletes a note from the server.
+ * Deletes a note.
  * @async
- * @param {string} noteId - The ID of the note to delete.
- * @returns {Promise<Object>} A promise that resolves with the server's response.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function deleteNoteAPI(noteId) {
     const response = await fetch(`api/note.php?id=${noteId}`, {
@@ -467,28 +385,19 @@ async function deleteNoteAPI(noteId) {
 }
 
 /**
- * Fetches page title suggestions from the server based on a search term.
- * Used for auto-completing page links (e.g., [[Page Title]]).
+ * Fetches page title suggestions.
  * @async
- * @param {string} searchTerm - The term to search for.
- * @returns {Promise<Array<Object>>} A promise that resolves with an array of suggestion objects (typically {id, title}).
- * @throws {Error} If the fetch operation fails.
  */
 async function fetchPageSuggestionsAPI(searchTerm) {
     const response = await fetch(`api/suggest_pages.php?q=${encodeURIComponent(searchTerm)}`);
     if (!response.ok) throw new Error(`HTTP error fetching page suggestions! status: ${response.status}`);
     const suggestions = await response.json();
-    // It's good practice to check if suggestions is indeed an array or if it might contain an error field.
-    // if (suggestions.error) throw new Error(suggestions.error);
     return suggestions;
 }
 
 /**
  * Fetches notes based on a custom SQL query.
  * @async
- * @param {string} sqlQuery - The SQL query to execute.
- * @returns {Promise<Array<Object>>} A promise that resolves with an array of note objects.
- * @throws {Error} If the fetch operation fails or the server returns an error.
  */
 async function fetchCustomQueryNotes(sqlQuery) {
     const response = await fetch('api/query_notes.php', {
@@ -497,9 +406,99 @@ async function fetchCustomQueryNotes(sqlQuery) {
         body: JSON.stringify({ query: sqlQuery })
     });
     if (!response.ok) {
-        // Try to parse error JSON, but provide a fallback error message
         const errorData = await response.json().catch(() => ({ error: 'Network response was not ok and failed to parse error JSON.' }));
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
-    return response.json(); // This will be an array of note objects
+    return response.json(); 
+}
+
+// --- NEW Generic Settings API Functions ---
+
+/**
+ * Fetches multiple settings from the backend.
+ * @param {string[]} keysArray - An array of setting keys to fetch.
+ * @returns {Promise<Object>} A promise that resolves to an object containing the fetched settings (key-value pairs).
+ *                            Returns an empty object {} on API error or if data.success is false.
+ */
+async function fetchSettings(keysArray) {
+    if (!Array.isArray(keysArray) || keysArray.length === 0) {
+        console.warn('fetchSettings: keysArray must be a non-empty array. Returning empty settings.');
+        return {};
+    }
+    const params = new URLSearchParams();
+    keysArray.forEach(key => params.append('key[]', key));
+    const queryString = params.toString();
+
+    try {
+        const response = await fetch(`api/user_settings.php?action=get&${queryString}`);
+        if (!response.ok) {
+            console.error(`API Error - fetchSettings response not OK for keys [${keysArray.join(', ')}]:`, response.status, await response.text());
+            return {}; 
+        }
+        const data = await response.json();
+        if (data.success && data.settings) {
+            return data.settings;
+        } else {
+            console.error(`API Error - fetchSettings returned success=false or no settings object for keys [${keysArray.join(', ')}]:`, data.message || 'Unknown API error');
+            return {};
+        }
+    } catch (error) {
+        console.error(`Network or JSON Error - fetchSettings for keys [${keysArray.join(', ')}]:`, error);
+        return {};
+    }
+}
+
+/**
+ * Updates a single setting on the backend.
+ * @param {string} key - The setting key to update.
+ * @param {string|boolean|number} value - The new value for the setting. Will be converted to a string.
+ * @returns {Promise<boolean>} A promise that resolves to true if the update was successful, false otherwise.
+ */
+async function updateSetting(key, value) {
+    try {
+        const response = await fetch('api/user_settings.php?action=set', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ key: key, value: String(value) }), // Ensure value is stringified
+        });
+        if (!response.ok) {
+            console.error(`API Error - updateSetting response not OK for key [${key}]:`, response.status, await response.text());
+            return false;
+        }
+        const data = await response.json();
+        if (data.success) {
+            return true;
+        } else {
+            console.error(`API Error - updateSetting returned success=false for key [${key}]:`, data.message || 'Unknown API error');
+            return false;
+        }
+    } catch (error) {
+        console.error(`Network or JSON Error - updateSetting for key [${key}]:`, error);
+        return false;
+    }
+}
+
+// --- Refactored Original Settings API Functions ---
+
+/**
+ * Fetches the toolbar visibility setting from the backend.
+ * @returns {Promise<boolean>} A promise that resolves to true if the toolbar should be visible, false otherwise.
+ */
+async function fetchToolbarVisibilityAPI() {
+    // The backend defaults 'toolbarVisible' to 'true' (string) if not found.
+    const settings = await fetchSettings(['toolbarVisible']);
+    // If settings.toolbarVisible is "true", return true, otherwise (e.g., "false", undefined, or settings is empty) return false.
+    // This maintains the boolean return type expected by consumers of this specific function.
+    return settings && settings.toolbarVisible === 'true';
+}
+
+/**
+ * Updates the toolbar visibility setting on the backend.
+ * @param {boolean} isVisible - True if the toolbar should be visible, false otherwise.
+ * @returns {Promise<boolean>} A promise that resolves to true if the update was successful, false otherwise.
+ */
+async function updateToolbarVisibilityAPI(isVisible) {
+    return await updateSetting('toolbarVisible', isVisible ? 'true' : 'false');
 }

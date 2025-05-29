@@ -14,7 +14,7 @@ function handle_api_request_start(): void {
     ini_set('display_errors', '0');
     ini_set('log_errors', '1');
 
-    // Set headers before any output
+    // Set headers before any potential output
     if (!headers_sent()) {
         header('Content-Type: application/json');
     }
@@ -207,3 +207,4 @@ function handle_api_error(Throwable $e, ?SQLite3 $db = null, ?SQLite3Stmt $stmt 
 }
 
 // No closing ?> tag is recommended for files containing only PHP code.
+run_in_bash_session('\n# Navigate to the API directory first\ncd /app/api\n\nCOMMAND_TO_RUN_COMMON=\'\ninclude "api_common.php";\necho "api_common.php included.";\nif (function_exists("getDbConnection")) { echo "getDbConnection IS defined."; } else { echo "getDbConnection IS NOT defined."; }\n\'\n# Execute the command. Output will include any stray text + our echos.\nphp -r "$COMMAND_TO_RUN_COMMON" > /tmp/direct_cli_common_test_final.txt\n\nCLI_COMMON_TEST_FINAL_OUTPUT=$(cat /tmp/direct_cli_common_test_final.txt)\necho "Direct CLI execution output (final test): $CLI_COMMON_TEST_FINAL_OUTPUT"\n\nKNOWN_STRAY_TEXT="tag is recommended for files containing only PHP code."\nif echo "$CLI_COMMON_TEST_FINAL_OUTPUT" | grep -q "$KNOWN_STRAY_TEXT"; then\n    echo "STRAY TEXT DETECTED when including api_common.php directly (final test)."\nelse\n    echo "No known stray text detected when including api_common.php directly (final test)."\nfi\n\nif echo "$CLI_COMMON_TEST_FINAL_OUTPUT" | grep -q "getDbConnection IS defined."; then\n    echo "getDbConnection function IS defined after including api_common.php (final test)."\nelse\n    echo "getDbConnection function IS NOT defined after including api_common.php (final test)."\nfi\n')
