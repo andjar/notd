@@ -9,6 +9,7 @@ marked.setOptions({
 });
 
 // State variables are now in js/state.js
+let dataWorker; // For the Web Worker
 
 // loadTemplates is now in js/api.js and will be called during initialization
 
@@ -58,6 +59,127 @@ document.addEventListener('DOMContentLoaded', async () => {
     await runUIInitializers();
     
     console.log('All initial UI components initialized via runUIInitializers.');
+
+    if (window.Worker) {
+        dataWorker = new Worker('js/data_worker.js');
+
+        // Temporary onmessage for initial errors, will be replaced by the main handler
+        dataWorker.onmessage = function(event) {
+            if (event.data.type === 'workerError') {
+                console.error("Initial error from data_worker.js:", event.data.error);
+                 // Display a more prominent error to the user if the worker fails to load critical scripts
+                if (outlineContainer) {
+                    outlineContainer.innerHTML = `
+                        <div class="error-message">
+                            <h3>Application Initialization Error</h3>
+                            <p>A critical component (data worker) failed to initialize: ${event.data.error}. Please try refreshing the application or check browser compatibility.</p>
+                        </div>`;
+                }
+            }
+        };
+
+        dataWorker.onerror = function(error) {
+            console.error("Uncaught error during data_worker.js initialization or general worker error:", error.message, error);
+            if (outlineContainer) {
+                outlineContainer.innerHTML = `
+                    <div class="error-message">
+                        <h3>Application Error</h3>
+                        <p>A critical error occurred with a background component: ${error.message}. Please try refreshing.</p>
+                    </div>`;
+            }
+            // Potentially terminate and nullify worker if it's in an unusable state
+            if (dataWorker) dataWorker.terminate();
+            dataWorker = null;
+        };
+
+        // Main message handler for the worker
+        dataWorker.onmessage = async function(event) { // Make it async
+            const message = event.data;
+            const loadingIndicator = document.querySelector('.loading-indicator');
+            if (loadingIndicator) {
+                loadingIndicator.remove();
+            }
+
+            const currentHash = window.location.hash.substring(1);
+            const messagePageId = message.pageId;
+
+            if (message.type !== 'workerError' && 
+                messagePageId && 
+                currentHash !== messagePageId && 
+                decodeURIComponent(currentHash) !== messagePageId) {
+                console.log(`Ignoring stale message (${message.type}) for page ${messagePageId}. Current page is ${currentHash}.`);
+                return;
+            }
+
+            switch (message.type) {
+                case 'pageLoaded':
+                    const pageData = message.data;
+                    if (pageData.properties && pageData.properties.alias) {
+                        navigateToPage(pageData.properties.alias);
+                        return;
+                    }
+
+                    currentPage = pageData;
+                    await renderPage(pageData);
+
+                    if (typeof applyToolbarVisibilityToActions === 'function') {
+                        applyToolbarVisibilityToActions();
+                    } else {
+                        console.error("applyToolbarVisibilityToActions function is not defined.");
+                    }
+
+                    if (window.renderCalendarForCurrentPage) {
+                        window.renderCalendarForCurrentPage();
+                    }
+                    
+                    await loadRecentPages();
+                    updateRecentPages(messagePageId); 
+
+                    const reActivateId = sessionStorage.getItem('lastActiveBlockIdBeforeReload');
+                    if (reActivateId) {
+                        const reActivatedBlock = document.querySelector(`.outline-item[data-note-id="${reActivateId}"]`);
+                        if (reActivatedBlock) setActiveBlock(reActivatedBlock, true);
+                        sessionStorage.removeItem('lastActiveBlockIdBeforeReload');
+                    }
+                    break;
+
+                case 'pageLoadError':
+                    console.error(`Error loading page ${messagePageId}:`, message.error);
+                    outlineContainer.innerHTML = `
+                        <div class="error-message">
+                            <h3>Error loading page: ${messagePageId}</h3>
+                            <p>${message.error}</p>
+                            <button onclick="navigateToPage('${String(messagePageId || currentHash).replace(/'/g, "\\'")}')">Retry</button>
+                        </div>
+                    `;
+                    break;
+                
+                case 'workerError': 
+                    console.error("Critical error from data_worker:", message.error);
+                    outlineContainer.innerHTML = `
+                        <div class="error-message">
+                            <h3>Application Error</h3>
+                            <p>A critical component (data worker) encountered an error: ${message.error}. Please try refreshing the application.</p>
+                        </div>`;
+                    if (dataWorker) dataWorker.terminate();
+                    dataWorker = null; // Prevent further interaction with a broken worker
+                    break;
+            }
+        };
+
+    } else {
+        console.warn('Web Workers are not supported in this browser. Page loading might block the UI.');
+        // Fallback logic could be implemented here if desired, e.g., by directly calling a modified fetchPageData.
+        // For now, it will rely on users having modern browsers.
+        // A simple user notification:
+        if (outlineContainer) {
+            outlineContainer.innerHTML = `
+                <div class="error-message">
+                    <h3>Browser Not Supported</h3>
+                    <p>This application requires Web Worker support, which is not available in your current browser. Please upgrade to a newer browser.</p>
+                </div>`;
+        }
+    }
 
     document.addEventListener('keydown', handleGlobalKeyDown);
     
@@ -158,62 +280,34 @@ async function loadPage(pageId) {
 
     document.body.classList.remove('logseq-focus-active');
     outlineContainer.classList.remove('focused');
-    clearActiveBlock();
+    clearActiveBlock(); // in js/ui.js
 
-    try {
-        document.getElementById('new-note').style.display = 'block';
+    document.getElementById('new-note').style.display = 'block'; // Direct DOM manipulation
 
-        // Use fetchPageData from api.js
-        const data = await fetchPageData(pageId);
+    outlineContainer.innerHTML = '<p class="loading-indicator">Loading page...</p>'; // Direct DOM manipulation
 
-        // Error handling for data.error is already within fetchPageData,
-        // but we might want specific UI updates here if an error is re-thrown.
-        // For now, assuming fetchPageData throws an error that's caught below.
-
-        if (data.properties && data.properties.alias) {
-            navigateToPage(data.properties.alias); // This navigation will trigger another loadPage
-            return;
+    if (dataWorker) {
+        try {
+            dataWorker.postMessage({ type: 'loadPage', pageId: pageId });
+        } catch (error) {
+            console.error('Error posting message to data worker:', error);
+            outlineContainer.innerHTML = `
+                <div class="error-message">
+                    <h3>Error Communicating with Page Loader</h3>
+                    <p>${error.message}</p>
+                    <button onclick="navigateToPage('${String(pageId).replace(/'/g, "\\'")}')">Retry</button>
+                </div>
+            `;
+            const loadingIndicator = document.querySelector('.loading-indicator');
+            if (loadingIndicator) loadingIndicator.remove();
         }
-
-        currentPage = data;
-        await renderPage(data); // Existing line
-        if (typeof applyToolbarVisibilityToActions === 'function') { // Add a check
-            applyToolbarVisibilityToActions(); // New line
-        } else {
-            console.error("applyToolbarVisibilityToActions function is not defined.");
-        }
-
-        // UI components are now initialized once or update reactively.
-        // General UI re-initialization is removed from here.
-        
-        // Re-run other UI initializers that might be page-dependent or need refresh
-        // if they were not included in runUIInitializers or depend on page content from renderPage
-        if (window.renderCalendarForCurrentPage) { // This one updates based on currentPage
-             window.renderCalendarForCurrentPage(); // So it should run after renderPage
-        }
-        // loadRecentPages() is also likely fine to run here if it refreshes the recent pages list.
-        await loadRecentPages(); 
-
-        updateRecentPages(pageId); // This seems to just call the API and then loadRecentPages again.
-                                   // The loadRecentPages call above might make this specific call redundant or it could be part of a sequence.
-                                   // For now, keeping it as per existing structure.
-
-        const reActivateId = sessionStorage.getItem('lastActiveBlockIdBeforeReload');
-        if (reActivateId) {
-            const reActivatedBlock = document.querySelector(`.outline-item[data-note-id="${reActivateId}"]`);
-            if (reActivatedBlock) setActiveBlock(reActivatedBlock, true);
-            sessionStorage.removeItem('lastActiveBlockIdBeforeReload');
-        }
-
-    } catch (error) {
-        console.error('Error loading page:', error);
-        outlineContainer.innerHTML = `
-            <div class="error-message">
-                <h3>Error loading page</h3>
-                <p>${error.message}</p>
-                <button onclick="navigateToPage('${pageId.replace(/'/g, "\\'")}')">Retry</button>
-            </div>
-        `;
+    } else {
+        console.error("Data worker not available to load page:", pageId);
+        outlineContainer.innerHTML = '<p class="error-message">Error: Page loading mechanism failed. Please try refreshing.</p>';
+        const loadingIndicator = document.querySelector('.loading-indicator');
+        if (loadingIndicator) loadingIndicator.remove();
+        // If Web Workers are not supported at all, the message is already shown by the init block.
+        // This else block handles cases where dataWorker is null for other unexpected reasons.
     }
 }
 
