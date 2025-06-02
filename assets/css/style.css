@@ -121,22 +121,22 @@
     --arrow-icon-visual-size: 0.8em;    /* Visual size of the chevron icon */
     --bullet-dot-visual-size: 6px;      /* Diameter of the bullet dot */
 
-    /* Control positioning - COMPLETELY REVISED for proper hierarchy */
+    /* Revised variables for control positioning */
     --controls-container-width: calc(var(--ls-space-6) * 1.2); /* Width of the container for arrow/bullet */
     --control-icon-size: 16px; /* Size of the clickable icon (arrow/bullet visual) */
     --control-vertical-offset: calc((var(--ls-font-size-base) * 1.5 - var(--control-icon-size)) / 2); /* Top padding for controls */
     --ls-indentation-unit: var(--ls-space-6); /* Main indent per level */
 
-    /* REVISED: Better control positioning for proper hierarchy */
-    --bullet-left-indent: 1.5em;            /* Bullet position from content start */
-    --arrow-left-indent: 0.2em;             /* Arrow very close to bullet */
+    /* Control positioning - cleaned up and more precise */
+    --bullet-left-indent: 1.5em;            /* Bullet position */
+    --arrow-left-indent: 0.8em;             /* Arrow position, closer to bullet */
     --content-left-padding: 2.4em;          /* Content starts after controls */
-
+    
     --control-icon-size: 16px;              /* Clickable area size */
     --bullet-visual-size: 6px;              /* Visual bullet dot size */
-    --arrow-visual-size: 0.8em;             /* Visual chevron size - slightly larger */
-    --thread-line-width: 2px;               /* Thread thickness - made thicker */
-
+    --arrow-visual-size: 0.7em;             /* Visual chevron size */
+    --thread-line-width: 1px;               /* Thread thickness */
+    
     /* Vertical positioning */
     --controls-top-offset: calc(var(--ls-space-1) + 2px); /* Align with content */
 }
@@ -522,7 +522,21 @@ body {
     transform: scale(1.2);
 }
 
-/* Arrow: Subtle, appears on hover for parent items only */
+/* Collapsed note bullet glow - indicates hidden children */
+.note-item.collapsed > .note-header-row .note-controls .note-bullet {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+.note-item.collapsed > .note-header-row .note-controls .note-bullet::before {
+    background-color: var(--ls-accent-10);
+    box-shadow: 0 0 3px var(--ls-accent-9);
+}
+
+.note-item.collapsed > .note-header-row .note-controls .note-bullet:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+/* Arrow: More prominent, appears for parent items with better positioning */
 .note-collapse-arrow {
     display: none; /* Hidden by default */
     position: absolute;
@@ -535,12 +549,10 @@ body {
     cursor: pointer;
     border-radius: 50%;
     
-    /* Start invisible and muted */
-    opacity: 0;
+    /* More prominent default state */
+    opacity: 0.6; /* More visible than before */
     pointer-events: none;
-    background-color: var(--ls-secondary-background-color);
-    border: 1px solid var(--ls-secondary-border-color);
-    color: var(--ls-tertiary-text-color);
+    color: var(--ls-secondary-text-color); /* Stronger color */
     
     transition: all var(--ls-transition-fast);
     z-index: 3; /* Above bullet and thread */
@@ -549,42 +561,46 @@ body {
 /* Show arrow for items with children */
 .note-item.has-children > .note-header-row .note-controls .note-collapse-arrow {
     display: inline-flex;
-    opacity: 0.3; /* Slightly visible by default */
+    opacity: 0.2; /* More visible by default */
     pointer-events: auto;
 }
 
-/* Arrow becomes prominent on hover */
+/* Arrow becomes very prominent on hover */
 .note-item.has-children:hover > .note-header-row .note-controls .note-collapse-arrow,
 .note-collapse-arrow:hover {
+    display: inline-flex;
     opacity: 1;
-    background-color: var(--ls-tertiary-background-color);
-    border-color: var(--ls-border-color);
-    color: var(--ls-secondary-text-color);
+    transform: scale(1.1);
 }
 
-.note-collapse-arrow > i.feather {
+.note-collapse-arrow > svg.feather {
     width: var(--arrow-visual-size);
     height: var(--arrow-visual-size);
     transition: transform var(--ls-transition-fast);
 }
 
 /* Arrow rotation: point right when collapsed, down when expanded */
-.note-item.collapsed .note-collapse-arrow > i.feather {
+.note-item.collapsed > .note-header-row .note-controls .note-collapse-arrow > svg.feather {
     transform: rotate(0deg); /* Right when collapsed */
 }
 
-.note-item:not(.collapsed) .note-collapse-arrow > i.feather {
+.note-item:not(.collapsed) > .note-header-row .note-controls .note-collapse-arrow > svg.feather {
     transform: rotate(90deg); /* Down when expanded */
 }
 
-/* Vertical thread - emerges from bullet center, for ALL parent items */
+/* Vertical thread - properly aligned with each note's bullet center */
 .note-item.has-children::after {
     content: '';
     position: absolute;
-    /* Position thread aligned with this item's bullet center */
-    left: calc(var(--bullet-left-indent) + (var(--control-icon-size) / 2) - (var(--thread-line-width) / 2));
+    /* Position thread aligned with this item's bullet center, accounting for nesting */
+    left: calc(
+        var(--nesting-level, 0) * var(--ls-indentation-unit) + 
+        var(--bullet-left-indent) + 
+        (var(--control-icon-size) / 2) - 
+        (var(--thread-line-width) / 2)
+    );
     /* Start from below this item's bullet */
-    top: calc(var(--controls-top-offset) + (var(--bullet-visual-size) / 2) + 3px);
+    top: calc(var(--controls-top-offset) + var(--control-icon-size) + 2px);
     /* Extend to the bottom of the children container */
     bottom: 0;
     width: var(--thread-line-width);
@@ -595,7 +611,7 @@ body {
 
 /* Thread becomes accent color on hover */
 .note-item.has-children:hover::after {
-    background-color: var(--ls-accent-10);
+    background-color: var(--ls-accent-9);
 }
 
 /* Hide children when collapsed */
@@ -615,7 +631,7 @@ body {
 
 /* Cleanup old styles */
 .note-bullet.has-children-bullet,
-.note-bullet.has-children-bullet > i.feather {
+.note-bullet.has-children-bullet > svg.feather {
     display: none !important;
 }
 
@@ -1127,7 +1143,7 @@ textarea:focus {
 }
 
 /* Ensure feather icons are sized correctly in the close button */
-.page-properties-modal-close i.feather {
+.page-properties-modal-close svg.feather {
     width: 18px;
     height: 18px;
 }
@@ -1269,6 +1285,7 @@ textarea:focus {
     padding: var(--ls-space-1);
     z-index: var(--ls-z-index-popover);
     min-width: 180px;
+    position: fixed;
 }
 .bullet-context-menu .menu-item {
     display: flex;
@@ -1285,12 +1302,12 @@ textarea:focus {
     background-color: var(--ls-secondary-background-color);
     color: var(--ls-primary-text-color);
 }
-.bullet-context-menu .menu-item i.feather {
+.bullet-context-menu .menu-item svg.feather {
     width: 16px;
     height: 16px;
     color: var(--ls-secondary-text-color);
 }
-.bullet-context-menu .menu-item:hover i.feather {
+.bullet-context-menu .menu-item:hover svg.feather {
     color: var(--ls-primary-text-color);
 }
 
@@ -1299,16 +1316,14 @@ textarea:focus {
 .copy-feedback {
     position: fixed;
     bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--ls-gray-12);
-    color: var(--ls-gray-1);
+    right: 20px;
+    background: var(--ls-accent-10);
+    color: white;
     padding: var(--ls-space-2) var(--ls-space-4);
     border-radius: var(--ls-border-radius-medium);
-    box-shadow: var(--ls-shadow-lg);
+    animation: fadeInOutToast 3s ease-in-out;
     z-index: var(--ls-z-index-tooltip);
     font-size: var(--ls-font-size-sm);
-    animation: fadeInOutToast 3s ease-in-out;
 }
 
 @keyframes fadeInOutToast {
@@ -1571,4 +1586,440 @@ textarea:focus {
 
 .image-viewer-close:hover {
     color: var(--ls-gray-10); /* Light gray for hover */
+}
+
+/* Essential UI Styles - moved from ui.js injections */
+
+/* Bullet Context Menu */
+.bullet-context-menu {
+    background: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    box-shadow: var(--ls-shadow-lg);
+    padding: var(--ls-space-1);
+    z-index: var(--ls-z-index-popover);
+    min-width: 180px;
+    position: fixed;
+}
+.bullet-context-menu .menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+    padding: var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+    cursor: pointer;
+    transition: background-color var(--ls-transition-fast);
+    font-size: var(--ls-font-size-sm);
+    color: var(--ls-primary-text-color);
+}
+.bullet-context-menu .menu-item:hover {
+    background-color: var(--ls-secondary-background-color);
+    color: var(--ls-primary-text-color);
+}
+.bullet-context-menu .menu-item svg.feather {
+    width: 16px;
+    height: 16px;
+    color: var(--ls-secondary-text-color);
+}
+.bullet-context-menu .menu-item:hover svg.feather {
+    color: var(--ls-primary-text-color);
+}
+
+/* Copy Feedback Toast */
+.copy-feedback {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--ls-accent-10);
+    color: white;
+    padding: var(--ls-space-2) var(--ls-space-4);
+    border-radius: var(--ls-border-radius-medium);
+    animation: fadeInOutToast 3s ease-in-out;
+    z-index: var(--ls-z-index-tooltip);
+    font-size: var(--ls-font-size-sm);
+}
+
+/* Task Container Improvements */
+.task-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--ls-border-radius-medium);
+    margin: 6px 0;
+    border-left: 4px solid transparent;
+    background: var(--ls-secondary-background-color);
+    box-shadow: none;
+    transition: background-color 0.2s ease;
+}
+
+.task-container:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+.task-container.todo {
+    border-left-color: var(--ls-accent-10);
+}
+
+.task-container.done {
+    border-left-color: #10b981; /* Green */
+}
+
+.task-container.cancelled {
+    border-left-color: var(--ls-gray-8);
+}
+
+.task-checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.task-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--ls-accent-10);
+    border-radius: 3px;
+    transition: transform 0.2s ease;
+}
+
+.task-checkbox:hover {
+    transform: scale(1.1);
+}
+
+.task-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.task-status-badge {
+    font-size: 9px;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    white-space: nowrap;
+    box-shadow: none;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.task-status-badge.todo {
+    background: var(--ls-accent-10);
+    color: white;
+}
+
+.task-status-badge.done {
+    background: #10b981;
+    color: white;
+}
+
+.task-status-badge.cancelled {
+    background: var(--ls-gray-8);
+    color: white;
+}
+
+.task-content {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.5;
+    font-size: 0.95em;
+}
+
+.task-content.done-text {
+    text-decoration: line-through;
+    opacity: 0.75;
+    color: var(--ls-secondary-text-color);
+}
+
+.task-content.cancelled-text {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: var(--ls-tertiary-text-color);
+}
+
+/* Dark theme adjustments for tasks */
+[data-theme="dark"] .task-container {
+    background: var(--ls-primary-background-color);
+}
+
+[data-theme="dark"] .task-container:hover {
+    background: var(--ls-secondary-background-color);
+}
+
+/* Inline Properties */
+.inline-properties {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.property-inline {
+    display: inline-flex;
+    align-items: center;
+    background: var(--ls-tertiary-background-color);
+    border-radius: var(--ls-border-radius-low);
+    padding: 2px 6px;
+    font-size: 0.85em;
+    border: 1px solid var(--ls-border-color);
+}
+
+.property-key {
+    color: var(--ls-accent-10);
+    font-weight: var(--ls-font-weight-medium);
+    margin-right: 2px;
+}
+
+.property-value {
+    color: var(--ls-primary-text-color);
+}
+
+.property-tag {
+    background: var(--ls-accent-10);
+    color: white;
+    border-radius: var(--ls-border-radius-low);
+    padding: 2px 6px;
+    font-size: 0.85em;
+    font-weight: var(--ls-font-weight-medium);
+}
+
+/* Dark theme adjustments for properties */
+[data-theme="dark"] .property-inline {
+    background: var(--ls-secondary-background-color);
+    border-color: var(--ls-secondary-border-color);
+}
+
+/* Note Content Mode Styles */
+.note-content {
+    transition: all 0.2s ease;
+    border-radius: var(--ls-border-radius-low);
+    min-height: 20px;
+}
+
+.note-content.rendered-mode {
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.note-content.rendered-mode:hover {
+    background: var(--ls-secondary-background-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.note-content.edit-mode {
+    background: var(--ls-primary-background-color);
+    border: 2px solid var(--ls-accent-10);
+    padding: 6px 8px;
+    outline: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.note-content.edit-mode:focus {
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Empty state placeholder */
+.note-content.rendered-mode:empty::before {
+    content: attr(data-placeholder);
+    color: var(--ls-tertiary-text-color);
+    font-style: italic;
+}
+
+.note-content.edit-mode:empty::before {
+    content: attr(data-placeholder);
+    color: var(--ls-tertiary-text-color);
+    font-style: italic;
+}
+
+/* Note Attachments Styles */
+.note-attachments {
+    display: none; /* Hidden by default, shown by JS if attachments exist */
+    flex-direction: column;
+    gap: var(--ls-space-2);
+    margin-top: var(--ls-space-3);
+    padding-top: var(--ls-space-3);
+    border-top: 1px solid var(--ls-secondary-border-color);
+}
+
+.note-attachment-item {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-3);
+    padding: var(--ls-space-2);
+    background-color: var(--ls-secondary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    border: 1px solid var(--ls-border-color);
+}
+
+.attachment-preview {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--ls-tertiary-background-color);
+    border-radius: var(--ls-border-radius-low);
+    overflow: hidden;
+}
+
+.attachment-preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.attachment-preview-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--ls-secondary-text-color);
+}
+
+.attachment-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ls-space-1);
+    overflow: hidden;
+}
+
+.attachment-name {
+    font-weight: var(--ls-font-weight-medium);
+    color: var(--ls-primary-text-color);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.attachment-name:hover {
+    color: var(--ls-accent-10);
+    text-decoration: underline;
+}
+
+.attachment-meta {
+    font-size: var(--ls-font-size-xs);
+    color: var(--ls-secondary-text-color);
+}
+
+.attachment-delete-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--ls-tertiary-text-color);
+    cursor: pointer;
+    padding: var(--ls-space-1);
+    border-radius: var(--ls-border-radius-low);
+}
+
+.attachment-delete-btn:hover {
+    color: var(--color-error, #dc2626);
+    background-color: rgba(220, 38, 38, 0.1);
+}
+
+[data-theme="dark"] .note-attachment-item {
+    background-color: var(--ls-primary-background-color);
+    border-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] .attachment-preview {
+    background-color: var(--ls-secondary-background-color);
+}
+
+/* Note Properties */
+.property-item.tag {
+    background-color: var(--ls-tertiary-background-color);
+    color: var(--ls-accent-10);
+    border-radius: var(--ls-border-radius-low);
+    padding: 2px 6px;
+    margin-right: 4px;
+    font-size: 0.9em;
+}
+
+.property-item.tag .property-key {
+    color: var(--ls-accent-10);
+    font-weight: var(--ls-font-weight-medium);
+}
+
+.property-item.tag .property-value {
+    color: var(--ls-accent-10);
+}
+
+.note-properties {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.9em;
+}
+
+/* Note Focus States */
+.note-item.note-hidden {
+    display: none;
+}
+
+.note-item.note-focused {
+    background-color: var(--ls-secondary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    margin: var(--ls-space-1) 0;
+    padding: var(--ls-space-1);
+    transition: all 0.2s ease;
+}
+
+.note-item.note-focused > .note-content-wrapper > .note-content {
+    background-color: transparent;
+    border: 1px solid var(--ls-accent-10);
+    box-shadow: 0 0 0 2px rgba(var(--ls-accent-10-rgb), 0.1);
+}
+
+.notes-container.has-focused-notes::before {
+    content: '← Show All Notes';
+    display: block;
+    background: var(--ls-accent-10);
+    color: white;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-medium);
+    margin-bottom: var(--ls-space-3);
+    cursor: pointer;
+    font-size: var(--ls-font-size-sm);
+    width: fit-content;
+    transition: all 0.2s ease;
+    user-select: none;
+    position: relative;
+    z-index: 10;
+}
+
+.notes-container.has-focused-notes::before:hover {
+    background: var(--ls-accent-11);
+    transform: translateX(-2px);
+}
+
+.show-all-notes-btn {
+    display: none;
+    background: var(--ls-accent-10);
+    color: white;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-medium);
+    margin-bottom: var(--ls-space-3);
+    cursor: pointer;
+    font-size: var(--ls-font-size-sm);
+    width: fit-content;
+    transition: all 0.2s ease;
+    border: none;
+    font-family: inherit;
+}
+
+.show-all-notes-btn:hover {
+    background: var(--ls-accent-11);
+    transform: translateX(-2px);
+}
+
+.notes-container.has-focused-notes .show-all-notes-btn {
+    display: block;
 }
