@@ -1,0 +1,1574 @@
+/* === LogSeq-Inspired Theming System === */
+:root {
+    /* --- Base Gray Scale (Light Theme) --- */
+    /* Mirrored from LogSeq's rx-gray values for light theme */
+    --ls-gray-1: hsl(0 0% 99%);    /* rx-gray-01 */
+    --ls-gray-2: hsl(0 0% 97.3%);  /* rx-gray-02 */
+    --ls-gray-3: hsl(0 0% 95.1%);  /* rx-gray-03 */
+    --ls-gray-4: hsl(0 0% 93.0%);  /* rx-gray-04 */
+    --ls-gray-5: hsl(0 0% 90.9%);  /* rx-gray-05 */
+    --ls-gray-6: hsl(0 0% 88.7%);  /* rx-gray-06 */
+    --ls-gray-7: hsl(0 0% 85.8%);  /* rx-gray-07 */
+    --ls-gray-8: hsl(0 0% 78.0%);  /* rx-gray-08 */
+    --ls-gray-9: hsl(0 0% 56.1%);  /* rx-gray-09 */
+    --ls-gray-10: hsl(0 0% 52.3%); /* rx-gray-10 */
+    --ls-gray-11: hsl(0 0% 43.5%); /* rx-gray-11 */
+    --ls-gray-12: hsl(0 0% 9%);    /* rx-gray-12 */
+
+    /* --- Accent Color (User's Primary - Blue) --- */
+    --ls-accent-hue: 210;
+    --ls-accent-saturation: 100%;
+    /* LogSeq uses scales like rx-blue-09 for main interactive elements */
+    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 95%; /* Very light, for subtle backgrounds */
+    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%; /* Brighter interactive */
+    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%; /* Main accent, like LogSeq's primary blue */
+    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 40%; /* Darker for hover/active */
+    
+    --ls-accent-3: hsl(var(--ls-accent-3-hsl));
+    --ls-accent-9: hsl(var(--ls-accent-9-hsl));
+    --ls-accent-10: hsl(var(--ls-accent-10-hsl));
+    --ls-accent-11: hsl(var(--ls-accent-11-hsl));
+
+    /* --- LogSeq Semantic Colors (Light Theme) --- */
+    --ls-primary-background-color: white; /* LogSeq uses #fff or rx-gray-01 for some areas */
+    --ls-secondary-background-color: var(--ls-gray-2); /* LogSeq uses #f7f7f7 or rx-gray-02 */
+    --ls-tertiary-background-color: var(--ls-gray-3);  /* LogSeq uses #eaeaea or rx-gray-03/04 */
+    --ls-quaternary-background-color: var(--ls-gray-4);
+    
+    --ls-primary-text-color: var(--ls-gray-12);      /* LogSeq uses a dark brown/gray like #433f38 */
+    --ls-secondary-text-color: var(--ls-gray-11);    /* LogSeq uses a slightly lighter dark gray */
+    --ls-tertiary-text-color: var(--ls-gray-9);      /* For less prominent text */
+
+    --ls-border-color: var(--ls-gray-6);             /* LogSeq uses #ccc or similar gray */
+    --ls-secondary-border-color: var(--ls-gray-4);   /* Lighter border */
+    --ls-guideline-color: var(--ls-gray-4);          /* LogSeq: rgba(46,27,5,.08) or similar muted color */
+    
+    --ls-link-text-color: var(--ls-accent-10);       /* LogSeq uses a strong blue */
+    --ls-link-text-hover-color: var(--ls-accent-11);
+    
+    --ls-tag-text-color: var(--ls-link-text-color);
+    --ls-tag-text-hover-color: var(--ls-link-text-hover-color);
+    --ls-tag-text-opacity: 0.8;
+    --ls-tag-text-hover-opacity: 1;
+    
+    --ls-block-bullet-color: var(--ls-gray-8);       /* LogSeq often uses a muted gray */
+    --ls-block-bullet-active-color: var(--ls-accent-10);
+    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 92%); /* Very light accent */
+    
+    /* LogSeq specific checkbox colors (using accent for consistency here) */
+    --ls-page-checkbox-color: var(--ls-accent-9); 
+    --ls-page-checkbox-border-color: var(--ls-accent-9);
+
+    /* Other semantic colors from user's CSS adapted to LogSeq scale */
+    --color-error: hsl(0 70% 50%); /* Example error color */
+    --color-bg-hover: var(--ls-gray-3);
+
+    /* Spacing System (User's system is good) */
+    --ls-space-unit: 0.25rem;
+    --ls-space-1: var(--ls-space-unit);    /* 4px */
+    --ls-space-2: calc(var(--ls-space-unit) * 2);  /* 8px */
+    --ls-space-3: calc(var(--ls-space-unit) * 3);  /* 12px */
+    --ls-space-4: calc(var(--ls-space-unit) * 4);  /* 16px */
+    --ls-space-6: calc(var(--ls-space-unit) * 6);  /* 24px */
+    --ls-space-8: calc(var(--ls-space-unit) * 8);  /* 32px */
+    
+    /* Typography */
+    --ls-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --ls-font-size-xs: 0.75rem;
+    --ls-font-size-sm: 0.875rem;
+    --ls-font-size-base: 1rem;
+    --ls-font-size-lg: 1.125rem;
+    --ls-font-size-xl: 1.25rem;
+    --ls-font-size-2xl: 1.5rem;
+    --ls-font-size-3xl: 1.875rem;
+    --ls-page-title-size: 36px; /* From LogSeq */
+    
+    /* Font Weights */
+    --ls-font-weight-normal: 400;
+    --ls-font-weight-medium: 500;
+    --ls-font-weight-semibold: 600;
+    --ls-font-weight-bold: 700;
+    
+    /* Layout */
+    --ls-left-sidebar-width: 280px;
+    --ls-header-height: 3rem;
+    --ls-main-content-max-width: 810px;
+    --ls-border-radius-low: 4px;
+    --ls-border-radius-medium: 8px;
+    
+    /* Transitions */
+    --ls-transition-fast: 150ms ease;
+    --ls-transition-normal: 250ms ease;
+    
+    /* Shadows (LogSeq style) */
+    --ls-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --ls-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --ls-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        
+    /* Z-index layers */
+    --ls-z-index-dropdown: 1000;
+    --ls-z-index-sticky: 1020;
+    --ls-z-index-modal: 1050;
+    --ls-z-index-popover: 1060;
+    --ls-z-index-tooltip: 1070;
+
+    /* New variables for precise control positioning */
+    --control-area-width: calc(var(--ls-space-6) * 0.8); /* Width of the area left of content for controls */
+    --arrow-left-in-item: 0.3em; /* Arrow's position from the item's very start (after hierarchical indent) */
+    --bullet-left-in-item: 1.5em; /* Bullet's position from the item's very start, to the right of arrow */
+    
+    --control-icon-container-size: 1.2em; /* Clickable area size for arrow/bullet */
+    --arrow-icon-visual-size: 0.8em;    /* Visual size of the chevron icon */
+    --bullet-dot-visual-size: 6px;      /* Diameter of the bullet dot */
+
+    /* Control positioning - COMPLETELY REVISED for proper hierarchy */
+    --controls-container-width: calc(var(--ls-space-6) * 1.2); /* Width of the container for arrow/bullet */
+    --control-icon-size: 16px; /* Size of the clickable icon (arrow/bullet visual) */
+    --control-vertical-offset: calc((var(--ls-font-size-base) * 1.5 - var(--control-icon-size)) / 2); /* Top padding for controls */
+    --ls-indentation-unit: var(--ls-space-6); /* Main indent per level */
+
+    /* REVISED: Better control positioning for proper hierarchy */
+    --bullet-left-indent: 1.5em;            /* Bullet position from content start */
+    --arrow-left-indent: 0.2em;             /* Arrow very close to bullet */
+    --content-left-padding: 2.4em;          /* Content starts after controls */
+
+    --control-icon-size: 16px;              /* Clickable area size */
+    --bullet-visual-size: 6px;              /* Visual bullet dot size */
+    --arrow-visual-size: 0.8em;             /* Visual chevron size - slightly larger */
+    --thread-line-width: 2px;               /* Thread thickness - made thicker */
+
+    /* Vertical positioning */
+    --controls-top-offset: calc(var(--ls-space-1) + 2px); /* Align with content */
+}
+
+/* Dark Theme (LogSeq inspired) */
+[data-theme="dark"] {
+    /* --- Radix-like Gray Scale (Dark Theme) --- */
+    --ls-gray-1: hsl(210 10% 12%); /* Darker than LogSeq's specific theme, adjust if needed */
+    --ls-gray-2: hsl(210 10% 15%);
+    --ls-gray-3: hsl(210 10% 20%);
+    --ls-gray-4: hsl(210 10% 25%);
+    --ls-gray-5: hsl(210 10% 30%);
+    --ls-gray-6: hsl(210 10% 35%);
+    --ls-gray-7: hsl(210 10% 40%);
+    --ls-gray-8: hsl(210 10% 50%);
+    --ls-gray-9: hsl(210 10% 65%);
+    --ls-gray-10: hsl(210 10% 75%);
+    --ls-gray-11: hsl(210 10% 85%);
+    --ls-gray-12: hsl(210 10% 95%);
+
+    /* --- Accent Color (Dark Theme) --- */
+    /* Keep user's hue, adjust lightness for dark mode */
+    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 20%;
+    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 70%;
+    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%;
+    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%;
+
+    /* --- LogSeq Semantic Colors (Dark Theme) --- */
+    /* Values taken directly from logseg_style.txt for data-color=logseq and data-theme=dark */
+    --ls-primary-background-color: #002b36;
+    --ls-secondary-background-color: #023643;
+    --ls-tertiary-background-color: #08404f;
+    --ls-quaternary-background-color: #094b5a;
+    
+    --ls-primary-text-color: #a4b5b6;
+    --ls-secondary-text-color: #dfdfdf;
+    --ls-tertiary-text-color: #93a1a1; /* LogSeq title-text-color */
+
+    --ls-border-color: #0e5263;
+    --ls-secondary-border-color: #126277;
+    --ls-guideline-color: #0b4a5a;
+    
+    --ls-link-text-color: #8abbbb;
+    --ls-link-text-hover-color: #d0e8e8; /* LogSeq active-secondary-color */
+        
+    --ls-block-bullet-color: #608e91;
+    --ls-block-bullet-active-color: var(--ls-accent-10);
+    --ls-block-highlight-color: #0a3d4b;
+    
+    --ls-page-checkbox-color: #6093a0;
+    --ls-page-checkbox-border-color: var(--ls-primary-background-color);
+
+    --color-error: hsl(0 70% 60%);
+    --color-bg-hover: var(--ls-gray-3);
+}
+
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--ls-font-family);
+    font-size: var(--ls-font-size-base);
+    line-height: 1.5;
+    color: var(--ls-primary-text-color);
+    background-color: var(--ls-primary-background-color);
+}
+
+/* Layout */
+.app-container {
+    display: grid;
+    grid-template-columns: var(--ls-left-sidebar-width) 1fr var(--ls-left-sidebar-width);
+    grid-template-areas: "left-sidebar main-content right-sidebar";
+    min-height: 100vh;
+}
+
+/* Sidebars */
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: var(--ls-left-sidebar-width);
+    background: var(--ls-secondary-background-color);
+    border-right: 1px solid var(--ls-border-color);
+    transition: transform 0.3s ease, width 0.3s ease;
+    z-index: var(--ls-z-index-sticky);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.left-sidebar { left: 0; }
+.right-sidebar {
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--ls-border-color);
+}
+
+.left-sidebar.collapsed { transform: translateX(-100%); }
+.right-sidebar.collapsed { transform: translateX(100%); }
+
+.sidebar-content {
+    padding: var(--ls-space-4);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: var(--ls-space-4);
+    border-top: 1px solid var(--ls-border-color);
+    background: var(--ls-secondary-background-color);
+    flex-shrink: 0;
+}
+
+/* Main Content */
+.main-content {
+    grid-area: main-content;
+    max-width: var(--ls-main-content-max-width);
+    margin: 0 auto;
+    padding: var(--ls-space-6);
+    width: 100%;
+    transition: margin 0.3s ease;
+    min-height: 100vh;
+}
+
+.left-sidebar:not(.collapsed) ~ .main-content { margin-left: var(--ls-left-sidebar-width); }
+.right-sidebar:not(.collapsed) ~ .main-content { margin-right: var(--ls-left-sidebar-width); }
+
+
+/* App Header */
+.app-header {
+    padding-top: var(--ls-space-6);
+    padding-bottom: var(--ls-space-4);
+    margin-bottom: var(--ls-space-4);
+}
+
+.app-header-main {
+    text-align: center;
+    margin-bottom: var(--ls-space-2);
+}
+
+.app-title-main {
+    font-size: var(--ls-page-title-size);
+    font-weight: var(--ls-font-weight-bold);
+    color: var(--ls-primary-text-color);
+    text-decoration: none;
+    display: inline-block;
+}
+
+.app-title {
+    font-size: var(--ls-font-size-2xl);
+    font-weight: var(--ls-font-weight-bold);
+    color: var(--ls-primary-text-color);
+    text-decoration: none;
+    display: block;
+    line-height: 1.2;
+}
+
+/* Calendar Widget */
+.calendar-widget {
+    background-color: var(--ls-tertiary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    padding: var(--ls-space-4);
+    margin-bottom: var(--ls-space-6);
+}
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--ls-space-4);
+}
+.calendar-grid { display: grid; gap: var(--ls-space-2); }
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: var(--ls-font-size-sm);
+    color: var(--ls-secondary-text-color);
+}
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--ls-space-1);
+}
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--ls-border-radius-low);
+    cursor: pointer;
+    transition: background-color var(--ls-transition-fast), color var(--ls-transition-fast);
+    font-size: var(--ls-font-size-sm);
+    color: var(--ls-secondary-text-color);
+}
+.calendar-day:hover {
+    background-color: var(--ls-gray-4);
+    color: var(--ls-primary-text-color);
+}
+.calendar-day.today {
+    background-color: var(--ls-accent-10);
+    color: white;
+    font-weight: var(--ls-font-weight-medium);
+}
+.calendar-day.current-page {
+    background-color: var(--ls-tertiary-background-color);
+    color: var(--ls-primary-text-color);
+    font-weight: var(--ls-font-weight-medium);
+    border: 1px solid var(--ls-accent-10);
+}
+.calendar-day.today.current-page {
+    background-color: var(--ls-accent-10);
+    color: white;
+    border: 1px solid var(--ls-accent-9);
+}
+
+/* Search Section */
+.search-section {
+    margin-bottom: var(--ls-space-6);
+    border-bottom: 1px solid var(--ls-border-color);
+    padding-bottom: var(--ls-space-4);
+}
+.search-input {
+    width: 100%;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    background: var(--ls-primary-background-color);
+    color: var(--ls-primary-text-color);
+    font-size: var(--ls-font-size-sm);
+    transition: border-color var(--ls-transition-fast), box-shadow var(--ls-transition-fast);
+    box-shadow: none;
+}
+.search-input:focus {
+    outline: none;
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+.search-input::placeholder { color: var(--ls-tertiary-text-color); }
+.search-results {
+    margin-top: var(--ls-space-3);
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    display: none;
+}
+.search-results.has-results { display: block; }
+.search-result-item {
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-bottom: 1px solid var(--ls-secondary-border-color);
+    cursor: pointer;
+    transition: background-color var(--ls-transition-fast);
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: var(--ls-secondary-background-color); }
+.search-result-title {
+    font-weight: var(--ls-font-weight-medium);
+    color: var(--ls-primary-text-color);
+    margin-bottom: var(--ls-space-1);
+    font-size: var(--ls-font-size-sm);
+}
+.search-result-snippet {
+    color: var(--ls-secondary-text-color);
+    font-size: var(--ls-font-size-xs);
+    line-height: 1.4;
+}
+
+/* New Page Form */
+.new-page-form {
+    display: flex;
+    gap: var(--ls-space-2);
+    margin-bottom: var(--ls-space-6);
+}
+.new-page-form input {
+    flex: 1;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    background: var(--ls-primary-background-color);
+    color: var(--ls-primary-text-color);
+    font-size: var(--ls-font-size-sm);
+    box-shadow: none;
+}
+.new-page-form input:focus {
+    outline: none;
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+
+/* Page List */
+#page-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ls-space-1);
+}
+#page-list a {
+    color: var(--ls-primary-text-color);
+    text-decoration: none;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-low);
+    transition: background-color var(--ls-transition-fast);
+}
+#page-list a:hover { background-color: var(--ls-tertiary-background-color); }
+#page-list a.active {
+    background-color: var(--ls-accent-10);
+    color: white;
+}
+
+/* Outliner / Notes Container */
+.outliner {
+    margin-top: var(--ls-space-6);
+    padding: var(--ls-space-2) 0;
+}
+
+.note-item {
+    position: relative;
+}
+
+.note-header-row {
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+    padding-left: calc(var(--nesting-level, 0) * var(--ls-indentation-unit));
+    min-height: calc(var(--ls-font-size-base) * 1.5 + var(--ls-space-1));
+}
+
+.note-controls {
+    position: relative;
+    width: 0;
+    height: 0;
+}
+
+.note-content-wrapper {
+    flex: 1;
+    min-width: 0;
+    padding-left: var(--content-left-padding);
+    padding-top: var(--ls-space-1);
+    padding-bottom: var(--ls-space-1);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Bullet: Always visible, defines the note structure */
+.note-bullet {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: var(--bullet-left-indent);
+    top: var(--controls-top-offset);
+    width: var(--control-icon-size);
+    height: var(--control-icon-size);
+    cursor: pointer;
+    z-index: 2;
+    border-radius: 50%;
+    transition: background-color var(--ls-transition-fast);
+}
+
+.note-bullet::before {
+    content: '';
+    width: var(--bullet-visual-size);
+    height: var(--bullet-visual-size);
+    background-color: var(--ls-block-bullet-color);
+    border-radius: 50%;
+    display: block;
+    transition: all var(--ls-transition-fast);
+}
+
+.note-bullet:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+.note-bullet:hover::before {
+    background-color: var(--ls-block-bullet-active-color);
+    transform: scale(1.2);
+}
+
+/* Arrow: Subtle, appears on hover for parent items only */
+.note-collapse-arrow {
+    display: none; /* Hidden by default */
+    position: absolute;
+    left: var(--arrow-left-indent);
+    top: var(--controls-top-offset);
+    width: var(--control-icon-size);
+    height: var(--control-icon-size);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    
+    /* Start invisible and muted */
+    opacity: 0;
+    pointer-events: none;
+    background-color: var(--ls-secondary-background-color);
+    border: 1px solid var(--ls-secondary-border-color);
+    color: var(--ls-tertiary-text-color);
+    
+    transition: all var(--ls-transition-fast);
+    z-index: 3; /* Above bullet and thread */
+}
+
+/* Show arrow for items with children */
+.note-item.has-children > .note-header-row .note-controls .note-collapse-arrow {
+    display: inline-flex;
+    opacity: 0.3; /* Slightly visible by default */
+    pointer-events: auto;
+}
+
+/* Arrow becomes prominent on hover */
+.note-item.has-children:hover > .note-header-row .note-controls .note-collapse-arrow,
+.note-collapse-arrow:hover {
+    opacity: 1;
+    background-color: var(--ls-tertiary-background-color);
+    border-color: var(--ls-border-color);
+    color: var(--ls-secondary-text-color);
+}
+
+.note-collapse-arrow > i.feather {
+    width: var(--arrow-visual-size);
+    height: var(--arrow-visual-size);
+    transition: transform var(--ls-transition-fast);
+}
+
+/* Arrow rotation: point right when collapsed, down when expanded */
+.note-item.collapsed .note-collapse-arrow > i.feather {
+    transform: rotate(0deg); /* Right when collapsed */
+}
+
+.note-item:not(.collapsed) .note-collapse-arrow > i.feather {
+    transform: rotate(90deg); /* Down when expanded */
+}
+
+/* Vertical thread - emerges from bullet center, for ALL parent items */
+.note-item.has-children::after {
+    content: '';
+    position: absolute;
+    /* Position thread aligned with this item's bullet center */
+    left: calc(var(--bullet-left-indent) + (var(--control-icon-size) / 2) - (var(--thread-line-width) / 2));
+    /* Start from below this item's bullet */
+    top: calc(var(--controls-top-offset) + (var(--bullet-visual-size) / 2) + 3px);
+    /* Extend to the bottom of the children container */
+    bottom: 0;
+    width: var(--thread-line-width);
+    background-color: var(--ls-guideline-color);
+    z-index: 1; /* Behind controls */
+    transition: background-color var(--ls-transition-fast);
+}
+
+/* Thread becomes accent color on hover */
+.note-item.has-children:hover::after {
+    background-color: var(--ls-accent-10);
+}
+
+/* Hide children when collapsed */
+.note-item.collapsed > .note-children {
+    display: none;
+}
+
+/* Remove old thread positioning */
+.note-item.has-children > .note-children::before {
+    display: none;
+}
+
+/* Remove horizontal connectors */
+.note-header-row::after {
+    display: none;
+}
+
+/* Cleanup old styles */
+.note-bullet.has-children-bullet,
+.note-bullet.has-children-bullet > i.feather {
+    display: none !important;
+}
+
+/* Adjust padding on note-content for placeholder text alignment */
+.note-content[contenteditable="true"]:empty:before {
+    left: var(--ls-space-2); /* Align with its padding */
+}
+
+.note-content {
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+    line-height: 1.6;
+    min-height: calc(var(--ls-font-size-base) * 1.5);
+    transition: background-color var(--ls-transition-fast);
+}
+
+.note-content[contenteditable="true"]:empty:before {
+    content: attr(data-placeholder);
+    color: var(--ls-tertiary-text-color);
+    font-style: italic;
+    pointer-events: none;
+}
+
+.note-content:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+.note-content:focus {
+    outline: none;
+    background-color: var(--ls-primary-background-color);
+    box-shadow: 0 0 0 1px var(--ls-accent-10);
+}
+
+/* Note Children and Nesting - Single Column with Indentation */
+.note-children {
+    margin-left: 0;
+    padding-left: 0;
+    position: relative;
+}
+
+.note-children .note-item::before {
+    display: none;
+}
+
+.note-children > .note-item:last-child::after {
+    display: none;
+}
+
+.note-children.collapsed { display: none; }
+.note-item.collapsed > .note-children { display: none; }
+
+/* Task Container (TODOs) - Styling for LogSeq appearance */
+.task-container {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ls-space-1);
+    padding: 2px 0;
+}
+
+.task-checkbox-container {
+    padding-top: calc((var(--ls-font-size-base) * 1.5 - 16px) / 2);
+}
+
+.task-checkbox {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--ls-page-checkbox-border-color);
+    border-radius: var(--ls-border-radius-low);
+    background-color: var(--ls-primary-background-color);
+    cursor: pointer;
+    position: relative;
+    margin-right: var(--ls-space-2);
+    flex-shrink: 0;
+}
+
+.task-checkbox:checked {
+    background-color: var(--ls-page-checkbox-color);
+    border-color: var(--ls-page-checkbox-color);
+}
+
+.task-checkbox:checked::after {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+    position: absolute;
+    top: 3px;
+    left: 5px;
+}
+
+/* Task Keywords - styling them like tags */
+.task-content .task-keyword {
+    font-weight: var(--ls-font-weight-semibold);
+    padding: 1px 5px;
+    border-radius: var(--ls-border-radius-low);
+    margin-right: var(--ls-space-1);
+    display: inline-block;
+    line-height: 1.2;
+    font-size: var(--ls-font-size-sm);
+}
+
+.task-content .task-keyword.todo,
+.task-content .task-keyword.later,
+.task-content .task-keyword.now,
+.task-content .task-keyword.doing {
+    background-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 90%);
+    color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 30%);
+}
+.task-content .task-keyword.later {
+    background-color: hsl(40 100% 90%);
+    color: hsl(30 100% 30%);
+}
+
+.task-content.done-text,
+.task-content.cancelled-text {
+    text-decoration: line-through;
+    color: var(--ls-tertiary-text-color);
+}
+
+.task-content.done-text .task-keyword.done,
+.task-content.cancelled-text .task-keyword.cancelled {
+    background-color: var(--ls-gray-3);
+    color: var(--ls-tertiary-text-color);
+    text-decoration: none;
+}
+
+.task-status-badge { display: none; }
+
+
+/* Page Properties */
+#page-properties {
+    margin: var(--ls-space-4) 0;
+    padding: var(--ls-space-3);
+    background-color: var(--ls-secondary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+}
+.page-properties-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ls-space-2);
+    margin-bottom: var(--ls-space-3);
+}
+.page-property-item {
+    background-color: var(--ls-tertiary-background-color);
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-low);
+}
+.page-property-key {
+    color: var(--ls-accent-10);
+    font-weight: var(--ls-font-weight-medium);
+}
+.page-property-value {
+    background-color: var(--ls-primary-background-color);
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--ls-border-radius-low);
+}
+.page-property-value:focus {
+    outline: 2px solid var(--ls-accent-10);
+    outline-offset: 1px;
+}
+.add-property-btn {
+    background-color: var(--ls-tertiary-background-color);
+    color: var(--ls-secondary-text-color);
+    border: none;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-low);
+    cursor: pointer;
+    font-size: var(--ls-font-size-sm);
+    transition: background-color var(--ls-transition-fast), color var(--ls-transition-fast);
+}
+.add-property-btn:hover {
+    background-color: var(--ls-accent-10);
+    color: white;
+}
+
+
+/* Transclusion Styles - align with new variables */
+.transclusion-placeholder {
+    background: var(--ls-secondary-background-color);
+    border: 1px dashed var(--ls-border-color);
+    border-radius: var(--ls-border-radius-low);
+    color: var(--ls-secondary-text-color);
+}
+.transclusion-placeholder.error {
+    border-color: var(--color-error);
+    background: hsl(0 100% 97%);
+    color: var(--color-error);
+}
+.transcluded-content {
+    background: var(--ls-secondary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-low);
+}
+.transclusion-header {
+    background: var(--ls-tertiary-background-color);
+    border-bottom: 1px solid var(--ls-border-color);
+}
+.transclusion-link { color: var(--ls-link-text-color); }
+.transclusion-body { padding: var(--ls-space-2); }
+
+
+/* Input field base styles - Using new variables */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+textarea {
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    background-color: var(--ls-primary-background-color);
+    color: var(--ls-primary-text-color);
+    font-size: var(--ls-font-size-base);
+    box-shadow: none;
+    transition: border-color var(--ls-transition-fast), box-shadow var(--ls-transition-fast);
+}
+
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+
+/* Remaining styles from user's CSS - ensure they use new variables or are reviewed */
+/* ... (User's .action-button, .sidebar-toggle, responsive styles, utility classes, etc. should be reviewed and updated to use --ls- variables) ... */
+
+.button, .action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--ls-space-2) var(--ls-space-4);
+    font-size: var(--ls-font-size-sm);
+    font-weight: var(--ls-font-weight-medium);
+    border-radius: var(--ls-border-radius-medium);
+    border: 1px solid var(--ls-border-color);
+    background-color: var(--ls-secondary-background-color);
+    color: var(--ls-primary-text-color);
+    cursor: pointer;
+    transition: background-color var(--ls-transition-fast), border-color var(--ls-transition-fast);
+    text-decoration: none;
+    box-shadow: none;
+}
+.button:hover, .action-button:hover {
+    background-color: var(--ls-tertiary-background-color);
+    border-color: var(--ls-gray-7);
+}
+.button.primary-button, .action-button.primary {
+    background-color: var(--ls-accent-10);
+    border-color: var(--ls-accent-10);
+}
+.button.primary-button:hover, .action-button.primary:hover {
+    background-color: var(--ls-accent-11);
+    border-color: var(--ls-accent-11);
+}
+
+/* Styles from original file that might need to be adapted or were intentionally kept */
+
+/* Full width button for sidebar (already using new vars essentially) */
+.full-width-button {
+    width: 100%;
+    justify-content: center;
+}
+
+/* Sidebar Toggle Buttons */
+.sidebar-toggle {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 48px;
+    background: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: 0 var(--ls-border-radius-low) var(--ls-border-radius-low) 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--ls-z-index-modal);
+    box-shadow: var(--ls-shadow-sm);
+    transition: all var(--ls-transition-normal);
+}
+
+.sidebar-toggle:hover {
+    background: var(--ls-secondary-background-color);
+}
+
+.sidebar-toggle.left {
+    left: 0;
+}
+
+.sidebar-toggle.right {
+    right: 0;
+    border-radius: var(--ls-border-radius-low) 0 0 var(--ls-border-radius-low);
+    border-left: none;
+    border-right: 1px solid var(--ls-border-color);
+}
+
+/* When sidebars are collapsed, adjust toggle button positions */
+.left-sidebar.collapsed ~ .sidebar-toggle.left {
+    left: 0;
+}
+
+.right-sidebar.collapsed ~ .sidebar-toggle.right {
+    right: 0;
+}
+
+/* Responsive Design - Using LS variables now */
+@media (max-width: 1200px) {
+    .app-container {
+        grid-template-columns: 1fr;
+        grid-template-areas: "main-content";
+    }
+    
+    .sidebar {
+        width: 280px;
+    }
+    
+    .left-sidebar:not(.collapsed) ~ .main-content {
+      margin-left: 280px;
+    }
+    .right-sidebar:not(.collapsed) ~ .main-content {
+      margin-right: 280px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        width: 220px;
+    }
+    .left-sidebar:not(.collapsed) ~ .main-content {
+        margin-left: 220px;
+    }
+    .right-sidebar:not(.collapsed) ~ .main-content {
+        margin-right: 220px;
+    }
+    
+    .sidebar-toggle {
+        width: 20px;
+        height: 40px;
+    }
+    .app-title-main {
+        font-size: var(--ls-font-size-3xl);
+    }
+    .main-content {
+        padding: var(--ls-space-4);
+    }
+}
+
+
+/* Utility Classes (generally fine, ensure no conflicts) */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Page title and properties gear icon */
+.page-title-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ls-space-2);
+    margin-bottom: var(--ls-space-4);
+    text-align: center;
+}
+
+/* Page Header in Main Content (specific, not app-header) */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: var(--ls-space-4);
+    padding-bottom: var(--ls-space-4);
+}
+
+#current-page-title {
+    font-size: var(--ls-page-title-size);
+    font-weight: var(--ls-font-weight-semibold);
+    color: var(--ls-primary-text-color);
+    line-height: 1.2;
+}
+
+.page-title-gear {
+    color: var(--ls-secondary-text-color);
+    cursor: pointer;
+    padding: var(--ls-space-1);
+    border-radius: var(--ls-border-radius-low);
+    transition: all var(--ls-transition-fast);
+}
+
+.page-title-gear:hover {
+    color: var(--ls-primary-text-color);
+    background: var(--ls-secondary-background-color);
+}
+
+/* Page properties modal - Remove most of these as it now uses .generic-modal */
+/* .page-properties-modal { ... } */
+/* .page-properties-modal.active { ... } */
+/* .page-properties-modal-content { ... } */
+/* .page-properties-modal.active .page-properties-modal-content { ... } */
+
+/* Keep header and title styling if generic-modal doesn't cover it sufficiently or for specific adjustments */
+.generic-modal-header { /* Was .page-properties-modal-header */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--ls-space-4);
+    padding-bottom: var(--ls-space-4);
+    border-bottom: 1px solid var(--ls-border-color);
+}
+
+.generic-modal-title { /* Was .page-properties-modal-title */
+    font-size: var(--ls-font-size-xl);
+    font-weight: var(--ls-font-weight-semibold);
+    color: var(--ls-primary-text-color);
+}
+
+.page-properties-modal-close { /* Style this to be a proper close button */
+    color: var(--ls-secondary-text-color);
+    cursor: pointer;
+    padding: var(--ls-space-1); /* Reduced padding */
+    border-radius: var(--ls-border-radius-medium); /* Consistent rounding */
+    transition: all var(--ls-transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; /* Smaller size */
+    height: 28px; /* Smaller size */
+    background: transparent; /* No background by default */
+    border: none; /* No border */
+}
+
+.page-properties-modal-close:hover {
+    color: var(--ls-primary-text-color);
+    background: var(--ls-tertiary-background-color); /* Subtle hover */
+}
+
+/* Styles for the list and items within the page properties modal remain */
+#page-properties-list {
+    /* Existing styles for page-properties-list are fine */
+    /* May need adjustments based on generic-modal-content padding */
+    margin-bottom: var(--ls-space-4); /* Ensure space before actions */
+}
+
+.page-property-item {
+    /* Existing styles are mostly fine */
+    background-color: var(--ls-secondary-background-color); /* ensure contrast if modal is primary */
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-low);
+    border: 1px solid var(--ls-border-color); /* Add a subtle border */
+}
+
+.page-property-key {
+    color: var(--ls-accent-10);
+    font-weight: var(--ls-font-weight-medium);
+    white-space: nowrap;
+}
+
+.page-property-value {
+    background-color: var(--ls-primary-background-color);
+    flex-grow: 1; /* Use flex-grow instead of flex:1 to allow shrinking if needed */
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border: 1px solid var(--ls-secondary-border-color);
+    border-radius: var(--ls-border-radius-low);
+    min-width: 100px; /* Prevent it from becoming too small */
+}
+.page-property-value:focus {
+    outline: none; /* Remove default outline */
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2); /* Consistent focus style */
+}
+
+.add-property-btn {
+    /* This is now a .button inside .generic-modal-actions, so it inherits button styles */
+    /* Specific overrides if needed: */
+    /* background-color: var(--ls-tertiary-background-color); */
+    /* color: var(--ls-secondary-text-color); */
+    /* ... */
+}
+
+/* Ensure feather icons are sized correctly in the close button */
+.page-properties-modal-close i.feather {
+    width: 18px;
+    height: 18px;
+}
+
+
+/* Generic Modal Styles - adapted to LS vars */
+.generic-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: var(--ls-z-index-modal);
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+.generic-modal.active {
+    display: flex;
+    opacity: 1;
+}
+
+.generic-modal-content {
+    background: var(--ls-primary-background-color);
+    padding: var(--ls-space-8);
+    border-radius: 16px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ls-space-6);
+    border: 1px solid var(--ls-border-color);
+    transform: scale(0.95);
+    transition: transform 0.3s ease;
+}
+
+.generic-modal.active .generic-modal-content {
+    transform: scale(1);
+}
+
+.generic-modal-input-field {
+    width: 100%;
+    padding: var(--ls-space-4);
+    border: 2px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    background: var(--ls-primary-background-color);
+    color: var(--ls-primary-text-color);
+    font-size: var(--ls-font-size-base);
+    box-shadow: none;
+    transition: border-color var(--ls-transition-fast), box-shadow var(--ls-transition-fast);
+}
+
+.generic-modal-input-field:focus {
+    outline: none;
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 3px hsl(var(--ls-accent-10-hsl) / 0.1);
+}
+
+.generic-modal-actions {
+    display: flex;
+    gap: var(--ls-space-3);
+    justify-content: flex-end;
+    margin-top: var(--ls-space-4);
+}
+
+/* Button variants (danger already defined in original and uses hex, keep for now) */
+.button.danger-button {
+    background: #dc2626;
+    color: white;
+    border-color: #dc2626;
+    transition: all 0.2s ease;
+}
+.button.danger-button:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+}
+
+/* Page Search Modal Specific Styles */
+.page-search-modal-content {
+    max-width: 700px;
+}
+.page-search-results-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 2px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-lg);
+    background: var(--ls-primary-background-color);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.page-search-results-list li {
+    padding: var(--ls-space-3) var(--ls-space-4);
+    border-bottom: 1px solid var(--ls-secondary-border-color);
+    cursor: pointer;
+    transition: all var(--ls-transition-fast);
+}
+.page-search-results-list li:last-child { border-bottom: none; }
+.page-search-results-list li:hover,
+.page-search-results-list li.selected {
+    background: var(--ls-secondary-background-color);
+    transform: translateX(2px);
+}
+.page-search-results-list li.selected {
+    background: var(--ls-accent-10);
+    color: white;
+}
+.page-search-results-list li.create-new-option {
+    font-style: italic;
+    color: var(--ls-secondary-text-color);
+}
+.page-search-results-list li.create-new-option span {
+    font-weight: var(--ls-font-weight-medium);
+    color: var(--ls-accent-10);
+}
+.page-search-results-list li.selected .create-new-option span,
+.page-search-results-list li.selected .create-new-option {
+    color: white !important;
+}
+
+
+/* Bullet Context Menu */
+.bullet-context-menu {
+    background: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    box-shadow: var(--ls-shadow-lg);
+    padding: var(--ls-space-1);
+    z-index: var(--ls-z-index-popover);
+    min-width: 180px;
+}
+.bullet-context-menu .menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+    padding: var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+    cursor: pointer;
+    transition: background-color var(--ls-transition-fast);
+    font-size: var(--ls-font-size-sm);
+    color: var(--ls-primary-text-color);
+}
+.bullet-context-menu .menu-item:hover {
+    background-color: var(--ls-secondary-background-color);
+    color: var(--ls-primary-text-color);
+}
+.bullet-context-menu .menu-item i.feather {
+    width: 16px;
+    height: 16px;
+    color: var(--ls-secondary-text-color);
+}
+.bullet-context-menu .menu-item:hover i.feather {
+    color: var(--ls-primary-text-color);
+}
+
+
+/* Copy Feedback (Toast) */
+.copy-feedback {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ls-gray-12);
+    color: var(--ls-gray-1);
+    padding: var(--ls-space-2) var(--ls-space-4);
+    border-radius: var(--ls-border-radius-medium);
+    box-shadow: var(--ls-shadow-lg);
+    z-index: var(--ls-z-index-tooltip);
+    font-size: var(--ls-font-size-sm);
+    animation: fadeInOutToast 3s ease-in-out;
+}
+
+@keyframes fadeInOutToast {
+    0% { opacity: 0; transform: translate(-50%, 20px); }
+    10% { opacity: 1; transform: translate(-50%, 0); }
+    90% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -20px); }
+}
+
+
+/* Note Properties (inline within note, if different from page properties) */
+.note-properties {
+    font-size: var(--ls-font-size-sm);
+    color: var(--ls-secondary-text-color);
+    margin-top: var(--ls-space-1);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ls-space-2);
+}
+
+.note-properties .property-item {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--ls-tertiary-background-color);
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+}
+
+.note-properties .property-key {
+    font-weight: var(--ls-font-weight-medium);
+    color: var(--ls-accent-10);
+    margin-right: var(--ls-space-1);
+}
+.note-properties .property-value {
+}
+
+
+/* Styles for note drag/chosen states */
+.note-ghost {
+    opacity: 0.5;
+    background: var(--ls-tertiary-background-color);
+    border: 2px dashed var(--ls-border-color);
+    border-radius: var(--ls-border-radius-low);
+}
+
+.note-chosen {
+    box-shadow: var(--ls-shadow-md);
+    background: var(--ls-secondary-background-color);
+}
+
+.note-drag {
+    opacity: 0.9;
+    box-shadow: var(--ls-shadow-lg);
+    z-index: var(--ls-z-index-dropdown);
+}
+
+/* Final check for any remaining :root variables that were missed or specific overrides */
+/* For example, the original had --color-accent-transparent, if used by JS, define it: */
+:root {
+    --ls-accent-transparent: hsl(var(--ls-accent-10-hsl) / 0.1);
+}
+
+[data-theme="dark"] {
+    --ls-accent-transparent: hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+
+/* Ensure note-item.has-children specific styling still applies if needed from original */
+.note-item.has-children > .note-controls .note-bullet.has-children-bullet {
+}
+
+/* Ensure hover effects on collapsible bullets are as intended */
+.note-item.has-children:hover > .note-controls .note-bullet.has-children-bullet {
+}
+
+#notes-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ls-space-1);
+}
+
+/* Breadcrumbs Container */
+.breadcrumbs-container {
+    margin-bottom: var(--ls-space-4);
+    padding: var(--ls-space-2) var(--ls-space-1);
+    background-color: var(--ls-secondary-background-color);
+    border-radius: var(--ls-border-radius-low);
+    font-size: var(--ls-font-size-sm);
+    display: none; /* Initially hidden by JS, flex when active */
+    align-items: center;
+    gap: var(--ls-space-1);
+    flex-wrap: wrap;
+}
+.breadcrumb-item a {
+    color: var(--ls-link-text-color);
+    text-decoration: none;
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+}
+.breadcrumb-item a:hover {
+    background-color: var(--ls-tertiary-background-color);
+    text-decoration: underline;
+}
+.breadcrumb-item:not(:last-child)::after {
+    content: '/';
+    color: var(--ls-secondary-text-color);
+    margin-left: var(--ls-space-1);
+}
+.breadcrumb-item.active a {
+    color: var(--ls-primary-text-color);
+    font-weight: var(--ls-font-weight-semibold);
+}
+
+/* Focused note item style */
+.note-item.focused > .note-content-wrapper > .note-content {
+    background-color: var(--ls-block-highlight-color);
+    box-shadow: inset 0 0 0 1px var(--ls-accent-9), 0 0 0 1px var(--ls-accent-9); /* Inner and outer glow */
+}
+.note-item.focused .note-bullet:not(.has-children-bullet)::before {
+    background-color: var(--ls-block-bullet-active-color);
+    transform: scale(1.3);
+}
+.note-item.focused .note-bullet.has-children-bullet {
+    background-color: var(--ls-accent-10);
+    color: white;
+}
+
+/* Note Focus States */
+.note-item.note-hidden {
+    display: none;
+}
+
+.note-item.note-focused {
+    background-color: var(--ls-secondary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    margin: var(--ls-space-1) 0;
+    padding: var(--ls-space-1);
+    transition: all 0.2s ease;
+}
+
+.note-item.note-focused > .note-content-wrapper > .note-content {
+    background-color: transparent;
+    border: 1px solid var(--ls-accent-10);
+    box-shadow: 0 0 0 2px rgba(var(--ls-accent-10-rgb), 0.1);
+}
+
+/* Add a "Show All" button when notes are focused */
+.notes-container.has-focused-notes::before {
+    content: '← Show All Notes';
+    display: block;
+    background: var(--ls-accent-10);
+    color: white;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-medium);
+    margin-bottom: var(--ls-space-3);
+    cursor: pointer;
+    font-size: var(--ls-font-size-sm);
+    width: fit-content;
+    transition: all 0.2s ease;
+    user-select: none;
+    position: relative;
+    z-index: 10;
+}
+
+.notes-container.has-focused-notes::before:hover {
+    background: var(--ls-accent-11);
+    transform: translateX(-2px);
+}
+
+/* Alternative: Real button for show all */
+.show-all-notes-btn {
+    display: none;
+    background: var(--ls-accent-10);
+    color: white;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border-radius: var(--ls-border-radius-medium);
+    margin-bottom: var(--ls-space-3);
+    cursor: pointer;
+    font-size: var(--ls-font-size-sm);
+    width: fit-content;
+    transition: all 0.2s ease;
+    border: none;
+    font-family: inherit;
+}
+
+.show-all-notes-btn:hover {
+    background: var(--ls-accent-11);
+    transform: translateX(-2px);
+}
+
+.notes-container.has-focused-notes .show-all-notes-btn {
+    display: block;
+}
+
+/* New style for the header row containing controls and content */
+.note-header-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    position: relative;
+    padding-left: calc(var(--nesting-level, 0) * var(--ls-indentation-unit));
+}
+
+/* Horizontal connector for each child note item's header row */
+.note-header-row::after {
+    display: none; /* Remove horizontal threads */
+}
+
+/* Styling for .note-item no longer needs ::after or padding-left for indentation directly */
+.notes-container > .note-item {
+}
+
+/* Drag over effect for attachment drop zones */
+.note-content-wrapper.dragover {
+    background-color: var(--ls-accent-3); /* A very light accent color */
+    outline: 2px dashed var(--ls-accent-9);
+    outline-offset: -4px; /* Inside the padding */
+}
+
+/* Image Viewer Modal Styles */
+.image-viewer-modal {
+    /* Uses .generic-modal for base, so it's already centered, has backdrop etc. */
+    /* Override content styling for image display */
+    background-color: transparent; /* Let backdrop show, or use a dark semi-transparent */
+    backdrop-filter: blur(8px); /* Enhance backdrop blur */
+}
+
+.image-viewer-modal .generic-modal-content {
+    /* If we were using generic-modal-content, override it */
+    /* For this simple modal, we are not nesting .generic-modal-content */
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    width: auto;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden; /* Prevent scrollbars if image is slightly too large */
+}
+
+#image-viewer-modal-img {
+    display: block;
+    max-width: 100%;
+    max-height: 100%; /* Changed from 90vh to fit within its container */
+    object-fit: contain;
+    border-radius: var(--ls-border-radius-medium);
+    box-shadow: var(--ls-shadow-lg); /* Add shadow to image itself */
+}
+
+.image-viewer-close {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    color: white;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    z-index: 1051; /* Above modal content */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5); /* Make X more visible on various backgrounds */
+}
+
+.image-viewer-close:hover {
+    color: var(--ls-gray-10); /* Light gray for hover */
+}

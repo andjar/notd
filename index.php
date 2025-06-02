@@ -1,83 +1,182 @@
 <?php
-// Check if the database exists, if not run init.php
-$dbPath = __DIR__ . '/db/notes.db';
-if (!file_exists($dbPath)) {
-    include __DIR__ . '/db/init.php';
-}
+require_once 'config.php';
+// You might include more common PHP setup here if needed
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>notd</title>
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="stylesheet" href="css/style.css">
-    <script src="js/libs/marked.min.js"></script>
-    <script src="js/libs/highlight.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <title>NotTD</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Sidebar"></button>
-    <button id="right-sidebar-toggle" class="sidebar-toggle" aria-label="Toggle Right Sidebar"></button>
-    <div class="container">
-        <div class="sidebar">
-            <a href="#" id="home-button" class="home-link">notd</a>
-            <div class="calendar-panel">
-                <div id="calendar"></div>
+    <div class="app-container">
+        <!-- Left Sidebar -->
+        <div id="right-sidebar-outer">
+            <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn">☰</button>
+                <div id="left-sidebar" class="sidebar left-sidebar">
+                    <div class="sidebar-content">
+                        <div class="app-header">
+                            <a href="#" id="app-title" class="app-title">notd</a>
+                        </div>
+
+                        <div class="calendar-widget">
+                            <div class="calendar-header">
+                                <button class="calendar-nav prev"><i class="fas fa-chevron-left"></i></button>
+                                <span class="current-month">September 2023</span>
+                                <button class="calendar-nav next"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <div class="calendar-grid">
+                                <div class="calendar-weekdays">
+                                    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+                                    <span>Th</span><span>Fr</span><span>Sa</span>
+                                </div>
+                                <div class="calendar-days">
+                                    <!-- Calendar days will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Global Search -->
+                        <div class="search-section">
+                            <input type="text" id="global-search-input" placeholder="Search notes..." class="search-input">
+                            <div id="search-results" class="search-results">
+                                <!-- Search results will be populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <div class="recent-pages">
+                            <h3>Recent Pages</h3>
+                            <div id="page-list">
+                                <!-- Pages will be populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <div class="sidebar-footer">
+                            <button id="open-page-search-modal-btn" class="action-button full-width-button">
+                                <i class="fas fa-search"></i>&nbsp;
+                                Search or Create Page
+                            </button>
+                        </div>
+                    </div>
+                </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content" class="main-content">
+            <div class="breadcrumb-container">
+                <!-- Breadcrumb navigation will be populated by JavaScript -->
             </div>
-            <div class="search-box">
-                <input type="text" id="search" placeholder="Search...">
-                <div class="search-links">
-                    <a href="#" id="advanced-search-link">Advanced search</a>
-                    <a href="#" id="toolbar-toggle">Hide toolbar</a>
+
+            <div class="page-header">
+                <div id="current-page-title-container" class="page-title-container">
+                    <h1 id="current-page-title">Journal</h1>
+                    <i data-feather="settings" class="page-title-gear" id="page-properties-gear"></i>
                 </div>
             </div>
-            <div class="recent-pages">
-                <ul id="recent-pages-list"></ul>
-            </div>
-            <button id="new-page" class="btn-primary">Add New Page</button>
-        </div>
-        <div class="main-content">
-            <div class="page-header">
-                <h1 id="page-title"></h1>
-                <div id="page-properties"></div>
-            </div>
-            <div id="outline-container">
+
+            <div id="page-title"></div>
+            <div id="page-properties"></div>
+            <div id="notes-container" class="outliner">
                 <!-- Notes will be rendered here -->
             </div>
-            <button id="new-note" class="btn-primary" onclick="createNote()">Add New Note</button>
-            
-            <div id="backlinks-section" class="backlinks-section">
-                <button id="backlinks-toggle" class="backlinks-toggle-button" aria-expanded="false">
-                    <span class="toggle-arrow">▶</span> Backlinks
-                </button>
-                <div id="backlinks-container" class="backlinks-container" style="display: none;">
-                    <!-- Backlinks will be rendered here by renderBacklinks -->
-                    <!-- Placeholder for "Showing X out of Y" and "Load More" will be added in a later step -->
-                </div>
-            </div>
+
+            <button id="add-root-note-btn" class="action-button">
+                <i class="fas fa-plus"></i>
+                Add Note
+            </button>
         </div>
-        <div class="right-sidebar collapsed">
-            <div class="sql-query-container">
-                <h3>Custom Query</h3>
-                <div class = "sql-query-button-container">
-                    <button id="edit-query-btn" class="btn-secondary" aria-label="Edit Query">✎</button>
-                    <button id="run-sql-query" class="btn-secondary">Run Query</button>
+
+        <!-- Right Sidebar -->
+        <div id="right-sidebar-outer">
+            <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn">☰</button>
+            <div id="right-sidebar" class="sidebar right-sidebar">
+                <div class="sidebar-content">
+                    <div class="sidebar-header">
+                        <h3>Page Info</h3>
+                    </div>
+                    
+                    <div class="backlinks-section">
+                        <h4>Backlinks</h4>
+                        <div id="backlinks-container">
+                            <!-- Backlinks will be populated by JavaScript -->
+                        </div>
+                    </div>
                 </div>
-                <div class="query-frequency-container"></div>
-            </div>
-            <div id="right-sidebar-notes-content">
-                <!-- Notes fetched by the query will be displayed here -->
             </div>
         </div>
     </div>
-    <script src="js/libs/Sortable.min.js"></script>
-    <script src="js/state.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/ui.js"></script>
-    <script src="js/render.js"></script>
-    <script src="js/app.js"></script>
+
+    <!-- Page Properties Modal -->
+    <div id="page-properties-modal" class="generic-modal">
+        <div class="generic-modal-content">
+            <div class="generic-modal-header">
+                <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
+                <i data-feather="x" class="page-properties-modal-close" id="page-properties-modal-close"></i>
+            </div>
+            <div id="page-properties-list" class="page-properties-list"></div>
+            <div class="generic-modal-actions">
+                <button class="button add-property-btn" id="add-page-property-btn">+ Add Property</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Search Modal -->
+    <div id="page-search-modal" class="generic-modal">
+        <div class="generic-modal-content page-search-modal-content">
+            <h3 id="page-search-modal-title">Search or Create Page</h3>
+            <input type="text" id="page-search-modal-input" class="generic-modal-input-field" placeholder="Type to search or create...">
+            <ul id="page-search-modal-results" class="page-search-results-list">
+                <!-- Results will be populated here by JavaScript -->
+            </ul>
+            <div class="generic-modal-actions">
+                <button id="page-search-modal-cancel" class="button secondary-button">Cancel</button>
+                <!-- No explicit OK button, Enter in input will handle action -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Input Modal -->
+    <div id="generic-input-modal" class="generic-modal">
+        <div class="generic-modal-content">
+            <h2 id="generic-input-modal-title" class="generic-modal-title">Input Required</h2>
+            <input type="text" id="generic-input-modal-input" class="generic-modal-input-field">
+            <div class="generic-modal-actions">
+                <button id="generic-input-modal-cancel" class="button secondary-button">Cancel</button>
+                <button id="generic-input-modal-ok" class="button primary-button">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Confirm Modal -->
+    <div id="generic-confirm-modal" class="generic-modal">
+        <div class="generic-modal-content">
+            <h2 id="generic-confirm-modal-title" class="generic-modal-title">Confirm Action</h2>
+            <p id="generic-confirm-modal-message">Are you sure?</p>
+            <div class="generic-modal-actions">
+                <button id="generic-confirm-modal-cancel" class="button secondary-button">Cancel</button>
+                <button id="generic-confirm-modal-ok" class="button primary-button">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simple Image Viewer Modal -->
+    <div id="image-viewer-modal" class="generic-modal image-viewer-modal">
+        <span class="image-viewer-close" id="image-viewer-modal-close">&times;</span>
+        <img src="" alt="Image Preview" id="image-viewer-modal-img">
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="assets/libs/marked.min.js"></script>
+    <script src="assets/js/utils.js" defer></script>
+    <script src="assets/js/api_client.js" defer></script>
+    <script src="assets/js/ui.js" defer></script>
+    <script src="assets/js/app.js" defer></script>
+    <script src="assets/js/lib/feather.min.js"></script>
 </body>
-</html> 
+</html>

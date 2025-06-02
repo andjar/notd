@@ -1,0 +1,2307 @@
+/**
+ * UI Module for NotTD application
+ * Handles all DOM manipulation and rendering
+ * @module ui
+ */
+
+// DOM References
+const domRefs = {
+    notesContainer: document.getElementById('notes-container'),
+    currentPageTitleEl: document.getElementById('current-page-title'),
+    pageListContainer: document.getElementById('page-list'),
+    addRootNoteBtn: document.getElementById('add-root-note-btn'),
+    toggleLeftSidebarBtn: document.getElementById('toggle-left-sidebar-btn'),
+    toggleRightSidebarBtn: document.getElementById('toggle-right-sidebar-btn'),
+    leftSidebar: document.getElementById('left-sidebar'),
+    rightSidebar: document.getElementById('right-sidebar'),
+    globalSearchInput: document.getElementById('global-search-input'),
+    searchResults: document.getElementById('search-results'),
+    backlinksContainer: document.getElementById('backlinks-container'),
+    breadcrumbsContainer: document.getElementById('breadcrumbs-container'),
+    pagePropertiesGear: document.getElementById('page-properties-gear'),
+    pagePropertiesModal: document.getElementById('page-properties-modal'),
+    pagePropertiesModalClose: document.getElementById('page-properties-modal-close'),
+    pagePropertiesList: document.getElementById('page-properties-list'),
+    addPagePropertyBtn: document.getElementById('add-page-property-btn'),
+
+    // New refs for Page Search Modal
+    openPageSearchModalBtn: document.getElementById('open-page-search-modal-btn'),
+    pageSearchModal: document.getElementById('page-search-modal'),
+    pageSearchModalInput: document.getElementById('page-search-modal-input'),
+    pageSearchModalResults: document.getElementById('page-search-modal-results'),
+    pageSearchModalCancel: document.getElementById('page-search-modal-cancel'),
+
+    // Image Viewer Modal Refs
+    imageViewerModal: document.getElementById('image-viewer-modal'),
+    imageViewerModalImg: document.getElementById('image-viewer-modal-img'),
+    imageViewerModalClose: document.getElementById('image-viewer-modal-close')
+};
+
+/**
+ * Renders a single note element with proper structure and event handling
+ * @param {Object} note - Note object
+ * @param {number} [nestingLevel=0] - Nesting level for indentation
+ * @returns {HTMLElement} Rendered note element
+ */
+function renderNote(note, nestingLevel = 0) {
+    const noteItemEl = document.createElement('div');
+    noteItemEl.className = 'note-item';
+    noteItemEl.dataset.noteId = note.id;
+    noteItemEl.style.setProperty('--nesting-level', nestingLevel);
+
+    // Add classes based on note state
+    if (note.children && note.children.length > 0) {
+        noteItemEl.classList.add('has-children');
+    }
+    if (note.collapsed) {
+        noteItemEl.classList.add('collapsed');
+    }
+
+    // Controls section (drag handle and bullet)
+    const controlsEl = document.createElement('div');
+    controlsEl.className = 'note-controls';
+
+    // Drag handle
+    const dragHandleEl = document.createElement('span');
+    dragHandleEl.className = 'note-drag-handle';
+    dragHandleEl.innerHTML = '<i data-feather="menu"></i>';
+    dragHandleEl.style.display = 'none'; // Hide the grip handle
+    controlsEl.appendChild(dragHandleEl);
+
+    // Bullet (common to all notes)
+    const bulletEl = document.createElement('span');
+    bulletEl.className = 'note-bullet';
+    bulletEl.dataset.noteId = note.id;
+    // No icon in bulletEl by default anymore
+
+    if (note.children && note.children.length > 0) {
+        noteItemEl.classList.add('has-children'); // Keep this class on note-item for styling
+
+        // Create arrow for collapsable sections
+        const arrowEl = document.createElement('span');
+        arrowEl.className = 'note-collapse-arrow';
+        arrowEl.innerHTML = '<i data-feather="chevron-right"></i>';
+        arrowEl.dataset.noteId = note.id;
+        arrowEl.dataset.collapsed = note.collapsed ? 'true' : 'false';
+
+        arrowEl.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent event from bubbling to note item click, etc.
+            const currentNoteItem = arrowEl.closest('.note-item');
+            if (!currentNoteItem) return;
+
+            const childrenContainer = currentNoteItem.querySelector('.note-children');
+            const isCurrentlyCollapsed = currentNoteItem.classList.toggle('collapsed');
+            
+            if (childrenContainer) {
+                childrenContainer.classList.toggle('collapsed', isCurrentlyCollapsed);
+            }
+            
+            // Update arrow data attribute to control rotation
+            arrowEl.dataset.collapsed = isCurrentlyCollapsed ? 'true' : 'false';
+
+            // Persist collapse state (important for backend or local storage)
+            // This part would typically involve calling an API:
+            // notesAPI.updateNote(note.id, { collapsed: isCurrentlyCollapsed });
+            // For now, we'll assume the note object in memory might be updated elsewhere
+            // or this is sufficient for UI-only interaction until persistence is wired.
+            // If 'note' object is part of a global store that displayNotes re-reads, update it:
+            // e.g., const noteToUpdate = window.notesForCurrentPage.find(n => n.id === note.id);
+            // if (noteToUpdate) noteToUpdate.collapsed = isCurrentlyCollapsed;
+            
+            // Visually update arrow rotation via CSS based on [data-collapsed]
+            // Feather.replace() might be needed if icons are dynamically changed beyond CSS
+        });
+        controlsEl.appendChild(arrowEl); // Add arrow first
+    }
+    
+    controlsEl.appendChild(dragHandleEl); // Add drag handle (original code had it here)
+    controlsEl.appendChild(bulletEl); // Add bullet after arrow (if arrow exists) or drag handle
+
+    // Add context menu to bullet
+    bulletEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const menu = document.createElement('div');
+        menu.className = 'bullet-context-menu';
+        menu.innerHTML = `
+            <div class="menu-item" data-action="copy-transclusion">
+                <i data-feather="link"></i> Copy transclusion link
+            </div>
+            <div class="menu-item" data-action="delete">
+                <i data-feather="trash-2"></i> Delete
+            </div>
+            <div class="menu-item" data-action="upload">
+                <i data-feather="upload"></i> Upload attachment
+            </div>
+        `;
+
+        // Position menu
+        menu.style.position = 'fixed';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+
+        // Handle menu actions
+        menu.addEventListener('click', async (e) => {
+            const action = e.target.closest('.menu-item')?.dataset.action;
+            if (!action) return;
+
+            switch (action) {
+                case 'copy-transclusion':
+                    // Use the actual note ID for transclusion
+                    const transclusionLink = `!{{${note.id}}}`;
+                    await navigator.clipboard.writeText(transclusionLink);
+                    // Show feedback
+                    const feedback = document.createElement('div');
+                    feedback.className = 'copy-feedback';
+                    feedback.textContent = 'Transclusion link copied!';
+                    document.body.appendChild(feedback);
+                    setTimeout(() => feedback.remove(), 2000);
+                    break;
+                case 'delete':
+                    if (confirm('Are you sure you want to delete this note?')) {
+                        try {
+                            await notesAPI.deleteNote(note.id);
+                            const noteEl = document.querySelector(`.note-item[data-note-id="${note.id}"]`);
+                            if (noteEl) noteEl.remove();
+                        } catch (error) {
+                            console.error('Error deleting note:', error);
+                            alert('Failed to delete note');
+                        }
+                    }
+                    break;
+                case 'upload':
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.onchange = async (e) => {
+                        const files = Array.from(e.target.files);
+                        for (const file of files) {
+                            const formData = new FormData();
+                            formData.append('attachmentFile', file);
+                            formData.append('note_id', note.id);
+                            try {
+                                const result = await attachmentsAPI.uploadAttachment(formData);
+                                console.log('File uploaded successfully:', result);
+                                
+                                // Show success feedback
+                                const feedback = document.createElement('div');
+                                feedback.className = 'copy-feedback';
+                                feedback.textContent = `File "${file.name}" uploaded successfully!`;
+                                document.body.appendChild(feedback);
+                                setTimeout(() => feedback.remove(), 3000);
+                                
+                                // Refresh note to show new attachment
+                                const notes = await notesAPI.getNotesForPage(note.page_id);
+                                ui.displayNotes(notes, note.page_id);
+                            } catch (error) {
+                                console.error('Error uploading file:', error);
+                                alert(`Failed to upload file "${file.name}": ${error.message}`);
+                            }
+                        }
+                    };
+                    input.click();
+                    break;
+            }
+            menu.remove();
+        });
+
+        // Close menu when clicking outside
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        document.addEventListener('click', closeMenu);
+
+        document.body.appendChild(menu);
+        feather.replace();
+    });
+
+    // Add click handler for bullet focus functionality (not drag!)
+    bulletEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        focusOnNote(note.id);
+    });
+
+    controlsEl.appendChild(dragHandleEl);
+    controlsEl.appendChild(bulletEl);
+
+    // Content wrapper (content + properties)
+    const contentWrapperEl = document.createElement('div');
+    contentWrapperEl.className = 'note-content-wrapper';
+
+    // Content div - starts in rendered mode
+    const contentEl = document.createElement('div');
+    contentEl.className = 'note-content rendered-mode';
+    contentEl.dataset.placeholder = 'Type to add content...';
+    contentEl.dataset.noteId = note.id;
+    contentEl.dataset.rawContent = note.content || '';
+
+    // Render initial content
+    if (note.content && note.content.trim()) {
+        contentEl.innerHTML = parseAndRenderContent(note.content);
+    }
+
+    // Add mode switching functionality
+    contentEl.addEventListener('click', (e) => {
+        // Don't switch mode if clicking on interactive elements
+        if (e.target.matches('.task-checkbox, .page-link, .property-inline, .task-status-badge')) {
+            return;
+        }
+        
+        switchToEditMode(contentEl);
+    });
+
+    // Properties div
+    const propertiesEl = document.createElement('div');
+    propertiesEl.className = 'note-properties';
+    renderProperties(propertiesEl, note.properties);
+
+    contentWrapperEl.appendChild(contentEl);
+    contentWrapperEl.appendChild(propertiesEl);
+
+    // Attachments section
+    const attachmentsEl = document.createElement('div');
+    attachmentsEl.className = 'note-attachments';
+    contentWrapperEl.appendChild(attachmentsEl);
+    // Asynchronously load and render attachments
+    if (note.id && (typeof note.id === 'number' || (typeof note.id === 'string' && !note.id.startsWith('temp-')))) {
+        attachmentsAPI.getAttachmentsForNote(note.id)
+            .then(attachments => {
+                renderAttachments(attachmentsEl, attachments, note.id);
+            })
+            .catch(error => {
+                console.error('Failed to load attachments for note:', note.id, error);
+                attachmentsEl.innerHTML = '<small>Could not load attachments.</small>';
+            });
+    }
+
+    // Add Drag and Drop listeners for attachments to contentWrapperEl
+    contentWrapperEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        contentWrapperEl.classList.add('dragover'); // For visual feedback
+    });
+
+    contentWrapperEl.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        contentWrapperEl.classList.remove('dragover');
+    });
+
+    contentWrapperEl.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        contentWrapperEl.classList.remove('dragover');
+
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0 && note.id && !String(note.id).startsWith('temp-')) {
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('attachmentFile', file);
+                formData.append('note_id', note.id);
+                try {
+                    const result = await attachmentsAPI.uploadAttachment(formData);
+                    console.log('File uploaded successfully via drag & drop:', result);
+                    
+                    // Show success feedback (reuse existing mechanism if available)
+                    const feedback = document.createElement('div');
+                    feedback.className = 'copy-feedback'; // Reuse class or create specific one
+                    feedback.textContent = `File "${file.name}" uploaded!`;
+                    document.body.appendChild(feedback);
+                    setTimeout(() => feedback.remove(), 3000);
+                    
+                    // Refresh note to show new attachment
+                    // This assumes notesForCurrentPage and currentPageId are accessible
+                    // and ui.displayNotes can re-render the page correctly.
+                    // Consider a more targeted update if possible.
+                    if (window.currentPageId) {
+                         const notes = await notesAPI.getNotesForPage(window.currentPageId);
+                         window.notesForCurrentPage = notes; // Update global cache
+                         ui.displayNotes(notes, window.currentPageId); // Re-render with fresh data
+                    }
+                } catch (error) {
+                    console.error('Error uploading file via drag & drop:', error);
+                    alert(`Failed to upload file "${file.name}": ${error.message}`);
+                }
+            }
+        } else if (String(note.id).startsWith('temp-')) {
+            alert('Please save the note (by adding some content) before adding attachments.');
+        }
+    });
+
+    // Assemble note item
+    // Create a header row for controls and content wrapper
+    const noteHeaderEl = document.createElement('div');
+    noteHeaderEl.className = 'note-header-row';
+    noteHeaderEl.appendChild(controlsEl);
+    noteHeaderEl.appendChild(contentWrapperEl);
+
+    noteItemEl.appendChild(noteHeaderEl);
+
+    // Children container
+    const childrenContainerEl = document.createElement('div');
+    childrenContainerEl.className = 'note-children';
+    if (note.collapsed) {
+        childrenContainerEl.classList.add('collapsed');
+    }
+
+    // Render children recursively
+    if (note.children && note.children.length > 0) {
+        note.children.forEach(childNote => {
+            childrenContainerEl.appendChild(renderNote(childNote, nestingLevel + 1));
+        });
+    }
+
+    noteItemEl.appendChild(childrenContainerEl);
+
+    // Update Feather icons with error handling
+    if (typeof feather !== 'undefined' && feather.replace) {
+        try {
+            feather.replace();
+        } catch (error) {
+            console.warn('Feather icons replacement failed:', error);
+        }
+    }
+
+    return noteItemEl;
+}
+
+/**
+ * Switches a note content element to edit mode
+ * @param {HTMLElement} contentEl - The note content element
+ */
+function switchToEditMode(contentEl) {
+    if (contentEl.classList.contains('edit-mode')) return;
+
+    const rawContent = contentEl.dataset.rawContent || '';
+    const noteId = contentEl.dataset.noteId;
+    
+    contentEl.classList.remove('rendered-mode');
+    contentEl.classList.add('edit-mode');
+    contentEl.contentEditable = true;
+    contentEl.innerHTML = '';
+    contentEl.textContent = rawContent;
+    contentEl.focus();
+
+    // Handle blur to switch back to rendered mode
+    const handleBlur = () => {
+        switchToRenderedMode(contentEl);
+        contentEl.removeEventListener('blur', handleBlur);
+        contentEl.removeEventListener('paste', handlePasteImage); // Remove paste listener on blur
+    };
+    contentEl.addEventListener('blur', handleBlur);
+
+    // Handle pasting images
+    const handlePasteImage = async (event) => {
+        if (String(noteId).startsWith('temp-')) {
+            alert('Please save the note (by adding some content) before pasting images.');
+            return;
+        }
+
+        const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+        let imageFile = null;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                imageFile = items[i].getAsFile();
+                break;
+            }
+        }
+
+        if (imageFile) {
+            event.preventDefault(); // Prevent default paste action for the image
+            console.log('Pasted image file:', imageFile);
+
+            const formData = new FormData();
+            // Create a unique name for the pasted image, e.g., based on timestamp
+            const fileName = `pasted_image_${Date.now()}.${imageFile.name.split('.').pop() || 'png'}`;
+            formData.append('attachmentFile', imageFile, fileName);
+            formData.append('note_id', noteId);
+            // Potentially add a flag to indicate it's a pasted inline image
+            // formData.append('is_inline', 'true'); 
+
+            try {
+                // Use a generic API function or create a new one if backend needs different handling
+                const result = await attachmentsAPI.uploadAttachment(formData);
+                console.log('Pasted image uploaded successfully:', result);
+
+                if (result && result.url) {
+                    // Insert image as a thumbnail at current cursor position or end of content
+                    // This is a simplified insertion. For precise cursor insertion:
+                    // document.execCommand('insertHTML', false, `<img src="${result.url}" alt="Pasted Image" style="max-width: 200px; cursor: pointer;" data-original-url="${result.url}" class="pasted-image-thumbnail">`);
+                    
+                    // Simpler: append to current content (might not be at cursor)
+                    // Or, better, use parseAndRender to add it to rawContent and re-render
+                    const currentRawContent = contentEl.textContent;
+                    const imageMarkdown = `\n![Pasted Image](${result.url})\n`;
+                    contentEl.textContent = currentRawContent + imageMarkdown;
+                    
+                    // Update raw content dataset and re-render if needed (or save directly)
+                    contentEl.dataset.rawContent = contentEl.textContent;
+                    // Potentially trigger save or re-render logic here
+                    // For now, we just update the textContent, blur will handle saving.
+
+                    // Show feedback
+                    const feedback = document.createElement('div');
+                    feedback.className = 'copy-feedback';
+                    feedback.textContent = 'Image pasted and uploaded!';
+                    document.body.appendChild(feedback);
+                    setTimeout(() => feedback.remove(), 3000);
+
+                    // Optionally, refresh attachments list for the note if it's separate
+                    // For now, assuming the pasted image is primarily inline content.
+                    // If it should also appear in the attachments list, an explicit refresh is needed:
+                    if (window.currentPageId) {
+                         const notes = await notesAPI.getNotesForPage(window.currentPageId);
+                         window.notesForCurrentPage = notes; 
+                         ui.displayNotes(notes, window.currentPageId); 
+                    }
+
+                } else {
+                    throw new Error('Upload result did not include a URL.');
+                }
+
+            } catch (error) {
+                console.error('Error uploading pasted image:', error);
+                alert(`Failed to upload pasted image: ${error.message}`);
+            } // End of try-catch block
+        }
+        // If not an image, let the default paste behavior occur
+    }; // End of handlePasteImage function
+
+    contentEl.addEventListener('paste', handlePasteImage);
+}
+
+/**
+ * Switches a note content element to rendered mode
+ * @param {HTMLElement} contentEl - The note content element
+ */
+function switchToRenderedMode(contentEl) {
+    if (contentEl.classList.contains('rendered-mode')) return;
+
+    const newContent = contentEl.textContent || '';
+    contentEl.dataset.rawContent = newContent;
+    
+    contentEl.classList.remove('edit-mode');
+    contentEl.classList.add('rendered-mode');
+    contentEl.contentEditable = false;
+
+    // Re-render content if there is any
+    if (newContent.trim()) {
+        contentEl.innerHTML = parseAndRenderContent(newContent);
+    } else {
+        contentEl.innerHTML = '';
+    }
+}
+
+/**
+ * Extracts properties from note content using {key::value} syntax
+ * @param {string} content - Note content 
+ * @returns {Object} Object with content and extracted properties
+ */
+function extractPropertiesFromContent(content) {
+    if (!content) return { content, properties: {} };
+    
+    const properties = {};
+    // Match {key::value} pattern, supporting multi-word keys and values
+    const propertyRegex = /\{([^:}]+)::([^}]+)\}/g;
+    let match;
+    let cleanContent = content;
+    
+    while ((match = propertyRegex.exec(content)) !== null) {
+        const key = match[1].trim();
+        const value = match[2].trim();
+        if (key && value) {
+            properties[key] = value;
+        }
+        // Remove the property from the content
+        cleanContent = cleanContent.replace(match[0], '').trim();
+    }
+    
+    return { content: cleanContent, properties };
+}
+
+/**
+ * Renders properties as inline elements
+ * @param {Object} properties - Properties object
+ * @returns {string} HTML string for properties
+ */
+function renderInlineProperties(properties) {
+    if (!properties || Object.keys(properties).length === 0) {
+        return '';
+    }
+    
+    return Object.entries(properties).map(([key, value]) => {
+        // Handle tag properties specially
+        if (key.toLowerCase() === 'tag' || key.startsWith('tag-')) {
+            return `<span class="property-tag">#${value}</span>`;
+        }
+        
+        return `<span class="property-inline">
+            <span class="property-key">${key}::</span>
+            <span class="property-value">${value}</span>
+        </span>`;
+    }).join(' ');
+}
+
+/**
+ * Parses and renders note content with special formatting
+ * @param {string} rawContent - Raw note content
+ * @returns {string} HTML string for display
+ */
+function parseAndRenderContent(rawContent) {
+    if (!rawContent) return '';
+    
+    // First extract properties from content
+    const { content, properties } = extractPropertiesFromContent(rawContent);
+    let html = String(content);
+
+    // Handle task markers with checkboxes - don't show the TODO/DONE prefix in content
+    if (html.startsWith('TODO ')) {
+        const taskContent = html.substring(5); // Remove "TODO " prefix
+        html = `
+            <div class="task-container todo">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="TODO" />
+                    <span class="task-status-badge todo">TODO</span>
+                </div>
+                <div class="task-content">${taskContent}</div>
+            </div>
+        `;
+    } else if (html.startsWith('DONE ')) {
+        const taskContent = html.substring(5); // Remove "DONE " prefix
+        html = `
+            <div class="task-container done">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="DONE" checked />
+                    <span class="task-status-badge done">DONE</span>
+                </div>
+                <div class="task-content done-text">${taskContent}</div>
+            </div>
+        `;
+    } else if (html.startsWith('CANCELLED ')) {
+        const taskContent = html.substring(10); // Remove "CANCELLED " prefix
+        html = `
+            <div class="task-container cancelled">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="CANCELLED" disabled />
+                    <span class="task-status-badge cancelled">CANCELLED</span>
+                </div>
+                <div class="task-content cancelled-text">${taskContent}</div>
+            </div>
+        `;
+    } else {
+        // Handle page links
+        html = html.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
+            const trimmedName = pageName.trim();
+            return `<span class="page-link-bracket">[[</span><a href="#" class="page-link" data-page-name="${trimmedName}">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
+        });
+
+        // Handle block references (transclusions)
+        html = html.replace(/!{{(.*?)}}/g, (match, blockRef) => {
+            const trimmedRef = blockRef.trim();
+            if (/^\d+$/.test(trimmedRef)) {
+                return `<div class="transclusion-placeholder" data-block-ref="${trimmedRef}">Loading...</div>`;
+            } else {
+                return `<div class="transclusion-placeholder error" data-block-ref="${trimmedRef}">Invalid block reference</div>`;
+            }
+        });
+
+        // Use marked.js for Markdown if available (only for non-task content)
+        if (typeof marked !== 'undefined' && marked.parse) {
+            try {
+                // Configure marked for better inline parsing and custom image rendering
+                const renderer = new marked.Renderer();
+                const originalImageRenderer = renderer.image;
+                renderer.image = (href, title, text) => {
+                    // Create a standard image tag but add a class and data attribute for modal viewing
+                    // Use a simple style for thumbnail, can be enhanced with CSS
+                    let imageHTML = originalImageRenderer.call(renderer, href, title, text);
+                    // Add class and data attribute to the <img> tag
+                    // Regex to find <img> tag and add attributes carefully
+                    imageHTML = imageHTML.replace(/^<img(.*?)>/, 
+                        `<img$1 class="content-image" data-original-src="${href}" style="max-width: 200px; cursor: pointer;">`);
+                    return imageHTML;
+                };
+
+                const originalHtml = html;
+                html = marked.parse(html, {
+                    renderer: renderer, // Use the custom renderer
+                    breaks: false, 
+                    gfm: true,
+                    smartypants: true,
+                    sanitize: false, // Be cautious with sanitize: false if content is not trusted
+                    smartLists: true
+                });
+                console.log('Markdown processed with custom image renderer:', { original: originalHtml, processed: html });
+            } catch (e) {
+                console.warn('Marked.js parsing error:', e);
+                // Don't add <br> tags - keep original content
+            }
+        } else {
+            console.warn('marked.js not loaded properly or missing parse method');
+            // Don't add <br> tags - keep original content as is
+        }
+
+        // Add inline properties at the end if any were found
+        const propertiesHtml = renderInlineProperties(properties);
+        if (propertiesHtml) {
+            html += `<div class="inline-properties">${propertiesHtml}</div>`;
+        }
+    }
+
+    return html;
+}
+
+/**
+ * Renders properties for a note
+ * @param {HTMLElement} container - Container element for properties
+ * @param {Object} properties - Properties object
+ */
+function renderProperties(container, properties) {
+    container.innerHTML = '';
+    if (!properties || Object.keys(properties).length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    Object.entries(properties).forEach(([key, value]) => {
+        const propItem = document.createElement('span');
+        propItem.className = 'property-item';
+        propItem.innerHTML = `
+            <span class="property-key">${key}::</span>
+            <span class="property-value">${parseAndRenderContent(String(value))}</span>
+        `;
+        container.appendChild(propItem);
+    });
+    container.style.display = 'block';
+}
+
+/**
+ * Displays notes in the container
+ * @param {Array} notesData - Array of note objects
+ * @param {number} pageId - Current page ID
+ */
+function displayNotes(notesData, pageId) {
+    domRefs.notesContainer.innerHTML = '';
+
+    if (!notesData || notesData.length === 0) {
+        // Create empty note for new page
+        const tempId = `temp-${pageId || 'new'}-root-${Date.now()}`;
+        const emptyNote = {
+            id: tempId,
+            content: '',
+            properties: {},
+            children: []
+        };
+        const emptyNoteEl = renderNote(emptyNote, 0);
+        domRefs.notesContainer.appendChild(emptyNoteEl);
+        
+        // Switch to edit mode for the empty note
+        const contentDiv = emptyNoteEl.querySelector('.note-content');
+        if (contentDiv) {
+            switchToEditMode(contentDiv);
+        }
+        return;
+    }
+
+    // Build and display note tree
+    const noteTree = buildNoteTree(notesData);
+    noteTree.forEach(note => {
+        domRefs.notesContainer.appendChild(renderNote(note, 0));
+    });
+    
+    // Initialize drag and drop functionality
+    initializeDragAndDrop();
+}
+
+/**
+ * Initializes drag and drop functionality for notes
+ */
+function initializeDragAndDrop() {
+    if (typeof Sortable === 'undefined') {
+        console.warn('Sortable.js not loaded, drag and drop disabled');
+        return;
+    }
+
+    // Track drag state to prevent interference
+    window.isDragInProgress = false;
+
+    // Initialize sortable for the main notes container
+    const notesContainer = domRefs.notesContainer;
+    if (notesContainer) {
+        Sortable.create(notesContainer, {
+            group: 'notes',
+            animation: 150,
+            handle: '.note-bullet',
+            ghostClass: 'note-ghost',
+            chosenClass: 'note-chosen',
+            dragClass: 'note-drag',
+            onStart: function(evt) {
+                window.isDragInProgress = true;
+            },
+            onEnd: async function(evt) {
+                try {
+                    await handleNoteDrop(evt);
+                } finally {
+                    setTimeout(() => {
+                        window.isDragInProgress = false;
+                    }, 500); // Keep the flag for a bit longer to prevent interference
+                }
+            }
+        });
+    }
+
+    // Initialize sortable for all children containers
+    const childrenContainers = document.querySelectorAll('.note-children');
+    childrenContainers.forEach(container => {
+        Sortable.create(container, {
+            group: 'notes',
+            animation: 150,
+            handle: '.note-bullet',
+            ghostClass: 'note-ghost',
+            chosenClass: 'note-chosen',
+            dragClass: 'note-drag',
+            onStart: function(evt) {
+                window.isDragInProgress = true;
+            },
+            onEnd: async function(evt) {
+                try {
+                    await handleNoteDrop(evt);
+                } finally {
+                    setTimeout(() => {
+                        window.isDragInProgress = false;
+                    }, 500); // Keep the flag for a bit longer to prevent interference
+                }
+            }
+        });
+    });
+}
+
+/**
+ * Handles note drop events
+ * @param {Object} evt - Sortable drop event
+ */
+async function handleNoteDrop(evt) {
+    const noteId = evt.item.dataset.noteId;
+    if (!noteId || noteId.startsWith('temp-')) {
+        console.warn('Attempted to drop a temporary or invalid note. Aborting.');
+        // Optionally revert drag UI immediately if needed
+        if (evt.from && evt.item.parentNode === evt.from) { // Check if it's still in the original container
+          evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex]);
+        } else if (evt.item.parentNode) { // If it was moved, try to remove it
+          evt.item.parentNode.removeChild(evt.item);
+        }
+        return;
+    }
+
+    const newContainer = evt.to;
+    const oldContainer = evt.from;
+    const newIndex = evt.newIndex;
+    const oldIndex = evt.oldIndex;
+
+    // Get the current note data to preserve content
+    const currentNoteData = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
+    if (!currentNoteData) {
+        console.error('Note data not found for ID:', noteId, 'in window.notesForCurrentPage. Aborting drop.');
+        // Revert the DOM change on error
+        if (oldContainer !== newContainer) {
+            oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
+        } else {
+            if (oldIndex < newIndex) {
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
+            } else {
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex + 1]);
+            }
+        }
+        return;
+    }
+
+    let newParentId = null;
+    if (newContainer.classList.contains('note-children')) {
+        const parentNoteItem = newContainer.closest('.note-item');
+        if (parentNoteItem) {
+            newParentId = parentNoteItem.dataset.noteId;
+            if (!newParentId || newParentId.startsWith('temp-')) {
+                console.error('Cannot drop note onto a temporary or invalid parent note.');
+                // Revert logic as above
+                 if (oldContainer !== newContainer) { oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]); } else { if (oldIndex < newIndex) { oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]); } else { oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex + 1]); } }
+                return;
+            }
+        }
+    }
+
+    // Calculate the correct order index based on its new siblings in the data model
+    let targetOrderIndex = 0;
+    const siblingsInNewParent = window.notesForCurrentPage.filter(note =>
+        (note.parent_note_id ? String(note.parent_note_id) : null) === (newParentId ? String(newParentId) : null) &&
+        String(note.id) !== String(noteId) // Exclude the note being moved
+    ).sort((a, b) => a.order_index - b.order_index);
+
+    if (newIndex >= siblingsInNewParent.length) {
+        targetOrderIndex = siblingsInNewParent.length > 0 ? siblingsInNewParent[siblingsInNewParent.length - 1].order_index + 1 : 0;
+    } else {
+        // If dropped at the beginning or in the middle
+        // We need to adjust order_index based on the visual position relative to actual data items
+        const elementAtIndex = newContainer.children[newIndex];
+        if(elementAtIndex && elementAtIndex !== evt.item) {
+            const siblingNoteId = elementAtIndex.dataset.noteId;
+            const siblingNoteData = window.notesForCurrentPage.find(n => String(n.id) === String(siblingNoteId));
+            if (siblingNoteData) {
+                 targetOrderIndex = siblingNoteData.order_index;
+                 // Shift subsequent items if necessary (API should handle this, or we do it client-side before API call)
+            } else {
+                // Fallback if sibling data not found, less accurate
+                targetOrderIndex = newIndex;
+            }
+        } else {
+             targetOrderIndex = newIndex; // Fallback or if dropped at the end relative to its own position
+        }
+    }
+    
+    // Optimistically update UI (SortableJS already did this)
+    // Prepare data for API call
+    const updateData = {
+        content: currentNoteData.content || '', // Ensure content is always present
+        parent_note_id: newParentId,
+        order_index: targetOrderIndex
+    };
+
+    console.log('Attempting to update note position:', { noteId, ...updateData });
+
+    try {
+        const updatedNote = await window.notesAPI.updateNote(noteId, updateData);
+        console.log('Note position updated successfully on server:', updatedNote);
+
+        // Update local data cache accurately
+        currentNoteData.parent_note_id = updatedNote.parent_note_id;
+        currentNoteData.order_index = updatedNote.order_index;
+        currentNoteData.updated_at = updatedNote.updated_at; // Sync timestamp
+
+        // Potentially re-fetch all notes for the page to ensure perfect order and hierarchy
+        // This is a trade-off: ensures consistency but can be a bit slower.
+        // For now, we'll rely on the optimistic update and correct data sync.
+        // If inconsistencies appear, re-enable full refresh:
+        if (window.currentPageId && !window.isDragInProgress) { // Check drag flag here as well
+            const notes = await window.notesAPI.getNotesForPage(window.currentPageId);
+            window.notesForCurrentPage = notes; // Update global cache
+            ui.displayNotes(notes, window.currentPageId); // Re-render with fresh data
+        }
+
+    } catch (error) {
+        console.error('Error updating note position on server:', error);
+        // Show user-friendly error message
+        const feedback = document.createElement('div');
+        feedback.className = 'copy-feedback'; // Reuse existing class, maybe add an error variant
+        feedback.style.background = 'var(--color-error, #dc2626)'; // Use CSS variable for error color
+        feedback.textContent = `Failed to save position: ${error.message}`;
+        document.body.appendChild(feedback);
+        setTimeout(() => feedback.remove(), 3000);
+
+        // Revert the DOM change by moving the item back
+        // This is tricky because Sortable already moved it. We might need to re-render from original data.
+        // For now, a simple revert based on old indices:
+        if (oldContainer !== newContainer) {
+            oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
+        } else {
+            if (oldIndex < newIndex) {
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
+            } else {
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex + 1]);
+            }
+        }
+        // Ideally, after reverting, also re-fetch and re-render notes for consistency
+        if (window.currentPageId) {
+            const notes = await window.notesAPI.getNotesForPage(window.currentPageId);
+            window.notesForCurrentPage = notes;
+            ui.displayNotes(notes, window.currentPageId);
+        }
+    }
+}
+
+/**
+ * Builds a tree structure from flat note array
+ * @param {Array} notes - Flat array of note objects
+ * @param {number|null} [parentId=null] - Parent note ID
+ * @returns {Array} Tree structure of notes
+ */
+function buildNoteTree(notes, parentId = null) {
+    if (!notes) return [];
+    
+    return notes
+        .filter(note => note.parent_note_id === parentId)
+        .sort((a, b) => a.order_index - b.order_index)
+        .map(note => ({
+            ...note,
+            children: buildNoteTree(notes, note.id)
+        }));
+}
+
+/**
+ * Updates the page title
+ * @param {string} name - Page name
+ */
+function updatePageTitle(name) {
+    domRefs.currentPageTitleEl.textContent = name;
+    document.title = `${name} - NotTD`;
+}
+
+/**
+ * Updates the page list in the sidebar
+ * @param {Array} pages - Array of page objects
+ * @param {string} activePageName - Currently active page
+ */
+function updatePageList(pages, activePageName) {
+    domRefs.pageListContainer.innerHTML = '';
+
+    if (!pages || pages.length === 0) {
+        const defaultPageName = typeof getTodaysJournalPageName === 'function' 
+            ? getTodaysJournalPageName() 
+            : 'Journal';
+        const link = document.createElement('a');
+        link.href = '#';
+        link.dataset.pageName = defaultPageName;
+        link.textContent = `${defaultPageName} (Create)`;
+        domRefs.pageListContainer.appendChild(link);
+        return;
+    }
+
+    // Sort by updated_at DESC, then name ASC
+    pages.sort((a, b) => {
+        if (a.updated_at > b.updated_at) return -1;
+        if (a.updated_at < b.updated_at) return 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    pages.forEach(page => {
+        const link = document.createElement('a');
+        link.href = '#';
+        link.dataset.pageName = page.name;
+        link.textContent = page.name;
+        if (page.name === activePageName) {
+            link.classList.add('active');
+        }
+        domRefs.pageListContainer.appendChild(link);
+    });
+}
+
+/**
+ * Updates the active page link in the sidebar
+ * @param {string} pageName - Active page name
+ */
+function updateActivePageLink(pageName) {
+    document.querySelectorAll('#page-list a').forEach(link => {
+        link.classList.toggle('active', link.dataset.pageName === pageName);
+    });
+}
+
+/**
+ * Shows or updates a property in a note
+ * @param {string} noteId - Note ID
+ * @param {string} propertyName - Property name
+ * @param {string} propertyValue - Property value
+ */
+function showPropertyInNote(noteId, propertyName, propertyValue) {
+    const noteEl = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
+    if (!noteEl) return;
+
+    let propertiesEl = noteEl.querySelector('.note-properties');
+    if (!propertiesEl) {
+        propertiesEl = document.createElement('div');
+        propertiesEl.className = 'note-properties';
+        noteEl.querySelector('.note-content-wrapper').appendChild(propertiesEl);
+    }
+
+    const existingProp = propertiesEl.querySelector(`.property-item[data-property="${propertyName}"]`);
+    if (existingProp) {
+        existingProp.querySelector('.property-value').innerHTML = parseAndRenderContent(String(propertyValue));
+    } else {
+        const propItem = document.createElement('span');
+        propItem.className = 'property-item';
+        propItem.dataset.property = propertyName;
+        propItem.innerHTML = `
+            <span class="property-key">${propertyName}::</span>
+            <span class="property-value">${parseAndRenderContent(String(propertyValue))}</span>
+        `;
+        propertiesEl.appendChild(propItem);
+    }
+    propertiesEl.style.display = 'block';
+}
+
+/**
+ * Removes a property from a note
+ * @param {string} noteId - Note ID
+ * @param {string} propertyName - Property name to remove
+ */
+function removePropertyFromNote(noteId, propertyName) {
+    const noteEl = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
+    if (!noteEl) return;
+
+    const propertiesEl = noteEl.querySelector('.note-properties');
+    if (!propertiesEl) return;
+
+    const propItem = propertiesEl.querySelector(`.property-item[data-property="${propertyName}"]`);
+    if (propItem) {
+        propItem.remove();
+        if (propertiesEl.children.length === 0) {
+            propertiesEl.style.display = 'none';
+        }
+    }
+}
+
+/**
+ * Renders transcluded content
+ * @param {HTMLElement} placeholderEl - Transclusion placeholder element
+ * @param {string} noteContent - Content to render
+ * @param {string} noteId - ID of the transcluded note
+ */
+function renderTransclusion(placeholderEl, noteContent, noteId) {
+    if (!placeholderEl || !noteContent) return;
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'transcluded-content';
+    contentEl.innerHTML = `
+        <div class="transclusion-header">
+            <span class="transclusion-icon">🔗</span>
+            <a href="#" class="transclusion-link" data-note-id="${noteId}">View original note</a>
+        </div>
+        <div class="transclusion-body">
+            ${parseAndRenderContent(noteContent)}
+        </div>
+    `;
+    
+    // Add click handler for the transclusion link
+    const transclusionLink = contentEl.querySelector('.transclusion-link');
+    if (transclusionLink) {
+        transclusionLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Find and focus the original note
+            const originalNote = document.querySelector(`[data-note-id="${noteId}"]`);
+            if (originalNote) {
+                originalNote.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Add a temporary highlight
+                originalNote.style.background = 'rgba(59, 130, 246, 0.1)';
+                setTimeout(() => {
+                    originalNote.style.background = '';
+                }, 2000);
+            }
+        });
+    }
+    
+    placeholderEl.replaceWith(contentEl);
+}
+
+/**
+ * Calendar Widget Module
+ */
+const calendarWidget = {
+    currentDate: new Date(),
+    currentPageName: null,
+    
+    init() {
+        this.calendarEl = document.querySelector('.calendar-widget');
+        if (!this.calendarEl) return;
+        
+        this.monthEl = this.calendarEl.querySelector('.current-month');
+        this.daysEl = this.calendarEl.querySelector('.calendar-days');
+        this.prevBtn = this.calendarEl.querySelector('.calendar-nav.prev');
+        this.nextBtn = this.calendarEl.querySelector('.calendar-nav.next');
+        
+        this.bindEvents();
+        this.render();
+    },
+    
+    bindEvents() {
+        if (this.prevBtn) {
+            this.prevBtn.addEventListener('click', () => {
+                this.currentDate.setMonth(this.currentDate.getMonth() - 1);
+                this.render();
+            });
+        }
+        
+        if (this.nextBtn) {
+            this.nextBtn.addEventListener('click', () => {
+                this.currentDate.setMonth(this.currentDate.getMonth() + 1);
+                this.render();
+            });
+        }
+    },
+    
+    setCurrentPage(pageName) {
+        this.currentPageName = pageName;
+        this.render();
+    },
+    
+    render() {
+        if (!this.monthEl || !this.daysEl) return;
+        
+        const year = this.currentDate.getFullYear();
+        const month = this.currentDate.getMonth();
+        
+        // Update month display
+        this.monthEl.textContent = new Date(year, month).toLocaleString('default', { 
+            month: 'long', 
+            year: 'numeric' 
+        });
+        
+        // Clear previous days
+        this.daysEl.innerHTML = '';
+        
+        // Get first day of month and total days
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const totalDays = lastDay.getDate();
+        const startingDay = firstDay.getDay();
+        
+        // Add empty cells for days before start of month
+        for (let i = 0; i < startingDay; i++) {
+            const emptyDay = document.createElement('div');
+            emptyDay.className = 'calendar-day empty';
+            this.daysEl.appendChild(emptyDay);
+        }
+        
+        // Add days of the month
+        const today = new Date();
+        for (let day = 1; day <= totalDays; day++) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'calendar-day';
+            dayEl.textContent = day;
+            
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            
+            // Check if this is today
+            if (day === today.getDate() && 
+                month === today.getMonth() && 
+                year === today.getFullYear()) {
+                dayEl.classList.add('today');
+            }
+            
+            // Check if this is the current page
+            if (this.currentPageName === dateStr) {
+                dayEl.classList.add('current-page');
+            }
+            
+            // Add click handler for journal navigation
+            dayEl.addEventListener('click', () => {
+                if (typeof window.loadPage === 'function') {
+                    window.loadPage(dateStr);
+                }
+            });
+            
+            this.daysEl.appendChild(dayEl);
+        }
+    }
+};
+
+// Initialize calendar when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    calendarWidget.init();
+});
+
+/**
+ * Renders attachments for a note
+ * @param {HTMLElement} container - The container element to render attachments into
+ * @param {Array<Object>} attachments - Array of attachment objects
+ * @param {string} noteId - The ID of the note these attachments belong to
+ */
+function renderAttachments(container, attachments, noteId) {
+    container.innerHTML = ''; // Clear previous attachments
+    if (!attachments || attachments.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'flex'; // Use flex for layout
+
+    attachments.forEach(attachment => {
+        const attachmentEl = document.createElement('div');
+        attachmentEl.className = 'note-attachment-item';
+        attachmentEl.dataset.attachmentId = attachment.id;
+
+        let previewEl = '';
+        const isImage = attachment.type && attachment.type.startsWith('image/');
+
+        if (isImage) {
+            previewEl = `<img src="${attachment.url}" alt="${attachment.name}" class="attachment-preview-image">`;
+        } else {
+            previewEl = `<i data-feather="file" class="attachment-preview-icon"></i>`;
+        }
+
+        // Create the link element. It will either navigate or open modal.
+        const linkEl = document.createElement('a');
+        linkEl.href = attachment.url;
+        linkEl.className = 'attachment-name';
+        if (!isImage) {
+            linkEl.target = '_blank'; // Open non-images in new tab
+        }
+        linkEl.textContent = attachment.name;
+
+        attachmentEl.innerHTML = `
+            <div class="attachment-preview">${previewEl}</div>
+            <div class="attachment-info">
+                ${linkEl.outerHTML} <!-- Inject the created link -->
+                <span class="attachment-meta">${attachment.type} - ${new Date(attachment.created_at).toLocaleDateString()}</span>
+            </div>
+            <button class="attachment-delete-btn" data-attachment-id="${attachment.id}" data-note-id="${noteId}">
+                <i data-feather="trash-2"></i>
+            </button>
+        `;
+
+        container.appendChild(attachmentEl);
+
+        // If it's an image, add click listener to open in modal
+        if (isImage) {
+            const imageLinkInDOM = attachmentEl.querySelector('.attachment-name');
+            if (imageLinkInDOM) {
+                imageLinkInDOM.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (domRefs.imageViewerModal && domRefs.imageViewerModalImg && domRefs.imageViewerModalClose) {
+                        domRefs.imageViewerModalImg.src = attachment.url;
+                        domRefs.imageViewerModal.classList.add('active');
+
+                        // Setup close listeners only once or ensure they are managed properly
+                        const closeImageModal = () => {
+                            domRefs.imageViewerModal.classList.remove('active');
+                            domRefs.imageViewerModalImg.src = ''; // Clear image src
+                            domRefs.imageViewerModalClose.removeEventListener('click', closeImageModal);
+                            domRefs.imageViewerModal.removeEventListener('click', outsideClickHandler);
+                        };
+
+                        const outsideClickHandler = (event) => {
+                            if (event.target === domRefs.imageViewerModal) { // Clicked on backdrop
+                                closeImageModal();
+                            }
+                        };
+
+                        domRefs.imageViewerModalClose.addEventListener('click', closeImageModal);
+                        domRefs.imageViewerModal.addEventListener('click', outsideClickHandler);
+                    } else {
+                        console.error('Image viewer modal elements not found.');
+                        // Fallback to old behavior if modal elements are missing
+                        window.open(attachment.url, '_blank');
+                    }
+                });
+            }
+        }
+
+        // Add event listener for delete button
+        const deleteBtn = attachmentEl.querySelector('.attachment-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                if (confirm(`Are you sure you want to delete "${attachment.name}"?`)) {
+                    try {
+                        await attachmentsAPI.deleteAttachment(attachment.id);
+                        attachmentEl.remove(); // Remove from UI
+                        // Check if container is empty after deletion
+                        if (container.children.length === 0) {
+                            container.style.display = 'none';
+                        }
+                        // Optionally, refresh the note or page if timestamps/etc. are affected server-side
+                        // For now, just removing the element is fine.
+                    } catch (error) {
+                        console.error('Error deleting attachment:', error);
+                        alert('Failed to delete attachment: ' + error.message);
+                    }
+                }
+            });
+        }
+    });
+
+    if (typeof feather !== 'undefined' && feather.replace) {
+        feather.replace();
+    }
+}
+
+/**
+ * Shows a generic input modal and returns a Promise with the entered value.
+ * @param {string} title - The title for the modal.
+ * @param {string} [defaultValue=''] - The default value for the input field.
+ * @returns {Promise<string|null>} A Promise that resolves with the input string or null if canceled.
+ */
+function showGenericInputModal(title, defaultValue = '') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('generic-input-modal');
+        const titleEl = document.getElementById('generic-input-modal-title');
+        const inputEl = document.getElementById('generic-input-modal-input');
+        const okBtn = document.getElementById('generic-input-modal-ok');
+        const cancelBtn = document.getElementById('generic-input-modal-cancel');
+
+        if (!modal || !titleEl || !inputEl || !okBtn || !cancelBtn) {
+            console.error('Generic input modal elements not found!');
+            resolve(prompt(title, defaultValue)); // Fallback to native prompt if modal elements are missing
+            return;
+        }
+
+        titleEl.textContent = title;
+        inputEl.value = defaultValue;
+        modal.classList.add('active');
+        inputEl.focus();
+        inputEl.select();
+
+        const closeHandler = (value) => {
+            modal.classList.remove('active');
+            // Remove event listeners to prevent multiple resolutions
+            okBtn.removeEventListener('click', okHandler);
+            inputEl.removeEventListener('keypress', enterKeyHandler);
+            cancelBtn.removeEventListener('click', cancelHandler);
+            document.removeEventListener('keydown', escapeKeyHandler);
+            resolve(value);
+        };
+
+        const okHandler = () => {
+            closeHandler(inputEl.value);
+        };
+
+        const cancelHandler = () => {
+            closeHandler(null);
+        };
+
+        const enterKeyHandler = (e) => {
+            if (e.key === 'Enter') {
+                okHandler();
+            }
+        };
+        
+        const escapeKeyHandler = (e) => {
+            if (e.key === 'Escape') {
+                cancelHandler();
+            }
+        };
+
+        okBtn.addEventListener('click', okHandler);
+        inputEl.addEventListener('keypress', enterKeyHandler);
+        cancelBtn.addEventListener('click', cancelHandler);
+        document.addEventListener('keydown', escapeKeyHandler); // Listen on document for Escape key
+    });
+}
+
+/**
+ * Shows a generic confirmation modal and returns a Promise with a boolean.
+ * @param {string} title - The title for the modal.
+ * @param {string} message - The confirmation message.
+ * @returns {Promise<boolean>} A Promise that resolves with true if OK is clicked, false otherwise.
+ */
+function showGenericConfirmModal(title, message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('generic-confirm-modal');
+        const titleEl = document.getElementById('generic-confirm-modal-title');
+        const messageEl = document.getElementById('generic-confirm-modal-message');
+        const okBtn = document.getElementById('generic-confirm-modal-ok');
+        const cancelBtn = document.getElementById('generic-confirm-modal-cancel');
+
+        if (!modal || !titleEl || !messageEl || !okBtn || !cancelBtn) {
+            console.error('Generic confirm modal elements not found!');
+            resolve(confirm(message)); // Fallback to native confirm
+            return;
+        }
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        modal.classList.add('active');
+        okBtn.focus();
+
+        const closeHandler = (value) => {
+            modal.classList.remove('active');
+            okBtn.removeEventListener('click', okHandler);
+            cancelBtn.removeEventListener('click', cancelHandler);
+            document.removeEventListener('keydown', escapeKeyHandler);
+            resolve(value);
+        };
+
+        const okHandler = () => {
+            closeHandler(true);
+        };
+
+        const cancelHandler = () => {
+            closeHandler(false);
+        };
+        
+        const escapeKeyHandler = (e) => {
+            if (e.key === 'Escape') {
+                cancelHandler();
+            }
+        };
+
+        okBtn.addEventListener('click', okHandler);
+        cancelBtn.addEventListener('click', cancelHandler);
+        document.addEventListener('keydown', escapeKeyHandler);
+    });
+}
+
+// Export functions and DOM references for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        domRefs,
+        renderNote,
+        parseAndRenderContent,
+        extractPropertiesFromContent,
+        renderInlineProperties,
+        renderProperties,
+        displayNotes,
+        buildNoteTree,
+        updatePageTitle,
+        updatePageList,
+        updateActivePageLink,
+        showPropertyInNote,
+        removePropertyFromNote,
+        renderTransclusion,
+        switchToEditMode,
+        switchToRenderedMode,
+        initializeDragAndDrop,
+        handleNoteDrop,
+        calendarWidget,
+        renderAttachments,
+        showGenericInputModal,
+        showGenericConfirmModal,
+        focusOnNote,
+        showAllNotes
+    };
+} else {
+    // For browser environment, attach to window
+    window.ui = {
+        domRefs,
+        renderNote,
+        parseAndRenderContent,
+        extractPropertiesFromContent,
+        renderInlineProperties,
+        renderProperties,
+        displayNotes,
+        buildNoteTree,
+        updatePageTitle,
+        updatePageList,
+        updateActivePageLink,
+        showPropertyInNote,
+        removePropertyFromNote,
+        renderTransclusion,
+        switchToEditMode,
+        switchToRenderedMode,
+        initializeDragAndDrop,
+        handleNoteDrop,
+        calendarWidget,
+        renderAttachments,
+        showGenericInputModal,
+        showGenericConfirmModal,
+        focusOnNote,
+        showAllNotes
+    };
+}
+
+function renderNoteProperties(note) {
+    if (!note.properties || Object.keys(note.properties).length === 0) {
+        return '';
+    }
+
+    const propertyItems = Object.entries(note.properties).map(([name, value]) => {
+        // Handle tag::tag format
+        if (name.startsWith('tag::')) {
+            const tagName = name.substring(5);
+            return `<span class="property-item tag">
+                <span class="property-key">#</span>
+                <span class="property-value">${tagName}</span>
+            </span>`;
+        }
+
+        // Handle list properties
+        if (Array.isArray(value)) {
+            return value.map(v => `
+                <span class="property-item">
+                    <span class="property-key">${name}</span>
+                    <span class="property-value">${v}</span>
+                </span>
+            `).join('');
+        }
+
+        // Handle regular properties
+        return `<span class="property-item">
+            <span class="property-key">${name}</span>
+            <span class="property-value">${value}</span>
+        </span>`;
+    }).join('');
+
+    return `<div class="note-properties">${propertyItems}</div>`;
+}
+
+// Add CSS for tags
+const tagStyles = document.createElement('style');
+tagStyles.textContent = `
+    .property-item.tag {
+        background-color: var(--color-bg-tertiary);
+        color: var(--color-accent);
+        border-radius: var(--border-radius-sm);
+        padding: 2px 6px;
+        margin-right: 4px;
+        font-size: 0.9em;
+    }
+    
+    .property-item.tag .property-key {
+        color: var(--color-accent);
+        font-weight: var(--font-weight-medium);
+    }
+    
+    .property-item.tag .property-value {
+        color: var(--color-accent);
+    }
+    
+    .note-properties {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 4px;
+        font-size: 0.9em;
+    }
+`;
+document.head.appendChild(tagStyles);
+
+// Add CSS for context menu
+const contextMenuStyles = document.createElement('style');
+contextMenuStyles.textContent = `
+    .bullet-context-menu {
+        background: var(--color-bg-primary);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        padding: 4px 0;
+        z-index: 1000;
+    }
+
+    .bullet-context-menu .menu-item {
+        padding: 8px 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--color-text-primary);
+    }
+
+    .bullet-context-menu .menu-item:hover {
+        background: var(--color-bg-secondary);
+    }
+
+    .bullet-context-menu .menu-item i {
+        width: 16px;
+        height: 16px;
+    }
+`;
+document.head.appendChild(contextMenuStyles);
+
+// Add CSS for sidebar toggle buttons
+const sidebarToggleStyles = document.createElement('style');
+sidebarToggleStyles.textContent = `
+    .sidebar-toggle-btn {
+        position: fixed;
+        top: 16px;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border-radius: 50%;
+        color: var(--color-text-primary);
+        background: var(--color-bg-secondary);
+        border: 1px solid var(--color-border-primary);
+        box-shadow: var(--shadow-md);
+        z-index: 1030;
+        transition: all 0.3s ease;
+        font-size: 18px;
+        font-weight: bold;
+        font-family: monospace;
+    }
+
+    .sidebar-toggle-btn:hover {
+        color: var(--color-accent);
+        background: var(--color-bg-tertiary);
+        border-color: var(--color-accent);
+        transform: scale(1.1);
+    }
+
+    /* Always visible positioning - independent of sidebar state */
+    #toggle-left-sidebar-btn {
+        left: 16px;
+        transition: left 0.3s ease, all 0.2s ease;
+    }
+
+    #toggle-right-sidebar-btn {
+        right: 16px;
+        transition: right 0.3s ease, all 0.2s ease;
+    }
+
+    /* When sidebars are expanded, move buttons inward */
+    body:not(.left-sidebar-collapsed) #toggle-left-sidebar-btn {
+        left: 284px; /* 300px sidebar width - 16px */
+    }
+
+    body:not(.right-sidebar-collapsed) #toggle-right-sidebar-btn {
+        right: 284px; /* 300px sidebar width - 16px */
+    }
+
+    /* Ensure buttons are always on top and visible */
+    .sidebar-toggle-btn {
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+`;
+document.head.appendChild(sidebarToggleStyles);
+
+// Update sidebar toggle buttons
+function updateSidebarToggleButtons() {
+    const leftToggle = domRefs.toggleLeftSidebarBtn;
+    const rightToggle = domRefs.toggleRightSidebarBtn;
+
+    // Check if sidebar is initially collapsed to set correct icon
+    const isLeftCollapsed = domRefs.leftSidebar && domRefs.leftSidebar.classList.contains('collapsed');
+    const isRightCollapsed = domRefs.rightSidebar && domRefs.rightSidebar.classList.contains('collapsed');
+
+    if (leftToggle) {
+        leftToggle.textContent = isLeftCollapsed ? '☰' : '✕'; // Unicode hamburger menu and X
+        leftToggle.title = isLeftCollapsed ? 'Show left sidebar' : 'Hide left sidebar';
+    }
+
+    if (rightToggle) {
+        rightToggle.textContent = isRightCollapsed ? '☰' : '✕'; // Unicode hamburger menu and X
+        rightToggle.title = isRightCollapsed ? 'Show right sidebar' : 'Hide right sidebar';
+    }
+}
+
+// Call this after DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    updateSidebarToggleButtons();
+});
+
+// Add CSS for copy feedback
+const copyFeedbackStyles = document.createElement('style');
+copyFeedbackStyles.textContent = `
+    .copy-feedback {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--color-accent);
+        color: white;
+        padding: 8px 16px;
+        border-radius: var(--border-radius);
+        animation: fadeInOut 2s ease-in-out;
+        z-index: 2000;
+    }
+
+    @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateY(10px); }
+        15% { opacity: 1; transform: translateY(0); }
+        85% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-10px); }
+    }
+`;
+document.head.appendChild(copyFeedbackStyles);
+
+// Add CSS for improved TODO rendering
+const todoStyles = document.createElement('style');
+todoStyles.textContent = `
+    .task-container {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+        border-radius: var(--border-radius-md);
+        margin: 6px 0;
+        border-left: 4px solid transparent;
+        background: var(--color-bg-secondary);
+        box-shadow: none;
+        transition: background-color 0.2s ease;
+    }
+
+    .task-container:hover {
+        background-color: var(--color-bg-tertiary);
+    }
+
+    .task-container.todo {
+        border-left-color: #3b82f6; /* Blue */
+    }
+
+    .task-container.done {
+        border-left-color: #10b981; /* Green */
+    }
+
+    .task-container.cancelled {
+        border-left-color: #6b7280; /* Gray */
+    }
+
+    .task-checkbox-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .task-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--color-accent);
+        border-radius: 3px;
+        transition: transform 0.2s ease;
+    }
+
+    .task-checkbox:hover {
+        transform: scale(1.1);
+    }
+
+    .task-checkbox:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .task-status-badge {
+        font-size: 9px;
+        font-weight: bold;
+        padding: 3px 8px;
+        border-radius: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        white-space: nowrap;
+        box-shadow: none;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .task-status-badge.todo {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .task-status-badge.done {
+        background: #10b981;
+        color: white;
+    }
+
+    .task-status-badge.cancelled {
+        background: #6b7280;
+        color: white;
+    }
+
+    .task-content {
+        flex: 1;
+        min-width: 0;
+        line-height: 1.5;
+        font-size: 0.95em;
+    }
+
+    .task-content.done-text {
+        text-decoration: line-through;
+        opacity: 0.75;
+        color: var(--color-text-secondary);
+    }
+
+    .task-content.cancelled-text {
+        text-decoration: line-through;
+        opacity: 0.6;
+        color: var(--color-text-tertiary);
+    }
+
+    /* Dark theme adjustments */
+    [data-theme="dark"] .task-container {
+        background: var(--color-bg-primary);
+    }
+
+    [data-theme="dark"] .task-container:hover {
+        background: var(--color-bg-secondary);
+    }
+`;
+document.head.appendChild(todoStyles);
+
+// Add CSS for inline properties
+const propertiesStyles = document.createElement('style');
+propertiesStyles.textContent = `
+    .inline-properties {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .property-inline {
+        display: inline-flex;
+        align-items: center;
+        background: var(--color-bg-tertiary);
+        border-radius: var(--border-radius-sm);
+        padding: 2px 6px;
+        font-size: 0.85em;
+        border: 1px solid var(--color-border-primary);
+    }
+
+    .property-key {
+        color: var(--color-accent);
+        font-weight: var(--font-weight-medium);
+        margin-right: 2px;
+    }
+
+    .property-value {
+        color: var(--color-text-primary);
+    }
+
+    .property-tag {
+        background: var(--color-accent);
+        color: white;
+        border-radius: var(--border-radius-sm);
+        padding: 2px 6px;
+        font-size: 0.85em;
+        font-weight: var(--font-weight-medium);
+    }
+
+    /* Dark theme adjustments */
+    [data-theme="dark"] .property-inline {
+        background: var(--color-bg-secondary);
+        border-color: var(--color-border-secondary);
+    }
+
+    /* Note mode styles */
+    .note-content {
+        transition: all 0.2s ease;
+        border-radius: var(--border-radius-sm);
+        min-height: 20px;
+    }
+
+    .note-content.rendered-mode {
+        cursor: pointer;
+        padding: 4px 8px;
+    }
+
+    .note-content.rendered-mode:hover {
+        background: var(--color-bg-secondary);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .note-content.edit-mode {
+        background: var(--color-bg-primary);
+        border: 2px solid var(--color-accent);
+        padding: 6px 8px;
+        outline: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .note-content.edit-mode:focus {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    /* Empty state placeholder */
+    .note-content.rendered-mode:empty::before {
+        content: attr(data-placeholder);
+        color: var(--color-text-tertiary);
+        font-style: italic;
+    }
+
+    .note-content.edit-mode:empty::before {
+        content: attr(data-placeholder);
+        color: var(--color-text-tertiary);
+        font-style: italic;
+    }
+
+    /* Transclusion styles */
+    .transcluded-content {
+        margin: 8px 0;
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--border-radius-md);
+        background: var(--color-bg-secondary);
+        overflow: hidden;
+    }
+
+    .transclusion-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--color-bg-tertiary);
+        border-bottom: 1px solid var(--color-border-primary);
+        font-size: 0.85em;
+    }
+
+    .transclusion-icon {
+        font-size: 0.9em;
+    }
+
+    .transclusion-link {
+        color: var(--color-accent);
+        text-decoration: none;
+        font-weight: var(--font-weight-medium);
+        transition: color 0.2s ease;
+    }
+
+    .transclusion-link:hover {
+        color: var(--color-accent-hover);
+        text-decoration: underline;
+    }
+
+    .transclusion-body {
+        padding: 12px;
+        font-size: 0.95em;
+    }
+
+    .transclusion-placeholder {
+        color: var(--color-text-tertiary);
+        font-style: italic;
+        padding: 4px 8px;
+        background: var(--color-bg-secondary);
+        border-radius: var(--border-radius-sm);
+        border: 1px dashed var(--color-border-primary);
+    }
+
+    .transclusion-placeholder.error {
+        color: var(--color-error, #dc2626);
+        background: rgba(220, 38, 38, 0.1);
+        border-color: var(--color-error, #dc2626);
+    }
+
+    /* Dark theme adjustments for transclusions */
+    [data-theme="dark"] .transcluded-content {
+        background: var(--color-bg-primary);
+        border-color: var(--color-border-secondary);
+    }
+
+    [data-theme="dark"] .transclusion-header {
+        background: var(--color-bg-secondary);
+        border-color: var(--color-border-secondary);
+    }
+    
+    /* Note Attachments Styles */
+    .note-attachments {
+        display: none; /* Hidden by default, shown by JS if attachments exist */
+        flex-direction: column;
+        gap: var(--space-2); /* 8px */
+        margin-top: var(--space-3); /* 12px */
+        padding-top: var(--space-3);
+        border-top: 1px solid var(--color-border-secondary);
+    }
+
+    .note-attachment-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3); /* 12px */
+        padding: var(--space-2); /* 8px */
+        background-color: var(--color-bg-secondary);
+        border-radius: var(--border-radius-md);
+        border: 1px solid var(--color-border-primary);
+    }
+
+    .attachment-preview {
+        flex-shrink: 0;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--color-bg-tertiary);
+        border-radius: var(--border-radius-sm);
+        overflow: hidden;
+    }
+
+    .attachment-preview-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .attachment-preview-icon {
+        width: 24px;
+        height: 24px;
+        color: var(--color-text-secondary);
+    }
+
+    .attachment-info {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1); /* 4px */
+        overflow: hidden; /* For text truncation */
+    }
+
+    .attachment-name {
+        font-weight: var(--font-weight-medium);
+        color: var(--color-text-primary);
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .attachment-name:hover {
+        color: var(--color-accent);
+        text-decoration: underline;
+    }
+
+    .attachment-meta {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-secondary);
+    }
+
+    .attachment-delete-btn {
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        color: var(--color-text-tertiary);
+        cursor: pointer;
+        padding: var(--space-1);
+        border-radius: var(--border-radius-sm);
+    }
+
+    .attachment-delete-btn:hover {
+        color: var(--color-error, #dc2626);
+        background-color: rgba(220, 38, 38, 0.1);
+    }
+
+    [data-theme="dark"] .note-attachment-item {
+        background-color: var(--color-bg-primary);
+        border-color: var(--color-border-secondary);
+    }
+
+    [data-theme="dark"] .attachment-preview {
+        background-color: var(--color-bg-secondary);
+    }
+
+    /* Page Title Gear Visibility */
+    .page-title-container .page-title-gear {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .page-title-container:hover .page-title-gear {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* New Full Width Button for Sidebar */
+    .action-button.full-width-button {
+        width: 100%;
+        justify-content: center; /* Center icon and text */
+    }
+
+    /* Page Search Modal Specific Styles */
+    .page-search-modal-content {
+        min-height: 300px; /* Ensure enough space for results */
+        max-height: 70vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #page-search-modal-input {
+        margin-bottom: var(--space-4); /* Space between input and results */
+    }
+
+    .page-search-results-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        overflow-y: auto;
+        flex-grow: 1; /* Allow list to take available space */
+        border: 1px solid var(--color-border-secondary);
+        border-radius: var(--border-radius-md);
+    }
+
+    .page-search-results-list li {
+        padding: var(--space-2) var(--space-3);
+        cursor: pointer;
+        border-bottom: 1px solid var(--color-border-secondary);
+        transition: background-color var(--transition-fast);
+    }
+
+    .page-search-results-list li:last-child {
+        border-bottom: none;
+    }
+
+    .page-search-results-list li:hover {
+        background-color: var(--color-bg-tertiary);
+    }
+
+    .page-search-results-list li.selected {
+        background-color: var(--color-accent);
+        color: white;
+    }
+
+    .page-search-results-list .create-new-option span {
+        font-style: italic;
+        color: var(--color-text-secondary);
+    }
+    
+    .page-search-results-list li.selected .create-new-option span {
+        color: white; /* Ensure contrast when selected */
+    }
+
+    /* Generic Modal Styles (for replacing prompts) */
+    .generic-modal {
+        display: none; /* Hidden by default */
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5); /* Slightly lighter backdrop */
+        z-index: var(--z-index-modal, 1050); 
+        align-items: center;
+        justify-content: center;
+    }
+
+    .generic-modal.active {
+        display: flex;
+    }
+
+    .generic-modal-content {
+        background: var(--color-bg-primary);
+        padding: var(--space-6); 
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-md); /* Use updated flatter shadow */
+        width: 90%;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4); 
+    }
+
+    #generic-input-modal-title {
+        font-size: var(--font-size-lg);
+        font-weight: var(--font-weight-semibold);
+        margin-bottom: var(--space-2);
+        color: var(--color-text-primary);
+    }
+
+    .generic-modal-input-field {
+        width: 100%;
+        padding: var(--space-3); /* 12px */
+        border: 1px solid var(--color-border-primary);
+        border-radius: var(--border-radius-md);
+        font-size: var(--font-size-base);
+    }
+
+    .generic-modal-input-field:focus {
+        outline: none;
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 2px var(--color-accent-transparent, rgba(59, 130, 246, 0.2));
+    }
+
+    .generic-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--space-3); /* 12px */
+        margin-top: var(--space-4);
+    }
+    /* Assuming .button, .primary-button, .secondary-button classes exist in style.css */
+    /* If not, add basic button styling here */
+    .generic-modal-actions .button {
+        padding: var(--space-2) var(--space-4);
+        border-radius: var(--border-radius-md);
+        font-weight: var(--font-weight-medium);
+        cursor: pointer;
+        border: 1px solid var(--color-border-primary);
+        box-shadow: none; /* Flatter buttons */
+    }
+    .generic-modal-actions .primary-button {
+        background-color: var(--color-accent);
+        border-color: var(--color-accent);
+        color: white;
+    }
+    .generic-modal-actions .primary-button:hover {
+        background-color: var(--color-accent-hover);
+        border-color: var(--color-accent-hover);
+    }
+    .generic-modal-actions .secondary-button {
+        background-color: var(--color-bg-secondary);
+        color: var(--color-text-primary);
+    }
+    .generic-modal-actions .secondary-button:hover {
+        background-color: var(--color-bg-tertiary);
+    }
+    .generic-modal-actions .danger-button {
+        background-color: var(--color-error, #dc2626); 
+        border-color: var(--color-error, #dc2626);
+        color: white;
+    }
+    .generic-modal-actions .danger-button:hover {
+        background-color: var(--color-error-hover, #b91c1c); 
+        border-color: var(--color-error-hover, #b91c1c);
+    }
+`;
+document.head.appendChild(propertiesStyles);
+
+/**
+ * Focuses on a specific note by hiding all other notes at the same level and above
+ * @param {string} noteId - The ID of the note to focus on
+ */
+function focusOnNote(noteId) {
+    const allNotes = document.querySelectorAll('.note-item');
+    const focusedNote = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
+    const notesContainer = document.getElementById('notes-container');
+    
+    if (!focusedNote) return;
+    
+    // Clear any existing focus states
+    allNotes.forEach(note => {
+        note.classList.remove('note-hidden');
+        note.classList.remove('note-focused');
+    });
+    
+    // Find all descendant notes of the focused note
+    const descendants = new Set();
+    
+    function collectDescendants(noteEl) {
+        const childrenContainer = noteEl.querySelector('.note-children');
+        if (childrenContainer) {
+            const childNotes = childrenContainer.querySelectorAll('.note-item');
+            childNotes.forEach(child => {
+                descendants.add(child);
+                collectDescendants(child);
+            });
+        }
+    }
+    
+    collectDescendants(focusedNote);
+    
+    // Hide all notes except the focused one and its descendants
+    allNotes.forEach(note => {
+        if (note === focusedNote || descendants.has(note)) {
+            // Keep visible
+            note.classList.add('note-focused');
+        } else {
+            // Hide this note
+            note.classList.add('note-hidden');
+        }
+    });
+    
+    // Add class to container and create show all button
+    notesContainer.classList.add('has-focused-notes');
+    
+    // Remove existing show all button if any
+    const existingBtn = notesContainer.querySelector('.show-all-notes-btn');
+    if (existingBtn) {
+        existingBtn.remove();
+    }
+    
+    // Create and add show all button
+    const showAllBtn = document.createElement('button');
+    showAllBtn.className = 'show-all-notes-btn';
+    showAllBtn.textContent = '← Show All Notes';
+    showAllBtn.addEventListener('click', showAllNotes);
+    
+    // Insert at the beginning of the container
+    notesContainer.insertBefore(showAllBtn, notesContainer.firstChild);
+}
+
+/**
+ * Shows all notes and clears focus state
+ */
+function showAllNotes() {
+    const allNotes = document.querySelectorAll('.note-item');
+    const notesContainer = document.getElementById('notes-container');
+    
+    allNotes.forEach(note => {
+        note.classList.remove('note-hidden');
+        note.classList.remove('note-focused');
+    });
+    
+    notesContainer.classList.remove('has-focused-notes');
+    
+    // Remove show all button
+    const showAllBtn = notesContainer.querySelector('.show-all-notes-btn');
+    if (showAllBtn) {
+        showAllBtn.remove();
+    }
+}
