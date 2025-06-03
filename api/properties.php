@@ -100,6 +100,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         send_json_response(['error' => 'Invalid JSON'], 400);
     }
     
+    // Check if this is a delete action
+    if (isset($input['action']) && $input['action'] === 'delete') {
+        // Handle property deletion via POST
+        $entityType = isset($input['entity_type']) ? htmlspecialchars($input['entity_type'], ENT_QUOTES, 'UTF-8') : null;
+        $rawEntityId = isset($input['entity_id']) ? $input['entity_id'] : null;
+        $entityId = filter_var($rawEntityId, FILTER_VALIDATE_INT, ['options' => ['default' => null]]);
+        $name = isset($input['name']) ? htmlspecialchars($input['name'], ENT_QUOTES, 'UTF-8') : null;
+        
+        error_log("[DEBUG API DELETE via POST] Parsed Params: entityType='{$entityType}', rawEntityId='{$rawEntityId}', filteredEntityId='".($entityId === null ? "NULL" : ($entityId === false ? "FALSE" : $entityId))."', name='{$name}'");
+
+        if ($entityType === null || $entityId === null || $entityId === false || $name === null) {
+            $errorDetails = "entityType: " . ($entityType === null ? "MISSING" : "OK") . 
+                            ", entityId (filtered): " . ($entityId === null ? "MISSING_OR_INVALID_RAW" : ($entityId === false ? "INVALID_INT" : "OK")) .
+                            ", name: " . ($name === null ? "MISSING" : "OK");
+            error_log("[DEBUG API DELETE via POST] Condition for missing params triggered. Details: " . $errorDetails);
+            send_json_response(['success' => false, 'error' => 'DELETE Error: Missing or invalid parameters. Details: ' . $errorDetails], 400);
+        }
+        
+        try {
+            $pdo = get_db_connection();
+            
+            if ($entityType === 'page') {
+                $stmt = $pdo->prepare("DELETE FROM Properties WHERE page_id = ? AND note_id IS NULL AND name = ?");
+            } else {
+                $stmt = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND page_id IS NULL AND name = ?");
+            }
+            $stmt->execute([$entityId, $name]);
+            
+            send_json_response(['success' => true]);
+            
+        } catch (Exception $e) {
+            send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    // Handle regular property creation/update
     // Get entity_type and entity_id from the JSON input, not $_POST
     $entityType = isset($input['entity_type']) ? htmlspecialchars($input['entity_type'], ENT_QUOTES, 'UTF-8') : null;
     $entityId = isset($input['entity_id']) ? filter_var($input['entity_id'], FILTER_VALIDATE_INT) : null;
@@ -158,45 +194,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
-    }
-}
-
-// DELETE /api/properties.php?entity_type=note&entity_id=123&name=property_name
-if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-    error_log("[DEBUG API DELETE] Processing DELETE request. Actual method: " . $_SERVER['REQUEST_METHOD']);
-    error_log("[DEBUG API DELETE] GET Params: " . print_r($_GET, true));
-
-    $entityType = isset($_GET['entity_type']) ? htmlspecialchars($_GET['entity_type'], ENT_QUOTES, 'UTF-8') : null;
-    // Use filter_var for entityId to get NULL if not set, or false on failure, which helps debugging
-    $rawEntityId = isset($_GET['entity_id']) ? $_GET['entity_id'] : null;
-    $entityId = filter_var($rawEntityId, FILTER_VALIDATE_INT, ['options' => ['default' => null]]); // Default to null to distinguish from 0
-    
-    $name = isset($_GET['name']) ? htmlspecialchars($_GET['name'], ENT_QUOTES, 'UTF-8') : null;
-    
-    error_log("[DEBUG API DELETE] Parsed Params: entityType='{$entityType}', rawEntityId='{$rawEntityId}', filteredEntityId='".($entityId === null ? "NULL" : ($entityId === false ? "FALSE" : $entityId))."', name='{$name}'");
-
-    if ($entityType === null || $entityId === null || $entityId === false || $name === null) {
-        $errorDetails = "entityType: " . ($entityType === null ? "MISSING" : "OK") . 
-                        ", entityId (filtered): " . ($entityId === null ? "MISSING_OR_INVALID_RAW" : ($entityId === false ? "INVALID_INT" : "OK")) .
-                        ", name: " . ($name === null ? "MISSING" : "OK");
-        error_log("[DEBUG API DELETE] Condition for missing params triggered. Details: " . $errorDetails);
-        send_json_response(['success' => false, 'error' => 'DELETE Error: Missing or invalid parameters. Details: ' . $errorDetails], 400);
-    }
-    
-    try {
-        $pdo = get_db_connection();
-        
-        if ($entityType === 'page') {
-            $stmt = $pdo->prepare("DELETE FROM Properties WHERE page_id = ? AND note_id IS NULL AND name = ?");
-        } else {
-            $stmt = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND page_id IS NULL AND name = ?");
-        }
-        $stmt->execute([$entityId, $name]);
-        
-        send_json_response(['success' => true]);
-        
-    } catch (Exception $e) {
         send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
     }
 }

@@ -224,10 +224,13 @@ const propertiesAPI = {
      * @returns {Promise<null>}
      */
     deleteProperty: (entityType, entityId, propertyName) => {
-        const bodyWithMethodOverride = {
-            _method: 'DELETE'
+        const deleteData = {
+            action: 'delete',
+            entity_type: entityType,
+            entity_id: entityId,
+            name: propertyName
         };
-        return apiRequest(`properties.php?entity_type=${entityType}&entity_id=${entityId}&name=${encodeURIComponent(propertyName)}`, 'POST', bodyWithMethodOverride);
+        return apiRequest('properties.php', 'POST', deleteData);
     }
 };
 

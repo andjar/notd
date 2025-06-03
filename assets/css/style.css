@@ -1131,6 +1131,19 @@ textarea:focus {
     color: var(--ls-accent-10); /* Match .property-item.tag .property-key */
     font-weight: var(--ls-font-weight-medium);
     white-space: nowrap;
+    padding: 4px 6px;
+    border-radius: var(--ls-border-radius-low);
+    transition: background-color var(--ls-transition-fast);
+}
+
+#page-properties-list .page-property-key:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+#page-properties-list .page-property-key:focus {
+    outline: 2px solid var(--ls-accent-10);
+    outline-offset: 1px;
+    background-color: var(--ls-primary-background-color);
 }
 
 #page-properties-list .page-property-separator {
@@ -1141,20 +1154,26 @@ textarea:focus {
 #page-properties-list .page-property-value {
     color: var(--ls-accent-10); /* Match .property-item.tag .property-value */
     font-weight: var(--ls-font-weight-medium);
-    background-color: transparent;
-    padding: 0;
-    border: none;
+    background-color: var(--ls-primary-background-color);
+    padding: 4px 8px;
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-low);
     outline: none;
-    min-width: auto;
+    min-width: 50px; /* Minimum width for easier editing */
+    width: auto;
+    font-size: inherit;
+    font-family: inherit;
 }
 
-#page-properties-list .page-property-value[contenteditable="true"]:focus {
+#page-properties-list .page-property-value:focus {
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
     background-color: var(--ls-primary-background-color);
     color: var(--ls-primary-text-color);
-    padding: 2px 4px;
-    box-shadow: 0 0 0 1px var(--ls-accent-10);
-    border-radius: var(--ls-border-radius-low);
-    opacity: 1;
+}
+
+#page-properties-list .page-property-value:hover {
+    border-color: var(--ls-accent-9);
 }
 
 #page-properties-list .page-property-delete {

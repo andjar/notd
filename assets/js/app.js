@@ -1108,61 +1108,137 @@ function displayPageProperties(properties) {
         return;
     }
 
+    // Clear existing content and event listeners
     pagePropertiesList.innerHTML = '';
+    
     if (!properties || Object.keys(properties).length === 0) {
         console.log('No properties to display in modal');
-        // Optional: Display a message like "No properties set for this page."
-        // pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
+        pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
         return;
     }
 
     Object.entries(properties).forEach(([key, value]) => {
         if (Array.isArray(value)) {
-            value.forEach(singleValue => {
+            // Handle array properties - show each value separately but allow editing
+            value.forEach((singleValue, index) => {
                 const propItem = document.createElement('div');
                 propItem.className = 'page-property-item';
-                // For multi-value, display each value separately
                 propItem.innerHTML = `
-                    <span class="page-property-key">${key}</span>
+                    <span class="page-property-key" contenteditable="true" data-original-key="${key}" data-is-array="true" data-array-index="${index}">${key}</span>
                     <span class="page-property-separator">:</span>
-                    <span class="page-property-value" data-property="${key}" data-value="${singleValue}">${singleValue}</span>
-                    <button class="page-property-delete" data-property="${key}" title="Delete all '${key}' properties">×</button>
+                    <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${singleValue}" value="${singleValue}" />
+                    <button class="page-property-delete" data-property="${key}" data-array-index="${index}" title="Delete this ${key} value">×</button>
                 `;
                 pagePropertiesList.appendChild(propItem);
             });
         } else {
+            // Handle single value properties
             const propItem = document.createElement('div');
             propItem.className = 'page-property-item';
-            // For single values, show key: value with editable value
             propItem.innerHTML = `
-                <span class="page-property-key">${key}</span>
+                <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
                 <span class="page-property-separator">:</span>
-                <span class="page-property-value" contenteditable="true" data-property="${key}">${value || ''}</span>
-                <button class="page-property-delete" data-property="${key}">×</button>
+                <input type="text" class="page-property-value" data-property="${key}" data-original-value="${value || ''}" value="${value || ''}" />
+                <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
             `;
             pagePropertiesList.appendChild(propItem);
         }
     });
 
-    // Add event listeners for property editing
-    pagePropertiesList.addEventListener('blur', async (e) => {
-        if (e.target.matches('.page-property-value')) {
-            const key = e.target.dataset.property;
-            const value = e.target.textContent.trim();
-            await updatePageProperty(key, value);
-        }
-    }, true);
+    // Remove any existing event listeners to prevent duplicates
+    const existingListener = pagePropertiesList._propertyEventListener;
+    if (existingListener) {
+        pagePropertiesList.removeEventListener('blur', existingListener, true);
+        pagePropertiesList.removeEventListener('keydown', existingListener);
+        pagePropertiesList.removeEventListener('click', existingListener);
+        pagePropertiesList.removeEventListener('change', existingListener);
+    }
 
-    // Add event listeners for property deletion
-    pagePropertiesList.addEventListener('click', async (e) => {
-        if (e.target.matches('.page-property-delete')) {
+    // Create new event listener function
+    const propertyEventListener = async (e) => {
+        // Handle property value editing (change event for input fields)
+        if (e.type === 'change' && e.target.matches('.page-property-value')) {
             const key = e.target.dataset.property;
-            const confirmed = await ui.showGenericConfirmModal('Delete Property', `Are you sure you want to delete the property "${key}"?`);
-            if (confirmed) {
-                await deletePageProperty(key);
+            const newValue = e.target.value.trim();
+            const originalValue = e.target.dataset.originalValue;
+            const arrayIndex = e.target.dataset.arrayIndex;
+            
+            if (newValue !== originalValue) {
+                if (arrayIndex !== undefined) {
+                    // Handle array property value update
+                    await updateArrayPropertyValue(key, parseInt(arrayIndex), newValue);
+                } else {
+                    // Handle single property value update
+                    await updatePageProperty(key, newValue);
+                }
+                e.target.dataset.originalValue = newValue;
             }
         }
-    });
+        
+        // Handle property key editing (blur event)
+        else if (e.type === 'blur' && e.target.matches('.page-property-key')) {
+            const originalKey = e.target.dataset.originalKey;
+            const newKey = e.target.textContent.trim();
+            const isArray = e.target.dataset.isArray === 'true';
+            const arrayIndex = e.target.dataset.arrayIndex;
+            
+            if (newKey !== originalKey && newKey !== '') {
+                if (isArray) {
+                    // For array properties, we need to handle renaming more carefully
+                    await renameArrayPropertyKey(originalKey, newKey, parseInt(arrayIndex));
+                } else {
+                    // Handle single property key rename
+                    await renamePropertyKey(originalKey, newKey);
+                }
+                e.target.dataset.originalKey = newKey;
+            } else if (newKey === '') {
+                // Reset to original key if empty
+                e.target.textContent = originalKey;
+            }
+        }
+        
+        // Handle Enter key to commit changes
+        else if (e.type === 'keydown' && e.key === 'Enter') {
+            if (e.target.matches('.page-property-value')) {
+                // For input fields, trigger change event
+                e.target.dispatchEvent(new Event('change', { bubbles: true }));
+            } else if (e.target.matches('.page-property-key')) {
+                // For contenteditable keys, trigger blur
+                e.target.blur();
+            }
+        }
+        
+        // Handle property deletion (click event)
+        else if (e.type === 'click' && e.target.matches('.page-property-delete')) {
+            const key = e.target.dataset.property;
+            const arrayIndex = e.target.dataset.arrayIndex;
+            
+            let confirmMessage;
+            if (arrayIndex !== undefined) {
+                confirmMessage = `Are you sure you want to delete this "${key}" value?`;
+            } else {
+                confirmMessage = `Are you sure you want to delete the property "${key}"?`;
+            }
+            
+            const confirmed = await ui.showGenericConfirmModal('Delete Property', confirmMessage);
+            if (confirmed) {
+                if (arrayIndex !== undefined) {
+                    await deleteArrayPropertyValue(key, parseInt(arrayIndex));
+                } else {
+                    await deletePageProperty(key);
+                }
+            }
+        }
+    };
+
+    // Store reference to the listener for cleanup
+    pagePropertiesList._propertyEventListener = propertyEventListener;
+
+    // Add event listeners
+    pagePropertiesList.addEventListener('blur', propertyEventListener, true);
+    pagePropertiesList.addEventListener('keydown', propertyEventListener);
+    pagePropertiesList.addEventListener('click', propertyEventListener);
+    pagePropertiesList.addEventListener('change', propertyEventListener); // Add change listener for input fields
 
     if (typeof feather !== 'undefined' && feather.replace) {
         feather.replace(); // Ensure Feather icons are re-applied
@@ -1170,67 +1246,214 @@ function displayPageProperties(properties) {
 }
 
 /**
- * Adds a new page property
- * @param {string} key - Property key
- * @param {string} value - Property value
+ * Renames a property key
+ * @param {string} oldKey - Original property key
+ * @param {string} newKey - New property key
  */
-async function addPageProperty(key, value) {
+async function renamePropertyKey(oldKey, newKey) {
     if (!currentPageId) return;
 
     try {
+        // Get current properties
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        const value = properties[oldKey];
+        
+        if (value === undefined) {
+            console.warn(`Property ${oldKey} not found for renaming`);
+            return;
+        }
+
+        // Delete old property and create new one
+        await propertiesAPI.deleteProperty('page', currentPageId, oldKey);
         await propertiesAPI.setProperty({
             entity_type: 'page',
             entity_id: currentPageId,
-            name: key,
+            name: newKey,
             value: value
         });
 
+        // Refresh display
+        const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(updatedProperties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(updatedProperties, ui.domRefs.pagePropertiesContainer);
+        }
+    } catch (error) {
+        console.error('Error renaming property key:', error);
+        alert('Failed to rename property');
+        // Refresh to restore original state
         const properties = await propertiesAPI.getProperties('page', currentPageId);
         displayPageProperties(properties);
-    } catch (error) {
-        console.error('Error adding page property:', error);
-        alert('Failed to add property');
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(properties, ui.domRefs.pagePropertiesContainer);
+        }
     }
 }
 
 /**
- * Updates a page property
- * @param {string} key - Property key
- * @param {string} value - New property value
+ * Renames a property key for array properties
+ * @param {string} oldKey - Original property key
+ * @param {string} newKey - New property key  
+ * @param {number} arrayIndex - Index of the array value being edited
  */
-async function updatePageProperty(key, value) {
+async function renameArrayPropertyKey(oldKey, newKey, arrayIndex) {
     if (!currentPageId) return;
 
     try {
-        await propertiesAPI.setProperty({
-            entity_type: 'page',
-            entity_id: currentPageId,
-            name: key,
-            value: value
-        });
+        // Get current properties
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        const values = properties[oldKey];
+        
+        if (!Array.isArray(values)) {
+            console.warn(`Property ${oldKey} is not an array for renaming`);
+            return;
+        }
 
+        // For array properties, we need to move all values to the new key
+        await propertiesAPI.deleteProperty('page', currentPageId, oldKey);
+        
+        // Add all values under the new key
+        for (const value of values) {
+            await propertiesAPI.setProperty({
+                entity_type: 'page',
+                entity_id: currentPageId,
+                name: newKey,
+                value: value
+            });
+        }
+
+        // Refresh display
+        const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(updatedProperties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(updatedProperties, ui.domRefs.pagePropertiesContainer);
+        }
+    } catch (error) {
+        console.error('Error renaming array property key:', error);
+        alert('Failed to rename property');
+        // Refresh to restore original state
         const properties = await propertiesAPI.getProperties('page', currentPageId);
         displayPageProperties(properties);
-    } catch (error) {
-        console.error('Error updating page property:', error);
-        alert('Failed to update property');
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(properties, ui.domRefs.pagePropertiesContainer);
+        }
     }
 }
 
 /**
- * Deletes a page property
- * @param {string} key - Property key to delete
+ * Updates a specific value in an array property
+ * @param {string} key - Property key
+ * @param {number} arrayIndex - Index of the value to update
+ * @param {string} newValue - New value
  */
-async function deletePageProperty(key) {
+async function updateArrayPropertyValue(key, arrayIndex, newValue) {
     if (!currentPageId) return;
 
     try {
+        // Get current properties
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        const values = properties[key];
+        
+        if (!Array.isArray(values) || arrayIndex >= values.length) {
+            console.warn(`Invalid array property update: ${key}[${arrayIndex}]`);
+            return;
+        }
+
+        // Delete all values for this key
         await propertiesAPI.deleteProperty('page', currentPageId, key);
+        
+        // Re-add all values with the updated one
+        for (let i = 0; i < values.length; i++) {
+            const value = i === arrayIndex ? newValue : values[i];
+            await propertiesAPI.setProperty({
+                entity_type: 'page',
+                entity_id: currentPageId,
+                name: key,
+                value: value
+            });
+        }
+
+        // Refresh display
+        const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(updatedProperties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(updatedProperties, ui.domRefs.pagePropertiesContainer);
+        }
+    } catch (error) {
+        console.error('Error updating array property value:', error);
+        alert('Failed to update property value');
+        // Refresh to restore original state
         const properties = await propertiesAPI.getProperties('page', currentPageId);
         displayPageProperties(properties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(properties, ui.domRefs.pagePropertiesContainer);
+        }
+    }
+}
+
+/**
+ * Deletes a specific value from an array property
+ * @param {string} key - Property key
+ * @param {number} arrayIndex - Index of the value to delete
+ */
+async function deleteArrayPropertyValue(key, arrayIndex) {
+    if (!currentPageId) return;
+
+    try {
+        // Get current properties
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        const values = properties[key];
+        
+        if (!Array.isArray(values) || arrayIndex >= values.length) {
+            console.warn(`Invalid array property deletion: ${key}[${arrayIndex}]`);
+            return;
+        }
+
+        // Delete all values for this key
+        await propertiesAPI.deleteProperty('page', currentPageId, key);
+        
+        // Re-add all values except the one being deleted
+        const remainingValues = values.filter((_, i) => i !== arrayIndex);
+        for (const value of remainingValues) {
+            await propertiesAPI.setProperty({
+                entity_type: 'page',
+                entity_id: currentPageId,
+                name: key,
+                value: value
+            });
+        }
+
+        // Refresh display
+        const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(updatedProperties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(updatedProperties, ui.domRefs.pagePropertiesContainer);
+        }
     } catch (error) {
-        console.error('Error deleting page property:', error);
-        alert('Failed to delete property');
+        console.error('Error deleting array property value:', error);
+        alert('Failed to delete property value');
+        // Refresh to restore original state
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(properties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(properties, ui.domRefs.pagePropertiesContainer);
+        }
     }
 }
 
@@ -1608,3 +1831,83 @@ notesContainer.addEventListener('drop', async (e) => {
         console.error('Error handling file uploads:', error);
     }
 });
+
+/**
+ * Adds a new page property
+ * @param {string} key - Property key
+ * @param {string} value - Property value
+ */
+async function addPageProperty(key, value) {
+    if (!currentPageId) return;
+
+    try {
+        await propertiesAPI.setProperty({
+            entity_type: 'page',
+            entity_id: currentPageId,
+            name: key,
+            value: value
+        });
+
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(properties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(properties, ui.domRefs.pagePropertiesContainer);
+        }
+    } catch (error) {
+        console.error('Error adding page property:', error);
+        alert('Failed to add property');
+    }
+}
+
+/**
+ * Updates a page property
+ * @param {string} key - Property key
+ * @param {string} value - New property value
+ */
+async function updatePageProperty(key, value) {
+    if (!currentPageId) return;
+
+    try {
+        await propertiesAPI.setProperty({
+            entity_type: 'page',
+            entity_id: currentPageId,
+            name: key,
+            value: value
+        });
+
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(properties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(properties, ui.domRefs.pagePropertiesContainer);
+        }
+    } catch (error) {
+        console.error('Error updating page property:', error);
+        alert('Failed to update property');
+    }
+}
+
+/**
+ * Deletes a page property
+ * @param {string} key - Property key to delete
+ */
+async function deletePageProperty(key) {
+    if (!currentPageId) return;
+
+    try {
+        await propertiesAPI.deleteProperty('page', currentPageId, key);
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        displayPageProperties(properties);
+        
+        // Also update inline properties display
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(properties, ui.domRefs.pagePropertiesContainer);
+        }
+    } catch (error) {
+        console.error('Error deleting page property:', error);
+        alert('Failed to delete property');
+    }
+}
