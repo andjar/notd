@@ -33,16 +33,33 @@ function validateNoteData($data) {
 // Helper function to parse properties from note content
 function parsePropertiesFromContent($content) {
     $properties = [];
-    // Match {property::value} patterns
+    // Match {property::value} patterns (existing logic)
     if (preg_match_all('/\{([^:]+)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
         foreach ($matches as $match) {
             $propertyName = trim($match[1]);
             $propertyValue = trim($match[2]);
             if (!empty($propertyName) && !empty($propertyValue)) {
+                // Allow multiple properties with the same name (e.g. multiple tags)
                 $properties[] = [
                     'name' => $propertyName,
                     'value' => $propertyValue
                 ];
+            }
+        }
+    }
+
+    // Match [[PageName]] patterns for 'links_to_page'
+    $linkedPages = []; // To track unique page names for links
+    if (preg_match_all('/\[\[([^\]]+)\]\]/', $content, $linkMatches, PREG_SET_ORDER)) {
+        foreach ($linkMatches as $linkMatch) {
+            $pageName = trim($linkMatch[1]);
+            // Avoid adding empty page names or self-references like [[]]
+            if (!empty($pageName) && !in_array($pageName, $linkedPages)) {
+                $properties[] = [
+                    'name' => 'links_to_page',
+                    'value' => $pageName
+                ];
+                $linkedPages[] = $pageName; // Add to tracker
             }
         }
     }
@@ -333,8 +350,8 @@ if ($method === 'GET') {
         
         // If content was updated, parse and save properties
         if (isset($input['content'])) {
-            // First, delete existing properties for this note
-            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ?");
+            // First, delete existing non-internal properties for this note
+            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND internal = 0");
             $stmtDeleteProps->execute([$noteId]);
             
             // Parse and save new properties from updated content
