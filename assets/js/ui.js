@@ -944,7 +944,10 @@ function updatePageList(pages, activePageName) {
         return a.name.localeCompare(b.name);
     });
 
-    pages.forEach(page => {
+    // Limit to 7 most recent pages
+    const limitedPages = pages.slice(0, 7);
+
+    limitedPages.forEach(page => {
         const link = document.createElement('a');
         link.href = '#';
         link.dataset.pageName = page.name;

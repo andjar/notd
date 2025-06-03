@@ -300,6 +300,7 @@ body {
     text-decoration: none;
     display: block;
     line-height: 1.2;
+    text-align: center;
 }
 
 /* Calendar Widget */
@@ -2119,13 +2120,13 @@ textarea:focus {
 /* Expanded State: "X" in the top corner of the open sidebar.
    These styles apply when the sidebar is not collapsed (i.e., body classes are absent). */
 #toggle-left-sidebar-btn {
-    top: 10px;
-    left: calc(var(--ls-left-sidebar-width) - 42px); /* Position X inside the left sidebar */
+    top: 15px;
+    left: 15px; /* Position X inside the left sidebar */
 }
 
 #toggle-right-sidebar-btn {
-    top: 10px;
-    right: calc(var(--ls-left-sidebar-width) - 42px); /* Position X inside the right sidebar */
+    top: 15px;
+    right: 15px; /* Position X inside the right sidebar */
     /* Assumes right sidebar uses --ls-left-sidebar-width for its width */
 }
 
@@ -2139,4 +2140,165 @@ body.left-sidebar-collapsed #toggle-left-sidebar-btn {
 body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     top: 15px;
     right: 15px; /* Top-right corner of the screen */
+}
+
+/* Backlinks Section Styles */
+.backlinks-section {
+    margin-top: var(--ls-space-8);
+    padding-top: var(--ls-space-6);
+    border-top: 2px solid var(--ls-secondary-border-color);
+    background-color: var(--ls-secondary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    padding: var(--ls-space-6);
+}
+
+.backlinks-section h4 {
+    font-size: var(--ls-font-size-lg);
+    font-weight: var(--ls-font-weight-semibold);
+    color: var(--ls-primary-text-color);
+    margin-bottom: var(--ls-space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+}
+
+#backlinks-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ls-space-3);
+}
+
+.backlink-item {
+    background-color: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    padding: var(--ls-space-4);
+    transition: all var(--ls-transition-fast);
+    position: relative;
+    overflow: hidden;
+}
+
+.backlink-item:hover {
+    background-color: var(--ls-tertiary-background-color);
+    border-color: var(--ls-accent-9);
+    box-shadow: var(--ls-shadow-sm);
+    transform: translateY(-1px);
+}
+
+.backlink-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: var(--ls-accent-10);
+    opacity: 0;
+    transition: opacity var(--ls-transition-fast);
+}
+
+.backlink-item:hover::before {
+    opacity: 1;
+}
+
+.backlink-item .page-link {
+    display: inline-block;
+    font-weight: var(--ls-font-weight-semibold);
+    color: var(--ls-link-text-color);
+    text-decoration: none;
+    font-size: var(--ls-font-size-base);
+    margin-bottom: var(--ls-space-2);
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+    transition: all var(--ls-transition-fast);
+    position: relative;
+}
+
+.backlink-item .page-link:hover {
+    color: var(--ls-link-text-hover-color);
+    background-color: var(--ls-accent-3);
+    text-decoration: none;
+    transform: translateX(2px);
+}
+
+.backlink-item .page-link:visited {
+    color: var(--ls-link-text-color);
+}
+
+.backlink-snippet {
+    font-size: var(--ls-font-size-sm);
+    color: var(--ls-secondary-text-color);
+    line-height: 1.5;
+    padding: var(--ls-space-2);
+    background-color: var(--ls-tertiary-background-color);
+    border-radius: var(--ls-border-radius-low);
+    border-left: 3px solid var(--ls-guideline-color);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.backlink-snippet code,
+.backlink-snippet .wiki-link {
+    background-color: var(--ls-accent-3);
+    color: var(--ls-accent-11);
+    padding: 1px 4px;
+    border-radius: var(--ls-border-radius-low);
+    font-weight: var(--ls-font-weight-medium);
+    font-size: 0.9em;
+}
+
+/* Empty state for backlinks */
+#backlinks-container:empty::after {
+    content: 'No backlinks found for this page.';
+    display: block;
+    color: var(--ls-tertiary-text-color);
+    font-style: italic;
+    text-align: center;
+    padding: var(--ls-space-6);
+    background-color: var(--ls-tertiary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    border: 1px dashed var(--ls-border-color);
+}
+
+/* Dark theme adjustments for backlinks */
+[data-theme="dark"] .backlinks-section {
+    background-color: var(--ls-primary-background-color);
+    border-top-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] .backlink-item {
+    background-color: var(--ls-secondary-background-color);
+    border-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] .backlink-item:hover {
+    background-color: var(--ls-tertiary-background-color);
+    border-color: var(--ls-accent-9);
+}
+
+[data-theme="dark"] .backlink-snippet {
+    background-color: var(--ls-quaternary-background-color);
+    border-left-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] #backlinks-container:empty::after {
+    background-color: var(--ls-secondary-background-color);
+    border-color: var(--ls-secondary-border-color);
+}
+
+/* Responsive adjustments for backlinks */
+@media (max-width: 768px) {
+    .backlinks-section {
+        padding: var(--ls-space-4);
+        margin-top: var(--ls-space-6);
+    }
+    
+    .backlink-item {
+        padding: var(--ls-space-3);
+    }
+    
+    .backlinks-section h4 {
+        font-size: var(--ls-font-size-base);
+    }
 }
