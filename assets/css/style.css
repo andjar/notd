@@ -138,7 +138,8 @@
     --thread-line-width: 1px;               /* Thread thickness */
     
     /* Vertical positioning */
-    --controls-top-offset: calc(var(--ls-space-1) + 2px); /* Align with content */
+    /* Ensure this next line is and stays commented out or removed */
+    /* --controls-top-offset: calc( (2 * var(--ls-space-1)) + (var(--ls-font-size-base) * 0.8) - (var(--control-icon-size) / 2) ); */
 }
 
 /* Dark Theme (LogSeq inspired) */
@@ -461,6 +462,7 @@ body {
 
 .note-item {
     position: relative;
+    --controls-top-offset: calc( (2 * var(--ls-space-1)) + (var(--ls-font-size-base) * 0.8) - (var(--control-icon-size) / 2) ); /* Base for text notes */
 }
 
 .note-header-row {
@@ -2022,4 +2024,13 @@ textarea:focus {
 
 .notes-container.has-focused-notes .show-all-notes-btn {
     display: block;
+}
+
+.note-item:not(.collapsed) > .note-header-row .note-controls .note-collapse-arrow > svg.feather {
+    transform: rotate(90deg); /* Down when expanded */
+}
+
+/* Task-specific vertical alignment for bullet/arrow */
+.note-item:has(.task-container) {
+    --controls-top-offset: calc( (2 * var(--ls-space-1)) + 23px - (var(--control-icon-size) / 2) ); /* Align bullet/arrow with checkbox center */
 }
