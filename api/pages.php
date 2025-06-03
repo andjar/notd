@@ -20,7 +20,33 @@ function addJournalProperty($pdo, $pageId) {
     $stmt->execute([$pageId]);
 }
 
+// Helper function to resolve page alias
+function resolvePageAlias($pdo, $pageData, $followAliases = true) {
+    if (!$followAliases || !$pageData || empty($pageData['alias'])) {
+        return $pageData;
+    }
+    
+    try {
+        // Follow the alias
+        $stmt = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
+        $stmt->execute([$pageData['alias']]);
+        $aliasedPage = $stmt->fetch();
+        
+        if ($aliasedPage) {
+            // Recursively resolve in case the aliased page also has an alias
+            return resolvePageAlias($pdo, $aliasedPage, true);
+        }
+    } catch (PDOException $e) {
+        error_log("Error resolving alias for page {$pageData['id']}: " . $e->getMessage());
+    }
+    
+    // Return original page if alias resolution fails
+    return $pageData;
+}
+
 if ($method === 'GET') {
+    $followAliases = !isset($_GET['follow_aliases']) || $_GET['follow_aliases'] !== '0';
+    
     if (isset($_GET['id'])) {
         // Get page by ID
         $stmt = $pdo->prepare("SELECT * FROM Pages WHERE id = ?");
@@ -28,7 +54,8 @@ if ($method === 'GET') {
         $page = $stmt->fetch();
         
         if ($page) {
-            echo json_encode(['success' => true, 'data' => $page]);
+            $resolvedPage = resolvePageAlias($pdo, $page, $followAliases);
+            echo json_encode(['success' => true, 'data' => $resolvedPage]);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Page not found']);
@@ -72,7 +99,8 @@ if ($method === 'GET') {
                 }
                 
                 $pdo->commit();
-                echo json_encode(['success' => true, 'data' => $page]);
+                $resolvedPage = resolvePageAlias($pdo, $page, $followAliases);
+                echo json_encode(['success' => true, 'data' => $resolvedPage]);
             } else {
                 // Try to create journal page if name matches pattern
                 $today_journal_name_pattern = '/^\d{4}-\d{2}-\d{2}$/';
@@ -89,7 +117,8 @@ if ($method === 'GET') {
                     $page = $stmt_new->fetch();
                     
                     $pdo->commit();
-                    echo json_encode(['success' => true, 'data' => $page]);
+                    $resolvedPage = resolvePageAlias($pdo, $page, $followAliases);
+                    echo json_encode(['success' => true, 'data' => $resolvedPage]);
                 } else {
                     $pdo->commit();
                     http_response_code(404);
@@ -103,7 +132,8 @@ if ($method === 'GET') {
                 $stmt_refetch = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
                 $stmt_refetch->execute([$_GET['name']]);
                 $page = $stmt_refetch->fetch();
-                echo json_encode(['success' => true, 'data' => $page]);
+                $resolvedPage = resolvePageAlias($pdo, $page, $followAliases);
+                echo json_encode(['success' => true, 'data' => $resolvedPage]);
             } else {
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Failed to create page: ' . $e->getMessage()]);
@@ -126,7 +156,16 @@ if ($method === 'GET') {
             $stmt = $pdo->query("SELECT id, name, alias, updated_at FROM Pages ORDER BY updated_at DESC, name ASC");
         }
         $pages = $stmt->fetchAll();
-        echo json_encode(['success' => true, 'data' => $pages]);
+        
+        // Apply alias resolution to all pages if requested
+        if ($followAliases) {
+            $resolvedPages = array_map(function($page) use ($pdo, $followAliases) {
+                return resolvePageAlias($pdo, $page, $followAliases);
+            }, $pages);
+            echo json_encode(['success' => true, 'data' => $resolvedPages]);
+        } else {
+            echo json_encode(['success' => true, 'data' => $pages]);
+        }
     }
 } elseif ($method === 'POST') {
     if (!isset($input['name']) || empty(trim($input['name']))) {

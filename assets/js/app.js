@@ -167,7 +167,7 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
         if (ui.domRefs.pagePropertiesContainer) ui.domRefs.pagePropertiesContainer.innerHTML = ''; // Clear inline props
 
         // Fetch page data (which might create it if it's a new journal page)
-        const pageData = await pagesAPI.getPage(pageName);
+        const pageData = await pagesAPI.getPageByName(pageName);
         if (!pageData) {
             throw new Error(`Page "${pageName}" not found and could not be created.`);
         }
@@ -234,7 +234,7 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
  */
 async function fetchAndDisplayPages(activePageName) {
     try {
-        const pages = await pagesAPI.getAllPages();
+        const pages = await pagesAPI.getPages();
         updatePageList(pages, activePageName || currentPageName);
     } catch (error) {
         console.error('Error fetching pages:', error);
@@ -975,7 +975,7 @@ document.body.addEventListener('click', async (e) => {
         
         try {
             // Try to load the page first
-            const existingPage = await pagesAPI.getPage(pageName);
+            const existingPage = await pagesAPI.getPageByName(pageName);
             
             if (existingPage && existingPage.id) {
                 // Page exists, load it normally
@@ -1582,7 +1582,7 @@ async function openSearchOrCreatePageModal() {
         return;
     }
     try {
-        allPagesForSearch = await pagesAPI.getAllPages({ excludeJournal: true });
+        allPagesForSearch = await pagesAPI.getPages({ excludeJournal: true });
     } catch (error) {
         console.error('Failed to fetch pages for search modal:', error);
         allPagesForSearch = []; // Continue with empty list if fetch fails

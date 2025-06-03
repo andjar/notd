@@ -1847,10 +1847,24 @@ textarea:focus {
     font-weight: var(--ls-font-weight-medium);
 }
 
+.property-inline.alias-property {
+    background: var(--ls-accent-01);
+    border: 1px solid var(--ls-accent-05);
+}
+
+.property-inline.alias-property .property-key {
+    color: var(--ls-accent-10);
+}
+
 /* Dark theme adjustments for properties */
 [data-theme="dark"] .property-inline {
     background: var(--ls-secondary-background-color);
     border-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] .property-inline.alias-property {
+    background: var(--ls-accent-02);
+    border-color: var(--ls-accent-07);
 }
 
 /* Note Content Mode Styles */

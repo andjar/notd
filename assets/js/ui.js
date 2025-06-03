@@ -527,6 +527,16 @@ function parseAndRenderContent(rawContent) {
             return `<span class="property-favorite">⭐</span>`;
         }
         
+        // Handle alias properties specially - render as page links
+        if (trimmedKey.toLowerCase() === 'alias') {
+            return `<span class="property-inline alias-property">
+                <span class="property-key">alias::</span>
+                <span class="page-link-bracket">[[</span>
+                <a href="#" class="page-link" data-page-name="${trimmedValue}">${trimmedValue}</a>
+                <span class="page-link-bracket">]]</span>
+            </span>`;
+        }
+        
         // Handle tag properties specially
         if (trimmedKey.toLowerCase() === 'tag' || trimmedKey.startsWith('tag-')) {
             return `<span class="property-tag">#${trimmedValue}</span>`;

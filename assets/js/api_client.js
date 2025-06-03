@@ -97,58 +97,69 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
 const pagesAPI = {
     /**
      * Get all pages
-     * @param {Object} [options={}] - Options for filtering pages
-     * @param {boolean} [options.excludeJournal=false] - Whether to exclude journal pages from the results
-     * @returns {Promise<Array<{id: number, name: string, created_at: string, updated_at: string}>>}
+     * @param {Object} [options={}] - Query options
+     * @param {boolean} [options.excludeJournal=false] - Whether to exclude journal pages
+     * @param {boolean} [options.followAliases=true] - Whether to follow page aliases
+     * @returns {Promise<Array>} Array of page objects
      */
-    getAllPages: (options = {}) => {
-        const queryParams = new URLSearchParams();
-        if (options.excludeJournal) {
-            queryParams.append('exclude_journal', '1');
-        }
-        const queryString = queryParams.toString();
+    getPages: (options = {}) => {
+        const params = new URLSearchParams();
+        if (options.excludeJournal) params.append('exclude_journal', '1');
+        if (options.followAliases === false) params.append('follow_aliases', '0');
+        
+        const queryString = params.toString();
         return apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
     },
 
     /**
-     * Get a page by name or ID
-     * @param {string|number} identifier - Page name or ID
-     * @returns {Promise<{id: number, name: string, created_at: string, updated_at: string}>}
+     * Get page by ID
+     * @param {number} id - Page ID
+     * @param {Object} [options={}] - Query options
+     * @param {boolean} [options.followAliases=true] - Whether to follow page aliases
+     * @returns {Promise<Object>} Page object
      */
-    getPage: (identifier) => apiRequest(`pages.php?${typeof identifier === 'number' ? 'id' : 'name'}=${encodeURIComponent(identifier)}`),
+    getPageById: (id, options = {}) => {
+        const params = new URLSearchParams({ id: id.toString() });
+        if (options.followAliases === false) params.append('follow_aliases', '0');
+        
+        return apiRequest(`pages.php?${params.toString()}`);
+    },
+
+    /**
+     * Get page by name
+     * @param {string} name - Page name
+     * @param {Object} [options={}] - Query options
+     * @param {boolean} [options.followAliases=true] - Whether to follow page aliases
+     * @returns {Promise<Object>} Page object
+     */
+    getPageByName: (name, options = {}) => {
+        const params = new URLSearchParams({ name });
+        if (options.followAliases === false) params.append('follow_aliases', '0');
+        
+        return apiRequest(`pages.php?${params.toString()}`);
+    },
 
     /**
      * Create a new page
-     * @param {{name: string}} pageData - Page data
-     * @returns {Promise<{id: number, name: string, created_at: string, updated_at: string}>}
+     * @param {{name: string, alias?: string}} pageData - Page data
+     * @returns {Promise<Object>} Created page object
      */
     createPage: (pageData) => apiRequest('pages.php', 'POST', pageData),
 
     /**
      * Update a page
-     * @param {number} pageId - Page ID
-     * @param {{name: string}} pageData - Updated page data
-     * @returns {Promise<{id: number, name: string, created_at: string, updated_at: string}>}
+     * @param {number} id - Page ID
+     * @param {{name?: string, alias?: string}} pageData - Updated page data
+     * @returns {Promise<Object>} Updated page object
      */
-    updatePage: (pageId, pageData) => {
-        const bodyWithMethodOverride = {
-            ...pageData,
-            _method: 'PUT'
-        };
-        return apiRequest(`pages.php?id=${pageId}`, 'POST', bodyWithMethodOverride);
-    },
+    updatePage: (id, pageData) => apiRequest(`pages.php?id=${id}`, 'PUT', pageData),
 
     /**
      * Delete a page
-     * @param {number} pageId - Page ID
-     * @returns {Promise<null>}
+     * @param {number} id - Page ID
+     * @returns {Promise<Object>} Delete confirmation
      */
-    deletePage: (pageId) => {
-        const bodyWithMethodOverride = {
-            _method: 'DELETE'
-        };
-        return apiRequest(`pages.php?id=${pageId}`, 'POST', bodyWithMethodOverride);
-    }
+    deletePage: (id) => apiRequest(`pages.php?id=${id}`, 'DELETE')
 };
 
 /**

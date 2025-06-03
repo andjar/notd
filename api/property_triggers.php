@@ -5,6 +5,7 @@
 // global $propertyTriggers; // This line is removed
 $propertyTriggers = [
     'internal' => 'handleInternalPropertyTriggerForNote',
+    'alias' => 'handleAliasPropertyTrigger',
     // Add other triggers here, e.g.
     // 'remember_me' => 'handleRememberMePropertyTrigger',
 ];
@@ -22,6 +23,26 @@ function handleInternalPropertyTriggerForNote($pdo, $entityType, $entityId, $pro
         } catch (PDOException $e) {
             // Log error, but don't let trigger failure stop main operation usually
             error_log("Error in handleInternalPropertyTriggerForNote: " . $e->getMessage());
+        }
+    }
+}
+
+function handleAliasPropertyTrigger($pdo, $entityType, $entityId, $propertyName, $propertyValue) {
+    if ($entityType === 'page' && $propertyName === 'alias') {
+        try {
+            $aliasValue = trim($propertyValue);
+            $aliasValue = empty($aliasValue) ? null : $aliasValue;
+            
+            $stmtUpdatePage = $pdo->prepare("UPDATE Pages SET alias = :aliasValue WHERE id = :pageId");
+            $stmtUpdatePage->bindParam(':aliasValue', $aliasValue, PDO::PARAM_STR);
+            $stmtUpdatePage->bindParam(':pageId', $entityId, PDO::PARAM_INT);
+            $stmtUpdatePage->execute();
+            
+            // Log for debugging
+            error_log("Updated Pages.alias for page $entityId to '$aliasValue' based on property value: $propertyValue");
+        } catch (PDOException $e) {
+            // Log error, but don't let trigger failure stop main operation usually
+            error_log("Error in handleAliasPropertyTrigger: " . $e->getMessage());
         }
     }
 }

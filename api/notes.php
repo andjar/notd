@@ -68,6 +68,41 @@ function savePropertiesForNote($pdo, $noteId, $properties) {
     }
 }
 
+// Helper function to save page-level properties from note content
+function savePagePropertiesFromContent($pdo, $pageId, $content) {
+    // Parse page-level properties (like alias) from content
+    $pageProperties = [];
+    if (preg_match_all('/\{(alias)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $match) {
+            $propertyName = trim($match[1]);
+            $propertyValue = trim($match[2]);
+            if (!empty($propertyName) && !empty($propertyValue)) {
+                $pageProperties[] = [
+                    'name' => $propertyName,
+                    'value' => $propertyValue
+                ];
+            }
+        }
+    }
+    
+    // Save page properties
+    foreach ($pageProperties as $property) {
+        try {
+            // Save the property to the page
+            $stmt = $pdo->prepare("
+                REPLACE INTO Properties (page_id, note_id, name, value, internal)
+                VALUES (?, NULL, ?, ?, 0)
+            ");
+            $stmt->execute([$pageId, $property['name'], $property['value']]);
+            
+            // Dispatch triggers (this will trigger our alias handler)
+            dispatchPropertyTriggers($pdo, 'page', $pageId, $property['name'], $property['value']);
+        } catch (Exception $e) {
+            error_log("Error saving page property {$property['name']} for page {$pageId}: " . $e->getMessage());
+        }
+    }
+}
+
 if ($method === 'GET') {
     $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
 
@@ -223,6 +258,9 @@ if ($method === 'GET') {
         $properties = parsePropertiesFromContent($input['content']);
         savePropertiesForNote($pdo, $noteId, $properties);
         
+        // Parse and save page properties from note content
+        savePagePropertiesFromContent($pdo, (int)$input['page_id'], $input['content']);
+        
         // Fetch the created note
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
         $stmt->execute([$noteId]);
@@ -303,6 +341,9 @@ if ($method === 'GET') {
             $properties = parsePropertiesFromContent($input['content']);
             savePropertiesForNote($pdo, $noteId, $properties);
         }
+        
+        // Parse and save page properties from updated content
+        savePagePropertiesFromContent($pdo, (int)$existingNote['page_id'], $input['content']);
         
         // Fetch updated note
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
