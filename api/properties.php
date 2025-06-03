@@ -1,7 +1,8 @@
 <?php
 require_once '../config.php';
 require_once 'db_connect.php';
-require_once 'property_triggers.php'; // Re-enabled
+require_once 'property_triggers.php';
+require_once 'property_auto_internal.php';
 
 header('Content-Type: application/json');
 
@@ -108,14 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $entityId = filter_var($rawEntityId, FILTER_VALIDATE_INT, ['options' => ['default' => null]]);
         $name = isset($input['name']) ? htmlspecialchars($input['name'], ENT_QUOTES, 'UTF-8') : null;
         
-        error_log("[DEBUG API DELETE via POST] Parsed Params: entityType='{$entityType}', rawEntityId='{$rawEntityId}', filteredEntityId='".($entityId === null ? "NULL" : ($entityId === false ? "FALSE" : $entityId))."', name='{$name}'");
-
         if ($entityType === null || $entityId === null || $entityId === false || $name === null) {
-            $errorDetails = "entityType: " . ($entityType === null ? "MISSING" : "OK") . 
-                            ", entityId (filtered): " . ($entityId === null ? "MISSING_OR_INVALID_RAW" : ($entityId === false ? "INVALID_INT" : "OK")) .
-                            ", name: " . ($name === null ? "MISSING" : "OK");
-            error_log("[DEBUG API DELETE via POST] Condition for missing params triggered. Details: " . $errorDetails);
-            send_json_response(['success' => false, 'error' => 'DELETE Error: Missing or invalid parameters. Details: ' . $errorDetails], 400);
+            send_json_response(['success' => false, 'error' => 'DELETE Error: Missing or invalid parameters'], 400);
         }
         
         try {
@@ -136,7 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     // Handle regular property creation/update
-    // Get entity_type and entity_id from the JSON input, not $_POST
     $entityType = isset($input['entity_type']) ? htmlspecialchars($input['entity_type'], ENT_QUOTES, 'UTF-8') : null;
     $entityId = isset($input['entity_id']) ? filter_var($input['entity_id'], FILTER_VALIDATE_INT) : null;
     
@@ -170,6 +164,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $validatedName = $propertyData['name'];
         $validatedValue = $propertyData['value'];
         
+        // Check property definitions to determine internal status
+        $finalInternal = determinePropertyInternalStatus($pdo, $validatedName, $internal);
+        
         // For single values, use REPLACE to handle both insert and update
         if ($entityType === 'page') {
             $stmt = $pdo->prepare("
@@ -182,13 +179,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 VALUES (?, NULL, ?, ?, ?)
             ");
         }
-        $stmt->execute([$entityId, $validatedName, $validatedValue, $internal]);
+        $stmt->execute([$entityId, $validatedName, $validatedValue, $finalInternal]);
         
         // Dispatch triggers
         dispatchPropertyTriggers($pdo, $entityType, $entityId, $validatedName, $validatedValue);
         
         $pdo->commit();
-        send_json_response(['success' => true, 'property' => ['name' => $validatedName, 'value' => $validatedValue, 'internal' => $internal]]);
+        send_json_response(['success' => true, 'property' => ['name' => $validatedName, 'value' => $validatedValue, 'internal' => $finalInternal]]);
         
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
