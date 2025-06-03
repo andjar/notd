@@ -14,8 +14,8 @@ function isJournalPage($name) {
 // Helper function to add journal property
 function addJournalProperty($pdo, $pageId) {
     $stmt = $pdo->prepare("
-        INSERT INTO Properties (entity_type, entity_id, name, value)
-        VALUES ('page', ?, 'type', 'journal')
+        INSERT INTO Properties (page_id, name, value)
+        VALUES (?, 'type', 'journal')
     ");
     $stmt->execute([$pageId]);
 }
@@ -58,6 +58,11 @@ if ($method === 'GET') {
                         $insert_stmt->execute([$_GET['name']]);
                         $page_id = $pdo->lastInsertId();
                         
+                        // Add journal property if it's a journal page
+                        if (isJournalPage($_GET['name'])) {
+                            addJournalProperty($pdo, $page_id);
+                        }
+                        
                         $stmt_new = $pdo->prepare("SELECT * FROM Pages WHERE id = ?");
                         $stmt_new->execute([$page_id]);
                         $page = $stmt_new->fetch();
@@ -75,6 +80,9 @@ if ($method === 'GET') {
                     $insert_stmt = $pdo->prepare("INSERT INTO Pages (name, updated_at) VALUES (?, CURRENT_TIMESTAMP)");
                     $insert_stmt->execute([$_GET['name']]);
                     $page_id = $pdo->lastInsertId();
+                    
+                    // Add journal property since this is definitely a journal page
+                    addJournalProperty($pdo, $page_id);
                     
                     $stmt_new = $pdo->prepare("SELECT * FROM Pages WHERE id = ?");
                     $stmt_new->execute([$page_id]);
@@ -143,8 +151,7 @@ if ($method === 'GET') {
             if (isJournalPage($name)) {
                 $stmt_check_prop = $pdo->prepare("
                     SELECT 1 FROM Properties 
-                    WHERE entity_type = 'page' 
-                    AND entity_id = ? 
+                    WHERE page_id = ? 
                     AND name = 'type' 
                     AND value = 'journal'
                 ");
@@ -257,7 +264,7 @@ if ($method === 'GET') {
         if ($updated_page) {
             $newName = $updated_page['name'];
             if (isJournalPage($newName)) {
-                $stmt_check_prop = $pdo->prepare("SELECT 1 FROM Properties WHERE entity_type = 'page' AND entity_id = ? AND name = 'type' AND value = 'journal'");
+                $stmt_check_prop = $pdo->prepare("SELECT 1 FROM Properties WHERE page_id = ? AND name = 'type' AND value = 'journal'");
                 $stmt_check_prop->execute([$page_id]);
                 if (!$stmt_check_prop->fetch()) {
                     addJournalProperty($pdo, $page_id);
@@ -265,7 +272,7 @@ if ($method === 'GET') {
             } else {
                 // Optional: If it was a journal page and now it is not, remove the property
                 // For now, we don't remove it automatically to prevent accidental data loss if renaming is temporary.
-                // $stmt_remove_prop = $pdo->prepare("DELETE FROM Properties WHERE entity_type = 'page' AND entity_id = ? AND name = 'type' AND value = 'journal'");
+                // $stmt_remove_prop = $pdo->prepare("DELETE FROM Properties WHERE page_id = ? AND name = 'type' AND value = 'journal'");
                 // $stmt_remove_prop->execute([$page_id]);
             }
         }

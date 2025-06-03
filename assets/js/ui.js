@@ -1443,9 +1443,9 @@ function renderPageInlineProperties(properties, targetContainer) {
 
     Object.entries(properties).forEach(([key, value]) => {
         // Skip specific properties like 'type: journal' from inline display
-        if ((key === 'type' && value === 'journal')) {
-            return;
-        }
+        // if ((key === 'type' && value === 'journal')) {
+        //     return;
+        // }
 
         hasVisibleProperties = true;
 
