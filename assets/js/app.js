@@ -13,6 +13,7 @@ let notesForCurrentPage = []; // Flat list of notes with properties
 window.currentPageId = null;
 window.notesForCurrentPage = [];
 window.notesAPI = notesAPI;
+window.currentFocusedNoteId = null; // Initialize focused note ID
 
 /**
  * Safely adds an event listener to an element if it exists
@@ -97,6 +98,16 @@ Object.entries(criticalElements).forEach(([name, element]) => {
  * @param {boolean} [updateHistory=true] - Whether to update browser history
  */
 async function loadPage(pageName, focusFirstNote = false, updateHistory = true) {
+    if (typeof ui !== 'undefined' && ui.showAllNotes) {
+        ui.showAllNotes(); // Clear any existing focus and breadcrumbs
+    } else {
+        // This case should ideally not happen if ui.js is loaded before app.js
+        console.warn('ui.showAllNotes() is not available. Skipping focus clear on page load.');
+        window.currentFocusedNoteId = null; // Manually reset if ui.js is not ready
+        if (ui.domRefs && ui.domRefs.breadcrumbsContainer) {
+             ui.domRefs.breadcrumbsContainer.innerHTML = ''; // Clear breadcrumbs manually
+        }
+    }
     console.log(`Loading page: ${pageName}`);
     try {
         const pageData = await pagesAPI.getPage(pageName);
@@ -105,6 +116,7 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
             // Page exists, load it
             currentPageId = pageData.id;
             currentPageName = pageData.name;
+            window.currentPageName = currentPageName; // Expose globally for breadcrumbs
             
             // Update global variables for drag and drop
             window.currentPageId = currentPageId;
@@ -148,18 +160,24 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
                     await fetchAndDisplayPages(newPage.name);
                     await loadPage(newPage.name, true);
                 } else {
-                    updatePageTitle(`Failed: ${pageName}`);
+                    currentPageName = `Failed: ${pageName}`;
+                    window.currentPageName = currentPageName; // Expose globally
+                    updatePageTitle(currentPageName);
                     notesContainer.innerHTML = `<p>Could not create page: ${pageName}</p>`;
                 }
             } else {
-                updatePageTitle(`Not Found: ${pageName}`);
+                currentPageName = `Not Found: ${pageName}`;
+                window.currentPageName = currentPageName; // Expose globally
+                updatePageTitle(currentPageName);
                 notesContainer.innerHTML = `<p>Page "${pageName}" not found.</p>`;
                 updateActivePageLink(null);
             }
         }
     } catch (error) {
         console.error('Error loading page:', error);
-        updatePageTitle(`Error: ${pageName}`);
+        currentPageName = `Error: ${pageName}`;
+        window.currentPageName = currentPageName; // Expose globally
+        updatePageTitle(currentPageName);
         notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
     }
 }
@@ -603,6 +621,15 @@ notesContainer.addEventListener('keydown', async (e) => {
                 notesForCurrentPage = notes;
                 ui.displayNotes(notesForCurrentPage, currentPageId);
 
+                if (window.currentFocusedNoteId) {
+                    const focusedNoteStillExists = window.notesForCurrentPage.some(n => String(n.id) === String(window.currentFocusedNoteId));
+                    if (focusedNoteStillExists) {
+                        ui.focusOnNote(window.currentFocusedNoteId);
+                    } else {
+                        ui.showAllNotes();
+                    }
+                }
+
                 // Focus new note in edit mode
                 const newNoteEl = getNoteElementById(savedNote.id);
                 if (newNoteEl) {
@@ -660,6 +687,15 @@ notesContainer.addEventListener('keydown', async (e) => {
                         notesForCurrentPage = notes;
                         window.notesForCurrentPage = notes;
                         ui.displayNotes(notesForCurrentPage, currentPageId);
+
+                        if (window.currentFocusedNoteId) {
+                            const focusedNoteStillExists = window.notesForCurrentPage.some(n => String(n.id) === String(window.currentFocusedNoteId));
+                            if (focusedNoteStillExists) {
+                                ui.focusOnNote(window.currentFocusedNoteId);
+                            } else {
+                                ui.showAllNotes();
+                            }
+                        }
                         
                         const updatedNoteEl = getNoteElementById(updatedNote.id);
                         if (updatedNoteEl) {
@@ -1540,6 +1576,15 @@ notesContainer.addEventListener('drop', async (e) => {
             notesForCurrentPage = notes;
             window.notesForCurrentPage = notesForCurrentPage;
             ui.displayNotes(notesForCurrentPage, currentPageId);
+
+            if (window.currentFocusedNoteId) {
+                const focusedNoteStillExists = window.notesForCurrentPage.some(n => String(n.id) === String(window.currentFocusedNoteId));
+                if (focusedNoteStillExists) {
+                    ui.focusOnNote(window.currentFocusedNoteId);
+                } else {
+                    ui.showAllNotes();
+                }
+            }
         }
     } catch (error) {
         console.error('Error handling file uploads:', error);

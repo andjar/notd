@@ -67,9 +67,7 @@ require_once 'config.php';
 
         <!-- Main Content -->
         <div id="main-content" class="main-content">
-            <div class="breadcrumb-container">
-                <!-- Breadcrumb navigation will be populated by JavaScript -->
-            </div>
+            
 
             <div class="page-header">
                 <div id="current-page-title-container" class="page-title-container">
@@ -80,6 +78,9 @@ require_once 'config.php';
 
             <div id="page-title"></div>
             <div id="page-properties"></div>
+            <div id="breadcrumbs-container">
+                <!-- Breadcrumb navigation will be populated by JavaScript -->
+            </div>
             <div id="notes-container" class="outliner">
                 <!-- Notes will be rendered here -->
             </div>
