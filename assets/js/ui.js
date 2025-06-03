@@ -522,6 +522,11 @@ function parseAndRenderContent(rawContent) {
         
         if (!trimmedKey || !trimmedValue) return match; // Keep original if invalid
         
+        // Handle favorite properties specially
+        if (trimmedKey.toLowerCase() === 'favorite' && trimmedValue.toLowerCase() === 'true') {
+            return `<span class="property-favorite">⭐</span>`;
+        }
+        
         // Handle tag properties specially
         if (trimmedKey.toLowerCase() === 'tag' || trimmedKey.startsWith('tag-')) {
             return `<span class="property-tag">#${trimmedValue}</span>`;
@@ -636,16 +641,46 @@ function renderProperties(container, properties) {
         return;
     }
 
-    Object.entries(properties).forEach(([key, value]) => {
-        const propItem = document.createElement('span');
-        propItem.className = 'property-item';
-        propItem.innerHTML = `
-            <span class="property-key">${key}::</span>
-            <span class="property-value">${parseAndRenderContent(String(value))}</span>
-        `;
-        container.appendChild(propItem);
-    });
-    container.style.display = 'block';
+    const propertyItems = Object.entries(properties).map(([name, value]) => {
+        // Handle favorite properties specially
+        if (name.toLowerCase() === 'favorite' && String(value).toLowerCase() === 'true') {
+            return `<span class="property-item favorite">
+                <span class="property-favorite">⭐</span>
+            </span>`;
+        }
+
+        // Handle tag::tag format
+        if (name.startsWith('tag::')) {
+            const tagName = name.substring(5);
+            return `<span class="property-item tag">
+                <span class="property-key">#</span>
+                <span class="property-value">${tagName}</span>
+            </span>`;
+        }
+
+        // Handle list properties
+        if (Array.isArray(value)) {
+            return value.map(v => `
+                <span class="property-item">
+                    <span class="property-key">${name}</span>
+                    <span class="property-value">${v}</span>
+                </span>
+            `).join('');
+        }
+
+        // Handle regular properties
+        return `<span class="property-item">
+            <span class="property-key">${name}</span>
+            <span class="property-value">${value}</span>
+        </span>`;
+    }).join('');
+
+    container.innerHTML = propertyItems;
+    container.style.display = 'flex'; // Use flex for layout
+    container.style.flexWrap = 'wrap'; // Allow pills to wrap
+    container.style.gap = 'var(--ls-space-2, 8px)'; // Add gap between pills
+    // Ensure it's placed appropriately if it was hidden
+    container.classList.remove('hidden'); 
 }
 
 /**
@@ -1456,6 +1491,13 @@ function renderPageInlineProperties(properties, targetContainer) {
             const propItem = document.createElement('span');
             propItem.className = 'property-inline'; // Use the correct CSS class for inline pills
 
+            // Special styling for favorite properties
+            if (key.toLowerCase() === 'favorite' && String(val).toLowerCase() === 'true') {
+                propItem.innerHTML = `<span class="property-favorite">⭐</span>`;
+                fragment.appendChild(propItem);
+                return;
+            }
+
             // Special styling for tags (key starting with 'tag::')
             if (key.startsWith('tag::')) {
                 const tagName = key.substring(5); // Remove 'tag::' prefix
@@ -1637,6 +1679,13 @@ function renderNoteProperties(note) {
     }
 
     const propertyItems = Object.entries(note.properties).map(([name, value]) => {
+        // Handle favorite properties specially
+        if (name.toLowerCase() === 'favorite' && String(value).toLowerCase() === 'true') {
+            return `<span class="property-item favorite">
+                <span class="property-favorite">⭐</span>
+            </span>`;
+        }
+
         // Handle tag::tag format
         if (name.startsWith('tag::')) {
             const tagName = name.substring(5);
