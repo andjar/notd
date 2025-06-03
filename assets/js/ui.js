@@ -1569,10 +1569,10 @@ function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
 // Helper function to be called by breadcrumb page link
 function showAllNotesAndLoadPage(pageName) {
     if (typeof ui !== 'undefined' && ui.showAllNotes) {
-        ui.showAllNotes();
+        ui.showAllNotes(); 
     }
     if (typeof window.loadPage === 'function') {
-        window.loadPage(pageName);
+        window.loadPage(pageName); 
     } else {
         console.warn('window.loadPage function not found. Cannot reload page for breadcrumb.');
     }
@@ -1644,64 +1644,73 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function focusOnNote(noteId) {
     window.currentFocusedNoteId = noteId; // Set current focused note ID
-    const allNotes = document.querySelectorAll('.note-item');
+
     const focusedNote = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
-    const notesContainer = document.getElementById('notes-container');
-    
-    if (!focusedNote) return;
-    
-    // Clear any existing focus states
-    allNotes.forEach(note => {
-        note.classList.remove('note-hidden');
-        note.classList.remove('note-focused');
-    });
-    
-    // Find all descendant notes of the focused note
-    const descendants = new Set();
-    
-    function collectDescendants(noteEl) {
-        const childrenContainer = noteEl.querySelector('.note-children');
+    const notesContainer = document.getElementById('notes-container'); // Keep this for showAllBtn logic
+
+    if (!focusedNote) {
+        console.warn(`Focus target note with ID ${noteId} not found.`);
+        return;
+    }
+
+    const elementsToMakeVisible = new Set();
+    const elementsToFocus = new Set();
+
+    // Process Focused Note and Its Descendants
+    elementsToMakeVisible.add(focusedNote);
+    elementsToFocus.add(focusedNote);
+
+    function collectAndMarkDescendants(currentElement) {
+        const childrenContainer = currentElement.querySelector('.note-children');
         if (childrenContainer) {
-            const childNotes = childrenContainer.querySelectorAll('.note-item');
+            const childNotes = Array.from(childrenContainer.children).filter(el => el.matches('.note-item'));
             childNotes.forEach(child => {
-                descendants.add(child);
-                collectDescendants(child);
+                elementsToMakeVisible.add(child);
+                elementsToFocus.add(child);
+                collectAndMarkDescendants(child); // Recursive call
             });
         }
     }
-    
-    collectDescendants(focusedNote);
-    
-    // Hide all notes except the focused one and its descendants
-    allNotes.forEach(note => {
-        if (note === focusedNote || descendants.has(note)) {
-            // Keep visible
-            note.classList.add('note-focused');
+    collectAndMarkDescendants(focusedNote);
+
+    // Process Ancestors
+    let currentAncestor = focusedNote.parentElement.closest('.note-item');
+    while (currentAncestor) {
+        elementsToMakeVisible.add(currentAncestor);
+        // Ancestors are not added to elementsToFocus unless they are the focusedNote itself (already handled)
+        currentAncestor = currentAncestor.parentElement.closest('.note-item');
+    }
+
+    // Apply Classes to All Notes
+    const allNoteElements = document.querySelectorAll('#notes-container .note-item');
+    allNoteElements.forEach(noteElement => {
+        if (elementsToMakeVisible.has(noteElement)) {
+            noteElement.classList.remove('note-hidden');
         } else {
-            // Hide this note
-            note.classList.add('note-hidden');
+            noteElement.classList.add('note-hidden');
+        }
+
+        if (elementsToFocus.has(noteElement)) {
+            noteElement.classList.add('note-focused');
+        } else {
+            noteElement.classList.remove('note-focused');
         }
     });
-    
-    // Add class to container and create show all button
+
+    // Maintain Existing Logic for showAllBtn and breadcrumbs
     notesContainer.classList.add('has-focused-notes');
     
-    // Remove existing show all button if any
     const existingBtn = notesContainer.querySelector('.show-all-notes-btn');
     if (existingBtn) {
         existingBtn.remove();
     }
     
-    // Create and add show all button
     const showAllBtn = document.createElement('button');
     showAllBtn.className = 'show-all-notes-btn';
     showAllBtn.textContent = '← Show All Notes';
     showAllBtn.addEventListener('click', showAllNotes);
-    
-    // Insert at the beginning of the container
     notesContainer.insertBefore(showAllBtn, notesContainer.firstChild);
 
-    // Render breadcrumbs
     if (window.notesForCurrentPage && window.currentPageName) {
         renderBreadcrumbs(noteId, window.notesForCurrentPage, window.currentPageName);
     } else {
