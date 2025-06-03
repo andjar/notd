@@ -264,12 +264,11 @@ function renderNote(note, nestingLevel = 0) {
     });
 
     // Properties div
-    const propertiesEl = document.createElement('div');
-    propertiesEl.className = 'note-properties';
-    renderProperties(propertiesEl, note.properties);
+    // const propertiesEl = document.createElement('div');
+    // propertiesEl.className = 'note-properties';
+    // renderProperties(propertiesEl, note.properties);
 
     contentWrapperEl.appendChild(contentEl);
-    contentWrapperEl.appendChild(propertiesEl);
 
     // Attachments section
     const attachmentsEl = document.createElement('div');
@@ -506,56 +505,6 @@ function switchToRenderedMode(contentEl) {
 }
 
 /**
- * Extracts properties from note content using {key::value} syntax
- * @param {string} content - Note content 
- * @returns {Object} Object with content and extracted properties
- */
-function extractPropertiesFromContent(content) {
-    if (!content) return { content, properties: {} };
-    
-    const properties = {};
-    // Match {key::value} pattern, supporting multi-word keys and values
-    const propertyRegex = /\{([^:}]+)::([^}]+)\}/g;
-    let match;
-    let cleanContent = content;
-    
-    while ((match = propertyRegex.exec(content)) !== null) {
-        const key = match[1].trim();
-        const value = match[2].trim();
-        if (key && value) {
-            properties[key] = value;
-        }
-        // Remove the property from the content
-        cleanContent = cleanContent.replace(match[0], '').trim();
-    }
-    
-    return { content: cleanContent, properties };
-}
-
-/**
- * Renders properties as inline elements
- * @param {Object} properties - Properties object
- * @returns {string} HTML string for properties
- */
-function renderInlineProperties(properties) {
-    if (!properties || Object.keys(properties).length === 0) {
-        return '';
-    }
-    
-    return Object.entries(properties).map(([key, value]) => {
-        // Handle tag properties specially
-        if (key.toLowerCase() === 'tag' || key.startsWith('tag-')) {
-            return `<span class="property-tag">#${value}</span>`;
-        }
-        
-        return `<span class="property-inline">
-            <span class="property-key">${key}::</span>
-            <span class="property-value">${value}</span>
-        </span>`;
-    }).join(' ');
-}
-
-/**
  * Parses and renders note content with special formatting
  * @param {string} rawContent - Raw note content
  * @returns {string} HTML string for display
@@ -563,9 +512,25 @@ function renderInlineProperties(properties) {
 function parseAndRenderContent(rawContent) {
     if (!rawContent) return '';
     
-    // First extract properties from content
-    const { content, properties } = extractPropertiesFromContent(rawContent);
-    let html = String(content);
+    let html = String(rawContent);
+
+    // Replace property patterns directly inline with rendered pills
+    html = html.replace(/\{([^:}]+)::([^}]+)\}/g, (match, key, value) => {
+        const trimmedKey = key.trim();
+        const trimmedValue = value.trim();
+        
+        if (!trimmedKey || !trimmedValue) return match; // Keep original if invalid
+        
+        // Handle tag properties specially
+        if (trimmedKey.toLowerCase() === 'tag' || trimmedKey.startsWith('tag-')) {
+            return `<span class="property-tag">#${trimmedValue}</span>`;
+        }
+        
+        return `<span class="property-inline">
+            <span class="property-key">${trimmedKey}::</span>
+            <span class="property-value">${trimmedValue}</span>
+        </span>`;
+    });
 
     // Handle task markers with checkboxes - don't show the TODO/DONE prefix in content
     if (html.startsWith('TODO ')) {
@@ -652,12 +617,6 @@ function parseAndRenderContent(rawContent) {
         } else {
             console.warn('marked.js not loaded properly or missing parse method');
             // Don't add <br> tags - keep original content as is
-        }
-
-        // Add inline properties at the end if any were found
-        const propertiesHtml = renderInlineProperties(properties);
-        if (propertiesHtml) {
-            html += `<div class="inline-properties">${propertiesHtml}</div>`;
         }
     }
 
@@ -1437,6 +1396,28 @@ function showGenericConfirmModal(title, message) {
         cancelBtn.addEventListener('click', cancelHandler);
         document.addEventListener('keydown', escapeKeyHandler);
     });
+}
+
+/**
+ * Extracts properties from note content using {key::value} syntax
+ * @param {string} content - Note content 
+ * @returns {Object} Object with content and extracted properties
+ * @deprecated This function is kept for backward compatibility but properties are now handled inline
+ */
+function extractPropertiesFromContent(content) {
+    // Simple stub - properties are now handled inline in parseAndRenderContent
+    return { content: content || '', properties: {} };
+}
+
+/**
+ * Renders properties as inline elements
+ * @param {Object} properties - Properties object
+ * @returns {string} HTML string for properties
+ * @deprecated This function is kept for backward compatibility but properties are now handled inline
+ */
+function renderInlineProperties(properties) {
+    // Simple stub - properties are now handled inline in parseAndRenderContent
+    return '';
 }
 
 // Export functions and DOM references for use in other modules

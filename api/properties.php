@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once 'db_connect.php';
+require_once 'property_triggers.php'; // Re-enabled
 
 header('Content-Type: application/json');
 
@@ -32,6 +33,7 @@ function validate_property_data($data) {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $entityType = isset($_GET['entity_type']) ? htmlspecialchars($_GET['entity_type'], ENT_QUOTES, 'UTF-8') : null;
     $entityId = filter_input(INPUT_GET, 'entity_id', FILTER_VALIDATE_INT);
+    $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
     
     if (!$entityType || !$entityId) {
         send_json_response(['error' => 'Missing required parameters'], 400);
@@ -40,14 +42,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $pdo = get_db_connection();
         
-        // Get all properties for the entity
-        $stmt = $pdo->prepare("
-            SELECT name, value 
+        // Base query
+        $sql = "
+            SELECT name, value, internal 
             FROM Properties 
-            WHERE " . ($entityType === 'page' ? 'page_id' : 'note_id') . " = ?
-            ORDER BY name, id
-        ");
-        $stmt->execute([$entityId]);
+            WHERE " . ($entityType === 'page' ? 'page_id' : 'note_id') . " = :entityId";
+
+        // Filter internal properties by default
+        if (!$includeInternal) {
+            $sql .= " AND internal = 0";
+        }
+        
+        $sql .= " ORDER BY name, id";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(':entityId', $entityId, PDO::PARAM_INT);
+        $stmt->execute();
         
         // Group properties by name to handle lists
         $properties = [];
@@ -56,13 +66,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             if (!isset($properties[$name])) {
                 $properties[$name] = [];
             }
-            $properties[$name][] = $row['value'];
+            // Store as an object to include internal flag if needed, or simplify if only one value
+            $properties[$name][] = ['value' => $row['value'], 'internal' => (int)$row['internal']];
         }
         
-        // Convert single values to strings
+        // Convert single values to strings or keep as object if internal flag is relevant
         foreach ($properties as $name => $values) {
             if (count($values) === 1) {
-                $properties[$name] = $values[0];
+                // If only one property and not specifically including internal, simplify output
+                if (!$includeInternal && $values[0]['internal'] == 0) {
+                     $properties[$name] = $values[0]['value'];
+                } else {
+                    // Otherwise, keep it as an object/array to show the internal flag
+                    $properties[$name] = $values[0];
+                }
+            } else {
+                 // For multiple values (lists), keep them as an array of objects
+                 $properties[$name] = $values;
             }
         }
         
@@ -88,9 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         send_json_response(['error' => 'Missing required parameters: entity_type and entity_id'], 400);
     }
     
-    // Extract the property name and value from the input
+    // Extract the property name, value, and internal flag from the input
     $name = isset($input['name']) ? $input['name'] : null;
     $value = isset($input['value']) ? $input['value'] : null;
+    $internal = isset($input['internal']) ? filter_var($input['internal'], FILTER_VALIDATE_INT, ['options' => ['default' => 0]]) : 0;
     
     if (!$name || $value === null) {
         send_json_response(['error' => 'Missing required parameters: name and value'], 400);
@@ -109,22 +130,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             send_json_response(['error' => 'Invalid property data'], 400);
         }
         
+        // Use the validated/normalized data
+        $validatedName = $propertyData['name'];
+        $validatedValue = $propertyData['value'];
+        
         // For single values, use REPLACE to handle both insert and update
         if ($entityType === 'page') {
             $stmt = $pdo->prepare("
-                REPLACE INTO Properties (page_id, note_id, name, value)
-                VALUES (?, NULL, ?, ?)
+                REPLACE INTO Properties (page_id, note_id, name, value, internal)
+                VALUES (?, NULL, ?, ?, ?)
             ");
         } else {
             $stmt = $pdo->prepare("
-                REPLACE INTO Properties (note_id, page_id, name, value)
-                VALUES (?, NULL, ?, ?)
+                REPLACE INTO Properties (note_id, page_id, name, value, internal)
+                VALUES (?, NULL, ?, ?, ?)
             ");
         }
-        $stmt->execute([$entityId, $name, $value]);
+        $stmt->execute([$entityId, $validatedName, $validatedValue, $internal]);
+        
+        // Dispatch triggers
+        dispatchPropertyTriggers($pdo, $entityType, $entityId, $validatedName, $validatedValue);
         
         $pdo->commit();
-        send_json_response(['success' => true, 'property' => ['name' => $name, 'value' => $value]]);
+        send_json_response(['success' => true, 'property' => ['name' => $validatedName, 'value' => $validatedValue, 'internal' => $internal]]);
         
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {

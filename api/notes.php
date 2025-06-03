@@ -1,5 +1,6 @@
 <?php
 require_once 'db_connect.php';
+require_once 'property_triggers.php';
 
 header('Content-Type: application/json');
 $pdo = get_db_connection();
@@ -29,66 +30,159 @@ function validateNoteData($data) {
     return true;
 }
 
+// Helper function to parse properties from note content
+function parsePropertiesFromContent($content) {
+    $properties = [];
+    // Match {property::value} patterns
+    if (preg_match_all('/\{([^:]+)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $match) {
+            $propertyName = trim($match[1]);
+            $propertyValue = trim($match[2]);
+            if (!empty($propertyName) && !empty($propertyValue)) {
+                $properties[] = [
+                    'name' => $propertyName,
+                    'value' => $propertyValue
+                ];
+            }
+        }
+    }
+    return $properties;
+}
+
+// Helper function to save properties for a note
+function savePropertiesForNote($pdo, $noteId, $properties) {
+    foreach ($properties as $property) {
+        try {
+            // Save the property
+            $stmt = $pdo->prepare("
+                REPLACE INTO Properties (note_id, page_id, name, value, internal)
+                VALUES (?, NULL, ?, ?, 0)
+            ");
+            $stmt->execute([$noteId, $property['name'], $property['value']]);
+            
+            // Dispatch triggers
+            dispatchPropertyTriggers($pdo, 'note', $noteId, $property['name'], $property['value']);
+        } catch (Exception $e) {
+            error_log("Error saving property {$property['name']} for note {$noteId}: " . $e->getMessage());
+        }
+    }
+}
+
 if ($method === 'GET') {
+    $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
+
     if (isset($_GET['id'])) {
         // Get single note
-        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
-        $stmt->execute([(int)$_GET['id']]);
+        $noteId = (int)$_GET['id'];
+        $sql = "SELECT * FROM Notes WHERE id = :id";
+        if (!$includeInternal) {
+            $sql .= " AND internal = 0";
+        }
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(':id', $noteId, PDO::PARAM_INT);
+        $stmt->execute();
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($note) {
             // Get properties for the note
-            $stmt = $pdo->prepare("SELECT * FROM Properties WHERE note_id = ?");
-            $stmt->execute([$note['id']]);
-            $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id";
+            if (!$includeInternal) {
+                $propSql .= " AND internal = 0";
+            }
+            $propSql .= " ORDER BY name"; // Added order for consistency
+            $stmtProps = $pdo->prepare($propSql);
+            $stmtProps->bindParam(':note_id', $note['id'], PDO::PARAM_INT);
+            $stmtProps->execute();
+            $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
             
-            // Add properties to note data
-            $note['properties'] = array_reduce($properties, function($acc, $prop) {
-                $acc[$prop['name']] = $prop['value'];
-                return $acc;
-            }, []);
+            $note['properties'] = [];
+            foreach ($propertiesResult as $prop) {
+                if (!isset($note['properties'][$prop['name']])) {
+                    $note['properties'][$prop['name']] = [];
+                }
+                // Match structure of api/properties.php
+                $propEntry = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
+                $note['properties'][$prop['name']][] = $propEntry;
+            }
+
+            foreach ($note['properties'] as $name => $values) {
+                if (count($values) === 1) {
+                    if (!$includeInternal && $values[0]['internal'] == 0) {
+                        $note['properties'][$name] = $values[0]['value'];
+                    } else {
+                        $note['properties'][$name] = $values[0];
+                    }
+                } else {
+                     $note['properties'][$name] = $values; // Keep as array of objects for lists
+                }
+            }
             
             sendJsonResponse(['success' => true, 'data' => $note]);
         } else {
-            sendJsonResponse(['success' => false, 'error' => 'Note not found'], 404);
+            sendJsonResponse(['success' => false, 'error' => 'Note not found or is internal'], 404); // Updated error message
         }
     } elseif (isset($_GET['page_id'])) {
         // Get notes for a page
-        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE page_id = ? ORDER BY order_index ASC");
-        $stmt->execute([(int)$_GET['page_id']]);
+        $pageId = (int)$_GET['page_id'];
+        $notesSql = "SELECT * FROM Notes WHERE page_id = :page_id";
+        if (!$includeInternal) {
+            $notesSql .= " AND internal = 0";
+        }
+        $notesSql .= " ORDER BY order_index ASC";
+        
+        $stmt = $pdo->prepare($notesSql);
+        $stmt->bindParam(':page_id', $pageId, PDO::PARAM_INT);
+        $stmt->execute();
         $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Get properties for all notes
         $noteIds = array_column($notes, 'id');
         
-        // Initialize properties for all notes to empty arrays first
         foreach ($notes as &$note) {
-            $note['properties'] = [];
+            $note['properties'] = []; // Initialize properties
         }
-        unset($note); // Unset reference to last element
+        unset($note);
 
         if (!empty($noteIds)) {
             $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
-            $stmt = $pdo->prepare("SELECT * FROM Properties WHERE note_id IN ($placeholders)");
-            $stmt->execute($noteIds);
-            $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
+            if (!$includeInternal) {
+                $propSql .= " AND internal = 0";
+            }
+            $propSql .= " ORDER BY name"; // Added order
+
+            $stmtProps = $pdo->prepare($propSql);
+            $stmtProps->execute($noteIds);
+            $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
             
-            // Group properties by note_id
             $propertiesByNote = [];
-            foreach ($properties as $prop) {
-                if (!isset($propertiesByNote[$prop['note_id']])) {
-                    $propertiesByNote[$prop['note_id']] = [];
+            foreach ($propertiesResult as $prop) {
+                $currentNoteId = $prop['note_id'];
+                if (!isset($propertiesByNote[$currentNoteId])) {
+                    $propertiesByNote[$currentNoteId] = [];
                 }
-                $propertiesByNote[$prop['note_id']][$prop['name']] = $prop['value'];
+                $propName = $prop['name'];
+                if (!isset($propertiesByNote[$currentNoteId][$propName])) {
+                    $propertiesByNote[$currentNoteId][$propName] = [];
+                }
+                $propertiesByNote[$currentNoteId][$propName][] = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
             }
             
-            // Add properties to notes
             foreach ($notes as &$note) {
                 if (isset($propertiesByNote[$note['id']])) {
-                    $note['properties'] = $propertiesByNote[$note['id']];
+                    foreach ($propertiesByNote[$note['id']] as $name => $values) {
+                        if (count($values) === 1) {
+                             if (!$includeInternal && $values[0]['internal'] == 0) {
+                                $note['properties'][$name] = $values[0]['value'];
+                            } else {
+                                $note['properties'][$name] = $values[0];
+                            }
+                        } else {
+                            $note['properties'][$name] = $values; // Keep as array of objects for lists
+                        }
+                    }
                 }
             }
-            unset($note); // Unset reference to last element
+            unset($note);
         }
         
         sendJsonResponse(['success' => true, 'data' => $notes]);
@@ -113,9 +207,9 @@ if ($method === 'GET') {
         
         // Insert new note
         $stmt = $pdo->prepare("
-            INSERT INTO Notes (page_id, content, parent_note_id, order_index, created_at, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ");
+            INSERT INTO Notes (page_id, content, parent_note_id, order_index, internal, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+        "); // Added 'internal' column with default 0
         $stmt->execute([
             (int)$input['page_id'],
             $input['content'],
@@ -124,6 +218,10 @@ if ($method === 'GET') {
         ]);
         
         $noteId = $pdo->lastInsertId();
+        
+        // Parse and save properties from note content
+        $properties = parsePropertiesFromContent($input['content']);
+        savePropertiesForNote($pdo, $noteId, $properties);
         
         // Fetch the created note
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
@@ -195,20 +293,51 @@ if ($method === 'GET') {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($executeParams);
         
+        // If content was updated, parse and save properties
+        if (isset($input['content'])) {
+            // First, delete existing properties for this note
+            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ?");
+            $stmtDeleteProps->execute([$noteId]);
+            
+            // Parse and save new properties from updated content
+            $properties = parsePropertiesFromContent($input['content']);
+            savePropertiesForNote($pdo, $noteId, $properties);
+        }
+        
         // Fetch updated note
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
         $stmt->execute([$noteId]);
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Get properties
-        $stmt = $pdo->prepare("SELECT * FROM Properties WHERE note_id = ?"); // Corrected table and column names
-        $stmt->execute([$note['id']]);
-        $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Get properties (respecting include_internal - defaulting to false for PUT response)
+        $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id";
+        // For PUT response, let's default to not showing internal properties, similar to a GET without include_internal
+        $propSql .= " AND internal = 0";
+        $propSql .= " ORDER BY name";
         
-        $note['properties'] = array_reduce($properties, function($acc, $prop) {
-            $acc[$prop['name']] = $prop['value'];
-            return $acc;
-        }, []);
+        $stmtProps = $pdo->prepare($propSql);
+        $stmtProps->bindParam(':note_id', $note['id'], PDO::PARAM_INT);
+        $stmtProps->execute();
+        $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
+
+        $note['properties'] = [];
+        foreach ($propertiesResult as $prop) {
+            if (!isset($note['properties'][$prop['name']])) {
+                $note['properties'][$prop['name']] = [];
+            }
+            // Match structure of api/properties.php for consistency
+            // Since this is a default view (like include_internal=false), simplify if possible
+            $propEntry = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
+             // This property would only be here if its internal = 0 due to the query filter
+            $note['properties'][$prop['name']][] = $prop['value']; // Simplified for non-internal properties
+        }
+
+        foreach ($note['properties'] as $name => $values) {
+            if (count($values) === 1) {
+                 $note['properties'][$name] = $values[0];
+            }
+            // If it was a list, it remains a list of values
+        }
         
         $pdo->commit();
         sendJsonResponse(['success' => true, 'data' => $note]);
