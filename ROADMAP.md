@@ -1,6 +1,6 @@
-# NotTD Application Roadmap
+# Notd Application Roadmap
 
-This document outlines the planned features and improvements for the NotTD application. Our development approach considers the constraints of the phpdesktop environment, ensuring all backend interactions utilize GET or POST (with method override for PUT/DELETE operations) requests.
+This document outlines the planned features and improvements for the `notd` application. Our development approach considers the constraints of the phpdesktop environment, ensuring all backend interactions utilize GET or POST (with method override for PUT/DELETE operations) requests.
 
 ## Proposed Features
 
@@ -8,10 +8,9 @@ This section lists features planned for upcoming development. Features are group
 
 ### Core Note-Taking Enhancements
 - **Note Templates:** Allow users to create and use templates for new notes or pages.
-- **Rich Text Formatting Toolbar:** A visual toolbar for common Markdown formatting options (bold, italics, lists, etc.) that outputs Markdown.
 - **Note Pinning/Favoriting:** Enable users to pin important notes within a page or add them to a global "Favorites" list.
 - **Advanced Search Operators:** Enhance search with operators like `tag:`, `created:YYYY-MM-DD`, `in:page_name`.
-- **Spell Check:** Integrate client-side spell checking for note content.
+- **Auto-suggsetions:** Get helpful suggestions for links and property values
 
 ### Organization & Navigation
 - **Tagging System:** Implement a dedicated tagging system (e.g., `Tags`, `NoteTags`, `PageTags` tables) for notes and pages, with UI for managing and filtering by tags.
@@ -35,7 +34,6 @@ This section lists features planned for upcoming development. Features are group
 This section lists features that are being considered for later stages of development or require more research.
 
 - **Simple Note Version History / Undo-Redo:** Basic versioning for notes or enhanced undo/redo functionality beyond typical browser behavior.
-- **Graph View:** A visual representation of links between notes and pages.
 - **Import from Database Backup (SQLite):** Allow restoring the application state from an SQLite backup file (requires careful consideration of phpdesktop limitations for file uploads).
 - **Keyboard Shortcut Customization:** Allow users to view and potentially customize keyboard shortcuts.
 - **Read-only Sharing of Pages:** Generate shareable, read-only links for individual pages.
