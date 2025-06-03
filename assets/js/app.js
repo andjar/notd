@@ -124,8 +124,21 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
         currentPageName = pageData.name; // pageData.name is the canonical name
         currentPageId = pageData.id;
         window.currentPageId = currentPageId; // Make globally available for other modules
+        window.currentPageName = currentPageName; // Make globally available for other modules
+
+        // Update browser URL if requested
+        if (updateHistory) {
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('page', currentPageName);
+            history.pushState({ pageName: currentPageName }, '', newUrl.toString());
+        }
 
         ui.updatePageTitle(currentPageName);
+
+        // Update calendar widget to show current page
+        if (ui.calendarWidget && typeof ui.calendarWidget.setCurrentPage === 'function') {
+            ui.calendarWidget.setCurrentPage(currentPageName);
+        }
 
         // Fetch properties for the current page
         const pageProperties = await propertiesAPI.getProperties('page', currentPageId);

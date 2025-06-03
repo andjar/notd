@@ -353,11 +353,13 @@ body {
     color: var(--ls-primary-text-color);
     font-weight: var(--ls-font-weight-medium);
     border: 1px solid var(--ls-accent-10);
+    box-shadow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3); /* Weak glow effect for journal pages */
 }
 .calendar-day.today.current-page {
     background-color: var(--ls-accent-10);
     color: white;
     border: 1px solid var(--ls-accent-9);
+    box-shadow: 0 0 12px hsl(var(--ls-accent-10-hsl) / 0.4); /* Slightly stronger glow when both today and current page */
 }
 
 /* Search Section */
