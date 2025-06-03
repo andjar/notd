@@ -1465,7 +1465,9 @@ if (typeof module !== 'undefined' && module.exports) {
         showGenericInputModal,
         showGenericConfirmModal,
         focusOnNote,
-        showAllNotes
+        showAllNotes,
+        getNoteAncestors, // Added for breadcrumbs
+        renderBreadcrumbs // Added for breadcrumbs
     };
 } else {
     // For browser environment, attach to window
@@ -1493,8 +1495,87 @@ if (typeof module !== 'undefined' && module.exports) {
         showGenericInputModal,
         showGenericConfirmModal,
         focusOnNote,
-        showAllNotes
+        showAllNotes,
+        getNoteAncestors, // Added for breadcrumbs
+        renderBreadcrumbs, // Added for breadcrumbs
+        showAllNotesAndLoadPage // Expose helper for breadcrumb page link
     };
+}
+
+/**
+ * Traverses upwards from the noteId using parent_note_id to collect all ancestors.
+ * @param {string} noteId - The ID of the note to start from.
+ * @param {Array<Object>} allNotesOnPage - Flat list of all notes on the current page.
+ * @returns {Array<Object>} Array of note objects, ordered from furthest ancestor to direct parent.
+ */
+function getNoteAncestors(noteId, allNotesOnPage) {
+    const ancestors = [];
+    if (!allNotesOnPage) {
+        console.warn('getNoteAncestors called without allNotesOnPage');
+        return ancestors;
+    }
+    let currentNote = allNotesOnPage.find(note => String(note.id) === String(noteId));
+
+    while (currentNote && currentNote.parent_note_id) {
+        const parentNote = allNotesOnPage.find(note => String(note.id) === String(currentNote.parent_note_id));
+        if (parentNote) {
+            ancestors.unshift(parentNote); // Add parent to the beginning of the array
+            currentNote = parentNote;
+        } else {
+            // Parent not found, break the loop
+            break;
+        }
+    }
+    return ancestors;
+}
+
+/**
+ * Renders breadcrumbs for the focused note.
+ * @param {string|null} focusedNoteId - The ID of the currently focused note, or null.
+ * @param {Array<Object>} allNotesOnPage - Flat list of all notes for the current page.
+ * @param {string} currentPageName - The name of the current page.
+ */
+function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
+    if (!domRefs.breadcrumbsContainer) {
+        console.warn('Breadcrumbs container not found in DOM.');
+        return;
+    }
+
+    if (!focusedNoteId || !allNotesOnPage || allNotesOnPage.length === 0) {
+        domRefs.breadcrumbsContainer.innerHTML = ''; // Clear breadcrumbs
+        return;
+    }
+
+    const focusedNote = allNotesOnPage.find(n => String(n.id) === String(focusedNoteId));
+    if (!focusedNote) {
+        domRefs.breadcrumbsContainer.innerHTML = ''; // Clear if focused note not found
+        return;
+    }
+
+    const ancestors = getNoteAncestors(focusedNoteId, allNotesOnPage);
+    let html = `<a href="#" onclick="ui.showAllNotesAndLoadPage('${currentPageName}'); return false;">${currentPageName}</a>`;
+
+    ancestors.forEach(ancestor => {
+        const noteName = (ancestor.content ? (ancestor.content.split('\n')[0].substring(0, 30) + (ancestor.content.length > 30 ? '...' : '')) : `Note ${ancestor.id}`).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html += ` &gt; <a href="#" onclick="ui.focusOnNote('${ancestor.id}'); return false;">${noteName}</a>`;
+    });
+
+    const focusedNoteName = (focusedNote.content ? (focusedNote.content.split('\n')[0].substring(0, 30) + (focusedNote.content.length > 30 ? '...' : '')) : `Note ${focusedNote.id}`).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html += ` &gt; <span class="breadcrumb-current">${focusedNoteName}</span>`;
+
+    domRefs.breadcrumbsContainer.innerHTML = html;
+}
+
+// Helper function to be called by breadcrumb page link
+function showAllNotesAndLoadPage(pageName) {
+    if (typeof ui !== 'undefined' && ui.showAllNotes) {
+        ui.showAllNotes();
+    }
+    if (typeof window.loadPage === 'function') {
+        window.loadPage(pageName);
+    } else {
+        console.warn('window.loadPage function not found. Cannot reload page for breadcrumb.');
+    }
 }
 
 function renderNoteProperties(note) {
@@ -1562,6 +1643,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * @param {string} noteId - The ID of the note to focus on
  */
 function focusOnNote(noteId) {
+    window.currentFocusedNoteId = noteId; // Set current focused note ID
     const allNotes = document.querySelectorAll('.note-item');
     const focusedNote = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
     const notesContainer = document.getElementById('notes-container');
@@ -1618,12 +1700,21 @@ function focusOnNote(noteId) {
     
     // Insert at the beginning of the container
     notesContainer.insertBefore(showAllBtn, notesContainer.firstChild);
+
+    // Render breadcrumbs
+    if (window.notesForCurrentPage && window.currentPageName) {
+        renderBreadcrumbs(noteId, window.notesForCurrentPage, window.currentPageName);
+    } else {
+        console.warn("Cannot render breadcrumbs: notesForCurrentPage or currentPageName is missing.");
+        if (domRefs.breadcrumbsContainer) domRefs.breadcrumbsContainer.innerHTML = '';
+    }
 }
 
 /**
  * Shows all notes and clears focus state
  */
 function showAllNotes() {
+    window.currentFocusedNoteId = null; // Clear current focused note ID
     const allNotes = document.querySelectorAll('.note-item');
     const notesContainer = document.getElementById('notes-container');
     
@@ -1639,4 +1730,11 @@ function showAllNotes() {
     if (showAllBtn) {
         showAllBtn.remove();
     }
+
+    // Clear breadcrumbs when showing all notes
+    if (domRefs.breadcrumbsContainer) {
+        domRefs.breadcrumbsContainer.innerHTML = '';
+    }
+    // Alternatively, call renderBreadcrumbs with null to ensure consistent handling
+    // renderBreadcrumbs(null, window.notesForCurrentPage, window.currentPageName);
 }
