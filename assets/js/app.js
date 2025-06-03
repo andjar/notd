@@ -16,6 +16,57 @@ window.notesAPI = notesAPI;
 window.currentFocusedNoteId = null; // Initialize focused note ID
 
 /**
+ * Helper functions to replace deprecated document.execCommand
+ */
+
+/**
+ * Inserts text at the current cursor position and positions cursor
+ * @param {string} text - Text to insert
+ * @param {number} cursorOffset - Position cursor relative to start of inserted text
+ */
+function insertTextAtCursor(text, cursorOffset = 0) {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const textNode = document.createTextNode(text);
+    range.insertNode(textNode);
+    
+    // Position cursor
+    range.setStart(textNode, cursorOffset);
+    range.setEnd(textNode, cursorOffset);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+/**
+ * Replaces text by deleting characters before cursor and inserting new text
+ * @param {number} deleteCount - Number of characters to delete before cursor
+ * @param {string} newText - Text to insert
+ * @param {number} cursorOffset - Position cursor relative to start of inserted text
+ */
+function replaceTextAtCursor(deleteCount, newText, cursorOffset = 0) {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    // Delete characters before cursor
+    range.setStart(range.startContainer, range.startOffset - deleteCount);
+    range.deleteContents();
+    
+    // Insert new text
+    const textNode = document.createTextNode(newText);
+    range.insertNode(textNode);
+    
+    // Position cursor
+    range.setStart(textNode, cursorOffset);
+    range.setEnd(textNode, cursorOffset);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+/**
  * Safely adds an event listener to an element if it exists
  * @param {HTMLElement|null} element - The element to add the listener to
  * @param {string} event - The event type
@@ -537,51 +588,36 @@ notesContainer.addEventListener('keydown', async (e) => {
         // Autoclose brackets
         if (e.key === '[') {
             e.preventDefault();
-            document.execCommand('insertText', false, '[]');
-            selection.collapse(selection.anchorNode, cursorPos + 1);
+            insertTextAtCursor('[]', 1);
             return; // Consume event
         } else if (e.key === '{') {
             e.preventDefault();
-            document.execCommand('insertText', false, '{}');
-            selection.collapse(selection.anchorNode, cursorPos + 1);
+            insertTextAtCursor('{}', 1);
             return; // Consume event
         } else if (e.key === '(') {
             e.preventDefault();
-            document.execCommand('insertText', false, '()');
-            selection.collapse(selection.anchorNode, cursorPos + 1);
+            insertTextAtCursor('()', 1);
             return; // Consume event
         }
 
         // Check for shortcut triggers (e.g., :t, :d)
         if (text.substring(cursorPos - 2, cursorPos) === ':t' && e.key === ' ') { // Trigger on space after :t
             e.preventDefault();
-            document.execCommand('deleteBackward', false, null); // Delete 't'
-            document.execCommand('deleteBackward', false, null); // Delete ':'
-            document.execCommand('insertText', false, '{tag::}');
-            selection.collapse(selection.anchorNode, cursorPos - 2 + 6); // Move cursor inside {}
+            replaceTextAtCursor(2, '{tag::}', 6);
             return; 
         } else if (text.substring(cursorPos - 2, cursorPos) === ':d' && e.key === ' ') {
             e.preventDefault();
-            document.execCommand('deleteBackward', false, null);
-            document.execCommand('deleteBackward', false, null);
             const today = new Date().toISOString().slice(0, 10);
-            document.execCommand('insertText', false, `{date::${today}}`);
-            selection.collapse(selection.anchorNode, cursorPos - 2 + 18); // Move cursor after date
+            replaceTextAtCursor(2, `{date::${today}}`, 18);
             return;
         } else if (text.substring(cursorPos - 2, cursorPos) === ':r' && e.key === ' ') {
             e.preventDefault();
-            document.execCommand('deleteBackward', false, null);
-            document.execCommand('deleteBackward', false, null);
-            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            document.execCommand('insertText', false, `{timestamp::${now}}`);
-            selection.collapse(selection.anchorNode, cursorPos - 2 + 23); // Move cursor after timestamp
+            const now = new Date().toISOString();
+            replaceTextAtCursor(2, `{timestamp::${now}}`, 23);
             return;
         } else if (text.substring(cursorPos - 2, cursorPos) === ':k' && e.key === ' ') {
             e.preventDefault();
-            document.execCommand('deleteBackward', false, null);
-            document.execCommand('deleteBackward', false, null);
-            document.execCommand('insertText', false, '{keyword::}');
-            selection.collapse(selection.anchorNode, cursorPos - 2 + 10); // Move cursor inside {}
+            replaceTextAtCursor(2, '{keyword::}', 10);
             return;
         }
     }
@@ -1546,7 +1582,7 @@ async function openSearchOrCreatePageModal() {
         return;
     }
     try {
-        allPagesForSearch = await pagesAPI.getAllPages();
+        allPagesForSearch = await pagesAPI.getAllPages({ excludeJournal: true });
     } catch (error) {
         console.error('Failed to fetch pages for search modal:', error);
         allPagesForSearch = []; // Continue with empty list if fetch fails

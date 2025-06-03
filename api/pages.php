@@ -103,7 +103,20 @@ if ($method === 'GET') {
         }
     } else {
         // Get all pages
-        $stmt = $pdo->query("SELECT id, name, alias, updated_at FROM Pages ORDER BY updated_at DESC, name ASC");
+        $excludeJournal = isset($_GET['exclude_journal']) && $_GET['exclude_journal'] === '1';
+        
+        if ($excludeJournal) {
+            // Exclude journal pages (date pattern YYYY-MM-DD or name 'journal')
+            // Using SQLite GLOB pattern matching instead of REGEXP
+            $stmt = $pdo->query("
+                SELECT id, name, alias, updated_at 
+                FROM Pages 
+                WHERE NOT (name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR LOWER(name) = 'journal')
+                ORDER BY updated_at DESC, name ASC
+            ");
+        } else {
+            $stmt = $pdo->query("SELECT id, name, alias, updated_at FROM Pages ORDER BY updated_at DESC, name ASC");
+        }
         $pages = $stmt->fetchAll();
         echo json_encode(['success' => true, 'data' => $pages]);
     }

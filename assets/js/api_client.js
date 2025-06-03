@@ -97,9 +97,18 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
 const pagesAPI = {
     /**
      * Get all pages
+     * @param {Object} [options={}] - Options for filtering pages
+     * @param {boolean} [options.excludeJournal=false] - Whether to exclude journal pages from the results
      * @returns {Promise<Array<{id: number, name: string, created_at: string, updated_at: string}>>}
      */
-    getAllPages: () => apiRequest('pages.php'),
+    getAllPages: (options = {}) => {
+        const queryParams = new URLSearchParams();
+        if (options.excludeJournal) {
+            queryParams.append('exclude_journal', '1');
+        }
+        const queryString = queryParams.toString();
+        return apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
+    },
 
     /**
      * Get a page by name or ID

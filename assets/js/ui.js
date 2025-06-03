@@ -914,7 +914,7 @@ function buildNoteTree(notes, parentId = null) {
  */
 function updatePageTitle(name) {
     domRefs.currentPageTitleEl.textContent = name;
-    document.title = `${name} - NotTD`;
+    document.title = `${name} - notd`;
 }
 
 /**
