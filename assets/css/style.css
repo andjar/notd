@@ -989,6 +989,13 @@ textarea:focus {
         width: 20px;
         height: 40px;
     }
+    
+    .sidebar-toggle-btn {
+        width: 24px;
+        height: 40px;
+        font-size: 14px;
+    }
+    
     .app-title-main {
         font-size: var(--ls-font-size-3xl);
     }
@@ -2033,4 +2040,54 @@ textarea:focus {
 /* Task-specific vertical alignment for bullet/arrow */
 .note-item:has(.task-container) {
     --controls-top-offset: calc( (2 * var(--ls-space-1)) + 23px - (var(--control-icon-size) / 2) ); /* Align bullet/arrow with checkbox center */
+}
+
+/* Sidebar Toggle Buttons */
+.sidebar-toggle-btn {
+    position: fixed;
+    width: 36px; /* Adjusted for a better click area */
+    height: 36px; /* Adjusted for a better click area */
+    background: transparent; /* Remove background */
+    border: none; /* Remove border */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: calc(var(--ls-z-index-sticky) + 1); /* Ensure it's above sidebars */
+    transition: all var(--ls-transition-normal);
+    font-size: 24px; /* Larger icon size */
+    color: var(--ls-secondary-text-color);
+    padding: 0; /* Remove padding */
+    box-shadow: none; /* Remove shadow */
+}
+
+.sidebar-toggle-btn:hover {
+    background: transparent; /* Keep transparent */
+    color: var(--ls-primary-text-color); /* Darken icon on hover */
+    transform: scale(1.1);
+}
+
+/* Expanded State: "X" in the top corner of the open sidebar.
+   These styles apply when the sidebar is not collapsed (i.e., body classes are absent). */
+#toggle-left-sidebar-btn {
+    top: 10px;
+    left: calc(var(--ls-left-sidebar-width) - 42px); /* Position X inside the left sidebar */
+}
+
+#toggle-right-sidebar-btn {
+    top: 10px;
+    right: calc(var(--ls-left-sidebar-width) - 42px); /* Position X inside the right sidebar */
+    /* Assumes right sidebar uses --ls-left-sidebar-width for its width */
+}
+
+/* Collapsed State: Hamburger "☰" in the absolute outer corners of the screen.
+   These rules override the above when the respective body class is present. */
+body.left-sidebar-collapsed #toggle-left-sidebar-btn {
+    top: 15px;
+    left: 15px; /* Top-left corner of the screen */
+}
+
+body.right-sidebar-collapsed #toggle-right-sidebar-btn {
+    top: 15px;
+    right: 15px; /* Top-right corner of the screen */
 }

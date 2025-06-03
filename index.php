@@ -15,60 +15,58 @@ require_once 'config.php';
 <body>
     <div class="app-container">
         <!-- Left Sidebar -->
-        <div id="right-sidebar-outer">
-            <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn">☰</button>
-                <div id="left-sidebar" class="sidebar left-sidebar">
-                    <div class="sidebar-content">
-                        <div class="app-header">
-                            <a href="#" id="app-title" class="app-title">notd</a>
-                        </div>
+        <div id="left-sidebar-outer">
+            <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn left-toggle">☰</button>
+            <div id="left-sidebar" class="sidebar left-sidebar">
+                <div class="sidebar-content">
+                    <div class="app-header">
+                        <a href="#" id="app-title" class="app-title">notd</a>
+                    </div>
 
-                        <div class="calendar-widget">
-                            <div class="calendar-header">
-                                <button class="calendar-nav prev"><i class="fas fa-chevron-left"></i></button>
-                                <span class="current-month">September 2023</span>
-                                <button class="calendar-nav next"><i class="fas fa-chevron-right"></i></button>
-                            </div>
-                            <div class="calendar-grid">
-                                <div class="calendar-weekdays">
-                                    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
-                                    <span>Th</span><span>Fr</span><span>Sa</span>
-                                </div>
-                                <div class="calendar-days">
-                                    <!-- Calendar days will be populated by JavaScript -->
-                                </div>
-                            </div>
+                    <div class="calendar-widget">
+                        <div class="calendar-header">
+                            <button class="calendar-nav prev"><i class="fas fa-chevron-left"></i></button>
+                            <span class="current-month">September 2023</span>
+                            <button class="calendar-nav next"><i class="fas fa-chevron-right"></i></button>
                         </div>
-
-                        <!-- Global Search -->
-                        <div class="search-section">
-                            <input type="text" id="global-search-input" placeholder="Search notes..." class="search-input">
-                            <div id="search-results" class="search-results">
-                                <!-- Search results will be populated by JavaScript -->
+                        <div class="calendar-grid">
+                            <div class="calendar-weekdays">
+                                <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+                                <span>Th</span><span>Fr</span><span>Sa</span>
                             </div>
-                        </div>
-
-                        <div class="recent-pages">
-                            <h3>Recent Pages</h3>
-                            <div id="page-list">
-                                <!-- Pages will be populated by JavaScript -->
+                            <div class="calendar-days">
+                                <!-- Calendar days will be populated by JavaScript -->
                             </div>
-                        </div>
-
-                        <div class="sidebar-footer">
-                            <button id="open-page-search-modal-btn" class="action-button full-width-button">
-                                <i class="fas fa-search"></i>&nbsp;
-                                Search or Create Page
-                            </button>
                         </div>
                     </div>
+
+                    <!-- Global Search -->
+                    <div class="search-section">
+                        <input type="text" id="global-search-input" placeholder="Search notes..." class="search-input">
+                        <div id="search-results" class="search-results">
+                            <!-- Search results will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="recent-pages">
+                        <h3>Recent Pages</h3>
+                        <div id="page-list">
+                            <!-- Pages will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="sidebar-footer">
+                        <button id="open-page-search-modal-btn" class="action-button full-width-button">
+                            <i class="fas fa-search"></i>&nbsp;
+                            Search or Create Page
+                        </button>
+                    </div>
                 </div>
+            </div>
         </div>
 
         <!-- Main Content -->
         <div id="main-content" class="main-content">
-            
-
             <div class="page-header">
                 <div id="current-page-title-container" class="page-title-container">
                     <h1 id="current-page-title">Journal</h1>
@@ -93,7 +91,7 @@ require_once 'config.php';
 
         <!-- Right Sidebar -->
         <div id="right-sidebar-outer">
-            <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn">☰</button>
+            <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn right-toggle">☰</button>
             <div id="right-sidebar" class="sidebar right-sidebar">
                 <div class="sidebar-content">
                     <div class="sidebar-header">
