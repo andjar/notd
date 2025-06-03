@@ -62,9 +62,15 @@ function dispatchPropertyTriggers($pdo, $entityType, $entityId, $propertyName, $
     if (isset($propertyTriggers[$propertyName])) {
         $handlerFunction = $propertyTriggers[$propertyName];
         if (function_exists($handlerFunction)) {
-            call_user_func($handlerFunction, $pdo, $entityType, $entityId, $propertyName, $propertyValue);
+            try {
+                call_user_func($handlerFunction, $pdo, $entityType, $entityId, $propertyName, $propertyValue);
+            } catch (Exception $e) {
+                // Log error but don't re-throw - make trigger errors non-fatal
+                error_log("Error in property trigger handler {$handlerFunction} for property {$propertyName}: " . $e->getMessage());
+            }
         } else {
             error_log("Property trigger handler function not found: {$handlerFunction} for property {$propertyName}");
         }
     }
+    // No registered handler for this property - this is normal and not an error
 } 

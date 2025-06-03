@@ -28,27 +28,6 @@ CREATE TABLE IF NOT EXISTS Notes (
 CREATE INDEX IF NOT EXISTS idx_notes_page_id ON Notes(page_id);
 CREATE INDEX IF NOT EXISTS idx_notes_parent_note_id ON Notes(parent_note_id);
 
--- FTS5 Virtual Table for Notes Search
-CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts5(
-    content,
-    content_rowid=id,
-    tokenize = 'porter unicode61'
-);
-
--- Triggers to keep Notes_fts synchronized with Notes table
-CREATE TRIGGER IF NOT EXISTS Notes_ai AFTER INSERT ON Notes BEGIN
-    INSERT INTO Notes_fts (rowid, content) VALUES (new.id, new.content);
-END;
-
-CREATE TRIGGER IF NOT EXISTS Notes_bd BEFORE DELETE ON Notes BEGIN
-    INSERT INTO Notes_fts (Notes_fts, rowid, content) VALUES ('delete', old.id, old.content);
-END;
-
-CREATE TRIGGER IF NOT EXISTS Notes_au AFTER UPDATE ON Notes WHEN OLD.content IS NOT NEW.content BEGIN
-    INSERT INTO Notes_fts (Notes_fts, rowid, content) VALUES ('delete', old.id, old.content);
-    INSERT INTO Notes_fts (rowid, content) VALUES (new.id, new.content);
-END;
-
 -- Attachments Table
 CREATE TABLE IF NOT EXISTS Attachments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

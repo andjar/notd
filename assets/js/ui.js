@@ -490,16 +490,26 @@ function switchToEditMode(contentEl) {
 function switchToRenderedMode(contentEl) {
     if (contentEl.classList.contains('rendered-mode')) return;
 
+    // Get the raw content and store it before any processing
     const newContent = contentEl.textContent || '';
+    
+    // Store the raw content first, before any rendering
     contentEl.dataset.rawContent = newContent;
     
+    // Update classes and editability
     contentEl.classList.remove('edit-mode');
     contentEl.classList.add('rendered-mode');
     contentEl.contentEditable = false;
 
-    // Re-render content if there is any
+    // Only render if we have content
     if (newContent.trim()) {
-        contentEl.innerHTML = parseAndRenderContent(newContent);
+        // Create a temporary div to safely decode any HTML entities
+        const tempDiv = document.createElement('div');
+        tempDiv.textContent = newContent;
+        const decodedContent = tempDiv.textContent;
+        
+        // Now render the decoded content
+        contentEl.innerHTML = parseAndRenderContent(decodedContent);
     } else {
         contentEl.innerHTML = '';
     }
@@ -513,9 +523,12 @@ function switchToRenderedMode(contentEl) {
 function parseAndRenderContent(rawContent) {
     if (!rawContent) return '';
     
-    let html = String(rawContent);
+    // Create a temporary div to safely handle HTML entities
+    const tempDiv = document.createElement('div');
+    tempDiv.textContent = rawContent;
+    let html = tempDiv.textContent;
 
-    // Replace property patterns directly inline with rendered pills
+    // Replace property patterns with rendered pills, but preserve the original pattern in a data attribute
     html = html.replace(/\{([^:}]+)::([^}]+)\}/g, (match, key, value) => {
         const trimmedKey = key.trim();
         const trimmedValue = value.trim();
@@ -524,12 +537,12 @@ function parseAndRenderContent(rawContent) {
         
         // Handle favorite properties specially
         if (trimmedKey.toLowerCase() === 'favorite' && trimmedValue.toLowerCase() === 'true') {
-            return `<span class="property-favorite">⭐</span>`;
+            return `<span class="property-favorite" data-original="${match}">⭐</span>`;
         }
         
         // Handle alias properties specially - render as page links
         if (trimmedKey.toLowerCase() === 'alias') {
-            return `<span class="property-inline alias-property">
+            return `<span class="property-inline alias-property" data-original="${match}">
                 <span class="property-key">alias::</span>
                 <span class="page-link-bracket">[[</span>
                 <a href="#" class="page-link" data-page-name="${trimmedValue}">${trimmedValue}</a>
@@ -539,10 +552,11 @@ function parseAndRenderContent(rawContent) {
         
         // Handle tag properties specially
         if (trimmedKey.toLowerCase() === 'tag' || trimmedKey.startsWith('tag-')) {
-            return `<span class="property-tag">#${trimmedValue}</span>`;
+            return `<span class="property-tag" data-original="${match}">#${trimmedValue}</span>`;
         }
         
-        return `<span class="property-inline">
+        // For all other properties, render as a pill but preserve the original pattern
+        return `<span class="property-inline" data-original="${match}">
             <span class="property-key">${trimmedKey}::</span>
             <span class="property-value">${trimmedValue}</span>
         </span>`;

@@ -487,16 +487,15 @@ const debouncedSaveNote = debounce(async (noteEl) => {
     if (noteId.startsWith('temp-')) return;
 
     const contentDiv = noteEl.querySelector('.note-content');
-    const rawContent = contentDiv.dataset.rawContent || contentDiv.innerText;
+    // Always use dataset.rawContent if available, otherwise fall back to textContent
+    // Never use innerText or innerHTML as they contain rendered HTML
+    const rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
     
     const noteData = getNoteDataById(noteId);
     if (noteData && noteData.content === rawContent) return;
 
     try {
         console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
-        const contentDivForSource = noteEl.querySelector('.note-content');
-        const contentSource = contentDivForSource.dataset.rawContent === rawContent ? 'dataset.rawContent' : (contentDivForSource.textContent === rawContent ? 'textContent' : 'unknown/mixed');
-        console.log('[DEBUG SAVE] Content source for rawContent:', contentSource);
         console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
         
         const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
