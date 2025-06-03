@@ -1,18 +1,22 @@
 <?php
 require_once 'db_connect.php';
 require_once 'property_triggers.php';
+require_once 'pattern_processor.php'; // Use new unified pattern processor
 
 header('Content-Type: application/json');
 $pdo = get_db_connection();
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
-// Handle method overriding for PUT via POST (e.g., for phpdesktop)
-if ($method === 'POST' && isset($input['_method']) && strtoupper($input['_method']) === 'PUT') {
-    $method = 'PUT';
-    // Optionally, remove _method from $input if it could interfere with validation or processing
-    // unset($input['_method']); 
-    // However, validateNoteData only checks for 'content', so it's likely fine to leave it.
+// Handle method overriding for PUT/DELETE via POST (e.g., for phpdesktop)
+if ($method === 'POST' && isset($input['_method'])) {
+    $overrideMethod = strtoupper($input['_method']);
+    if ($overrideMethod === 'PUT' || $overrideMethod === 'DELETE') {
+        $method = $overrideMethod;
+        // Optionally, remove _method from $input if it could interfere with validation or processing
+        // unset($input['_method']); 
+        // However, validateNoteData only checks for 'content', so it's likely fine to leave it.
+    }
 }
 
 // Helper function to send JSON response
@@ -30,93 +34,100 @@ function validateNoteData($data) {
     return true;
 }
 
-// Helper function to parse properties from note content
+// Helper function to parse properties from note content using new pattern processor
 function parsePropertiesFromContent($content) {
-    $properties = [];
-    // Match {property::value} patterns (existing logic)
-    if (preg_match_all('/\{([^:]+)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
-        foreach ($matches as $match) {
-            $propertyName = trim($match[1]);
-            $propertyValue = trim($match[2]);
-            if (!empty($propertyName) && !empty($propertyValue)) {
-                // Allow multiple properties with the same name (e.g. multiple tags)
-                $properties[] = [
-                    'name' => $propertyName,
-                    'value' => $propertyValue
-                ];
-            }
-        }
+    // Use the new pattern processor for backward compatibility
+    $processor = getPatternProcessor();
+    $results = $processor->processContent($content, 'note', 0);
+    
+    // Convert to old format for backward compatibility
+    $oldFormat = [];
+    foreach ($results['properties'] as $property) {
+        $oldFormat[] = [
+            'name' => $property['name'],
+            'value' => $property['value']
+        ];
     }
-
-    // Match [[PageName]] patterns for 'links_to_page'
-    $linkedPages = []; // To track unique page names for links
-    if (preg_match_all('/\[\[([^\]]+)\]\]/', $content, $linkMatches, PREG_SET_ORDER)) {
-        foreach ($linkMatches as $linkMatch) {
-            $pageName = trim($linkMatch[1]);
-            // Avoid adding empty page names or self-references like [[]]
-            if (!empty($pageName) && !in_array($pageName, $linkedPages)) {
-                $properties[] = [
-                    'name' => 'links_to_page',
-                    'value' => $pageName
-                ];
-                $linkedPages[] = $pageName; // Add to tracker
-            }
-        }
-    }
-    return $properties;
+    return $oldFormat;
 }
 
-// Helper function to save properties for a note
-function savePropertiesForNote($pdo, $noteId, $properties) {
-    foreach ($properties as $property) {
-        try {
-            // Save the property
-            $stmt = $pdo->prepare("
-                REPLACE INTO Properties (note_id, page_id, name, value, internal)
-                VALUES (?, NULL, ?, ?, 0)
-            ");
-            $stmt->execute([$noteId, $property['name'], $property['value']]);
-            
-            // Dispatch triggers
-            dispatchPropertyTriggers($pdo, 'note', $noteId, $property['name'], $property['value']);
-        } catch (Exception $e) {
-            error_log("Error saving property {$property['name']} for note {$noteId}: " . $e->getMessage());
+// Helper function to save properties for a note using pattern processor
+function savePropertiesForNote($pdo, $noteId, $content) {
+    try {
+        // Delete existing non-internal properties for this note
+        $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND internal = 0");
+        $stmtDeleteProps->execute([$noteId]);
+        
+        // Use the legacy function to get properties in the expected format
+        $properties = parsePropertiesFromContent($content);
+        
+        // Save new properties
+        foreach ($properties as $property) {
+            try {
+                $stmt = $pdo->prepare("
+                    REPLACE INTO Properties (note_id, page_id, name, value, internal)
+                    VALUES (?, NULL, ?, ?, 0)
+                ");
+                $stmt->execute([$noteId, $property['name'], $property['value']]);
+                
+                // Dispatch triggers
+                dispatchPropertyTriggers($pdo, 'note', $noteId, $property['name'], $property['value']);
+            } catch (Exception $e) {
+                error_log("[NOTES_API_ERROR] Error saving property {$property['name']} for note {$noteId}: " . $e->getMessage());
+                throw $e; // Re-throw to trigger transaction rollback
+            }
         }
+        
+        error_log("[NOTES_API_DEBUG] Successfully saved properties for note {$noteId}");
+        
+    } catch (Exception $e) {
+        error_log("[NOTES_API_ERROR] Failed to save properties for note {$noteId}: " . $e->getMessage());
+        throw $e; // Re-throw to be caught by the caller
     }
 }
 
 // Helper function to save page-level properties from note content
 function savePagePropertiesFromContent($pdo, $pageId, $content) {
-    // Parse page-level properties (like alias) from content
-    $pageProperties = [];
-    if (preg_match_all('/\{(alias)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
-        foreach ($matches as $match) {
-            $propertyName = trim($match[1]);
-            $propertyValue = trim($match[2]);
-            if (!empty($propertyName) && !empty($propertyValue)) {
-                $pageProperties[] = [
-                    'name' => $propertyName,
-                    'value' => $propertyValue
-                ];
+    try {
+        $processor = getPatternProcessor();
+        
+        // Only look for specific page-level properties like alias
+        if (preg_match_all('/\{(alias)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
+            $pageProperties = [];
+            foreach ($matches as $match) {
+                $propertyName = trim($match[1]);
+                $propertyValue = trim($match[2]);
+                if (!empty($propertyName) && !empty($propertyValue)) {
+                    $pageProperties[] = [
+                        'name' => $propertyName,
+                        'value' => $propertyValue
+                    ];
+                }
+            }
+            
+            // Save page properties
+            foreach ($pageProperties as $property) {
+                try {
+                    $stmt = $pdo->prepare("
+                        REPLACE INTO Properties (page_id, note_id, name, value, internal)
+                        VALUES (?, NULL, ?, ?, 0)
+                    ");
+                    $stmt->execute([$pageId, $property['name'], $property['value']]);
+                    
+                    // Dispatch triggers (this will trigger our alias handler)
+                    dispatchPropertyTriggers($pdo, 'page', $pageId, $property['name'], $property['value']);
+                } catch (Exception $e) {
+                    error_log("[NOTES_API_ERROR] Error saving page property {$property['name']} for page {$pageId}: " . $e->getMessage());
+                    throw $e; // Re-throw to trigger transaction rollback
+                }
             }
         }
-    }
-    
-    // Save page properties
-    foreach ($pageProperties as $property) {
-        try {
-            // Save the property to the page
-            $stmt = $pdo->prepare("
-                REPLACE INTO Properties (page_id, note_id, name, value, internal)
-                VALUES (?, NULL, ?, ?, 0)
-            ");
-            $stmt->execute([$pageId, $property['name'], $property['value']]);
-            
-            // Dispatch triggers (this will trigger our alias handler)
-            dispatchPropertyTriggers($pdo, 'page', $pageId, $property['name'], $property['value']);
-        } catch (Exception $e) {
-            error_log("Error saving page property {$property['name']} for page {$pageId}: " . $e->getMessage());
-        }
+        
+        error_log("[NOTES_API_DEBUG] Successfully saved page properties for page {$pageId}");
+        
+    } catch (Exception $e) {
+        error_log("[NOTES_API_ERROR] Failed to save page properties for page {$pageId}: " . $e->getMessage());
+        throw $e; // Re-throw to be caught by the caller
     }
 }
 
@@ -249,6 +260,9 @@ if ($method === 'GET') {
     validateNoteData($input);
     
     try {
+        error_log("[NOTES_API_DEBUG] Starting note creation for page_id: " . $input['page_id']);
+        error_log("[NOTES_API_DEBUG] Content: " . $input['content']);
+        
         $pdo->beginTransaction();
         
         // Get max order_index for the page
@@ -257,37 +271,99 @@ if ($method === 'GET') {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         $orderIndex = ($result['max_order'] ?? 0) + 1;
         
+        error_log("[NOTES_API_DEBUG] Calculated order_index: " . $orderIndex);
+        
         // Insert new note
-        $stmt = $pdo->prepare("
+        $insertSql = "
             INSERT INTO Notes (page_id, content, parent_note_id, order_index, internal, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
-        "); // Added 'internal' column with default 0
-        $stmt->execute([
+            VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ";
+        $insertParams = [
             (int)$input['page_id'],
             $input['content'],
             isset($input['parent_note_id']) ? (int)$input['parent_note_id'] : null,
             $orderIndex
-        ]);
+        ];
         
-        $noteId = $pdo->lastInsertId();
+        error_log("[NOTES_API_DEBUG] About to execute INSERT Notes with SQL: " . $insertSql);
+        error_log("[NOTES_API_DEBUG] Parameters: " . json_encode($insertParams));
         
-        // Parse and save properties from note content
-        $properties = parsePropertiesFromContent($input['content']);
-        savePropertiesForNote($pdo, $noteId, $properties);
-        
-        // Parse and save page properties from note content
-        savePagePropertiesFromContent($pdo, (int)$input['page_id'], $input['content']);
-        
-        // Fetch the created note
-        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
-        $stmt->execute([$noteId]);
-        $note = $stmt->fetch(PDO::FETCH_ASSOC);
-        $note['properties'] = [];
-        
-        $pdo->commit();
-        sendJsonResponse(['success' => true, 'data' => $note]);
-    } catch (PDOException $e) {
-        $pdo->rollBack();
+        $stmt = $pdo->prepare($insertSql);
+        try {
+            $stmt->execute($insertParams);
+            
+            // Check for errors immediately after execute
+            $executeError = $stmt->errorInfo();
+            if ($executeError[0] !== PDO::ERR_NONE && $executeError[0] !== '00000') {
+                $error_message = "SQL Error after INSERT Notes: [{$executeError[0]}] {$executeError[2]}";
+                error_log("[NOTES_API_ERROR] " . $error_message);
+                error_log("[NOTES_API_ERROR] SQL State: " . $executeError[0]);
+                error_log("[NOTES_API_ERROR] Error Code: " . $executeError[1]);
+                error_log("[NOTES_API_ERROR] Error Message: " . $executeError[2]);
+                
+                // Try to get more info about the FTS table state
+                try {
+                    $ftsCheck = $pdo->query("SELECT COUNT(*) as count FROM Notes_fts");
+                    $ftsCount = $ftsCheck->fetch(PDO::FETCH_ASSOC)['count'];
+                    error_log("[NOTES_API_DEBUG] Current Notes_fts count: " . $ftsCount);
+                } catch (Exception $e) {
+                    error_log("[NOTES_API_ERROR] Could not check Notes_fts: " . $e->getMessage());
+                }
+                
+                throw new PDOException($error_message);
+            }
+            
+            $noteId = $pdo->lastInsertId();
+            error_log("[NOTES_API_DEBUG] Successfully inserted note with ID: " . $noteId);
+            
+            // Parse and save properties from note content
+            try {
+                error_log("[NOTES_API_DEBUG] Starting to save properties for note " . $noteId);
+                $properties = parsePropertiesFromContent($input['content']);
+                error_log("[NOTES_API_DEBUG] Parsed properties: " . json_encode($properties));
+                savePropertiesForNote($pdo, $noteId, $input['content']);
+                error_log("[NOTES_API_DEBUG] Successfully saved properties for note " . $noteId);
+            } catch (Exception $e) {
+                error_log("[NOTES_API_ERROR] Error saving properties for note " . $noteId . ": " . $e->getMessage());
+                throw $e; // Re-throw to trigger transaction rollback
+            }
+            
+            // Parse and save page properties from note content
+            try {
+                error_log("[NOTES_API_DEBUG] Starting to save page properties for page " . $input['page_id']);
+                savePagePropertiesFromContent($pdo, (int)$input['page_id'], $input['content']);
+                error_log("[NOTES_API_DEBUG] Successfully saved page properties for page " . $input['page_id']);
+            } catch (Exception $e) {
+                error_log("[NOTES_API_ERROR] Error saving page properties for page " . $input['page_id'] . ": " . $e->getMessage());
+                throw $e; // Re-throw to trigger transaction rollback
+            }
+            
+            // Fetch the created note
+            $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
+            $stmt->execute([$noteId]);
+            $note = $stmt->fetch(PDO::FETCH_ASSOC);
+            $note['properties'] = [];
+            
+            $pdo->commit();
+            error_log("[NOTES_API_DEBUG] Successfully committed transaction for note " . $noteId);
+            sendJsonResponse(['success' => true, 'data' => $note]);
+            
+        } catch (PDOException $e) {
+            error_log("[NOTES_API_ERROR] PDO Exception during note creation: " . $e->getMessage());
+            error_log("[NOTES_API_ERROR] SQL State: " . $e->getCode());
+            error_log("[NOTES_API_ERROR] Trace: " . $e->getTraceAsString());
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            sendJsonResponse(['success' => false, 'error' => 'Database error during note creation: ' . $e->getMessage()], 500);
+            return;
+        }
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log("[NOTES_API_ERROR] Unexpected error during note creation: " . $e->getMessage());
+        error_log("[NOTES_API_ERROR] Trace: " . $e->getTraceAsString());
         sendJsonResponse(['success' => false, 'error' => 'Failed to create note: ' . $e->getMessage()], 500);
     }
 } elseif ($method === 'PUT') {
@@ -299,8 +375,8 @@ if ($method === 'GET') {
     // validateNoteData($input); // Content is only required if it's the only thing sent or for new notes
 
     try {
-        $pdo->beginTransaction();
-        
+        $pdo->beginTransaction(); // Start transaction for the main note update
+
         $noteId = (int)$_GET['id'];
 
         // Check if note exists
@@ -309,18 +385,30 @@ if ($method === 'GET') {
         $existingNote = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$existingNote) {
-            $pdo->rollBack();
+            $pdo->rollBack(); // Rollback if note not found
             sendJsonResponse(['success' => false, 'error' => 'Note not found'], 404);
         }
         
-        // Build the SET part of the SQL query dynamically
+        // --- Build and execute the main UPDATE Notes statement ---
         $setClauses = [];
         $executeParams = [];
+
+        $internalValueFromContent = null; // Variable to hold internal status from content
 
         if (isset($input['content'])) {
             $setClauses[] = "content = ?";
             $executeParams[] = $input['content'];
+
+            // Parse properties from content to find 'internal' status
+            $propertiesFromContent = parsePropertiesFromContent($input['content']);
+            foreach ($propertiesFromContent as $prop) {
+                if (strtolower($prop['name']) === 'internal') {
+                    $internalValueFromContent = (strtolower($prop['value']) === 'true' || $prop['value'] === '1') ? 1 : 0;
+                    break; // Use the first 'internal' property found
+                }
+            }
         }
+
         if (array_key_exists('parent_note_id', $input)) { // Use array_key_exists to allow null
             $setClauses[] = "parent_note_id = ?";
             $executeParams[] = $input['parent_note_id'] === null ? null : (int)$input['parent_note_id'];
@@ -334,8 +422,14 @@ if ($method === 'GET') {
             $executeParams[] = (int)$input['collapsed']; // Should be 0 or 1
         }
 
+        // Add internal status from content to the main update query if found
+        if ($internalValueFromContent !== null) {
+            $setClauses[] = "internal = ?";
+            $executeParams[] = $internalValueFromContent;
+        }
+
         if (empty($setClauses)) {
-            $pdo->rollBack();
+            $pdo->rollBack(); // Rollback if nothing to update
             sendJsonResponse(['success' => false, 'error' => 'No updateable fields provided'], 400);
             return; // Exit early
         }
@@ -345,34 +439,87 @@ if ($method === 'GET') {
         $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
         $executeParams[] = $noteId;
         
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($executeParams);
+        error_log("[NOTES_API_DEBUG] About to execute UPDATE Notes with SQL: " . $sql);
+        error_log("[NOTES_API_DEBUG] Parameters: " . json_encode($executeParams));
         
-        // If content was updated, parse and save properties
-        if (isset($input['content'])) {
-            // First, delete existing non-internal properties for this note
-            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND internal = 0");
-            $stmtDeleteProps->execute([$noteId]);
+        $stmt = $pdo->prepare($sql);
+        try {
+            $stmt->execute($executeParams);
             
-            // Parse and save new properties from updated content
-            $properties = parsePropertiesFromContent($input['content']);
-            savePropertiesForNote($pdo, $noteId, $properties);
+            // Check for errors immediately after execute, especially for FTS trigger issues
+            $executeError = $stmt->errorInfo();
+            if ($executeError[0] !== PDO::ERR_NONE && $executeError[0] !== '00000') {
+                $error_message = "SQL Error after UPDATE Notes: [{$executeError[0]}] {$executeError[2]}";
+                error_log("[NOTES_API_ERROR] " . $error_message);
+                error_log("[NOTES_API_ERROR] SQL State: " . $executeError[0]);
+                error_log("[NOTES_API_ERROR] Error Code: " . $executeError[1]);
+                error_log("[NOTES_API_ERROR] Error Message: " . $executeError[2]);
+                
+                // Try to get more info about the FTS table state
+                try {
+                    $ftsCheck = $pdo->query("SELECT COUNT(*) as count FROM Notes_fts");
+                    $ftsCount = $ftsCheck->fetch(PDO::FETCH_ASSOC)['count'];
+                    error_log("[NOTES_API_DEBUG] Current Notes_fts count: " . $ftsCount);
+                } catch (Exception $e) {
+                    error_log("[NOTES_API_ERROR] Could not check Notes_fts: " . $e->getMessage());
+                }
+                
+                $pdo->rollBack(); // Rollback before sending response
+                sendJsonResponse(['success' => false, 'error' => $error_message], 500);
+                return; // Exit early
+            }
+            
+            // Log successful update
+            error_log("[NOTES_API_DEBUG] Successfully executed UPDATE Notes for note {$noteId}");
+            
+        } catch (PDOException $e) {
+            error_log("[NOTES_API_ERROR] PDO Exception during UPDATE Notes: " . $e->getMessage());
+            error_log("[NOTES_API_ERROR] SQL State: " . $e->getCode());
+            error_log("[NOTES_API_ERROR] Trace: " . $e->getTraceAsString());
+            $pdo->rollBack();
+            sendJsonResponse(['success' => false, 'error' => 'Database error during update: ' . $e->getMessage()], 500);
+            return;
         }
         
-        // Parse and save page properties from updated content
-        savePagePropertiesFromContent($pdo, (int)$existingNote['page_id'], $input['content']);
-        
-        // Fetch updated note
+        // --- Fetch the updated note data for the response ---
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
         $stmt->execute([$noteId]);
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        // Get properties (respecting include_internal - defaulting to false for PUT response)
+
+        // --- Commit the main note update transaction ---
+        $pdo->commit();
+
+        // --- Now, save properties in separate transactions ---
+        $propertySaveError = null; // Variable to catch errors from property saving
+
+        if (isset($input['content'])) {
+            try {
+                // savePropertiesForNote should manage its own transaction
+                savePropertiesForNote($pdo, $noteId, $input['content']);
+            } catch (Exception $e) {
+                $propertySaveError = "Error saving note properties: " . $e->getMessage();
+                error_log("[NOTES_API_ERROR] PUT Note (Properties): " . $propertySaveError);
+                // Don't re-throw, just log and continue to page properties
+            }
+        }
+
+        if (isset($input['content']) && is_string($input['content'])) {
+            try {
+                // savePagePropertiesFromContent should manage its own transaction
+                savePagePropertiesFromContent($pdo, (int)$existingNote['page_id'], $input['content']);
+            } catch (Exception $e) {
+                $propertySaveError = ($propertySaveError ? $propertySaveError . " | " : "") . "Error saving page properties: " . $e->getMessage();
+                error_log("[NOTES_API_ERROR] PUT Note (Page Properties): " . $e->getMessage());
+                // Don't re-throw, just log
+            }
+        }
+
+        // --- Get properties (respecting include_internal - defaulting to false for PUT response) ---
+        // This fetches properties *after* they have been potentially updated by the separate save calls above.
         $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id";
-        // For PUT response, let's default to not showing internal properties, similar to a GET without include_internal
-        $propSql .= " AND internal = 0";
+        $propSql .= " AND internal = 0"; // Default to excluding internal for PUT response
         $propSql .= " ORDER BY name";
-        
+
         $stmtProps = $pdo->prepare($propSql);
         $stmtProps->bindParam(':note_id', $note['id'], PDO::PARAM_INT);
         $stmtProps->execute();
@@ -383,25 +530,42 @@ if ($method === 'GET') {
             if (!isset($note['properties'][$prop['name']])) {
                 $note['properties'][$prop['name']] = [];
             }
-            // Match structure of api/properties.php for consistency
-            // Since this is a default view (like include_internal=false), simplify if possible
-            $propEntry = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
-             // This property would only be here if its internal = 0 due to the query filter
-            $note['properties'][$prop['name']][] = $prop['value']; // Simplified for non-internal properties
+            // Match structure of api/properties.php (simplified for non-internal)
+            $note['properties'][$prop['name']][] = $prop['value'];
         }
 
         foreach ($note['properties'] as $name => $values) {
             if (count($values) === 1) {
-                 $note['properties'][$name] = $values[0];
+                 $note['properties'][$name] = $values[0]; // Simplify single values
             }
-            // If it was a list, it remains a list of values
         }
-        
-        $pdo->commit();
-        sendJsonResponse(['success' => true, 'data' => $note]);
+
+        // --- Prepare the final response ---
+        $responseData = ['success' => true, 'data' => $note];
+        if ($propertySaveError) {
+            // Include property save errors in the response, but don't fail the whole request
+            $responseData['property_save_warning'] = $propertySaveError;
+        }
+
+        sendJsonResponse($responseData);
+
     } catch (PDOException $e) {
-        $pdo->rollBack();
-        sendJsonResponse(['success' => false, 'error' => 'Failed to update note: ' . $e->getMessage()], 500);
+        // This catch block now primarily handles errors from the main note update transaction
+        if ($pdo->inTransaction()) {
+             $pdo->rollBack(); // Ensure rollback if an error occurred before commit
+        }
+        $error_detail = 'Failed to update note: ' . $e->getMessage();
+        if (method_exists($e, 'errorInfo') && $e->errorInfo !== null && isset($e->errorInfo[1]) && isset($e->errorInfo[2])) {
+            $error_detail .= " | SQL Error [" . $e->errorInfo[1] . "]: " . $e->errorInfo[2];
+        }
+        error_log("[NOTES_API_ERROR] PUT Note (Main Update): " . $error_detail . " | Trace: " . $e->getTraceAsString()); // Server-side log
+        sendJsonResponse(['success' => false, 'error' => $error_detail], 500); // Send detailed error to client for debugging
+    } catch (Exception $e) { // Catch any other unexpected exceptions (e.g., from property functions if they somehow throw outside their try-catch)
+        if ($pdo->inTransaction()) {
+             $pdo->rollBack();
+        }
+        error_log("[NOTES_API_ERROR] PUT Note (Unexpected): " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
+        sendJsonResponse(['success' => false, 'error' => 'An unexpected error occurred: ' . $e->getMessage()], 500);
     }
 } elseif ($method === 'DELETE') {
     if (!isset($_GET['id'])) {

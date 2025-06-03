@@ -493,7 +493,15 @@ const debouncedSaveNote = debounce(async (noteEl) => {
     if (noteData && noteData.content === rawContent) return;
 
     try {
+        console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
+        const contentDivForSource = noteEl.querySelector('.note-content');
+        const contentSource = contentDivForSource.dataset.rawContent === rawContent ? 'dataset.rawContent' : (contentDivForSource.textContent === rawContent ? 'textContent' : 'unknown/mixed');
+        console.log('[DEBUG SAVE] Content source for rawContent:', contentSource);
+        console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
+        
         const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
+        
+        console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
         const noteIndex = notesForCurrentPage.findIndex(n => n.id === updatedNote.id);
         if (noteIndex > -1) {
             notesForCurrentPage[noteIndex] = updatedNote;
@@ -523,7 +531,24 @@ async function saveNoteImmediately(noteEl) {
     if (noteData && noteData.content === rawContent) return;
 
     try {
+        // const noteId = noteEl.dataset.noteId; // already defined
+        // const contentDiv = noteEl.querySelector('.note-content'); // already defined
+        // const rawContent = contentDiv.dataset.rawContent || contentDiv.innerText; // already defined
+
+        console.log('[DEBUG DEBOUNCED SAVE] Attempting to save noteId:', noteId);
+        const contentDivForSource = contentDiv; // Use existing contentDiv
+        const actualRawContentForLogging = contentDivForSource.dataset.rawContent || contentDivForSource.textContent; // Get the latest for logging comparison
+        const contentSource = contentDivForSource.dataset.rawContent === rawContent ? 'dataset.rawContent' : (contentDivForSource.textContent === rawContent ? 'textContent' : 'unknown/mixed');
+
+        console.log('[DEBUG DEBOUNCED SAVE] Content source for rawContent variable:', contentSource);
+        console.log('[DEBUG DEBOUNCED SAVE] `rawContent` variable to be sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
+        if(rawContent !== actualRawContentForLogging) {
+            console.warn('[DEBUG DEBOUNCED SAVE] Mismatch between rawContent variable and fresh query from DOM for noteId ' + noteId + '. Fresh query:', JSON.stringify(actualRawContentForLogging));
+        }
+
         const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
+        
+        console.log('[DEBUG DEBOUNCED SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
         const noteIndex = notesForCurrentPage.findIndex(n => n.id === updatedNote.id);
         if (noteIndex > -1) {
             notesForCurrentPage[noteIndex] = updatedNote;
