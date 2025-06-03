@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
         }
         
-        send_json_response($properties);
+        send_json_response(['success' => true, 'data' => $properties]);
         
     } catch (Exception $e) {
         send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
@@ -164,12 +164,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // DELETE /api/properties.php?entity_type=note&entity_id=123&name=property_name
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    error_log("[DEBUG API DELETE] Processing DELETE request. Actual method: " . $_SERVER['REQUEST_METHOD']);
+    error_log("[DEBUG API DELETE] GET Params: " . print_r($_GET, true));
+
     $entityType = isset($_GET['entity_type']) ? htmlspecialchars($_GET['entity_type'], ENT_QUOTES, 'UTF-8') : null;
-    $entityId = filter_input(INPUT_GET, 'entity_id', FILTER_VALIDATE_INT);
+    // Use filter_var for entityId to get NULL if not set, or false on failure, which helps debugging
+    $rawEntityId = isset($_GET['entity_id']) ? $_GET['entity_id'] : null;
+    $entityId = filter_var($rawEntityId, FILTER_VALIDATE_INT, ['options' => ['default' => null]]); // Default to null to distinguish from 0
+    
     $name = isset($_GET['name']) ? htmlspecialchars($_GET['name'], ENT_QUOTES, 'UTF-8') : null;
     
-    if (!$entityType || !$entityId || !$name) {
-        send_json_response(['error' => 'Missing required parameters'], 400);
+    error_log("[DEBUG API DELETE] Parsed Params: entityType='{$entityType}', rawEntityId='{$rawEntityId}', filteredEntityId='".($entityId === null ? "NULL" : ($entityId === false ? "FALSE" : $entityId))."', name='{$name}'");
+
+    if ($entityType === null || $entityId === null || $entityId === false || $name === null) {
+        $errorDetails = "entityType: " . ($entityType === null ? "MISSING" : "OK") . 
+                        ", entityId (filtered): " . ($entityId === null ? "MISSING_OR_INVALID_RAW" : ($entityId === false ? "INVALID_INT" : "OK")) .
+                        ", name: " . ($name === null ? "MISSING" : "OK");
+        error_log("[DEBUG API DELETE] Condition for missing params triggered. Details: " . $errorDetails);
+        send_json_response(['success' => false, 'error' => 'DELETE Error: Missing or invalid parameters. Details: ' . $errorDetails], 400);
     }
     
     try {

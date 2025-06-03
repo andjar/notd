@@ -8,6 +8,7 @@
 const domRefs = {
     notesContainer: document.getElementById('notes-container'),
     currentPageTitleEl: document.getElementById('current-page-title'),
+    pagePropertiesContainer: document.getElementById('page-properties'),
     pageListContainer: document.getElementById('page-list'),
     addRootNoteBtn: document.getElementById('add-root-note-btn'),
     toggleLeftSidebarBtn: document.getElementById('toggle-left-sidebar-btn'),
@@ -1420,6 +1421,72 @@ function renderInlineProperties(properties) {
     return '';
 }
 
+/**
+ * Renders page properties as inline "pills" directly on the page.
+ * @param {Object} properties - The page's properties object.
+ * @param {HTMLElement} targetContainer - The HTML element to render properties into.
+ */
+function renderPageInlineProperties(properties, targetContainer) {
+    if (!targetContainer) {
+        console.error("Target container for inline page properties not provided.");
+        return;
+    }
+    targetContainer.innerHTML = ''; // Clear previous properties
+
+    if (!properties || Object.keys(properties).length === 0) {
+        targetContainer.style.display = 'none';
+        return;
+    }
+
+    let hasVisibleProperties = false;
+    const fragment = document.createDocumentFragment();
+
+    Object.entries(properties).forEach(([key, value]) => {
+        // Skip specific properties like 'type: journal' from inline display
+        if ((key === 'type' && value === 'journal')) {
+            return;
+        }
+
+        hasVisibleProperties = true;
+
+        const processValue = (val) => {
+            const propItem = document.createElement('span');
+            propItem.className = 'property-inline'; // Use the correct CSS class for inline pills
+
+            // Special styling for tags (key starting with 'tag::')
+            if (key.startsWith('tag::')) {
+                const tagName = key.substring(5); // Remove 'tag::' prefix
+                propItem.innerHTML = `<span class="property-key">#${tagName}</span>`;
+                propItem.classList.add('property-tag'); // Add tag-specific styling
+            } else {
+                // For regular properties, show key: value
+                // Don't use parseAndRenderContent for simple values to avoid <p> tags
+                const displayValue = String(val).trim();
+                propItem.innerHTML = `<span class="property-key">${key}:</span> <span class="property-value">${displayValue}</span>`;
+            }
+            fragment.appendChild(propItem);
+        };
+
+        if (Array.isArray(value)) {
+            value.forEach(v => processValue(v));
+        } else {
+            processValue(value);
+        }
+    });
+
+    if (hasVisibleProperties) {
+        targetContainer.appendChild(fragment);
+        targetContainer.style.display = 'flex'; // Use flex for layout
+        targetContainer.style.flexWrap = 'wrap'; // Allow pills to wrap
+        targetContainer.style.gap = 'var(--ls-space-2, 8px)'; // Add gap between pills
+        // Ensure it's placed appropriately if it was hidden
+        targetContainer.classList.remove('hidden'); 
+    } else {
+        targetContainer.style.display = 'none';
+        targetContainer.classList.add('hidden');
+    }
+}
+
 // Export functions and DOM references for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -1428,6 +1495,7 @@ if (typeof module !== 'undefined' && module.exports) {
         parseAndRenderContent,
         extractPropertiesFromContent,
         renderInlineProperties,
+        renderPageInlineProperties,
         renderProperties,
         displayNotes,
         buildNoteTree,
@@ -1447,8 +1515,8 @@ if (typeof module !== 'undefined' && module.exports) {
         showGenericConfirmModal,
         focusOnNote,
         showAllNotes,
-        getNoteAncestors, // Added for breadcrumbs
-        renderBreadcrumbs // Added for breadcrumbs
+        getNoteAncestors,
+        renderBreadcrumbs
     };
 } else {
     // For browser environment, attach to window
@@ -1458,6 +1526,7 @@ if (typeof module !== 'undefined' && module.exports) {
         parseAndRenderContent,
         extractPropertiesFromContent,
         renderInlineProperties,
+        renderPageInlineProperties,
         renderProperties,
         displayNotes,
         buildNoteTree,
@@ -1477,9 +1546,9 @@ if (typeof module !== 'undefined' && module.exports) {
         showGenericConfirmModal,
         focusOnNote,
         showAllNotes,
-        getNoteAncestors, // Added for breadcrumbs
-        renderBreadcrumbs, // Added for breadcrumbs
-        showAllNotesAndLoadPage // Expose helper for breadcrumb page link
+        getNoteAncestors,
+        renderBreadcrumbs,
+        showAllNotesAndLoadPage
     };
 }
 

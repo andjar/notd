@@ -772,9 +772,6 @@ body {
 /* Page Properties */
 #page-properties {
     margin: var(--ls-space-4) 0;
-    padding: var(--ls-space-3);
-    background-color: var(--ls-secondary-background-color);
-    border-radius: var(--ls-border-radius-medium);
 }
 .page-properties-list {
     display: flex;
@@ -1107,48 +1104,79 @@ textarea:focus {
 
 /* Styles for the list and items within the page properties modal remain */
 #page-properties-list {
-    /* Existing styles for page-properties-list are fine */
-    /* May need adjustments based on generic-modal-content padding */
+    display: flex; /* Arrange pills in a row */
+    flex-wrap: wrap; /* Allow pills to wrap to the next line */
+    gap: var(--ls-space-2); /* Space between pills */
     margin-bottom: var(--ls-space-4); /* Ensure space before actions */
+    padding: 0; /* Remove any default padding */
+    list-style: none; /* Ensure no list bullets if it were a ul/ol */
 }
 
-.page-property-item {
-    /* Existing styles are mostly fine */
-    background-color: var(--ls-secondary-background-color); /* ensure contrast if modal is primary */
-    display: flex;
-    align-items: center;
-    gap: var(--ls-space-2);
-    padding: var(--ls-space-2) var(--ls-space-3);
-    border-radius: var(--ls-border-radius-low);
-    border: 1px solid var(--ls-border-color); /* Add a subtle border */
-}
-
-.page-property-key {
+/* Styles for individual property pills in the modal - TO MATCH INLINE PILLS */
+#page-properties-list .page-property-item {
+    /* Match .property-item.tag and .property-inline styles exactly */
+    background-color: var(--ls-tertiary-background-color);
     color: var(--ls-accent-10);
+    border-radius: var(--ls-border-radius-low); /* Use low instead of full for consistency */
+    padding: 2px 6px; /* Exact match to inline properties */
+    font-size: 0.9em; /* Match .property-item.tag */
+    display: inline-flex;
+    align-items: center;
+    gap: 2px; /* Small gap, similar to inline */
+    border: 1px solid var(--ls-border-color); /* Match .property-inline border */
+    margin-right: 4px; /* Match .property-item.tag margin */
+}
+
+#page-properties-list .page-property-key {
+    color: var(--ls-accent-10); /* Match .property-item.tag .property-key */
     font-weight: var(--ls-font-weight-medium);
     white-space: nowrap;
 }
 
-.page-property-value {
-    background-color: var(--ls-primary-background-color);
-    flex-grow: 1; /* Use flex-grow instead of flex:1 to allow shrinking if needed */
-    padding: var(--ls-space-1) var(--ls-space-2);
-    border: 1px solid var(--ls-secondary-border-color);
-    border-radius: var(--ls-border-radius-low);
-    min-width: 100px; /* Prevent it from becoming too small */
-}
-.page-property-value:focus {
-    outline: none; /* Remove default outline */
-    border-color: var(--ls-accent-10);
-    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2); /* Consistent focus style */
+#page-properties-list .page-property-separator {
+    color: var(--ls-accent-10);
+    opacity: 0.8;
 }
 
-.add-property-btn {
-    /* This is now a .button inside .generic-modal-actions, so it inherits button styles */
-    /* Specific overrides if needed: */
-    /* background-color: var(--ls-tertiary-background-color); */
-    /* color: var(--ls-secondary-text-color); */
-    /* ... */
+#page-properties-list .page-property-value {
+    color: var(--ls-accent-10); /* Match .property-item.tag .property-value */
+    font-weight: var(--ls-font-weight-medium);
+    background-color: transparent;
+    padding: 0;
+    border: none;
+    outline: none;
+    min-width: auto;
+}
+
+#page-properties-list .page-property-value[contenteditable="true"]:focus {
+    background-color: var(--ls-primary-background-color);
+    color: var(--ls-primary-text-color);
+    padding: 2px 4px;
+    box-shadow: 0 0 0 1px var(--ls-accent-10);
+    border-radius: var(--ls-border-radius-low);
+    opacity: 1;
+}
+
+#page-properties-list .page-property-delete {
+    background: transparent;
+    border: none;
+    color: var(--ls-accent-10);
+    opacity: 0.7;
+    padding: 0 2px;
+    margin-left: 2px;
+    cursor: pointer;
+    font-size: 0.9em;
+    line-height: 1;
+    border-radius: var(--ls-border-radius-low);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#page-properties-list .page-property-delete:hover {
+    color: var(--color-error, #dc2626);
+    background-color: rgba(220, 38, 38, 0.1);
+    opacity: 1;
 }
 
 /* Ensure feather icons are sized correctly in the close button */

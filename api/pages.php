@@ -239,6 +239,23 @@ if ($method === 'GET') {
         $stmt_updated = $pdo->prepare("SELECT * FROM Pages WHERE id = ?");
         $stmt_updated->execute([$page_id]);
         $updated_page = $stmt_updated->fetch();
+
+        // After successful rename, check if the new name makes it a journal page
+        if ($updated_page) {
+            $newName = $updated_page['name'];
+            if (isJournalPage($newName)) {
+                $stmt_check_prop = $pdo->prepare("SELECT 1 FROM Properties WHERE entity_type = 'page' AND entity_id = ? AND name = 'type' AND value = 'journal'");
+                $stmt_check_prop->execute([$page_id]);
+                if (!$stmt_check_prop->fetch()) {
+                    addJournalProperty($pdo, $page_id);
+                }
+            } else {
+                // Optional: If it was a journal page and now it is not, remove the property
+                // For now, we don't remove it automatically to prevent accidental data loss if renaming is temporary.
+                // $stmt_remove_prop = $pdo->prepare("DELETE FROM Properties WHERE entity_type = 'page' AND entity_id = ? AND name = 'type' AND value = 'journal'");
+                // $stmt_remove_prop->execute([$page_id]);
+            }
+        }
         
         $pdo->commit();
         echo json_encode(['success' => true, 'data' => $updated_page]);

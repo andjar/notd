@@ -98,80 +98,60 @@ Object.entries(criticalElements).forEach(([name, element]) => {
  * @param {boolean} [updateHistory=true] - Whether to update browser history
  */
 async function loadPage(pageName, focusFirstNote = false, updateHistory = true) {
-    if (typeof ui !== 'undefined' && ui.showAllNotes) {
-        ui.showAllNotes(); // Clear any existing focus and breadcrumbs
-    } else {
-        // This case should ideally not happen if ui.js is loaded before app.js
-        console.warn('ui.showAllNotes() is not available. Skipping focus clear on page load.');
-        window.currentFocusedNoteId = null; // Manually reset if ui.js is not ready
-        if (ui.domRefs && ui.domRefs.breadcrumbsContainer) {
-             ui.domRefs.breadcrumbsContainer.innerHTML = ''; // Clear breadcrumbs manually
-        }
+    console.log(`Loading page: ${pageName}, focusFirstNote: ${focusFirstNote}, updateHistory: ${updateHistory}`);
+    if (window.blockPageLoad) {
+        console.warn('Page load blocked, possibly due to unsaved changes or ongoing operation.');
+        return;
     }
-    console.log(`Loading page: ${pageName}`);
+    window.blockPageLoad = true; // Block subsequent loads until this one completes
+
     try {
+        if (!pageName || pageName.trim() === '') {
+            console.warn('loadPage called with empty pageName, defaulting to initial page.');
+            pageName = getInitialPage();
+        }
+
+        // Clear existing content and show loading state if applicable
+        if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
+        if (ui.domRefs.pagePropertiesContainer) ui.domRefs.pagePropertiesContainer.innerHTML = ''; // Clear inline props
+
+        // Fetch page data (which might create it if it's a new journal page)
         const pageData = await pagesAPI.getPage(pageName);
-        
-        if (pageData && pageData.id) {
-            // Page exists, load it
-            currentPageId = pageData.id;
-            currentPageName = pageData.name;
-            window.currentPageName = currentPageName; // Expose globally for breadcrumbs
-            
-            // Update global variables for drag and drop
-            window.currentPageId = currentPageId;
-            
-            // Update URL if needed
-            if (updateHistory) {
-                const url = new URL(window.location);
-                url.searchParams.set('page', pageName);
-                window.history.pushState({ pageName }, '', url);
-            }
-            
-            // Load page properties
-            const pageProperties = await propertiesAPI.getProperties('page', currentPageId);
-            displayPageProperties(pageProperties);
-            
-            notesForCurrentPage = await notesAPI.getNotesForPage(currentPageId);
-            window.notesForCurrentPage = notesForCurrentPage; // Update global
-            ui.updatePageTitle(currentPageName);
-            ui.displayNotes(notesForCurrentPage, currentPageId);
-            ui.updateActivePageLink(currentPageName);
+        if (!pageData) {
+            throw new Error(`Page "${pageName}" not found and could not be created.`);
+        }
 
-            // Load backlinks
-            const backlinks = await searchAPI.getBacklinks(currentPageName);
-            displayBacklinks(backlinks);
+        currentPageName = pageData.name; // pageData.name is the canonical name
+        currentPageId = pageData.id;
+        window.currentPageId = currentPageId; // Make globally available for other modules
 
-            // Handle transclusions
-            await handleTransclusions();
+        ui.updatePageTitle(currentPageName);
 
-            if (focusFirstNote) {
-                const firstNote = notesContainer.querySelector('.note-content');
-                if (firstNote) firstNote.focus();
-            }
-        } else {
-            // Page doesn't exist, check if it's a journal page
-            const journalPattern = /^\d{4}-\d{2}-\d{2}$|^Journal$/i;
-            if (journalPattern.test(pageName)) {
-                console.log(`Creating journal page: ${pageName}`);
-                const newPage = await pagesAPI.createPage({ name: pageName });
-                
-                if (newPage && newPage.id) {
-                    await fetchAndDisplayPages(newPage.name);
-                    await loadPage(newPage.name, true);
-                } else {
-                    currentPageName = `Failed: ${pageName}`;
-                    window.currentPageName = currentPageName; // Expose globally
-                    updatePageTitle(currentPageName);
-                    notesContainer.innerHTML = `<p>Could not create page: ${pageName}</p>`;
-                }
-            } else {
-                currentPageName = `Not Found: ${pageName}`;
-                window.currentPageName = currentPageName; // Expose globally
-                updatePageTitle(currentPageName);
-                notesContainer.innerHTML = `<p>Page "${pageName}" not found.</p>`;
-                updateActivePageLink(null);
-            }
+        // Fetch properties for the current page
+        const pageProperties = await propertiesAPI.getProperties('page', currentPageId);
+        console.log('Page properties for ', currentPageName, ':', pageProperties);
+
+        // Render inline page properties (under the title)
+        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+            ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
+        }
+
+        // Fetch notes for the page
+        notesForCurrentPage = await notesAPI.getNotesForPage(currentPageId);
+        window.notesForCurrentPage = notesForCurrentPage; // Update global
+        ui.displayNotes(notesForCurrentPage, currentPageId);
+        ui.updateActivePageLink(currentPageName);
+
+        // Load backlinks
+        const backlinks = await searchAPI.getBacklinks(currentPageName);
+        displayBacklinks(backlinks);
+
+        // Handle transclusions
+        await handleTransclusions();
+
+        if (focusFirstNote) {
+            const firstNote = notesContainer.querySelector('.note-content');
+            if (firstNote) firstNote.focus();
         }
     } catch (error) {
         console.error('Error loading page:', error);
@@ -179,6 +159,8 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
         window.currentPageName = currentPageName; // Expose globally
         updatePageTitle(currentPageName);
         notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
+    } finally {
+        window.blockPageLoad = false; // Allow subsequent loads
     }
 }
 
@@ -1016,60 +998,93 @@ function getInitialPage() {
 
 // Page Properties Modal Handling
 function initPagePropertiesModal() {
-    const gear = ui.domRefs.pagePropertiesGear;
-    const modal = ui.domRefs.pagePropertiesModal;
-    const closeButton = ui.domRefs.pagePropertiesModalClose;
+    const titleContainer = document.getElementById('current-page-title-container');
+    const modal = document.getElementById('page-properties-modal');
+    const modalContent = modal ? modal.querySelector('.generic-modal-content') : null;
 
-    console.log('Initializing page properties modal...');
-    console.log('Gear element:', gear);
-    console.log('Modal element:', modal);
-    console.log('Close button element:', closeButton);
+    console.log('[InitPagePropsModal-Delegated] Initializing...');
+    console.log('[InitPagePropsModal-Delegated] Title Container for listener:', titleContainer);
+    console.log('[InitPagePropsModal-Delegated] Modal element:', modal);
+    console.log('[InitPagePropsModal-Delegated] Modal Content element for close listener:', modalContent);
 
-    if (!gear || !modal || !closeButton) {
-        console.warn('Page properties modal elements not found. Modal functionality will be disabled.');
+    if (!titleContainer) {
+        console.warn('[InitPagePropsModal-Delegated] Page title container element not found. Cannot attach delegated listener for gear icon.');
+        return;
+    }
+    if (!modal) {
+        console.warn('[InitPagePropsModal-Delegated] Page properties MODAL element not found. Modal functionality will be disabled.');
         return;
     }
 
-    gear.addEventListener('click', async () => {
-        console.log('Page properties gear clicked!');
-        console.log('Current page ID:', currentPageId);
+    console.log('[InitPagePropsModal-Delegated] Attaching delegated click listener to title container:', titleContainer);
+    titleContainer.addEventListener('click', async (event) => {
+        const gearIcon = event.target.closest('#page-properties-gear');
+        if (!gearIcon) {
+            return; // Click was not on the gear icon or its children
+        }
+
+        console.log('[InitPagePropsModal-Delegated] Gear icon clicked (via delegation). Target:', event.target);
+        if (!modal) {
+            console.error('[InitPagePropsModal-Delegated] Modal element is null or undefined at click time!');
+            return;
+        }
+        console.log('[InitPagePropsModal-Delegated] Current page ID for properties:', currentPageId);
         
-        // Refresh page properties before showing modal
         if (currentPageId) {
             try {
-                console.log('Fetching properties for page:', currentPageId);
+                console.log('[InitPagePropsModal-Delegated] Fetching properties for page:', currentPageId);
                 const properties = await propertiesAPI.getProperties('page', currentPageId);
-                console.log('Properties fetched:', properties);
-                displayPageProperties(properties); // Make sure this function is available in ui module
+                console.log('[InitPagePropsModal-Delegated] Properties fetched for modal:', properties);
+                displayPageProperties(properties);
             } catch (error) {
-                console.error('Error fetching page properties for modal:', error);
+                console.error('[InitPagePropsModal-Delegated] Error fetching page properties for modal:', error);
                 displayPageProperties({}); // Display empty or error state
             }
         }
         
-        console.log('Adding active class to modal');
+        console.log('[InitPagePropsModal-Delegated] Current modal classList BEFORE add active:', modal.classList.toString());
         modal.classList.add('active');
-        
+        console.log('[InitPagePropsModal-Delegated] Current modal classList AFTER add active:', modal.classList.toString());
+        console.log('[InitPagePropsModal-Delegated] Modal display style after adding active class:', window.getComputedStyle(modal).display);
+
         if (typeof feather !== 'undefined' && feather.replace) {
             feather.replace();
         }
     });
 
-    closeButton.addEventListener('click', () => {
-        console.log('Page properties modal close button clicked');
-        modal.classList.remove('active');
-    });
+    // Delegated listener for the close button on the modal content
+    if (modalContent) {
+        modalContent.addEventListener('click', (event) => {
+            const closeIcon = event.target.closest('#page-properties-modal-close');
+            if (closeIcon) {
+                console.log('[InitPagePropsModal-Delegated] Modal close icon clicked (via delegation). Target:', event.target);
+                if (!modal) {
+                    console.error('[InitPagePropsModal-Delegated] Modal element is null at close icon click time!');
+                    return;
+                }
+                modal.classList.remove('active');
+                console.log('[InitPagePropsModal-Delegated] Modal display style after removing active class (close icon):', modal ? window.getComputedStyle(modal).display : 'modal not found');
+            } else {
+                // console.log('[InitPagePropsModal-Delegated] Click inside modal content, but not on close icon. Target:', event.target);
+            }
+        });
+    } else {
+        console.warn('[InitPagePropsModal-Delegated] Modal content area not found. Cannot attach delegated listener for close icon.');
+    }
 
-    // Close modal when clicking outside its content
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            console.log('Clicked outside modal content, closing modal');
-            modal.classList.remove('active');
-        }
-    });
+    // Close modal when clicking outside its content (on the backdrop)
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                console.log('[InitPagePropsModal-Delegated] Clicked outside modal content, closing modal.');
+                modal.classList.remove('active');
+                console.log('[InitPagePropsModal-Delegated] Modal display style after removing active class (click outside):', window.getComputedStyle(modal).display);
+            }
+        });
+    }
 
     // Add property button
-    const addBtn = ui.domRefs.addPagePropertyBtn;
+    const addBtn = ui.domRefs.addPagePropertyBtn; // Assuming addPagePropertyBtn is still correctly referenced via ui.domRefs
     if (addBtn) {
         addBtn.addEventListener('click', async () => {
             const key = await ui.showGenericInputModal('Enter property name:');
@@ -1077,6 +1092,8 @@ function initPagePropertiesModal() {
                 await addPageProperty(key.trim(), '');
             }
         });
+    } else {
+        console.warn('[InitPagePropsModal-Delegated] Add page property button not found via ui.domRefs.');
     }
 }
 
@@ -1093,22 +1110,21 @@ function displayPageProperties(properties) {
 
     pagePropertiesList.innerHTML = '';
     if (!properties || Object.keys(properties).length === 0) {
-        console.log('No properties to display');
+        console.log('No properties to display in modal');
+        // Optional: Display a message like "No properties set for this page."
+        // pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
         return;
     }
 
     Object.entries(properties).forEach(([key, value]) => {
-        if (key === 'type' && value === 'journal') return; // Skip journal type property
-        
         if (Array.isArray(value)) {
             value.forEach(singleValue => {
                 const propItem = document.createElement('div');
                 propItem.className = 'page-property-item';
-                // For multi-value, make value non-editable for now, or decide on edit strategy
-                // Deletion should delete just this specific value if backend supports it, or the whole key if not.
-                // For simplicity, current delete button will target the key.
+                // For multi-value, display each value separately
                 propItem.innerHTML = `
-                    <span class="page-property-key">${key}::</span>
+                    <span class="page-property-key">${key}</span>
+                    <span class="page-property-separator">:</span>
                     <span class="page-property-value" data-property="${key}" data-value="${singleValue}">${singleValue}</span>
                     <button class="page-property-delete" data-property="${key}" title="Delete all '${key}' properties">×</button>
                 `;
@@ -1117,9 +1133,11 @@ function displayPageProperties(properties) {
         } else {
             const propItem = document.createElement('div');
             propItem.className = 'page-property-item';
+            // For single values, show key: value with editable value
             propItem.innerHTML = `
-                <span class="page-property-key">${key}::</span>
-                <span class="page-property-value" contenteditable="true" data-property="${key}">${value}</span>
+                <span class="page-property-key">${key}</span>
+                <span class="page-property-separator">:</span>
+                <span class="page-property-value" contenteditable="true" data-property="${key}">${value || ''}</span>
                 <button class="page-property-delete" data-property="${key}">×</button>
             `;
             pagePropertiesList.appendChild(propItem);

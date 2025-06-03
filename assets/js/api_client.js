@@ -75,9 +75,12 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
             throw new Error(data.error || 'API request failed');
         }
 
+        console.log('[apiRequest] Response successful. Full data object:', JSON.parse(JSON.stringify(data)));
+        console.log('[apiRequest] Returning data.data:', data.data);
         return data.data;
     } catch (error) {
         // Handle network errors or JSON parsing failures
+        console.error('[apiRequest] Error details:', { endpoint, method, error: error.message, stack: error.stack });
         if (error instanceof SyntaxError) {
             console.error('Failed to parse API response:', error);
             throw new Error('Invalid API response format: ' + error.message);
