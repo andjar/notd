@@ -2,6 +2,7 @@
 require_once 'db_connect.php';
 require_once 'property_triggers.php';
 require_once 'pattern_processor.php'; // Use new unified pattern processor
+require_once 'property_auto_internal.php';
 
 header('Content-Type: application/json');
 $pdo = get_db_connection();
