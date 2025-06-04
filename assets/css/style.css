@@ -127,12 +127,6 @@
     --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
     --ls-image-viewer-close-text: var(--ls-primary-text-color);
     --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-    --ls-property-tag-bg: var(--ls-accent-10);
-    --ls-property-tag-text: var(--ls-primary-background-color, #ffffff);
-    --ls-save-status-bg: var(--ls-gray-7);
-    --ls-save-status-spinner-color: var(--ls-primary-text-color);
-    --ls-save-status-saved-icon-color: var(--ls-accent-10); /* Using accent color */
-    --ls-save-status-error-icon-color: var(--color-error);
 
     /* NEWLY ADDED THEMEABLE VARIABLES - FALLBACKS */
     --ls-active-nav-item-text-color: #ffffff;

@@ -95,7 +95,7 @@
     --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(44,62,80,0.5);
     --ls-property-tag-bg: var(--ls-accent-9);
     --ls-property-tag-text: #ffffff;
-    --ls-save-status-bg: var(--ls-gray-2);
+    --ls-save-status-bg: var(--ls-gray-1);
     --ls-save-status-spinner-color: var(--ls-accent-9); /* Accent for spinner */
     --ls-save-status-saved-icon-color: #18bc9c; /* Flatly success green */
     --ls-save-status-error-icon-color: #e74c3c; /* Flatly danger red */
