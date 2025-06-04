@@ -1556,6 +1556,71 @@ function renderPageInlineProperties(properties, targetContainer) {
     }
 }
 
+// Export functions and DOM references for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        domRefs,
+        renderNote,
+        parseAndRenderContent,
+        extractPropertiesFromContent,
+        renderInlineProperties,
+        renderPageInlineProperties,
+        renderProperties,
+        displayNotes,
+        buildNoteTree,
+        updatePageTitle,
+        updatePageList,
+        updateActivePageLink,
+        showPropertyInNote,
+        removePropertyFromNote,
+        renderTransclusion,
+        switchToEditMode,
+        switchToRenderedMode,
+        initializeDragAndDrop,
+        handleNoteDrop,
+        calendarWidget,
+        renderAttachments,
+        showGenericInputModal,
+        showGenericConfirmModal,
+        focusOnNote,
+        showAllNotes,
+        getNoteAncestors,
+        renderBreadcrumbs
+    };
+} else {
+    // For browser environment, attach to window
+    window.ui = {
+        domRefs,
+        renderNote,
+        parseAndRenderContent,
+        extractPropertiesFromContent,
+        renderInlineProperties,
+        renderPageInlineProperties,
+        renderProperties,
+        displayNotes,
+        buildNoteTree,
+        updatePageTitle,
+        updatePageList,
+        updateActivePageLink,
+        showPropertyInNote,
+        removePropertyFromNote,
+        renderTransclusion,
+        switchToEditMode,
+        switchToRenderedMode,
+        initializeDragAndDrop,
+        handleNoteDrop,
+        calendarWidget,
+        renderAttachments,
+        showGenericInputModal,
+        showGenericConfirmModal,
+        focusOnNote,
+        showAllNotes,
+        getNoteAncestors,
+        renderBreadcrumbs,
+        showAllNotesAndLoadPage
+    };
+}
+
 /**
  * Traverses upwards from the noteId using parent_note_id to collect all ancestors.
  * @param {string} noteId - The ID of the note to start from.
@@ -1805,147 +1870,6 @@ function showAllNotes() {
     if (domRefs.breadcrumbsContainer) {
         domRefs.breadcrumbsContainer.innerHTML = '';
     }
-}
-
-function getNestingLevel(noteElement) {
-    let level = 0;
-    let parent = noteElement.parentElement;
-    while (parent) {
-        if (parent.classList.contains('note-children')) {
-            level++;
-        }
-        if (parent.id === 'notes-container') { // Stop at the main container
-            break;
-        }
-        parent = parent.parentElement;
-    }
-    return level;
-}
-
-function updateParentVisuals(parentNoteElement) {
-    if (!parentNoteElement) return;
-    const childrenContainer = parentNoteElement.querySelector('.note-children');
-    const hasChildren = childrenContainer && childrenContainer.querySelector('.note-item');
-    const controlsEl = parentNoteElement.querySelector('.note-controls');
-
-
-    if (hasChildren) {
-        parentNoteElement.classList.add('has-children');
-        if (controlsEl) {
-            let arrowEl = controlsEl.querySelector('.note-collapse-arrow');
-            if (!arrowEl) {
-                arrowEl = document.createElement('span');
-                arrowEl.className = 'note-collapse-arrow';
-                arrowEl.innerHTML = '<i data-feather="chevron-right"></i>';
-                arrowEl.dataset.noteId = parentNoteElement.dataset.noteId;
-                arrowEl.dataset.collapsed = parentNoteElement.classList.contains('collapsed') ? 'true' : 'false';
-                // Add event listener for collapse/expand
-                arrowEl.addEventListener('click', async (e) => { 
-                    e.stopPropagation();
-                    const currentNoteItem = arrowEl.closest('.note-item');
-                    if (!currentNoteItem) return;
-                    const noteId = currentNoteItem.dataset.noteId;
-                    const isCurrentlyCollapsed = currentNoteItem.classList.toggle('collapsed');
-                    arrowEl.dataset.collapsed = isCurrentlyCollapsed ? 'true' : 'false';
-                    const childrenContainer = currentNoteItem.querySelector('.note-children');
-                    if (childrenContainer) {
-                        childrenContainer.classList.toggle('collapsed', isCurrentlyCollapsed);
-                    }
-                    try {
-                        await window.notesAPI.updateNote(noteId, { collapsed: isCurrentlyCollapsed });
-                        const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-                        if (noteToUpdate) noteToUpdate.collapsed = isCurrentlyCollapsed;
-                    } catch (error) {
-                        console.error('Error saving collapse state from updateParentVisuals:', error);
-                    }
-                });
-                
-                const bulletEl = controlsEl.querySelector('.note-bullet');
-                const dragHandle = controlsEl.querySelector('.note-drag-handle');
-                if (dragHandle) {
-                     controlsEl.insertBefore(arrowEl, dragHandle);
-                } else if (bulletEl) {
-                     controlsEl.insertBefore(arrowEl, bulletEl);
-                } else {
-                     controlsEl.appendChild(arrowEl); 
-                }
-                if (typeof feather !== 'undefined' && feather.replace) feather.replace();
-            }
-        }
-    } else {
-        parentNoteElement.classList.remove('has-children');
-        const arrowEl = controlsEl ? controlsEl.querySelector('.note-collapse-arrow') : null;
-        if (arrowEl) {
-            arrowEl.remove();
-        }
-    }
-}
-
-// Export functions and DOM references for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        domRefs,
-        renderNote,
-        parseAndRenderContent,
-        extractPropertiesFromContent,
-        renderInlineProperties,
-        renderPageInlineProperties,
-        renderProperties,
-        displayNotes,
-        buildNoteTree,
-        updatePageTitle,
-        updatePageList,
-        updateActivePageLink,
-        showPropertyInNote,
-        removePropertyFromNote,
-        renderTransclusion,
-        switchToEditMode,
-        switchToRenderedMode,
-        initializeDragAndDrop,
-        handleNoteDrop,
-        calendarWidget,
-        renderAttachments,
-        showGenericInputModal,
-        showGenericConfirmModal,
-        focusOnNote,
-        showAllNotes,
-        getNoteAncestors,
-        renderBreadcrumbs,
-        getNestingLevel, 
-        updateParentVisuals
-    };
-} else {
-    // For browser environment, attach to window
-    window.ui = {
-        domRefs,
-        renderNote,
-        parseAndRenderContent,
-        extractPropertiesFromContent,
-        renderInlineProperties,
-        renderPageInlineProperties,
-        renderProperties,
-        displayNotes,
-        buildNoteTree,
-        updatePageTitle,
-        updatePageList,
-        updateActivePageLink,
-        showPropertyInNote,
-        removePropertyFromNote,
-        renderTransclusion,
-        switchToEditMode,
-        switchToRenderedMode,
-        initializeDragAndDrop,
-        handleNoteDrop,
-        calendarWidget,
-        renderAttachments,
-        showGenericInputModal,
-        showGenericConfirmModal,
-        focusOnNote,
-        showAllNotes,
-        getNoteAncestors,
-        renderBreadcrumbs,
-        showAllNotesAndLoadPage,
-        getNestingLevel, 
-        updateParentVisuals
-    };
+    // Alternatively, call renderBreadcrumbs with null to ensure consistent handling
+    // renderBreadcrumbs(null, window.notesForCurrentPage, window.currentPageName);
 }

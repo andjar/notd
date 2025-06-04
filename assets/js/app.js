@@ -7,6 +7,11 @@
 // State
 let currentPageId = null;
 let currentPageName = null;
+
+// NEW: Pre-fetching cache
+const pageDataCache = new Map(); // Using a Map for easier key management
+const CACHE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_PREFETCH_PAGES = 10;
 let notesForCurrentPage = []; // Flat list of notes with properties
 
 // Make some variables globally accessible for drag and drop
@@ -154,7 +159,63 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
         console.warn('Page load blocked, possibly due to unsaved changes or ongoing operation.');
         return;
     }
-    window.blockPageLoad = true; // Block subsequent loads until this one completes
+    window.blockPageLoad = true;
+
+    // NEW: Check cache first
+    if (pageDataCache.has(pageName) && (Date.now() - pageDataCache.get(pageName).timestamp < CACHE_MAX_AGE_MS)) {
+        const cachedData = pageDataCache.get(pageName);
+        console.log(`Using cached data for page: ${pageName}`);
+        
+        try {
+            currentPageName = cachedData.name; // Use canonical name from cache
+            currentPageId = cachedData.id;
+            window.currentPageId = currentPageId;
+            window.currentPageName = currentPageName;
+
+            if (updateHistory) {
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('page', currentPageName);
+                history.pushState({ pageName: currentPageName }, '', newUrl.toString());
+            }
+
+            ui.updatePageTitle(currentPageName);
+            if (ui.calendarWidget && typeof ui.calendarWidget.setCurrentPage === 'function') {
+                 ui.calendarWidget.setCurrentPage(currentPageName);
+            }
+
+            // Use cached properties
+            const pageProperties = cachedData.properties;
+            console.log('Page properties for (cached)', currentPageName, ':', pageProperties);
+            if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+                ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
+            }
+
+            // Use cached notes
+            notesForCurrentPage = cachedData.notes;
+            window.notesForCurrentPage = notesForCurrentPage;
+            ui.displayNotes(notesForCurrentPage, currentPageId); // This will also initialize drag-and-drop
+            ui.updateActivePageLink(currentPageName);
+
+            // Backlinks and transclusions are still fetched live for now
+            // Or they could be part of the cache if deemed necessary
+            const backlinks = await searchAPI.getBacklinks(currentPageName);
+            displayBacklinks(backlinks);
+            await handleTransclusions(); // Pass notesForCurrentPage if it needs it
+
+            if (focusFirstNote) {
+                const firstNote = notesContainer.querySelector('.note-content');
+                if (firstNote) firstNote.focus();
+            }
+            window.blockPageLoad = false;
+            return; // Exit early as page loaded from cache
+        } catch (error) {
+            console.error('Error loading page from cache, falling back to network:', error);
+            // Clear potentially corrupted cache entry
+            pageDataCache.delete(pageName);
+            // Continue to network fetch
+        }
+    }
+    // End of NEW cache check
 
     try {
         if (!pageName || pageName.trim() === '') {
@@ -166,7 +227,7 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
         if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
         if (ui.domRefs.pagePropertiesContainer) ui.domRefs.pagePropertiesContainer.innerHTML = ''; // Clear inline props
 
-        // Fetch page data (which might create it if it's a new journal page)
+        // Step 1: Get initial page data (ID and canonical name)
         const pageData = await pagesAPI.getPageByName(pageName);
         if (!pageData) {
             throw new Error(`Page "${pageName}" not found and could not be created.`);
@@ -191,27 +252,45 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
             ui.calendarWidget.setCurrentPage(currentPageName);
         }
 
-        // Fetch properties for the current page
-        const pageProperties = await propertiesAPI.getProperties('page', currentPageId);
-        console.log('Page properties for ', currentPageName, ':', pageProperties);
+        // Step 2: Fetch notes, properties, and backlinks in parallel
+        console.log(`Starting parallel fetch for page details: ${currentPageName}`);
+        const [fetchedPageProperties, fetchedNotes, fetchedBacklinks] = await Promise.all([
+            propertiesAPI.getProperties('page', currentPageId),
+            notesAPI.getNotesForPage(currentPageId),
+            searchAPI.getBacklinks(currentPageName) // Uses currentPageName
+        ]);
+        console.log(`Parallel fetch completed for page: ${currentPageName}`);
 
-        // Render inline page properties (under the title)
+        // Assign fetched data
+        const pageProperties = fetchedPageProperties;
+        notesForCurrentPage = fetchedNotes;
+        window.notesForCurrentPage = notesForCurrentPage; // Update global
+        const backlinks = fetchedBacklinks;
+
+        // Step 3: Update the cache with fetched data
+        if (currentPageId && currentPageName) {
+            pageDataCache.set(currentPageName, {
+                id: currentPageId,
+                name: currentPageName,
+                notes: notesForCurrentPage,
+                properties: pageProperties,
+                timestamp: Date.now()
+            });
+            console.log(`Page data for ${currentPageName} fetched from network and cached.`);
+        }
+
+        // Step 4: Render the page content
+        console.log('Page properties for ', currentPageName, ':', pageProperties);
         if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
             ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
         }
 
-        // Fetch notes for the page
-        notesForCurrentPage = await notesAPI.getNotesForPage(currentPageId);
-        window.notesForCurrentPage = notesForCurrentPage; // Update global
         ui.displayNotes(notesForCurrentPage, currentPageId);
         ui.updateActivePageLink(currentPageName);
-
-        // Load backlinks
-        const backlinks = await searchAPI.getBacklinks(currentPageName);
         displayBacklinks(backlinks);
 
-        // Handle transclusions
-        await handleTransclusions();
+        // Step 5: Handle transclusions (depends on notes being rendered)
+        await handleTransclusions(); // Pass notesForCurrentPage if it needs it
 
         if (focusFirstNote) {
             const firstNote = notesContainer.querySelector('.note-content');
@@ -221,8 +300,10 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
         console.error('Error loading page:', error);
         currentPageName = `Error: ${pageName}`;
         window.currentPageName = currentPageName; // Expose globally
-        updatePageTitle(currentPageName);
-        notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
+        ui.updatePageTitle(currentPageName); // Use ui.updatePageTitle
+        if (notesContainer) { // Ensure notesContainer is defined
+            notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
+        }
     } finally {
         window.blockPageLoad = false; // Allow subsequent loads
     }
@@ -397,6 +478,62 @@ const sidebarState = {
     }
 };
 
+async function prefetchRecentPagesData() {
+    console.log("Starting pre-fetch for recent pages.");
+    try {
+        const allPages = await pagesAPI.getPages(); // Assumes this returns pages sorted by updated_at or we sort them
+        
+        // Sort pages by updated_at descending if not already sorted by API
+        // Assuming 'updated_at' is a string like 'YYYY-MM-DD HH:MM:SS'
+        allPages.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+        const recentPagesToPrefetch = allPages.slice(0, MAX_PREFETCH_PAGES);
+
+        for (const page of recentPagesToPrefetch) {
+            if (!pageDataCache.has(page.name) || 
+                (Date.now() - (pageDataCache.get(page.name)?.timestamp || 0) > CACHE_MAX_AGE_MS)) {
+                
+                console.log(`Pre-fetching data for page: ${page.name}`);
+                try {
+                    // Fetch necessary data. We need pageId first if not already in `page` object.
+                    // The `page` object from `getPages` might already have the ID.
+                    // If not, an additional getPageByName might be needed, or getPages could be enhanced.
+                    // For this implementation, assume `page.id` is available.
+                    if (!page.id) {
+                        console.warn(`Page ${page.name} from list does not have an ID. Cannot pre-fetch details without another lookup.`);
+                        const detailedPageData = await pagesAPI.getPageByName(page.name); // This is an extra call, ideally getPages includes IDs
+                        if (!detailedPageData || !detailedPageData.id) continue;
+                        page.id = detailedPageData.id; // Augment page object
+                    }
+
+                    const notes = await notesAPI.getNotesForPage(page.id);
+                    const properties = await propertiesAPI.getProperties('page', page.id);
+                    
+                    pageDataCache.set(page.name, {
+                        id: page.id, // Store page ID
+                        name: page.name, // Store page name (canonical)
+                        notes,
+                        properties,
+                        timestamp: Date.now()
+                    });
+                    console.log(`Successfully pre-fetched and cached data for page: ${page.name}`);
+                } catch (error) {
+                    console.error(`Error pre-fetching data for page ${page.name}:`, error);
+                    // Optionally remove from cache if fetching failed partially
+                    if (pageDataCache.has(page.name)) {
+                        pageDataCache.delete(page.name);
+                    }
+                }
+            } else {
+                console.log(`Page ${page.name} is already in cache and recent.`);
+            }
+        }
+        console.log("Pre-fetching for recent pages completed.");
+    } catch (error) {
+        console.error('Error fetching page list for pre-fetching:', error);
+    }
+}
+
 // Event Handlers
 
 // Sidebar toggle (Remove old direct listeners if sidebarState.init handles it)
@@ -487,13 +624,20 @@ const debouncedSaveNote = debounce(async (noteEl) => {
     if (noteId.startsWith('temp-')) return;
 
     const contentDiv = noteEl.querySelector('.note-content');
-    const rawContent = contentDiv.dataset.rawContent || contentDiv.innerText;
+    // Always use dataset.rawContent if available, otherwise fall back to textContent
+    // Never use innerText or innerHTML as they contain rendered HTML
+    const rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
     
     const noteData = getNoteDataById(noteId);
     if (noteData && noteData.content === rawContent) return;
 
     try {
+        console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
+        console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
+        
         const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
+        
+        console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
         const noteIndex = notesForCurrentPage.findIndex(n => n.id === updatedNote.id);
         if (noteIndex > -1) {
             notesForCurrentPage[noteIndex] = updatedNote;
@@ -502,7 +646,6 @@ const debouncedSaveNote = debounce(async (noteEl) => {
         // Update the stored raw content
         contentDiv.dataset.rawContent = updatedNote.content;
         
-        await fetchAndDisplayPages(currentPageName);
     } catch (error) {
         console.error('Error updating note:', error);
     }
@@ -523,7 +666,24 @@ async function saveNoteImmediately(noteEl) {
     if (noteData && noteData.content === rawContent) return;
 
     try {
+        // const noteId = noteEl.dataset.noteId; // already defined
+        // const contentDiv = noteEl.querySelector('.note-content'); // already defined
+        // const rawContent = contentDiv.dataset.rawContent || contentDiv.innerText; // already defined
+
+        console.log('[DEBUG DEBOUNCED SAVE] Attempting to save noteId:', noteId);
+        const contentDivForSource = contentDiv; // Use existing contentDiv
+        const actualRawContentForLogging = contentDivForSource.dataset.rawContent || contentDivForSource.textContent; // Get the latest for logging comparison
+        const contentSource = contentDivForSource.dataset.rawContent === rawContent ? 'dataset.rawContent' : (contentDivForSource.textContent === rawContent ? 'textContent' : 'unknown/mixed');
+
+        console.log('[DEBUG DEBOUNCED SAVE] Content source for rawContent variable:', contentSource);
+        console.log('[DEBUG DEBOUNCED SAVE] `rawContent` variable to be sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
+        if(rawContent !== actualRawContentForLogging) {
+            console.warn('[DEBUG DEBOUNCED SAVE] Mismatch between rawContent variable and fresh query from DOM for noteId ' + noteId + '. Fresh query:', JSON.stringify(actualRawContentForLogging));
+        }
+
         const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
+        
+        console.log('[DEBUG DEBOUNCED SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
         const noteIndex = notesForCurrentPage.findIndex(n => n.id === updatedNote.id);
         if (noteIndex > -1) {
             notesForCurrentPage[noteIndex] = updatedNote;
@@ -532,7 +692,6 @@ async function saveNoteImmediately(noteEl) {
         // Update the stored raw content
         contentDiv.dataset.rawContent = updatedNote.content;
         
-        await fetchAndDisplayPages(currentPageName);
     } catch (error) {
         console.error('Error updating note:', error);
     }
@@ -646,28 +805,77 @@ notesContainer.addEventListener('keydown', async (e) => {
             try {
                 const savedNote = await notesAPI.createNote(newNote);
                 notesForCurrentPage.push(savedNote);
-                
-                // Re-render to get correct order
-                const notes = await notesAPI.getNotesForPage(currentPageId);
-                notesForCurrentPage = notes;
-                ui.displayNotes(notesForCurrentPage, currentPageId);
+                window.notesForCurrentPage = notesForCurrentPage; // Update global
 
-                if (window.currentFocusedNoteId) {
-                    const focusedNoteStillExists = window.notesForCurrentPage.some(n => String(n.id) === String(window.currentFocusedNoteId));
-                    if (focusedNoteStillExists) {
-                        ui.focusOnNote(window.currentFocusedNoteId);
-                    } else {
-                        ui.showAllNotes();
+                // It's possible other notes' order_index were shifted by the backend.
+                // To be perfectly safe without a full refresh, the API would need to return all affected notes.
+                // Or, fetch and update just the siblings if order_index collisions are possible.
+                // For now, we'll proceed with adding the single note and rely on its order_index.
+                // This might lead to slight visual misordering if backend reorders extensively until a full refresh.
+
+                // 2. Render the new note element.
+                // Determine its nesting level based on its parent.
+                let newNoteNestingLevel = 0;
+                let parentChildrenContainer = notesContainer; // Default to root
+
+                if (savedNote.parent_note_id) {
+                    const parentNoteEl = getNoteElementById(savedNote.parent_note_id);
+                    if (parentNoteEl) {
+                        parentChildrenContainer = parentNoteEl.querySelector('.note-children');
+                        if (!parentChildrenContainer) { // Should exist if parent has children
+                            parentChildrenContainer = document.createElement('div');
+                            parentChildrenContainer.className = 'note-children';
+                            parentNoteEl.appendChild(parentChildrenContainer);
+                            if (typeof Sortable !== 'undefined') {
+                                Sortable.create(parentChildrenContainer, { /* ... Sortable options ... */ });
+                            }
+                        }
+                        newNoteNestingLevel = ui.getNestingLevel(parentNoteEl) + 1;
+                    }
+                } else {
+                     // Find the nesting level of root notes, should be 0
+                     const rootNotes = Array.from(notesContainer.children).filter(child => child.classList.contains('note-item'));
+                     if(rootNotes.length > 0) newNoteNestingLevel = parseInt(rootNotes[0].style.getPropertyValue('--nesting-level') || '0');
+                }
+                
+                const newNoteEl = ui.renderNote(savedNote, newNoteNestingLevel); // ui.renderNote needs to handle a single note object
+
+                // 3. Insert the new note element into the DOM at the correct position.
+                // This needs to respect `order_index`.
+                const siblingsInDom = Array.from(parentChildrenContainer.children)
+                    .filter(child => child.classList.contains('note-item'))
+                    .map(childEl => ({
+                        id: childEl.dataset.noteId,
+                        element: childEl,
+                        order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index
+                    }))
+                    .sort((a, b) => a.order_index - b.order_index);
+
+                let inserted = false;
+                for (let i = 0; i < siblingsInDom.length; i++) {
+                    // If savedNote.order_index is the same as an existing note, insert before it.
+                    // This assumes backend handles unique order_index or provides a convention.
+                    if (savedNote.order_index <= siblingsInDom[i].order_index) {
+                        parentChildrenContainer.insertBefore(newNoteEl, siblingsInDom[i].element);
+                        inserted = true;
+                        break;
                     }
                 }
+                if (!inserted) {
+                    parentChildrenContainer.appendChild(newNoteEl);
+                }
+                
+                // Update parent's visual state if it's the first child
+                if (savedNote.parent_note_id) {
+                    const parentEl = getNoteElementById(savedNote.parent_note_id);
+                    if(parentEl) ui.updateParentVisuals(parentEl);
+                }
 
-                // Focus new note in edit mode
-                const newNoteEl = getNoteElementById(savedNote.id);
-                if (newNoteEl) {
-                    const newContentDiv = newNoteEl.querySelector('.note-content');
-                    if (newContentDiv) {
-                        ui.switchToEditMode(newContentDiv);
-                    }
+
+                // 4. Focus the new note.
+                const contentDiv = newNoteEl.querySelector('.note-content');
+                if (contentDiv) {
+                    ui.switchToEditMode(contentDiv);
                 }
             } catch (error) {
                 console.error('Error creating sibling note:', error);
@@ -699,43 +907,108 @@ notesContainer.addEventListener('keydown', async (e) => {
                     });
                     
                     // Update local data
-                    const noteIndex = notesForCurrentPage.findIndex(n => n.id === noteId);
-                    if (noteIndex > -1) {
-                        notesForCurrentPage[noteIndex] = updatedNote;
+                    const initialNoteIndex = notesForCurrentPage.findIndex(n => n.id === noteId);
+                    if (initialNoteIndex > -1) {
+                        notesForCurrentPage[initialNoteIndex] = updatedNote;
                         window.notesForCurrentPage = notesForCurrentPage;
                     }
                     
-                    // Only refresh if the structure changes significantly
-                    // For simple indentation, let the current DOM state persist
-                    setTimeout(async () => {
-                        // Don't refresh if drag operation is in progress
-                        if (window.isDragInProgress) {
-                            console.log('Skipping refresh due to drag in progress');
-                            return;
-                        }
-                        
-                        const notes = await notesAPI.getNotesForPage(currentPageId);
-                        notesForCurrentPage = notes;
-                        window.notesForCurrentPage = notes;
-                        ui.displayNotes(notesForCurrentPage, currentPageId);
+                    // Update local data and rebuild note tree
+                    const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
+                    if (updatedNoteIndex > -1) {
+                        notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedNote };
+                        window.notesForCurrentPage = notesForCurrentPage;
+                    } else {
+                        // This case should ideally not happen if the note existed
+                        notesForCurrentPage.push(updatedNote);
+                        window.notesForCurrentPage = notesForCurrentPage;
+                    }
 
-                        if (window.currentFocusedNoteId) {
-                            const focusedNoteStillExists = window.notesForCurrentPage.some(n => String(n.id) === String(window.currentFocusedNoteId));
-                            if (focusedNoteStillExists) {
-                                ui.focusOnNote(window.currentFocusedNoteId);
-                            } else {
-                                ui.showAllNotes();
+                    // Rebuild the note tree from the updated `notesForCurrentPage`
+                    const newNoteTree = ui.buildNoteTree(notesForCurrentPage);
+
+
+                    // 3. Get the note element from the DOM.
+                    const noteElToMove = getNoteElementById(updatedNote.id);
+                    if (noteElToMove) {
+                        // 4. Determine the new parent element in the DOM.
+                        let newParentChildrenContainer;
+                        if (updatedNote.parent_note_id) {
+                            const parentNoteEl = getNoteElementById(updatedNote.parent_note_id);
+                            if (parentNoteEl) {
+                                newParentChildrenContainer = parentNoteEl.querySelector('.note-children');
+                                if (!newParentChildrenContainer) {
+                                    // If children container doesn't exist, create it (should be rare)
+                                    newParentChildrenContainer = document.createElement('div');
+                                    newParentChildrenContainer.className = 'note-children';
+                                    parentNoteEl.appendChild(newParentChildrenContainer);
+                                    // Ensure Sortable is initialized on this new container if not already
+                                    if (typeof Sortable !== 'undefined') {
+                                        Sortable.create(newParentChildrenContainer, { /* ... Sortable options ... */ });
+                                    }
+                                }
+                            }
+                        } else {
+                            newParentChildrenContainer = notesContainer; // Top-level note
+                        }
+
+                        // 5. Move the note element in the DOM.
+                        // This needs to respect the `order_index`. Find the correct sibling to insert before.
+                        if (newParentChildrenContainer) {
+                            const siblingsInNewParent = Array.from(newParentChildrenContainer.children)
+                                .filter(child => child.classList.contains('note-item') && child !== noteElToMove)
+                                .map(childEl => ({
+                                    id: childEl.dataset.noteId,
+                                    element: childEl,
+                                    // Fetch order_index from notesForCurrentPage for accuracy
+                                    order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index
+                                }))
+                                .sort((a, b) => a.order_index - b.order_index);
+
+                            let inserted = false;
+                            for (const sibling of siblingsInNewParent) {
+                                if (updatedNote.order_index < sibling.order_index) {
+                                    newParentChildrenContainer.insertBefore(noteElToMove, sibling.element);
+                                    inserted = true;
+                                    break;
+                                }
+                            }
+                            if (!inserted) {
+                                newParentChildrenContainer.appendChild(noteElToMove);
+                            }
+                            
+                            // Update nesting level style property
+                            const newNestingLevel = ui.getNestingLevel(noteElToMove);
+                            noteElToMove.style.setProperty('--nesting-level', newNestingLevel);
+
+                            // Update parent's "has-children" class and arrow
+                            const oldParentEl = noteElToMove.parentElement.closest('.note-item');
+                            if(oldParentEl) ui.updateParentVisuals(oldParentEl);
+                            if(updatedNote.parent_note_id) {
+                                 const newParentEl = getNoteElementById(updatedNote.parent_note_id);
+                                 if(newParentEl) ui.updateParentVisuals(newParentEl);
+                            }
+
+
+                            // 6. Focus the updated note.
+                            const contentDiv = noteElToMove.querySelector('.note-content');
+                            if (contentDiv) {
+                                ui.switchToEditMode(contentDiv); // Or just focus if already in edit mode
+                            }
+                        } else {
+                            // Fallback to full re-render if DOM manipulation is too complex (e.g., parent element not found)
+                            console.warn("Failed to find new parent element for indent/outdent, falling back to full refresh.");
+                            const notes = await notesAPI.getNotesForPage(currentPageId);
+                            notesForCurrentPage = notes;
+                            window.notesForCurrentPage = notes;
+                            ui.displayNotes(notesForCurrentPage, currentPageId);
+                            const updatedNoteElToFocus = getNoteElementById(updatedNote.id);
+                            if (updatedNoteElToFocus) {
+                                const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content');
+                                if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv);
                             }
                         }
-                        
-                        const updatedNoteEl = getNoteElementById(updatedNote.id);
-                        if (updatedNoteEl) {
-                            const updatedContentDiv = updatedNoteEl.querySelector('.note-content');
-                            if (updatedContentDiv) {
-                                ui.switchToEditMode(updatedContentDiv);
-                            }
-                        }
-                    }, 100); // Small delay to allow any pending drag operations to complete
+                    }
                 } catch (error) {
                     console.error('Error outdenting note:', error);
                 }
@@ -758,34 +1031,108 @@ notesContainer.addEventListener('keydown', async (e) => {
                     });
                     
                     // Update local data
-                    const noteIndex = notesForCurrentPage.findIndex(n => n.id === noteId);
-                    if (noteIndex > -1) {
-                        notesForCurrentPage[noteIndex] = updatedNote;
+                    const initialNoteIndex = notesForCurrentPage.findIndex(n => n.id === noteId);
+                    if (initialNoteIndex > -1) {
+                        notesForCurrentPage[initialNoteIndex] = updatedNote;
                         window.notesForCurrentPage = notesForCurrentPage;
                     }
                     
-                    // Only refresh if the structure changes significantly
-                    // For simple indentation, let the current DOM state persist
-                    setTimeout(async () => {
-                        // Don't refresh if drag operation is in progress
-                        if (window.isDragInProgress) {
-                            console.log('Skipping refresh due to drag in progress');
-                            return;
+                    // Update local data and rebuild note tree
+                    const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
+                    if (updatedNoteIndex > -1) {
+                        notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedNote };
+                        window.notesForCurrentPage = notesForCurrentPage;
+                    } else {
+                        // This case should ideally not happen if the note existed
+                        notesForCurrentPage.push(updatedNote);
+                        window.notesForCurrentPage = notesForCurrentPage;
+                    }
+
+                    // Rebuild the note tree from the updated `notesForCurrentPage`
+                    const newNoteTree = ui.buildNoteTree(notesForCurrentPage);
+
+
+                    // 3. Get the note element from the DOM.
+                    const noteElToMove = getNoteElementById(updatedNote.id);
+                    if (noteElToMove) {
+                        // 4. Determine the new parent element in the DOM.
+                        let newParentChildrenContainer;
+                        if (updatedNote.parent_note_id) {
+                            const parentNoteEl = getNoteElementById(updatedNote.parent_note_id);
+                            if (parentNoteEl) {
+                                newParentChildrenContainer = parentNoteEl.querySelector('.note-children');
+                                if (!newParentChildrenContainer) {
+                                    // If children container doesn't exist, create it (should be rare)
+                                    newParentChildrenContainer = document.createElement('div');
+                                    newParentChildrenContainer.className = 'note-children';
+                                    parentNoteEl.appendChild(newParentChildrenContainer);
+                                    // Ensure Sortable is initialized on this new container if not already
+                                    if (typeof Sortable !== 'undefined') {
+                                        Sortable.create(newParentChildrenContainer, { /* ... Sortable options ... */ });
+                                    }
+                                }
+                            }
+                        } else {
+                            newParentChildrenContainer = notesContainer; // Top-level note
                         }
-                        
-                        const notes = await notesAPI.getNotesForPage(currentPageId);
-                        notesForCurrentPage = notes;
-                        window.notesForCurrentPage = notes;
-                        ui.displayNotes(notesForCurrentPage, currentPageId);
-                        
-                        const updatedNoteEl = getNoteElementById(updatedNote.id);
-                        if (updatedNoteEl) {
-                            const updatedContentDiv = updatedNoteEl.querySelector('.note-content');
-                            if (updatedContentDiv) {
-                                ui.switchToEditMode(updatedContentDiv);
+
+                        // 5. Move the note element in the DOM.
+                        // This needs to respect the `order_index`. Find the correct sibling to insert before.
+                        if (newParentChildrenContainer) {
+                            const siblingsInNewParent = Array.from(newParentChildrenContainer.children)
+                                .filter(child => child.classList.contains('note-item') && child !== noteElToMove)
+                                .map(childEl => ({
+                                    id: childEl.dataset.noteId,
+                                    element: childEl,
+                                    // Fetch order_index from notesForCurrentPage for accuracy
+                                    order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index
+                                }))
+                                .sort((a, b) => a.order_index - b.order_index);
+
+                            let inserted = false;
+                            for (const sibling of siblingsInNewParent) {
+                                if (updatedNote.order_index < sibling.order_index) {
+                                    newParentChildrenContainer.insertBefore(noteElToMove, sibling.element);
+                                    inserted = true;
+                                    break;
+                                }
+                            }
+                            if (!inserted) {
+                                newParentChildrenContainer.appendChild(noteElToMove);
+                            }
+                            
+                            // Update nesting level style property
+                            const newNestingLevel = ui.getNestingLevel(noteElToMove);
+                            noteElToMove.style.setProperty('--nesting-level', newNestingLevel);
+
+                            // Update parent's "has-children" class and arrow
+                            const oldParentEl = noteElToMove.parentElement.closest('.note-item');
+                            if(oldParentEl) ui.updateParentVisuals(oldParentEl);
+                            if(updatedNote.parent_note_id) {
+                                 const newParentEl = getNoteElementById(updatedNote.parent_note_id);
+                                 if(newParentEl) ui.updateParentVisuals(newParentEl);
+                            }
+
+
+                            // 6. Focus the updated note.
+                            const contentDiv = noteElToMove.querySelector('.note-content');
+                            if (contentDiv) {
+                                ui.switchToEditMode(contentDiv); // Or just focus if already in edit mode
+                            }
+                        } else {
+                            // Fallback to full re-render if DOM manipulation is too complex (e.g., parent element not found)
+                            console.warn("Failed to find new parent element for indent/outdent, falling back to full refresh.");
+                            const notes = await notesAPI.getNotesForPage(currentPageId);
+                            notesForCurrentPage = notes;
+                            window.notesForCurrentPage = notes;
+                            ui.displayNotes(notesForCurrentPage, currentPageId);
+                            const updatedNoteElToFocus = getNoteElementById(updatedNote.id);
+                            if (updatedNoteElToFocus) {
+                                const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content');
+                                if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv);
                             }
                         }
-                    }, 100); // Small delay to allow any pending drag operations to complete
+                    }
                 } catch (error) {
                     console.error('Error indenting note:', error);
                 }
@@ -1718,6 +2065,10 @@ document.addEventListener('keydown', (e) => {
  * Initializes the application
  */
 async function initializeApp() {
+    const splashScreen = document.getElementById('splash-screen');
+    if (splashScreen) {
+        splashScreen.classList.remove('hidden'); // Ensure it's visible
+    }
     try {
         // Initialize sidebar state
         sidebarState.init();
@@ -1756,6 +2107,12 @@ async function initializeApp() {
             // If you want initial focus on existing pages always, pass true to initial loadPage.
         }
 
+        // Load page list (this was already here, ensuring it's before prefetch)
+        await fetchAndDisplayPages(initialPageName);
+            
+        // NEW: Start pre-fetching, but don't await it if it should run in background
+        prefetchRecentPagesData(); // Run asynchronously in the background
+
         // Add delegated click listener for content images (pasted or from Markdown)
         if (ui.domRefs.notesContainer) {
             ui.domRefs.notesContainer.addEventListener('click', (e) => {
@@ -1793,9 +2150,15 @@ async function initializeApp() {
             });
         }
         
+        if (splashScreen) {
+            splashScreen.classList.add('hidden');
+        }
         console.log('App initialized successfully');
     } catch (error) {
         console.error('Failed to initialize app:', error);
+        if (splashScreen) {
+            splashScreen.classList.add('hidden');
+        }
         // Display a user-friendly error message on the page
         if (document.body) {
             document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>' + error.message + '</p>Check console for details.</div>';

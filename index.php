@@ -7,12 +7,19 @@ require_once 'config.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NotTD</title>
+    <title>notd</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <div id="splash-screen">
+        <div class="splash-content">
+            <h1>Loading notd...</h1>
+            <p>Please wait a moment.</p>
+            <!-- Optional: Add a spinner or simple animation here -->
+        </div>
+    </div>
     <div class="app-container">
         <!-- Left Sidebar -->
         <div id="left-sidebar-outer">
