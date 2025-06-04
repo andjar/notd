@@ -1,0 +1,232 @@
+/* Flatly Theme (Bootswatch) - Light Mode */
+:root {
+    /* Base Gray Scale - Flatly Grays */
+    --ls-gray-1: #f8f9fa;   /* Bootswatch $gray-100 */
+    --ls-gray-2: #ecf0f1;   /* Bootswatch $gray-200 (Clouds), common light bg */
+    --ls-gray-3: #dee2e6;   /* Bootswatch $gray-300 */
+    --ls-gray-4: #ced4da;   /* Bootswatch $gray-400 */
+    --ls-gray-5: #adb5bd;   /* Bootswatch $gray-500 */
+    --ls-gray-6: #95a5a6;   /* Bootswatch $gray-600 (Silver), secondary text */
+    --ls-gray-7: #7b8a8b;   /* Bootswatch $gray-700 (Asbestos) */
+    --ls-gray-8: #34495e;   /* Bootswatch $gray-800 (Wet Asphalt), dark text */
+    --ls-gray-9: #2c3e50;   /* Bootswatch $gray-900 (Midnight Blue), primary/darker text */
+    --ls-gray-10: #23313f;  /* Darker shade of $gray-900 */
+    --ls-gray-11: #1a2530;  /* Even darker */
+    --ls-gray-12: #121a21;  /* Darkest */
+
+    /* Accent Colors - Flatly Blue */
+    /* For HSL: #3498db (Peter River) is HSL(207, 70%, 59%) */
+    --ls-accent-hue: 207;
+    --ls-accent-saturation: 70%;
+    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 92%; /* Very light blue */
+    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 65%; /* Brighter interactive */
+    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 59%; /* True #3498db */
+    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%; /* Darker blue */
+    
+    --ls-accent-3: hsl(var(--ls-accent-3-hsl));
+    --ls-accent-9: hsl(var(--ls-accent-9-hsl));
+    --ls-accent-10: hsl(var(--ls-accent-10-hsl));
+    --ls-accent-11: hsl(var(--ls-accent-11-hsl));
+
+    /* Semantic Colors */
+    --ls-primary-background-color: #ffffff; /* White */
+    --ls-secondary-background-color: var(--ls-gray-2); /* #ecf0f1 */
+    --ls-tertiary-background-color: var(--ls-gray-1);
+    --ls-quaternary-background-color: #e9ecef; /* Slightly different light gray */
+    
+    --ls-primary-text-color: var(--ls-gray-9);      /* #2c3e50 */
+    --ls-secondary-text-color: var(--ls-gray-7);    /* #7b8a8b */
+    --ls-tertiary-text-color: var(--ls-gray-6);      /* #95a5a6 */
+
+    --ls-border-color: var(--ls-gray-4);             /* #ced4da */
+    --ls-secondary-border-color: var(--ls-gray-3);   
+    --ls-guideline-color: var(--ls-gray-3);
+    
+    --ls-link-text-color: var(--ls-accent-10);       /* #3498db */
+    --ls-link-text-hover-color: var(--ls-accent-11);
+    
+    --ls-block-bullet-color: var(--ls-gray-6);       /* #95a5a6 */
+    --ls-block-bullet-active-color: var(--ls-accent-10);
+    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 94%);
+    
+    --ls-page-checkbox-color: var(--ls-accent-9);
+    --ls-page-checkbox-border-color: var(--ls-accent-9);
+
+    --color-error: #e74c3c; /* Flatly Danger (Pomegranate) */
+    --color-bg-hover: var(--ls-gray-3);
+
+    /* Task and Status Colors */
+    --ls-task-done-color: #18bc9c; /* Flatly Success (Turquoise) */
+    --ls-task-done-hover-color: hsl(168, 76%, 38%); /* Darker Turquoise */
+    --ls-task-cancelled-color: var(--ls-gray-7);
+    --ls-task-cancelled-hover-color: var(--ls-gray-8);
+    
+    /* Button Colors */
+    --ls-button-danger-color: #e74c3c; /* Flatly Danger */
+    --ls-button-danger-hover-color: hsl(5, 79%, 55%); /* Darker Pomegranate */
+    --ls-button-danger-shadow-color: hsla(5, 80%, 59%, 0.3);
+    
+    /* Status Colors */
+    --ls-status-success-color: #18bc9c; /* Flatly Success */
+    --ls-status-success-light-color: hsl(168, 76%, 90%); /* Light Turquoise */
+    
+    /* Splash Screen (Example, matching Flatly) */
+    --ls-splash-bg-color: var(--ls-gray-9); /* Midnight Blue */
+    --ls-splash-orb-bg-color: rgba(52, 152, 219, 0.2); /* Transparent Peter River */
+
+    /* Newly Added Variables - Flatly Light */
+    --ls-calendar-today-bg: var(--ls-accent-10);
+    --ls-calendar-today-text: white;
+    --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-hue) var(--ls-accent-saturation) / 0.3);
+    --ls-modal-close-danger-hover-bg: hsla(5, 80%, 59%, 0.1); /* Pomegranate transparent */
+    --ls-button-danger-bg: #e74c3c; /* Flatly Danger (Pomegranate) */
+    --ls-button-danger-text: white;
+    --ls-button-danger-border-color: #e74c3c;
+    --ls-button-danger-hover-bg: hsl(5, 79%, 55%);
+    --ls-button-danger-hover-text: white;
+    --ls-button-danger-hover-border-color: hsl(5, 79%, 55%);
+    --ls-button-danger-box-shadow: 0 2px 4px hsla(5, 80%, 59%, 0.2);
+    --ls-task-done-border-color: #18bc9c; /* Flatly Success (Turquoise) */
+    --ls-task-done-badge-bg: #18bc9c;
+    --ls-task-done-badge-text: white;
+    --ls-task-cancelled-badge-bg: var(--ls-gray-7); /* Asbestos */
+    --ls-task-cancelled-badge-text: var(--ls-gray-1); /* Lightest gray text */
+    --ls-transclusion-error-bg: hsl(5, 100%, 97%); /* Light Pomegranate */
+    --ls-splash-orb-text-color: white;
+    --ls-splash-orb-dot-color: rgba(236, 240, 241, 0.7); /* Light gray dots (Clouds) */
+    --ls-generic-modal-backdrop-bg: rgba(44, 62, 80, 0.6); /* Midnight Blue transparent */
+    --ls-image-viewer-close-text: white;
+    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(44,62,80,0.5);
+    --ls-property-tag-bg: var(--ls-accent-9);
+    --ls-property-tag-text: #ffffff;
+    --ls-save-status-bg: var(--ls-gray-2);
+    --ls-save-status-spinner-color: var(--ls-accent-9); /* Accent for spinner */
+    --ls-save-status-saved-icon-color: #18bc9c; /* Flatly success green */
+    --ls-save-status-error-icon-color: #e74c3c; /* Flatly danger red */
+
+    /* == Newly Added Variables - Flatly Light == */
+    --ls-active-nav-item-text-color: #ffffff;
+    --ls-task-checkbox-checkmark-color: #ffffff;
+    --ls-task-keyword-later-bg: #f39c12; /* Flatly warning orange */
+    --ls-task-keyword-later-text: #ffffff;
+    --ls-add-property-btn-hover-text-color: #ffffff;
+    --ls-search-selected-item-text-color: #ffffff;
+    --ls-search-selected-create-new-text-color: #ffffff;
+    --ls-toast-feedback-text-color: #ffffff;
+    --ls-focused-parent-bullet-text-color: #ffffff;
+    --ls-show-all-notes-btn-text-color: #ffffff;
+    --ls-task-badge-todo-text-color: #ffffff;
+}
+
+/* Flatly Theme (Bootswatch) - Dark Mode (derived, as Flatly is light) */
+/* This will be similar to Bootswatch "Darkly" or a generic dark version of Flatly */
+[data-theme="dark"] {
+    /* Base Gray Scale - Darker Grays */
+    --ls-gray-1: #212529;  /* Bootstrap dark default */
+    --ls-gray-2: #2c3034;  
+    --ls-gray-3: #343a40;  /* Bootswatch Darkly $gray-700 */
+    --ls-gray-4: #495057;  /* Bootswatch Darkly $gray-600 */
+    --ls-gray-5: #6c757d;  /* Bootswatch Darkly $gray-500 */
+    --ls-gray-6: #adb5bd;  /* Bootswatch Darkly $gray-400 (light text) */
+    --ls-gray-7: #ced4da;
+    --ls-gray-8: #dee2e6;
+    --ls-gray-9: #f8f9fa;  /* Lightest gray */
+    --ls-gray-10: #ffffff; 
+    --ls-gray-11: #ffffff;
+    --ls-gray-12: #ffffff; /* Primary text (white) */
+
+    /* Accent Colors - Flatly Blue (adjusted for dark) */
+    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 25%;
+    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%;
+    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 65%; /* Brighter Blue for dark */
+    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 55%;
+
+    /* Semantic Colors - Dark Mode */
+    --ls-primary-background-color: #22252a; /* Dark, similar to Darkly's bg */
+    --ls-secondary-background-color: var(--ls-gray-3);
+    --ls-tertiary-background-color: var(--ls-gray-2);
+    --ls-quaternary-background-color: var(--ls-gray-1);
+    
+    --ls-primary-text-color: var(--ls-gray-12);      /* White */
+    --ls-secondary-text-color: var(--ls-gray-9);    
+    --ls-tertiary-text-color: var(--ls-gray-6);      
+
+    --ls-border-color: var(--ls-gray-4);             
+    --ls-secondary-border-color: var(--ls-gray-5);   
+    --ls-guideline-color: var(--ls-gray-4);
+    
+    --ls-link-text-color: var(--ls-accent-10);       /* Brighter Blue */
+    --ls-link-text-hover-color: var(--ls-accent-9);
+    
+    --ls-block-bullet-color: var(--ls-gray-6);
+    --ls-block-bullet-active-color: var(--ls-accent-10);
+    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 20%);
+    
+    --ls-page-checkbox-color: var(--ls-accent-9);
+    --ls-page-checkbox-border-color: var(--ls-accent-9);
+
+    --color-error: #e74c3c; /* Flatly Danger - often same in dark */
+    --color-bg-hover: var(--ls-gray-3);
+
+    /* Task and Status Colors - Dark Mode */
+    --ls-task-done-color: #18bc9c; /* Flatly Success - often same in dark */
+    --ls-task-done-hover-color: hsl(168, 76%, 45%);
+    --ls-task-cancelled-color: var(--ls-gray-7);
+    --ls-task-cancelled-hover-color: var(--ls-gray-6);
+    
+    /* Button Colors - Dark Mode */
+    --ls-button-danger-color: #e74c3c;
+    --ls-button-danger-hover-color: hsl(5, 79%, 60%);
+    --ls-button-danger-shadow-color: hsla(5, 80%, 59%, 0.2);
+    
+    /* Status Colors - Dark Mode */
+    --ls-status-success-color: #18bc9c;
+    --ls-status-success-light-color: hsl(168, 76%, 25%); 
+    
+    /* Splash Screen - Dark Mode (Example) */
+    --ls-splash-bg-color: var(--ls-gray-1); 
+    --ls-splash-orb-bg-color: rgba(52, 152, 219, 0.3); 
+
+    /* Newly Added Variables - Flatly Dark (Derived) */
+    --ls-calendar-today-bg: var(--ls-accent-10);
+    --ls-calendar-today-text: var(--ls-gray-1); /* Dark text on lighter accent */
+    --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-hue) var(--ls-accent-saturation) / 0.4);
+    --ls-modal-close-danger-hover-bg: hsla(5, 79%, 60%, 0.15);
+    --ls-button-danger-bg: #e74c3c; /* Keep Flatly Danger, often same in dark */
+    --ls-button-danger-text: white;
+    --ls-button-danger-border-color: #e74c3c;
+    --ls-button-danger-hover-bg: hsl(5, 79%, 50%);
+    --ls-button-danger-hover-text: white;
+    --ls-button-danger-hover-border-color: hsl(5, 79%, 50%);
+    --ls-button-danger-box-shadow: 0 2px 4px hsla(5, 79%, 60%, 0.2);
+    --ls-task-done-border-color: #18bc9c; /* Keep Flatly Success */
+    --ls-task-done-badge-bg: #18bc9c;
+    --ls-task-done-badge-text: var(--ls-gray-1);
+    --ls-task-cancelled-badge-bg: var(--ls-gray-5); /* $gray-500 */
+    --ls-task-cancelled-badge-text: var(--ls-gray-9); /* Lightest gray text */
+    --ls-transclusion-error-bg: hsl(5, 80%, 15%); /* Darker error bg */
+    --ls-splash-orb-text-color: var(--ls-gray-12);
+    --ls-splash-orb-dot-color: rgba(222, 226, 230, 0.6); /* $gray-300 dots */
+    --ls-generic-modal-backdrop-bg: rgba(10, 15, 20, 0.7); /* Darker backdrop */
+    --ls-image-viewer-close-text: var(--ls-gray-12);
+    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    --ls-property-tag-bg: var(--ls-accent-9);
+    --ls-property-tag-text: var(--ls-gray-dark-1); /* Lightest gray for text on dark accent */
+    --ls-save-status-bg: var(--ls-gray-dark-11);
+    --ls-save-status-spinner-color: var(--ls-accent-dark-9);
+    --ls-save-status-saved-icon-color: #2ecc71; /* Brighter green for dark */
+    --ls-save-status-error-icon-color: #e74c3c; /* Flatly danger red (can stay) */
+
+    /* == Newly Added Variables - Flatly Dark == */
+    --ls-active-nav-item-text-color: var(--ls-gray-dark-1);
+    --ls-task-checkbox-checkmark-color: var(--ls-gray-dark-1);
+    --ls-task-keyword-later-bg: #e67e22; /* Darker orange for dark mode */
+    --ls-task-keyword-later-text: var(--ls-gray-dark-1);
+    --ls-add-property-btn-hover-text-color: var(--ls-gray-dark-1);
+    --ls-search-selected-item-text-color: var(--ls-gray-dark-1);
+    --ls-search-selected-create-new-text-color: var(--ls-gray-dark-1);
+    --ls-toast-feedback-text-color: var(--ls-gray-dark-1);
+    --ls-focused-parent-bullet-text-color: var(--ls-gray-dark-1);
+    --ls-show-all-notes-btn-text-color: var(--ls-gray-dark-1);
+    --ls-task-badge-todo-text-color: var(--ls-gray-dark-1);
+} 

@@ -8,9 +8,10 @@ require_once 'config.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>notd</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>��</text></svg>">
+    <?php require_once 'assets/css/theme_loader.php'; ?>
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/all.min.css">
 </head>
 <body>
     <div id="splash-screen">
@@ -189,7 +190,7 @@ require_once 'config.php';
     </div>
 
     <!-- SCRIPTS -->
-    <script src="assets/js/feather.min.js"></script>
+    <script src="assets/libs/feather.min.js"></script>
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
     <script src="assets/js/utils.js"></script>

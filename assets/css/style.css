@@ -1,67 +1,7 @@
 /* === LogSeq-Inspired Theming System === */
 :root {
-    /* --- Base Gray Scale (Light Theme) --- */
-    /* Mirrored from LogSeq's rx-gray values for light theme */
-    --ls-gray-1: hsl(0 0% 99%);    /* rx-gray-01 */
-    --ls-gray-2: hsl(0 0% 97.3%);  /* rx-gray-02 */
-    --ls-gray-3: hsl(0 0% 95.1%);  /* rx-gray-03 */
-    --ls-gray-4: hsl(0 0% 93.0%);  /* rx-gray-04 */
-    --ls-gray-5: hsl(0 0% 90.9%);  /* rx-gray-05 */
-    --ls-gray-6: hsl(0 0% 88.7%);  /* rx-gray-06 */
-    --ls-gray-7: hsl(0 0% 85.8%);  /* rx-gray-07 */
-    --ls-gray-8: hsl(0 0% 78.0%);  /* rx-gray-08 */
-    --ls-gray-9: hsl(0 0% 56.1%);  /* rx-gray-09 */
-    --ls-gray-10: hsl(0 0% 52.3%); /* rx-gray-10 */
-    --ls-gray-11: hsl(0 0% 43.5%); /* rx-gray-11 */
-    --ls-gray-12: hsl(0 0% 9%);    /* rx-gray-12 */
-
-    /* --- Accent Color (User's Primary - Blue) --- */
-    --ls-accent-hue: 210;
-    --ls-accent-saturation: 100%;
-    /* LogSeq uses scales like rx-blue-09 for main interactive elements */
-    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 95%; /* Very light, for subtle backgrounds */
-    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%; /* Brighter interactive */
-    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%; /* Main accent, like LogSeq's primary blue */
-    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 40%; /* Darker for hover/active */
-    
-    --ls-accent-3: hsl(var(--ls-accent-3-hsl));
-    --ls-accent-9: hsl(var(--ls-accent-9-hsl));
-    --ls-accent-10: hsl(var(--ls-accent-10-hsl));
-    --ls-accent-11: hsl(var(--ls-accent-11-hsl));
-
-    /* --- LogSeq Semantic Colors (Light Theme) --- */
-    --ls-primary-background-color: white; /* LogSeq uses #fff or rx-gray-01 for some areas */
-    --ls-secondary-background-color: var(--ls-gray-2); /* LogSeq uses #f7f7f7 or rx-gray-02 */
-    --ls-tertiary-background-color: var(--ls-gray-3);  /* LogSeq uses #eaeaea or rx-gray-03/04 */
-    --ls-quaternary-background-color: var(--ls-gray-4);
-    
-    --ls-primary-text-color: var(--ls-gray-12);      /* LogSeq uses a dark brown/gray like #433f38 */
-    --ls-secondary-text-color: var(--ls-gray-11);    /* LogSeq uses a slightly lighter dark gray */
-    --ls-tertiary-text-color: var(--ls-gray-9);      /* For less prominent text */
-
-    --ls-border-color: var(--ls-gray-6);             /* LogSeq uses #ccc or similar gray */
-    --ls-secondary-border-color: var(--ls-gray-4);   /* Lighter border */
-    --ls-guideline-color: var(--ls-gray-4);          /* LogSeq: rgba(46,27,5,.08) or similar muted color */
-    
-    --ls-link-text-color: var(--ls-accent-10);       /* LogSeq uses a strong blue */
-    --ls-link-text-hover-color: var(--ls-accent-11);
-    
-    --ls-tag-text-color: var(--ls-link-text-color);
-    --ls-tag-text-hover-color: var(--ls-link-text-hover-color);
-    --ls-tag-text-opacity: 0.8;
-    --ls-tag-text-hover-opacity: 1;
-    
-    --ls-block-bullet-color: var(--ls-gray-8);       /* LogSeq often uses a muted gray */
-    --ls-block-bullet-active-color: var(--ls-accent-10);
-    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 92%); /* Very light accent */
-    
-    /* LogSeq specific checkbox colors (using accent for consistency here) */
-    --ls-page-checkbox-color: var(--ls-accent-9); 
-    --ls-page-checkbox-border-color: var(--ls-accent-9);
-
-    /* Other semantic colors from user's CSS adapted to LogSeq scale */
-    --color-error: hsl(0 70% 50%); /* Example error color */
-    --color-bg-hover: var(--ls-gray-3);
+    /* NON-COLOR Variables like Spacing, Typography, Layout, Shadows etc. will remain here */
+    /* Color-related variables are now sourced from the active theme CSS */
 
     /* Spacing System (User's system is good) */
     --ls-space-unit: 0.25rem;
@@ -132,7 +72,7 @@
     --arrow-left-indent: 0.8em;             /* Arrow position, closer to bullet */
     --content-left-padding: 2.4em;          /* Content starts after controls */
     
-    --control-icon-size: 16px;              /* Clickable area size */
+    /* --control-icon-size: 16px;  Defined above, keeping one definition */
     --bullet-visual-size: 6px;              /* Visual bullet dot size */
     --arrow-visual-size: 0.7em;             /* Visual chevron size */
     --thread-line-width: 1px;               /* Thread thickness */
@@ -140,59 +80,77 @@
     /* Vertical positioning */
     /* Ensure this next line is and stays commented out or removed */
     /* --controls-top-offset: calc( (2 * var(--ls-space-1)) + (var(--ls-font-size-base) * 0.8) - (var(--control-icon-size) / 2) ); */
+
+    /* Tag specific variables (restored) */
+    --ls-tag-text-color: var(--ls-link-text-color); /* Uses theme-provided --ls-link-text-color */
+    --ls-tag-text-hover-color: var(--ls-link-text-hover-color); /* Uses theme-provided --ls-link-text-hover-color */
+    --ls-tag-text-opacity: 0.8;
+    --ls-tag-text-hover-opacity: 1;
+
+    /* Calendar specific variables */
+    --ls-calendar-today-bg: var(--ls-accent-10);
+    --ls-calendar-today-text: var(--ls-primary-background-color, #ffffff);
+    --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3);
+
+    /* Button specific variables */
+    --ls-button-danger-color: #dc2626; /* This is a fallback, primarily for --color-error consumers if not themed */
+    --ls-button-danger-text: var(--ls-primary-background-color, #ffffff);
+    --ls-button-danger-hover-color: #b91c1c;
+    --ls-button-danger-hover-text: var(--ls-button-danger-text, var(--ls-primary-background-color, #ffffff));
+    --ls-button-danger-box-shadow: none;
+
+    /* Transclusion specific variables */
+    --ls-transclusion-error-bg: hsl(0 100% 97%);
+
+    /* Splash screen specific variables */
+    --ls-splash-screen-bg: rgb(50, 30, 45);
+    --ls-splash-orb-bg: rgba(40, 20, 35, 0.6);
+    --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
+    --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
+
+    /* Define fallbacks for NEW variables here, to be overridden by themes */
+    --ls-modal-close-danger-hover-bg: rgba(220, 38, 38, 0.1);
+    --ls-button-danger-bg: #dc2626;
+    --ls-button-danger-border-color: #dc2626;
+    --ls-button-danger-hover-bg: #b91c1c;
+    --ls-button-danger-hover-border-color: #b91c1c;
+    --ls-task-done-border-color: #10b981;
+    --ls-task-done-badge-bg: #10b981;
+    --ls-task-done-badge-text: var(--ls-primary-background-color, #ffffff);
+    --ls-task-cancelled-badge-bg: var(--ls-gray-8);
+    --ls-task-cancelled-badge-text: var(--ls-primary-background-color, #ffffff);
+    --ls-transclusion-error-bg: hsl(0, 100%, 97%);
+    --ls-splash-screen-bg: rgb(50, 30, 45);
+    --ls-splash-orb-bg: rgba(40, 20, 35, 0.6);
+    --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
+    --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
+    --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
+    --ls-image-viewer-close-text: var(--ls-primary-text-color);
+    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    --ls-property-tag-bg: var(--ls-accent-10);
+    --ls-property-tag-text: var(--ls-primary-background-color, #ffffff);
+    --ls-save-status-bg: var(--ls-gray-7);
+    --ls-save-status-spinner-color: var(--ls-primary-text-color);
+    --ls-save-status-saved-icon-color: var(--ls-accent-10); /* Using accent color */
+    --ls-save-status-error-icon-color: var(--color-error);
+
+    /* NEWLY ADDED THEMEABLE VARIABLES - FALLBACKS */
+    --ls-active-nav-item-text-color: #ffffff;
+    --ls-task-checkbox-checkmark-color: #ffffff;
+    --ls-task-keyword-later-bg: hsl(40, 100%, 90%); /* Light yellow/orange */
+    --ls-task-keyword-later-text: hsl(30, 100%, 30%); /* Dark orange/brown */
+    --ls-add-property-btn-hover-text-color: #ffffff;
+    --ls-search-selected-item-text-color: #ffffff;
+    --ls-search-selected-create-new-text-color: #ffffff;
+    --ls-toast-feedback-text-color: #ffffff;
+    --ls-focused-parent-bullet-text-color: #ffffff;
+    --ls-show-all-notes-btn-text-color: #ffffff;
+    --ls-task-badge-todo-text-color: #ffffff;
 }
 
-/* Dark Theme (LogSeq inspired) */
-[data-theme="dark"] {
-    /* --- Radix-like Gray Scale (Dark Theme) --- */
-    --ls-gray-1: hsl(210 10% 12%); /* Darker than LogSeq's specific theme, adjust if needed */
-    --ls-gray-2: hsl(210 10% 15%);
-    --ls-gray-3: hsl(210 10% 20%);
-    --ls-gray-4: hsl(210 10% 25%);
-    --ls-gray-5: hsl(210 10% 30%);
-    --ls-gray-6: hsl(210 10% 35%);
-    --ls-gray-7: hsl(210 10% 40%);
-    --ls-gray-8: hsl(210 10% 50%);
-    --ls-gray-9: hsl(210 10% 65%);
-    --ls-gray-10: hsl(210 10% 75%);
-    --ls-gray-11: hsl(210 10% 85%);
-    --ls-gray-12: hsl(210 10% 95%);
-
-    /* --- Accent Color (Dark Theme) --- */
-    /* Keep user's hue, adjust lightness for dark mode */
-    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 20%;
-    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 70%;
-    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%;
-    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%;
-
-    /* --- LogSeq Semantic Colors (Dark Theme) --- */
-    /* Values taken directly from logseg_style.txt for data-color=logseq and data-theme=dark */
-    --ls-primary-background-color: #002b36;
-    --ls-secondary-background-color: #023643;
-    --ls-tertiary-background-color: #08404f;
-    --ls-quaternary-background-color: #094b5a;
-    
-    --ls-primary-text-color: #a4b5b6;
-    --ls-secondary-text-color: #dfdfdf;
-    --ls-tertiary-text-color: #93a1a1; /* LogSeq title-text-color */
-
-    --ls-border-color: #0e5263;
-    --ls-secondary-border-color: #126277;
-    --ls-guideline-color: #0b4a5a;
-    
-    --ls-link-text-color: #8abbbb;
-    --ls-link-text-hover-color: #d0e8e8; /* LogSeq active-secondary-color */
-        
-    --ls-block-bullet-color: #608e91;
-    --ls-block-bullet-active-color: var(--ls-accent-10);
-    --ls-block-highlight-color: #0a3d4b;
-    
-    --ls-page-checkbox-color: #6093a0;
-    --ls-page-checkbox-border-color: var(--ls-primary-background-color);
-
-    --color-error: hsl(0 70% 60%);
-    --color-bg-hover: var(--ls-gray-3);
-}
+/* Dark Theme color variables are now sourced from the active theme CSS */
+/* The [data-theme="dark"] block defining colors has been removed from this file. */
+/* It is expected to be present in the loaded theme file, e.g., default.css or purple.css */
 
 /* Base Styles */
 * {
@@ -345,8 +303,8 @@ body {
     color: var(--ls-primary-text-color);
 }
 .calendar-day.today {
-    background-color: var(--ls-accent-10);
-    color: white;
+    background-color: var(--ls-calendar-today-bg);
+    color: var(--ls-calendar-today-text);
     font-weight: var(--ls-font-weight-medium);
 }
 .calendar-day.current-page {
@@ -354,13 +312,13 @@ body {
     color: var(--ls-primary-text-color);
     font-weight: var(--ls-font-weight-medium);
     border: 1px solid var(--ls-accent-10);
-    box-shadow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3); /* Weak glow effect for journal pages */
+    box-shadow: var(--ls-calendar-current-page-glow);
 }
 .calendar-day.today.current-page {
-    background-color: var(--ls-accent-10);
-    color: white;
+    background-color: var(--ls-calendar-today-bg);
+    color: var(--ls-calendar-today-text);
     border: 1px solid var(--ls-accent-9);
-    box-shadow: 0 0 12px hsl(var(--ls-accent-10-hsl) / 0.4); /* Slightly stronger glow when both today and current page */
+    box-shadow: var(--ls-calendar-current-page-glow); /* Consider a brighter variant if needed */
 }
 
 /* Search Section */
@@ -454,7 +412,7 @@ body {
 #page-list a:hover { background-color: var(--ls-tertiary-background-color); }
 #page-list a.active {
     background-color: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-active-nav-item-text-color);
 }
 
 /* Outliner / Notes Container */
@@ -726,7 +684,7 @@ body {
     display: block;
     width: 4px;
     height: 8px;
-    border: solid white;
+    border: solid var(--ls-task-checkbox-checkmark-color);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg) translate(-1px, -1px);
     position: absolute;
@@ -753,8 +711,8 @@ body {
     color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 30%);
 }
 .task-content .task-keyword.later {
-    background-color: hsl(40 100% 90%);
-    color: hsl(30 100% 30%);
+    background-color: var(--ls-task-keyword-later-bg);
+    color: var(--ls-task-keyword-later-text);
 }
 
 .task-content.done-text,
@@ -818,7 +776,7 @@ body {
 }
 .add-property-btn:hover {
     background-color: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-add-property-btn-hover-text-color);
 }
 
 
@@ -831,7 +789,7 @@ body {
 }
 .transclusion-placeholder.error {
     border-color: var(--color-error);
-    background: hsl(0 100% 97%);
+    background: var(--ls-transclusion-error-bg);
     color: var(--color-error);
 }
 .transcluded-content {
@@ -1197,8 +1155,8 @@ textarea:focus {
 }
 
 #page-properties-list .page-property-delete:hover {
-    color: var(--color-error, #dc2626);
-    background-color: rgba(220, 38, 38, 0.1);
+    color: var(--color-error, #dc2626); /* Fallback for color-error itself */
+    background-color: var(--ls-modal-close-danger-hover-bg);
     opacity: 1;
 }
 
@@ -1217,7 +1175,7 @@ textarea:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--ls-generic-modal-backdrop-bg);
     backdrop-filter: blur(4px);
     z-index: var(--ls-z-index-modal);
     align-items: center;
@@ -1279,16 +1237,18 @@ textarea:focus {
 
 /* Button variants (danger already defined in original and uses hex, keep for now) */
 .button.danger-button {
-    background: #dc2626;
-    color: white;
-    border-color: #dc2626;
+    background: var(--ls-button-danger-bg);
+    color: var(--ls-button-danger-text);
+    border-color: var(--ls-button-danger-border-color);
     transition: all 0.2s ease;
+    box-shadow: var(--ls-button-danger-box-shadow);
 }
 .button.danger-button:hover {
-    background: #b91c1c;
-    border-color: #b91c1c;
+    background: var(--ls-button-danger-hover-bg);
+    border-color: var(--ls-button-danger-hover-border-color);
+    color: var(--ls-button-danger-hover-text);
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3);
+    /* Potentially a different shadow on hover, or handled by the main shadow var if it includes pseudo-classes */
 }
 
 /* Page Search Modal Specific Styles */
@@ -1320,7 +1280,7 @@ textarea:focus {
 }
 .page-search-results-list li.selected {
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-search-selected-item-text-color);
 }
 .page-search-results-list li.create-new-option {
     font-style: italic;
@@ -1332,7 +1292,7 @@ textarea:focus {
 }
 .page-search-results-list li.selected .create-new-option span,
 .page-search-results-list li.selected .create-new-option {
-    color: white !important;
+    color: var(--ls-search-selected-create-new-text-color) !important;
 }
 
 
@@ -1378,7 +1338,7 @@ textarea:focus {
     bottom: 20px;
     right: 20px;
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-toast-feedback-text-color);
     padding: var(--ls-space-2) var(--ls-space-4);
     border-radius: var(--ls-border-radius-medium);
     animation: fadeInOutToast 3s ease-in-out;
@@ -1507,7 +1467,7 @@ textarea:focus {
 }
 .note-item.focused .note-bullet.has-children-bullet {
     background-color: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-focused-parent-bullet-text-color);
 }
 
 /* Note Focus States */
@@ -1534,7 +1494,7 @@ textarea:focus {
     content: '← Show All Notes';
     display: block;
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-show-all-notes-btn-text-color);
     padding: var(--ls-space-2) var(--ls-space-3);
     border-radius: var(--ls-border-radius-medium);
     margin-bottom: var(--ls-space-3);
@@ -1556,7 +1516,7 @@ textarea:focus {
 .show-all-notes-btn {
     display: none;
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-show-all-notes-btn-text-color);
     padding: var(--ls-space-2) var(--ls-space-3);
     border-radius: var(--ls-border-radius-medium);
     margin-bottom: var(--ls-space-3);
@@ -1635,13 +1595,13 @@ textarea:focus {
     position: absolute;
     top: 20px;
     right: 30px;
-    color: white;
+    color: var(--ls-image-viewer-close-text);
     font-size: 40px;
     font-weight: bold;
     cursor: pointer;
     transition: color 0.2s ease;
     z-index: 1051; /* Above modal content */
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5); /* Make X more visible on various backgrounds */
+    text-shadow: var(--ls-image-viewer-close-text-shadow);
 }
 
 .image-viewer-close:hover {
@@ -1691,7 +1651,7 @@ textarea:focus {
     bottom: 20px;
     right: 20px;
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-toast-feedback-text-color);
     padding: var(--ls-space-2) var(--ls-space-4);
     border-radius: var(--ls-border-radius-medium);
     animation: fadeInOutToast 3s ease-in-out;
@@ -1722,11 +1682,11 @@ textarea:focus {
 }
 
 .task-container.done {
-    border-left-color: #10b981; /* Green */
+    border-left-color: var(--ls-task-done-border-color);
 }
 
 .task-container.cancelled {
-    border-left-color: var(--ls-gray-8);
+    border-left-color: var(--ls-task-cancelled-badge-bg);
 }
 
 .task-checkbox-container {
@@ -1769,17 +1729,17 @@ textarea:focus {
 
 .task-status-badge.todo {
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-task-badge-todo-text-color);
 }
 
 .task-status-badge.done {
-    background: #10b981;
-    color: white;
+    background: var(--ls-task-done-badge-bg);
+    color: var(--ls-task-done-badge-text);
 }
 
 .task-status-badge.cancelled {
-    background: var(--ls-gray-8);
-    color: white;
+    background: var(--ls-task-cancelled-badge-bg);
+    color: var(--ls-task-cancelled-badge-text);
 }
 
 .task-content {
@@ -1840,8 +1800,8 @@ textarea:focus {
 }
 
 .property-tag {
-    background: var(--ls-accent-10);
-    color: white;
+    background: var(--ls-property-tag-bg);
+    color: var(--ls-property-tag-text);
     border-radius: var(--ls-border-radius-low);
     padding: 2px 6px;
     font-size: 0.85em;
@@ -1990,8 +1950,8 @@ textarea:focus {
 }
 
 .attachment-delete-btn:hover {
-    color: var(--color-error, #dc2626);
-    background-color: rgba(220, 38, 38, 0.1);
+    color: var(--color-error, var(--ls-button-danger-bg)); /* Use variable for error color */
+    background-color: var(--ls-modal-close-danger-hover-bg); /* Use existing variable for background */
 }
 
 [data-theme="dark"] .note-attachment-item {
@@ -2053,7 +2013,7 @@ textarea:focus {
     content: '← Show All Notes';
     display: block;
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-show-all-notes-btn-text-color);
     padding: var(--ls-space-2) var(--ls-space-3);
     border-radius: var(--ls-border-radius-medium);
     margin-bottom: var(--ls-space-3);
@@ -2074,7 +2034,7 @@ textarea:focus {
 .show-all-notes-btn {
     display: none;
     background: var(--ls-accent-10);
-    color: white;
+    color: var(--ls-show-all-notes-btn-text-color);
     padding: var(--ls-space-2) var(--ls-space-3);
     border-radius: var(--ls-border-radius-medium);
     margin-bottom: var(--ls-space-3);
@@ -2161,7 +2121,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgb(50, 30, 45); /* Dark, warm purple */
+    background-color: var(--ls-splash-screen-bg);
     display: flex; /* Kept for existing centering, will be overridden by orb logic */
     justify-content: center; /* Kept for existing centering */
     align-items: center; /* Kept for existing centering */
@@ -2212,7 +2172,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     position: relative;
     width: 220px; /* Adjust size as needed */
     height: 220px; /* Adjust size as needed */
-    background-color: rgba(40, 20, 35, 0.6); /* Semi-transparent, darker shade of purple */
+    background-color: var(--ls-splash-orb-bg);
     border-radius: 50%;
     display: flex;
     flex-direction: column;
@@ -2236,7 +2196,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 #splash-orb-text {
-    color: white;
+    color: var(--ls-splash-orb-text-color);
     font-family: var(--ls-font-family, sans-serif);
     font-size: 1.1em;
     text-align: center;
@@ -2255,7 +2215,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     position: absolute;
     width: 5px;
     height: 5px;
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: var(--ls-splash-orb-dot-color);
     border-radius: 50%;
     opacity: 0;
     /* Animation will set transform and opacity */
@@ -2285,33 +2245,31 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 
 /* Light Theme Defaults (outside [data-theme="dark"]) */
 #save-status-indicator {
-    background-color: var(--ls-gray-7); /* Medium-dark gray for contrast */
+    background-color: var(--ls-save-status-bg);
 }
 .dot-spinner {
-    --uib-color: var(--ls-primary-text-color); /* Lighter gray dots */
+    --uib-color: var(--ls-save-status-spinner-color);
 }
 #save-status-indicator.status-saved svg {
-    stroke: var(--ls-primary-text-color); /* Accent color for checkmark (e.g., blueish) */
-    /* Or a specific green: stroke: hsl(145, 63%, 42%); */
+    stroke: var(--ls-save-status-saved-icon-color);
 }
 #save-status-indicator.status-error svg {
-    stroke: var(--color-error); /* Red for error from your palette */
+    stroke: var(--ls-save-status-error-icon-color);
 }
 
 
 /* Dark Theme Overrides */
 [data-theme="dark"] #save-status-indicator {
-    background-color: var(--ls-gray-4); /* Darker gray background */
+    background-color: var(--ls-save-status-bg); /* Theme will provide appropriate dark value */
 }
 [data-theme="dark"] .dot-spinner {
-    --uib-color: var(--ls-gray-9); /* Lighter gray dots for dark theme */
+    --uib-color: var(--ls-save-status-spinner-color); /* Theme will provide appropriate dark value */
 }
 [data-theme="dark"] #save-status-indicator.status-saved svg {
-    stroke: var(--ls-accent-9); /* Accent color for checkmark (adjusts with theme) */
-    /* Or a specific light green for dark theme: stroke: hsl(145, 50%, 70%); */
+    stroke: var(--ls-save-status-saved-icon-color); /* Theme will provide appropriate dark value */
 }
 [data-theme="dark"] #save-status-indicator.status-error svg {
-    stroke: var(--color-error); /* Error color from your dark theme palette */
+    stroke: var(--ls-save-status-error-icon-color); /* Theme will provide appropriate dark value */
 }
 
 
