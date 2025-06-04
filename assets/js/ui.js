@@ -495,14 +495,63 @@ function switchToEditMode(contentEl) {
 }
 
 /**
+ * Extracts raw text content from an HTML element, converting BR tags to newlines,
+ * and attempting to respect paragraph breaks from DIV/P tags.
+ * @param {HTMLElement} element - The HTML element to extract text from.
+ * @returns {string} The processed text content with newlines.
+ */
+function getRawTextWithNewlines(element) {
+    let text = "";
+    if (!element || !element.childNodes) return text;
+
+    for (const node of element.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            text += node.textContent;
+        } else if (node.nodeName === "BR") {
+            text += "\n";
+        } else if (node.nodeName === "DIV" || node.nodeName === "P") {
+            // Add a newline before processing the block if needed for separation
+            if (text.length > 0 && !text.endsWith("\n")) {
+                text += "\n";
+            }
+            text += getRawTextWithNewlines(node); // Recurse for children of the block
+            // Ensure a newline after the block, unless it's already ending with multiple (handled by normalization)
+            if (!text.endsWith("\n")) {
+                text += "\n";
+            }
+        } else {
+            // For other inline elements (e.g., SPAN), recurse without adding extra newlines around them.
+            text += getRawTextWithNewlines(node);
+        }
+    }
+    return text;
+}
+
+/**
+ * Normalizes newline characters in a string.
+ * Converts 3+ newlines to 2 (paragraph), and trims leading/trailing whitespace.
+ * @param {string} str - The input string.
+ * @returns {string} The normalized string.
+ */
+function normalizeNewlines(str) {
+    if (typeof str !== 'string') return '';
+    // Convert 3 or more newlines to exactly two (for a paragraph break)
+    let normalized = str.replace(/\n\s*\n\s*\n+/g, '\n\n');
+    // Trim leading and trailing whitespace (which includes newlines)
+    normalized = normalized.trim();
+    return normalized;
+}
+
+/**
  * Switches a note content element to rendered mode
  * @param {HTMLElement} contentEl - The note content element
  */
 function switchToRenderedMode(contentEl) {
     if (contentEl.classList.contains('rendered-mode')) return;
 
-    // Get the raw content and store it before any processing
-    const newContent = contentEl.textContent || '';
+    // Get the raw content using the new helper and normalize it
+    const rawTextValue = getRawTextWithNewlines(contentEl);
+    const newContent = normalizeNewlines(rawTextValue);
     
     // Store the raw content first, before any rendering
     contentEl.dataset.rawContent = newContent;
@@ -644,7 +693,7 @@ function parseAndRenderContent(rawContent) {
                 const originalHtml = html;
                 html = marked.parse(html, {
                     renderer: renderer, // Use the custom renderer
-                    breaks: false, 
+                    breaks: true,
                     gfm: true,
                     smartypants: true,
                     sanitize: false, // Be cautious with sanitize: false if content is not trusted
@@ -727,26 +776,9 @@ function displayNotes(notesData, pageId) {
     domRefs.notesContainer.innerHTML = '';
 
     if (!notesData || notesData.length === 0) {
-        // Create empty note for new page
-        const tempId = `temp-${pageId || 'new'}-root-${Date.now()}`;
-        const emptyNote = {
-            id: tempId,
-            content: '',
-            properties: {},
-            children: []
-        };
-        const emptyNoteEl = renderNote(emptyNote, 0);
-        domRefs.notesContainer.appendChild(emptyNoteEl);
-        
-        // Switch to edit mode for the empty note
-        const contentDiv = emptyNoteEl.querySelector('.note-content');
-        if (contentDiv) {
-            switchToEditMode(contentDiv);
-        }
-        // Initialize Feather icons after adding the note
-        if (typeof feather !== 'undefined' && feather.replace) {
-            feather.replace();
-        }
+        // ui.displayNotes will now simply leave the container empty if there are no notes.
+        // The creation of the first note on an empty page is handled by app.js (handleCreateAndFocusFirstNote).
+        // No temporary client-side note needed here anymore.
         return;
     }
 
@@ -1882,6 +1914,60 @@ function updateParentVisuals(parentNoteElement) {
     }
 }
 
+/**
+ * Initializes the page properties modal and its event listeners
+ */
+function initPagePropertiesModal() {
+    const { pagePropertiesGear, pagePropertiesModal, pagePropertiesModalClose, addPagePropertyBtn } = domRefs;
+
+    // Open modal when clicking the gear icon
+    if (pagePropertiesGear) {
+        pagePropertiesGear.addEventListener('click', async () => {
+            if (!currentPageId) return;
+            
+            // Get current properties
+            const properties = await propertiesAPI.getProperties('page', currentPageId);
+            displayPageProperties(properties);
+            
+            // Show modal
+            pagePropertiesModal.classList.add('active');
+            pagePropertiesModal.querySelector('.generic-modal-content').style.transform = 'scale(1)';
+        });
+    }
+
+    // Close modal when clicking the close button or outside the modal
+    if (pagePropertiesModalClose) {
+        pagePropertiesModalClose.addEventListener('click', () => {
+            pagePropertiesModal.classList.remove('active');
+            pagePropertiesModal.querySelector('.generic-modal-content').style.transform = 'scale(0.95)';
+        });
+    }
+
+    // Close modal when clicking outside
+    if (pagePropertiesModal) {
+        pagePropertiesModal.addEventListener('click', (e) => {
+            if (e.target === pagePropertiesModal) {
+                pagePropertiesModal.classList.remove('active');
+                pagePropertiesModal.querySelector('.generic-modal-content').style.transform = 'scale(0.95)';
+            }
+        });
+    }
+
+    // Add new property when clicking the add button
+    if (addPagePropertyBtn) {
+        addPagePropertyBtn.addEventListener('click', async () => {
+            const result = await showGenericInputModal('Add Property', 'Enter property name and value:', {
+                key: { label: 'Property Name', type: 'text', required: true },
+                value: { label: 'Property Value', type: 'text', required: true }
+            });
+
+            if (result) {
+                await addPageProperty(result.key, result.value);
+            }
+        });
+    }
+}
+
 // Export functions and DOM references for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -1912,8 +1998,12 @@ if (typeof module !== 'undefined' && module.exports) {
         showAllNotes,
         getNoteAncestors,
         renderBreadcrumbs,
+        showAllNotesAndLoadPage,
         getNestingLevel, 
-        updateParentVisuals
+        updateParentVisuals,
+        getRawTextWithNewlines,
+        normalizeNewlines,
+        initPagePropertiesModal
     };
 } else {
     // For browser environment, attach to window
@@ -1947,6 +2037,9 @@ if (typeof module !== 'undefined' && module.exports) {
         renderBreadcrumbs,
         showAllNotesAndLoadPage,
         getNestingLevel, 
-        updateParentVisuals
+        updateParentVisuals,
+        getRawTextWithNewlines,
+        normalizeNewlines,
+        initPagePropertiesModal
     };
 }

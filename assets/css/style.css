@@ -646,11 +646,11 @@ body {
 }
 
 .note-content {
-    padding: var(--ls-space-1) var(--ls-space-2);
+    transition: all 0.2s ease;
     border-radius: var(--ls-border-radius-low);
-    line-height: 1.6;
-    min-height: calc(var(--ls-font-size-base) * 1.5);
-    transition: background-color var(--ls-transition-fast);
+    min-height: 20px; /* Or var(--ls-line-height-base) if defined */
+    padding: 6px 8px; /* Standardized padding */
+    line-height: 1.6; /* From original .note-content, ensure consistency */
 }
 
 .note-content[contenteditable="true"]:empty:before {
@@ -658,6 +658,7 @@ body {
     color: var(--ls-tertiary-text-color);
     font-style: italic;
     pointer-events: none;
+    display: inline-block; /* Ensures it takes space */
 }
 
 .note-content:hover {
@@ -1871,43 +1872,40 @@ textarea:focus {
 .note-content {
     transition: all 0.2s ease;
     border-radius: var(--ls-border-radius-low);
-    min-height: 20px;
+    min-height: 20px; /* Or var(--ls-line-height-base) if defined */
+    padding: 6px 8px; /* Standardized padding */
+    line-height: 1.6; /* From original .note-content, ensure consistency */
 }
 
 .note-content.rendered-mode {
     cursor: pointer;
-    padding: 4px 8px;
+    /* No specific background, rely on hover */
 }
 
 .note-content.rendered-mode:hover {
-    background: var(--ls-secondary-background-color);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: var(--ls-gray-2); /* Very subtle hover, was --ls-secondary-background-color */
+    /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); Removed more prominent shadow */
 }
 
 .note-content.edit-mode {
-    background: var(--ls-primary-background-color);
-    border: 2px solid var(--ls-accent-10);
-    padding: 6px 8px;
-    outline: none;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    background: transparent; /* Make it feel like part of the page */
+    /* border: 2px solid var(--ls-accent-10); Removed border */
+    outline: none; /* Remove default outline if using custom subtle indicator */
+    /* box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); Removed shadow */
 }
 
 .note-content.edit-mode:focus {
-    border-color: var(--ls-accent-10);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    /* Subtle focus indicator, browser default might be enough or: */
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2); /* Subtle glow */
 }
 
 /* Empty state placeholder */
-.note-content.rendered-mode:empty::before {
+.note-content:empty::before { /* Combined for both modes */
     content: attr(data-placeholder);
     color: var(--ls-tertiary-text-color);
     font-style: italic;
-}
-
-.note-content.edit-mode:empty::before {
-    content: attr(data-placeholder);
-    color: var(--ls-tertiary-text-color);
-    font-style: italic;
+    pointer-events: none; /* Important for click-to-edit */
+    display: inline-block; /* Ensures it takes space */
 }
 
 /* Note Attachments Styles */
@@ -2163,31 +2161,239 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: #f8f9fa; /* Or your app's background color */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999; /* Ensure it's on top */
-    transition: opacity 0.5s ease-out; /* For fade-out effect */
+    background-color: rgb(50, 30, 45); /* Dark, warm purple */
+    display: flex; /* Kept for existing centering, will be overridden by orb logic */
+    justify-content: center; /* Kept for existing centering */
+    align-items: center; /* Kept for existing centering */
+    z-index: 9999;
+    transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+    visibility: visible;
+    opacity: 1;
+    overflow: hidden; /* Prevent scrollbars from animated elements */
 }
 
 #splash-screen.hidden {
     opacity: 0;
-    pointer-events: none; /* Allow interaction with underlying content when hidden */
+    visibility: hidden;
+    pointer-events: none;
 }
 
-.splash-content {
+/* Remove old .splash-content if it exists */
+.splash-content { display: none; }
+
+#splash-background-bubbles-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Bubbles are contained */
+}
+
+.splash-bubble {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0;
+    /* Animation will set specific colors, sizes, positions */
+    /* filter: blur(2px); /* Soft edges, can be adjusted */
+}
+
+#splash-orb-container {
+    position: relative; /* For z-indexing above bubbles */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+}
+
+#splash-orb-inner-core {
+    position: relative;
+    width: 220px; /* Adjust size as needed */
+    height: 220px; /* Adjust size as needed */
+    background-color: rgba(40, 20, 35, 0.6); /* Semi-transparent, darker shade of purple */
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 30px rgba(0,0,0,0.3);
+    padding: 20px;
+}
+
+#splash-orb-text-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.splash-logo-svg {
+    width: 50px;
+    height: 50px;
+    margin-bottom: 5px;
+}
+
+#splash-orb-text {
+    color: white;
+    font-family: var(--ls-font-family, sans-serif);
+    font-size: 1.1em;
     text-align: center;
-    color: #333;
+    line-height: 1.3;
 }
 
-.splash-content h1 {
-    font-size: 2em;
-    margin-bottom: 10px;
+#splash-orb-perimeter-dots {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Dots are visual only */
 }
 
-.splash-content p {
-    font-size: 1.2em;
+.splash-orb-dot {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    opacity: 0;
+    /* Animation will set transform and opacity */
+}
+
+/* Save Status Indicator Styles */
+/* Save Status Indicator Styles */
+#save-status-indicator {
+    position: fixed;
+    bottom: 15px;
+    right: 15px;
+    padding: 8px;
+    border-radius: 50%;
+    /* Background color set by theme */
+    box-shadow: var(--ls-shadow-md); /* Using your theme's shadow */
+    z-index: var(--ls-z-index-popover, 1060); /* Use theme z-index */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    transition: opacity 0.3s var(--ls-transition-normal), transform 0.3s var(--ls-transition-normal);
+    transform: scale(1);
+    opacity: 1;
+    overflow: hidden;
+}
+
+/* Light Theme Defaults (outside [data-theme="dark"]) */
+#save-status-indicator {
+    background-color: var(--ls-gray-7); /* Medium-dark gray for contrast */
+}
+.dot-spinner {
+    --uib-color: var(--ls-primary-text-color); /* Lighter gray dots */
+}
+#save-status-indicator.status-saved svg {
+    stroke: var(--ls-primary-text-color); /* Accent color for checkmark (e.g., blueish) */
+    /* Or a specific green: stroke: hsl(145, 63%, 42%); */
+}
+#save-status-indicator.status-error svg {
+    stroke: var(--color-error); /* Red for error from your palette */
+}
+
+
+/* Dark Theme Overrides */
+[data-theme="dark"] #save-status-indicator {
+    background-color: var(--ls-gray-4); /* Darker gray background */
+}
+[data-theme="dark"] .dot-spinner {
+    --uib-color: var(--ls-gray-9); /* Lighter gray dots for dark theme */
+}
+[data-theme="dark"] #save-status-indicator.status-saved svg {
+    stroke: var(--ls-accent-9); /* Accent color for checkmark (adjusts with theme) */
+    /* Or a specific light green for dark theme: stroke: hsl(145, 50%, 70%); */
+}
+[data-theme="dark"] #save-status-indicator.status-error svg {
+    stroke: var(--color-error); /* Error color from your dark theme palette */
+}
+
+
+/* SVG icon base style */
+#save-status-indicator svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2; /* Default stroke width for feather icons */
+    display: block;
+}
+
+#save-status-indicator.status-hidden {
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
+}
+
+/* Dot Spinner (Spinning Dots Effect) */
+.dot-spinner {
+    --uib-size: 20px; /* Size of the spinner area */
+    --uib-speed: 1s; /* Speed of the animation */
+    /* --uib-color is set by theme above */
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Center the rotating dots assembly */
+    height: var(--uib-size);
+    width: var(--uib-size);
+}
+
+.dot-spinner__dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex; /* Not strictly necessary but okay */
+    align-items: center;
+    justify-content: flex-start; /* Dot ::before will be at the 'start' of this rotated container */
+    height: 100%;
+    width: 100%;
+}
+
+.dot-spinner__dot::before {
+    content: '';
+    height: 25%; /* Dot size relative to spinner container (var(--uib-size)) */
+    width: 25%;
+    border-radius: 50%;
+    background-color: var(--uib-color);
+    /* Animation applies a pulse to each dot */
+    animation: PulseDot var(--uib-speed) ease-in-out infinite;
+}
+
+/* Position and stagger animations for the "spinning" effect */
+.dot-spinner__dot:nth-child(1) {
+    /* transform: rotate(0deg); */ /* Default, no rotation needed for the first */
+}
+.dot-spinner__dot:nth-child(1)::before {
+    animation-delay: calc(var(--uib-speed) * -0.45); /* Stagger start earlier */
+}
+
+.dot-spinner__dot:nth-child(2) {
+    transform: rotate(120deg); /* Position second dot */
+}
+.dot-spinner__dot:nth-child(2)::before {
+    animation-delay: calc(var(--uib-speed) * -0.30); /* Stagger start middle */
+}
+
+.dot-spinner__dot:nth-child(3) {
+    transform: rotate(240deg); /* Position third dot */
+}
+.dot-spinner__dot:nth-child(3)::before {
+    animation-delay: calc(var(--uib-speed) * -0.15); /* Stagger start later */
+}
+
+@keyframes PulseDot {
+    0%, 100% {
+        transform: scale(0.6); /* Dot is smaller */
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1);   /* Dot is at full size */
+        opacity: 1;
+    }
 }
 
 /* Backlinks Section Styles */

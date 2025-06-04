@@ -7,6 +7,7 @@
 // State
 let currentPageId = null;
 let currentPageName = null;
+let saveStatus = 'saved'; // Can be 'saved', 'pending', 'error'
 
 // NEW: Pre-fetching cache
 const pageDataCache = new Map(); // Using a Map for easier key management
@@ -307,6 +308,61 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
     } finally {
         window.blockPageLoad = false; // Allow subsequent loads
     }
+
+    // If notesForCurrentPage is empty after loading, create the first note.
+    if (notesForCurrentPage.length === 0 && currentPageId) {
+        await handleCreateAndFocusFirstNote();
+    }
+}
+
+/**
+ * Creates the very first note on an empty page and focuses it.
+ */
+async function handleCreateAndFocusFirstNote() {
+    if (!currentPageId) {
+        console.warn("Cannot create first note without a currentPageId.");
+        return;
+    }
+    try {
+        const savedNote = await notesAPI.createNote({
+            page_id: currentPageId,
+            content: '', // Initial content is empty
+            parent_note_id: null
+            // order_index will be handled by the backend, typically as the first/next available
+        });
+
+        if (savedNote) {
+            notesForCurrentPage.push(savedNote);
+            window.notesForCurrentPage = notesForCurrentPage; // Update global
+
+            // Ensure notesContainer is empty or ready for the first note.
+            // ui.displayNotes would have left it empty if notesForCurrentPage was empty.
+            if(notesContainer.innerHTML.includes("empty-page-hint") || notesContainer.children.length === 0) {
+                notesContainer.innerHTML = ''; // Clear any hints or placeholders
+            }
+
+            const noteEl = ui.renderNote(savedNote, 0);
+            if (notesContainer) {
+                notesContainer.appendChild(noteEl);
+            }
+
+            const contentDiv = noteEl.querySelector('.note-content');
+            if (contentDiv) {
+                // Set initial rawContent to empty string to ensure proper tracking
+                contentDiv.dataset.rawContent = '';
+                ui.switchToEditMode(contentDiv);
+            }
+             // Initialize Feather icons if new elements with icons were added
+            if (typeof feather !== 'undefined' && feather.replace) {
+                feather.replace();
+            }
+        }
+    } catch (error) {
+        console.error('Error creating the first note for the page:', error);
+        if (notesContainer) {
+            notesContainer.innerHTML = '<p>Error creating the first note. Please try reloading.</p>';
+        }
+    }
 }
 
 /**
@@ -583,38 +639,52 @@ safeAddEventListener(addRootNoteBtn, 'click', async () => {
         return;
     }
 
-    const tempId = generateTempId();
-    const tempNote = {
-        id: tempId,
-        content: '',
-        page_id: currentPageId,
-        parent_note_id: null,
-        properties: {},
-        children: []
-    };
-
-    // Optimistic UI update
-    const noteEl = renderNote(tempNote, 0);
-    if (notesContainer) {
-        notesContainer.appendChild(noteEl);
-        const contentDiv = noteEl.querySelector('.note-content');
-        if (contentDiv) contentDiv.focus();
-    }
-
     try {
+        // 1. Call notesAPI.createNote first
         const savedNote = await notesAPI.createNote({
             page_id: currentPageId,
-            content: '',
+            content: '', // Initial content is empty
             parent_note_id: null
         });
 
-        // Update with real data
-        noteEl.dataset.noteId = savedNote.id;
-        notesForCurrentPage.push(savedNote);
+        if (savedNote) {
+            // a. Add savedNote to the notesForCurrentPage array
+            notesForCurrentPage.push(savedNote);
+            window.notesForCurrentPage = notesForCurrentPage; // Update global
+
+            // b. Call ui.renderNote to create the noteEl
+            // Assuming root notes have nesting level 0
+            const noteEl = ui.renderNote(savedNote, 0); 
+
+            // c. Append noteEl to the notesContainer
+            if (notesContainer) {
+                notesContainer.appendChild(noteEl);
+            }
+
+            // d. Get the contentDiv from noteEl
+            const contentDiv = noteEl.querySelector('.note-content');
+
+            // e. Call ui.switchToEditMode to make it editable and focused
+            if (contentDiv) {
+                // Set initial rawContent to empty string to ensure proper tracking
+                contentDiv.dataset.rawContent = '';
+                ui.switchToEditMode(contentDiv);
+                
+                // Add a one-time input handler to ensure first content is saved
+                const initialInputHandler = async (e) => {
+                    const currentContent = contentDiv.textContent;
+                    if (currentContent !== '') {
+                        contentDiv.dataset.rawContent = currentContent;
+                        await saveNoteImmediately(noteEl);
+                        contentDiv.removeEventListener('input', initialInputHandler);
+                    }
+                };
+                contentDiv.addEventListener('input', initialInputHandler);
+            }
+        }
     } catch (error) {
         console.error('Error creating root note:', error);
-        noteEl.remove();
-        alert('Failed to save new note.');
+        alert('Failed to save new note. Please try again.');
     }
 }, 'addRootNoteBtn');
 
@@ -624,30 +694,38 @@ const debouncedSaveNote = debounce(async (noteEl) => {
     if (noteId.startsWith('temp-')) return;
 
     const contentDiv = noteEl.querySelector('.note-content');
-    // Always use dataset.rawContent if available, otherwise fall back to textContent
-    // Never use innerText or innerHTML as they contain rendered HTML
     const rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
     
     const noteData = getNoteDataById(noteId);
-    if (noteData && noteData.content === rawContent) return;
+    // Only save if content has actually changed, or if it's a new note without existing noteData (though temp- notes are excluded)
+    if (noteData && noteData.content === rawContent && !noteId.startsWith('new-')) return; // Added check for new-
 
     try {
+        updateSaveStatusIndicator('pending'); 
         console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
         console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
         
         const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
         
         console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
-        const noteIndex = notesForCurrentPage.findIndex(n => n.id === updatedNote.id);
+        const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id)); // Ensure ID comparison is robust
         if (noteIndex > -1) {
             notesForCurrentPage[noteIndex] = updatedNote;
+        } else {
+            // If note was not in notesForCurrentPage (e.g. a new note just saved by saveNoteImmediately, then edited)
+            // It should ideally be added. However, createNote path usually handles adding to notesForCurrentPage.
+            // This case might indicate a temp note that got its ID updated and should now be in notesForCurrentPage.
+            console.warn('[DEBUG SAVE] Note with ID ' + updatedNote.id + ' not found in notesForCurrentPage after update. Adding it.');
+            notesForCurrentPage.push(updatedNote); // Add if missing, might need sorting or better state management
         }
+        window.notesForCurrentPage = notesForCurrentPage; // Ensure global is updated
         
-        // Update the stored raw content
         contentDiv.dataset.rawContent = updatedNote.content;
+        updateSaveStatusIndicator('saved'); 
         
     } catch (error) {
-        console.error('Error updating note:', error);
+        console.error('Error updating note (debounced):', error);
+        updateSaveStatusIndicator('error'); 
     }
 }, 1000);
 
@@ -657,43 +735,43 @@ const debouncedSaveNote = debounce(async (noteEl) => {
  */
 async function saveNoteImmediately(noteEl) {
     const noteId = noteEl.dataset.noteId;
-    if (noteId.startsWith('temp-')) return;
+    if (noteId.startsWith('temp-')) {
+        console.warn('Attempted to save temporary note immediately. This should be handled by createNote flow.');
+        return; // Usually, temp notes are saved via createNote which then updates their ID.
+    }
 
     const contentDiv = noteEl.querySelector('.note-content');
-    const rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
+    // Use the new UI helpers to get and normalize content for saving
+    const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+    const rawContent = ui.normalizeNewlines(rawTextValue); 
     
     const noteData = getNoteDataById(noteId);
-    if (noteData && noteData.content === rawContent) return;
+    // Allow save even if content appears same, server might have other reasons or it handles idempotency.
+    // if (noteData && noteData.content === rawContent) return; 
 
     try {
-        // const noteId = noteEl.dataset.noteId; // already defined
-        // const contentDiv = noteEl.querySelector('.note-content'); // already defined
-        // const rawContent = contentDiv.dataset.rawContent || contentDiv.innerText; // already defined
-
-        console.log('[DEBUG DEBOUNCED SAVE] Attempting to save noteId:', noteId);
-        const contentDivForSource = contentDiv; // Use existing contentDiv
-        const actualRawContentForLogging = contentDivForSource.dataset.rawContent || contentDivForSource.textContent; // Get the latest for logging comparison
-        const contentSource = contentDivForSource.dataset.rawContent === rawContent ? 'dataset.rawContent' : (contentDivForSource.textContent === rawContent ? 'textContent' : 'unknown/mixed');
-
-        console.log('[DEBUG DEBOUNCED SAVE] Content source for rawContent variable:', contentSource);
-        console.log('[DEBUG DEBOUNCED SAVE] `rawContent` variable to be sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
-        if(rawContent !== actualRawContentForLogging) {
-            console.warn('[DEBUG DEBOUNCED SAVE] Mismatch between rawContent variable and fresh query from DOM for noteId ' + noteId + '. Fresh query:', JSON.stringify(actualRawContentForLogging));
-        }
+        updateSaveStatusIndicator('pending');
+        console.log('[DEBUG IMMEDIATE SAVE] Attempting to save noteId:', noteId);
+        console.log('[DEBUG IMMEDIATE SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
 
         const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
         
-        console.log('[DEBUG DEBOUNCED SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
-        const noteIndex = notesForCurrentPage.findIndex(n => n.id === updatedNote.id);
+        console.log('[DEBUG IMMEDIATE SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
+        const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
         if (noteIndex > -1) {
             notesForCurrentPage[noteIndex] = updatedNote;
+        } else {
+            console.warn('[DEBUG IMMEDIATE SAVE] Note with ID ' + updatedNote.id + ' not found in notesForCurrentPage after immediate save. Adding it.');
+            notesForCurrentPage.push(updatedNote);
         }
+        window.notesForCurrentPage = notesForCurrentPage; // Ensure global is updated
         
-        // Update the stored raw content
-        contentDiv.dataset.rawContent = updatedNote.content;
+        contentDiv.dataset.rawContent = updatedNote.content; // Update dataset after successful save
+        updateSaveStatusIndicator('saved');
         
     } catch (error) {
-        console.error('Error updating note:', error);
+        console.error('Error updating note (immediately):', error);
+        updateSaveStatusIndicator('error');
     }
 }
 
@@ -701,29 +779,11 @@ safeAddEventListener(notesContainer, 'input', (e) => {
     if (e.target.matches('.note-content.edit-mode')) {
         const noteItem = e.target.closest('.note-item');
         if (noteItem) {
-            // Update the raw content data attribute
+            // Update the raw content data attribute using the new UI helper
             const contentDiv = e.target;
-            contentDiv.dataset.rawContent = contentDiv.textContent;
+            const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+            contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
             debouncedSaveNote(noteItem);
-        }
-    }
-}, 'notesContainer');
-
-safeAddEventListener(notesContainer, 'blur', (e) => {
-    if (e.target.matches('.note-content.edit-mode')) {
-        const noteItem = e.target.closest('.note-item');
-        if (noteItem) {
-            // Save immediately on blur
-            const contentDiv = e.target;
-            contentDiv.dataset.rawContent = contentDiv.textContent;
-            
-            // Cancel the debounced save and save immediately
-            debouncedSaveNote.cancel();
-            
-            const noteId = noteItem.dataset.noteId;
-            if (!noteId.startsWith('temp-')) {
-                saveNoteImmediately(noteItem);
-            }
         }
     }
 }, 'notesContainer');
@@ -763,29 +823,72 @@ notesContainer.addEventListener('keydown', async (e) => {
         if (text.substring(cursorPos - 2, cursorPos) === ':t' && e.key === ' ') { // Trigger on space after :t
             e.preventDefault();
             replaceTextAtCursor(2, '{tag::}', 6);
+            const noteItemForShortcut = contentDiv.closest('.note-item');
+            if (noteItemForShortcut) {
+                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
+                debouncedSaveNote(noteItemForShortcut);
+            }
             return; 
         } else if (text.substring(cursorPos - 2, cursorPos) === ':d' && e.key === ' ') {
             e.preventDefault();
             const today = new Date().toISOString().slice(0, 10);
             replaceTextAtCursor(2, `{date::${today}}`, 18);
+            const noteItemForShortcut = contentDiv.closest('.note-item');
+            if (noteItemForShortcut) {
+                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
+                debouncedSaveNote(noteItemForShortcut);
+            }
             return;
         } else if (text.substring(cursorPos - 2, cursorPos) === ':r' && e.key === ' ') {
             e.preventDefault();
             const now = new Date().toISOString();
-            replaceTextAtCursor(2, `{timestamp::${now}}`, 23);
+            replaceTextAtCursor(2, `{timestamp::${now}}`, 12 + now.length + 1);
+            const noteItemForShortcut = contentDiv.closest('.note-item');
+            if (noteItemForShortcut) {
+                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
+                debouncedSaveNote(noteItemForShortcut);
+            }
             return;
         } else if (text.substring(cursorPos - 2, cursorPos) === ':k' && e.key === ' ') {
             e.preventDefault();
             replaceTextAtCursor(2, '{keyword::}', 10);
+            const noteItemForShortcut = contentDiv.closest('.note-item');
+            if (noteItemForShortcut) {
+                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
+                debouncedSaveNote(noteItemForShortcut);
+            }
             return;
         }
     }
 
-    // if (!noteData || noteId.startsWith('temp-')) return; // Keep this for other keydown events
+    if (!noteData || noteId.startsWith('temp-')) {
+        // Allow Enter to switch to edit mode even if noteData is somehow not found yet for a rendered note
+        if (e.key === 'Enter' && contentDiv.classList.contains('rendered-mode')) {
+             // Special case: if Enter is pressed on a rendered note, switch to edit mode.
+        } else if (noteId.startsWith('temp-')) {
+            // For temp notes, only allow basic editing, not structural changes via keyboard.
+            // Specific keys like Enter, Tab, Backspace for structural changes are blocked here.
+            // You might want to allow ArrowUp/ArrowDown if they make sense for temp notes.
+            if (['Enter', 'Tab', 'Backspace'].includes(e.key)) {
+                console.warn('Action (' + e.key + ') blocked on temporary note ID: ' + noteId);
+                return;
+            }
+        } else if (!noteData) {
+            console.warn('Note data not found for ID: ' + noteId + ' during keydown event. Key: ' + e.key);
+            // Allow navigation keys even if note data is missing, but block others.
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                return;
+            }
+        }
+    }
 
     switch (e.key) {
         case 'Enter':
-            if (noteId.startsWith('temp-')) return; // Prevent actions on temp notes for Enter
+            // if (noteId.startsWith('temp-')) return; // This check is now handled above more generally
             e.preventDefault();
             
             // If in rendered mode, switch to edit mode
@@ -794,7 +897,12 @@ notesContainer.addEventListener('keydown', async (e) => {
                 return;
             }
             
-            // If in edit mode, create new note
+            // If in edit mode, create new note (ensure noteData is available)
+            if (!noteData) {
+                console.error("Cannot create new note with Enter: current noteData is missing.");
+                return;
+            }
+
             const newNote = {
                 page_id: currentPageId,
                 content: '',
@@ -805,56 +913,43 @@ notesContainer.addEventListener('keydown', async (e) => {
             try {
                 const savedNote = await notesAPI.createNote(newNote);
                 notesForCurrentPage.push(savedNote);
-                window.notesForCurrentPage = notesForCurrentPage; // Update global
+                window.notesForCurrentPage = notesForCurrentPage; 
 
-                // It's possible other notes' order_index were shifted by the backend.
-                // To be perfectly safe without a full refresh, the API would need to return all affected notes.
-                // Or, fetch and update just the siblings if order_index collisions are possible.
-                // For now, we'll proceed with adding the single note and rely on its order_index.
-                // This might lead to slight visual misordering if backend reorders extensively until a full refresh.
-
-                // 2. Render the new note element.
-                // Determine its nesting level based on its parent.
                 let newNoteNestingLevel = 0;
-                let parentChildrenContainer = notesContainer; // Default to root
+                let parentChildrenContainer = notesContainer; 
 
                 if (savedNote.parent_note_id) {
                     const parentNoteEl = getNoteElementById(savedNote.parent_note_id);
                     if (parentNoteEl) {
                         parentChildrenContainer = parentNoteEl.querySelector('.note-children');
-                        if (!parentChildrenContainer) { // Should exist if parent has children
+                        if (!parentChildrenContainer) { 
                             parentChildrenContainer = document.createElement('div');
                             parentChildrenContainer.className = 'note-children';
                             parentNoteEl.appendChild(parentChildrenContainer);
                             if (typeof Sortable !== 'undefined') {
-                                Sortable.create(parentChildrenContainer, { /* ... Sortable options ... */ });
+                                Sortable.create(parentChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', ghostClass: 'note-ghost', chosenClass: 'note-chosen', dragClass: 'note-drag', onEnd: handleNoteDrop });
                             }
                         }
                         newNoteNestingLevel = ui.getNestingLevel(parentNoteEl) + 1;
                     }
                 } else {
-                     // Find the nesting level of root notes, should be 0
                      const rootNotes = Array.from(notesContainer.children).filter(child => child.classList.contains('note-item'));
                      if(rootNotes.length > 0) newNoteNestingLevel = parseInt(rootNotes[0].style.getPropertyValue('--nesting-level') || '0');
                 }
                 
-                const newNoteEl = ui.renderNote(savedNote, newNoteNestingLevel); // ui.renderNote needs to handle a single note object
+                const newNoteEl = ui.renderNote(savedNote, newNoteNestingLevel); 
 
-                // 3. Insert the new note element into the DOM at the correct position.
-                // This needs to respect `order_index`.
                 const siblingsInDom = Array.from(parentChildrenContainer.children)
                     .filter(child => child.classList.contains('note-item'))
                     .map(childEl => ({
                         id: childEl.dataset.noteId,
                         element: childEl,
-                        order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index
+                        order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index ?? Infinity
                     }))
                     .sort((a, b) => a.order_index - b.order_index);
 
                 let inserted = false;
                 for (let i = 0; i < siblingsInDom.length; i++) {
-                    // If savedNote.order_index is the same as an existing note, insert before it.
-                    // This assumes backend handles unique order_index or provides a convention.
                     if (savedNote.order_index <= siblingsInDom[i].order_index) {
                         parentChildrenContainer.insertBefore(newNoteEl, siblingsInDom[i].element);
                         inserted = true;
@@ -865,17 +960,14 @@ notesContainer.addEventListener('keydown', async (e) => {
                     parentChildrenContainer.appendChild(newNoteEl);
                 }
                 
-                // Update parent's visual state if it's the first child
                 if (savedNote.parent_note_id) {
                     const parentEl = getNoteElementById(savedNote.parent_note_id);
                     if(parentEl) ui.updateParentVisuals(parentEl);
                 }
 
-
-                // 4. Focus the new note.
-                const contentDiv = newNoteEl.querySelector('.note-content');
-                if (contentDiv) {
-                    ui.switchToEditMode(contentDiv);
+                const newContentDiv = newNoteEl.querySelector('.note-content');
+                if (newContentDiv) {
+                    ui.switchToEditMode(newContentDiv);
                 }
             } catch (error) {
                 console.error('Error creating sibling note:', error);
@@ -884,14 +976,14 @@ notesContainer.addEventListener('keydown', async (e) => {
 
         case 'Tab':
             e.preventDefault();
-            if (noteId.startsWith('temp-') || !noteData) return;
-            
-            // Save current content first
-            const currentContent = contentDiv.dataset.rawContent || contentDiv.textContent;
-            if (currentContent !== noteData.content) {
+            // if (noteId.startsWith('temp-') || !noteData) return; // Already handled
+            if (!noteData) return;
+
+
+            const currentContentForTab = contentDiv.dataset.rawContent || contentDiv.textContent;
+            if (currentContentForTab !== noteData.content) {
                 await saveNoteImmediately(noteItem);
-                // Update local note data
-                noteData.content = currentContent;
+                noteData.content = currentContentForTab;
             }
             
             if (e.shiftKey) {
@@ -900,74 +992,52 @@ notesContainer.addEventListener('keydown', async (e) => {
                 
                 try {
                     const parentNote = getNoteDataById(noteData.parent_note_id);
+                    if (!parentNote) { // Parent note must exist to outdent
+                        console.error("Cannot outdent: parent note data not found.");
+                        return;
+                    }
                     const updatedNote = await notesAPI.updateNote(noteId, {
-                        content: currentContent, // Preserve content
+                        content: currentContentForTab, 
                         parent_note_id: parentNote.parent_note_id,
-                        order_index: parentNote.order_index + 1
+                        order_index: parentNote.order_index + 1 
                     });
                     
-                    // Update local data
-                    const initialNoteIndex = notesForCurrentPage.findIndex(n => n.id === noteId);
-                    if (initialNoteIndex > -1) {
-                        notesForCurrentPage[initialNoteIndex] = updatedNote;
-                        window.notesForCurrentPage = notesForCurrentPage;
-                    }
-                    
-                    // Update local data and rebuild note tree
                     const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
                     if (updatedNoteIndex > -1) {
                         notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedNote };
                         window.notesForCurrentPage = notesForCurrentPage;
                     } else {
-                        // This case should ideally not happen if the note existed
                         notesForCurrentPage.push(updatedNote);
                         window.notesForCurrentPage = notesForCurrentPage;
                     }
 
-                    // Rebuild the note tree from the updated `notesForCurrentPage`
-                    const newNoteTree = ui.buildNoteTree(notesForCurrentPage);
-
-
-                    // 3. Get the note element from the DOM.
                     const noteElToMove = getNoteElementById(updatedNote.id);
                     if (noteElToMove) {
-                        // 4. Determine the new parent element in the DOM.
                         let newParentChildrenContainer;
                         if (updatedNote.parent_note_id) {
                             const parentNoteEl = getNoteElementById(updatedNote.parent_note_id);
                             if (parentNoteEl) {
                                 newParentChildrenContainer = parentNoteEl.querySelector('.note-children');
                                 if (!newParentChildrenContainer) {
-                                    // If children container doesn't exist, create it (should be rare)
                                     newParentChildrenContainer = document.createElement('div');
                                     newParentChildrenContainer.className = 'note-children';
                                     parentNoteEl.appendChild(newParentChildrenContainer);
-                                    // Ensure Sortable is initialized on this new container if not already
-                                    if (typeof Sortable !== 'undefined') {
-                                        Sortable.create(newParentChildrenContainer, { /* ... Sortable options ... */ });
-                                    }
+                                    if (typeof Sortable !== 'undefined') { Sortable.create(newParentChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', onEnd: handleNoteDrop }); }
                                 }
                             }
                         } else {
-                            newParentChildrenContainer = notesContainer; // Top-level note
+                            newParentChildrenContainer = notesContainer;
                         }
 
-                        // 5. Move the note element in the DOM.
-                        // This needs to respect the `order_index`. Find the correct sibling to insert before.
                         if (newParentChildrenContainer) {
                             const siblingsInNewParent = Array.from(newParentChildrenContainer.children)
                                 .filter(child => child.classList.contains('note-item') && child !== noteElToMove)
-                                .map(childEl => ({
-                                    id: childEl.dataset.noteId,
-                                    element: childEl,
-                                    // Fetch order_index from notesForCurrentPage for accuracy
-                                    order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index
-                                }))
+                                .map(childEl => ({ id: childEl.dataset.noteId, element: childEl, order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index ?? Infinity }))
                                 .sort((a, b) => a.order_index - b.order_index);
 
                             let inserted = false;
                             for (const sibling of siblingsInNewParent) {
-                                if (updatedNote.order_index < sibling.order_index) {
+                                if (updatedNote.order_index <= sibling.order_index) {
                                     newParentChildrenContainer.insertBefore(noteElToMove, sibling.element);
                                     inserted = true;
                                     break;
@@ -977,36 +1047,26 @@ notesContainer.addEventListener('keydown', async (e) => {
                                 newParentChildrenContainer.appendChild(noteElToMove);
                             }
                             
-                            // Update nesting level style property
                             const newNestingLevel = ui.getNestingLevel(noteElToMove);
                             noteElToMove.style.setProperty('--nesting-level', newNestingLevel);
 
-                            // Update parent's "has-children" class and arrow
-                            const oldParentEl = noteElToMove.parentElement.closest('.note-item');
+                            const oldParentEl = getNoteElementById(noteData.parent_note_id); // Use original parent_note_id for old parent
                             if(oldParentEl) ui.updateParentVisuals(oldParentEl);
                             if(updatedNote.parent_note_id) {
                                  const newParentEl = getNoteElementById(updatedNote.parent_note_id);
                                  if(newParentEl) ui.updateParentVisuals(newParentEl);
                             }
 
-
-                            // 6. Focus the updated note.
-                            const contentDiv = noteElToMove.querySelector('.note-content');
-                            if (contentDiv) {
-                                ui.switchToEditMode(contentDiv); // Or just focus if already in edit mode
+                            const tabContentDiv = noteElToMove.querySelector('.note-content');
+                            if (tabContentDiv) {
+                                ui.switchToEditMode(tabContentDiv); 
                             }
                         } else {
-                            // Fallback to full re-render if DOM manipulation is too complex (e.g., parent element not found)
-                            console.warn("Failed to find new parent element for indent/outdent, falling back to full refresh.");
                             const notes = await notesAPI.getNotesForPage(currentPageId);
-                            notesForCurrentPage = notes;
-                            window.notesForCurrentPage = notes;
+                            notesForCurrentPage = notes; window.notesForCurrentPage = notes;
                             ui.displayNotes(notesForCurrentPage, currentPageId);
                             const updatedNoteElToFocus = getNoteElementById(updatedNote.id);
-                            if (updatedNoteElToFocus) {
-                                const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content');
-                                if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv);
-                            }
+                            if (updatedNoteElToFocus) { const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content'); if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv); }
                         }
                     }
                 } catch (error) {
@@ -1017,120 +1077,66 @@ notesContainer.addEventListener('keydown', async (e) => {
                 const siblings = notesForCurrentPage.filter(n => 
                     n.parent_note_id === noteData.parent_note_id && 
                     n.order_index < noteData.order_index
-                );
+                ).sort((a,b) => b.order_index - a.order_index); // Get the immediate previous sibling
                 
                 if (siblings.length === 0) return;
                 
-                const newParent = siblings[siblings.length - 1];
+                const newParent = siblings[0]; // Closest preceding sibling at the same level
                 
                 try {
+                    // New order_index will be 0 if it's the first child, or count of existing children.
+                    const newParentChildrenCount = notesForCurrentPage.filter(n => n.parent_note_id === newParent.id).length;
                     const updatedNote = await notesAPI.updateNote(noteId, {
-                        content: currentContent, // Preserve content
+                        content: currentContentForTab, 
                         parent_note_id: newParent.id,
-                        order_index: 0
+                        order_index: newParentChildrenCount 
                     });
                     
-                    // Update local data
-                    const initialNoteIndex = notesForCurrentPage.findIndex(n => n.id === noteId);
-                    if (initialNoteIndex > -1) {
-                        notesForCurrentPage[initialNoteIndex] = updatedNote;
-                        window.notesForCurrentPage = notesForCurrentPage;
-                    }
-                    
-                    // Update local data and rebuild note tree
                     const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
                     if (updatedNoteIndex > -1) {
                         notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedNote };
                         window.notesForCurrentPage = notesForCurrentPage;
                     } else {
-                        // This case should ideally not happen if the note existed
                         notesForCurrentPage.push(updatedNote);
                         window.notesForCurrentPage = notesForCurrentPage;
                     }
 
-                    // Rebuild the note tree from the updated `notesForCurrentPage`
-                    const newNoteTree = ui.buildNoteTree(notesForCurrentPage);
-
-
-                    // 3. Get the note element from the DOM.
                     const noteElToMove = getNoteElementById(updatedNote.id);
                     if (noteElToMove) {
-                        // 4. Determine the new parent element in the DOM.
                         let newParentChildrenContainer;
-                        if (updatedNote.parent_note_id) {
-                            const parentNoteEl = getNoteElementById(updatedNote.parent_note_id);
-                            if (parentNoteEl) {
-                                newParentChildrenContainer = parentNoteEl.querySelector('.note-children');
-                                if (!newParentChildrenContainer) {
-                                    // If children container doesn't exist, create it (should be rare)
-                                    newParentChildrenContainer = document.createElement('div');
-                                    newParentChildrenContainer.className = 'note-children';
-                                    parentNoteEl.appendChild(newParentChildrenContainer);
-                                    // Ensure Sortable is initialized on this new container if not already
-                                    if (typeof Sortable !== 'undefined') {
-                                        Sortable.create(newParentChildrenContainer, { /* ... Sortable options ... */ });
-                                    }
-                                }
+                        const parentNoteEl = getNoteElementById(updatedNote.parent_note_id); // Should be newParent.id
+                        if (parentNoteEl) {
+                            newParentChildrenContainer = parentNoteEl.querySelector('.note-children');
+                            if (!newParentChildrenContainer) {
+                                newParentChildrenContainer = document.createElement('div');
+                                newParentChildrenContainer.className = 'note-children';
+                                parentNoteEl.appendChild(newParentChildrenContainer);
+                                if (typeof Sortable !== 'undefined') { Sortable.create(newParentChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', onEnd: handleNoteDrop }); }
                             }
-                        } else {
-                            newParentChildrenContainer = notesContainer; // Top-level note
                         }
 
-                        // 5. Move the note element in the DOM.
-                        // This needs to respect the `order_index`. Find the correct sibling to insert before.
                         if (newParentChildrenContainer) {
-                            const siblingsInNewParent = Array.from(newParentChildrenContainer.children)
-                                .filter(child => child.classList.contains('note-item') && child !== noteElToMove)
-                                .map(childEl => ({
-                                    id: childEl.dataset.noteId,
-                                    element: childEl,
-                                    // Fetch order_index from notesForCurrentPage for accuracy
-                                    order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index
-                                }))
-                                .sort((a, b) => a.order_index - b.order_index);
-
-                            let inserted = false;
-                            for (const sibling of siblingsInNewParent) {
-                                if (updatedNote.order_index < sibling.order_index) {
-                                    newParentChildrenContainer.insertBefore(noteElToMove, sibling.element);
-                                    inserted = true;
-                                    break;
-                                }
-                            }
-                            if (!inserted) {
-                                newParentChildrenContainer.appendChild(noteElToMove);
-                            }
+                            // Simpler append for indent, as it becomes the last child of the new parent
+                            newParentChildrenContainer.appendChild(noteElToMove);
                             
-                            // Update nesting level style property
                             const newNestingLevel = ui.getNestingLevel(noteElToMove);
                             noteElToMove.style.setProperty('--nesting-level', newNestingLevel);
 
-                            // Update parent's "has-children" class and arrow
-                            const oldParentEl = noteElToMove.parentElement.closest('.note-item');
+                            const oldParentEl = getNoteElementById(noteData.parent_note_id);
                             if(oldParentEl) ui.updateParentVisuals(oldParentEl);
-                            if(updatedNote.parent_note_id) {
-                                 const newParentEl = getNoteElementById(updatedNote.parent_note_id);
-                                 if(newParentEl) ui.updateParentVisuals(newParentEl);
-                            }
+                            if(parentNoteEl) ui.updateParentVisuals(parentNoteEl);
 
 
-                            // 6. Focus the updated note.
-                            const contentDiv = noteElToMove.querySelector('.note-content');
-                            if (contentDiv) {
-                                ui.switchToEditMode(contentDiv); // Or just focus if already in edit mode
+                            const tabContentDiv = noteElToMove.querySelector('.note-content');
+                            if (tabContentDiv) {
+                                ui.switchToEditMode(tabContentDiv); 
                             }
                         } else {
-                            // Fallback to full re-render if DOM manipulation is too complex (e.g., parent element not found)
-                            console.warn("Failed to find new parent element for indent/outdent, falling back to full refresh.");
-                            const notes = await notesAPI.getNotesForPage(currentPageId);
-                            notesForCurrentPage = notes;
-                            window.notesForCurrentPage = notes;
+                             const notes = await notesAPI.getNotesForPage(currentPageId);
+                            notesForCurrentPage = notes; window.notesForCurrentPage = notes;
                             ui.displayNotes(notesForCurrentPage, currentPageId);
                             const updatedNoteElToFocus = getNoteElementById(updatedNote.id);
-                            if (updatedNoteElToFocus) {
-                                const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content');
-                                if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv);
-                            }
+                            if (updatedNoteElToFocus) { const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content'); if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv); }
                         }
                     }
                 } catch (error) {
@@ -1140,29 +1146,76 @@ notesContainer.addEventListener('keydown', async (e) => {
             break;
 
         case 'Backspace':
-            if (noteId.startsWith('temp-')) return; // Prevent actions on temp notes for Backspace
+            // if (noteId.startsWith('temp-')) return; // Already handled
+            if (!noteData) return;
             
-            // Only delete on backspace if in edit mode and content is empty
-            if (contentDiv.classList.contains('edit-mode') && e.target.textContent.trim() === '') {
-                const children = notesForCurrentPage.filter(n => n.parent_note_id === noteData.id);
+            if (contentDiv.classList.contains('edit-mode') && (contentDiv.dataset.rawContent || contentDiv.textContent).trim() === '') {
+                const children = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteData.id));
                 if (children.length > 0) {
-                    console.log('Note has children, not deleting');
-                    return;
+                    console.log('Note has children, not deleting on backspace.');
+                    // Optionally, provide feedback to the user or implement promotion of children.
+                    return; // Prevent deletion if note has children
                 }
 
-                const isOnlyRootNote = !noteData.parent_note_id && 
-                    notesForCurrentPage.filter(n => !n.parent_note_id).length === 1;
-                if (isOnlyRootNote && notesForCurrentPage.length === 1) {
-                    console.log('Cannot delete the only note on the page');
+                // Check if it's the only note on the page (root or otherwise)
+                // More robust check: if it's a root note and it's the last root note
+                const isRootNote = !noteData.parent_note_id;
+                const rootNotesCount = notesForCurrentPage.filter(n => !n.parent_note_id).length;
+
+                if (isRootNote && rootNotesCount === 1 && notesForCurrentPage.length === 1) {
+                    console.log('Cannot delete the only note on the page via Backspace.');
+                    // Keep the note, maybe clear content if user expects that, but don't delete.
+                    // For now, just return to prevent deletion.
                     return;
                 }
+                
+                // Find which note to focus next
+                let noteToFocusAfterDelete = null;
+                const allNoteElements = Array.from(notesContainer.querySelectorAll('.note-item'));
+                const currentNoteIndexInDOM = allNoteElements.findIndex(el => el.dataset.noteId === noteId);
+
+                if (currentNoteIndexInDOM > 0) { // Try focusing previous note
+                    noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM - 1];
+                } else if (allNoteElements.length > 1) { // Try focusing next note (if current was first)
+                     noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM + 1];
+                } else if (noteData.parent_note_id) { // If it was a child and no siblings, focus parent
+                    noteToFocusAfterDelete = getNoteElementById(noteData.parent_note_id);
+                }
+
 
                 e.preventDefault();
                 try {
                     await notesAPI.deleteNote(noteId);
-                    notesForCurrentPage = notesForCurrentPage.filter(n => n.id !== noteData.id);
+                    const parentIdOfDeleted = noteData.parent_note_id; // Store before modifying notesForCurrentPage
+                    notesForCurrentPage = notesForCurrentPage.filter(n => String(n.id) !== String(noteData.id));
+                    window.notesForCurrentPage = notesForCurrentPage; // Update global
                     noteItem.remove();
-                    await fetchAndDisplayPages(currentPageName);
+                    
+                    // Update parent visuals if the deleted note was a child
+                    if (parentIdOfDeleted) {
+                        const parentEl = getNoteElementById(parentIdOfDeleted);
+                        if (parentEl) {
+                            ui.updateParentVisuals(parentEl);
+                        }
+                    }
+                    
+                    // Focus the determined note
+                    if (noteToFocusAfterDelete) {
+                        const contentDivToFocus = noteToFocusAfterDelete.querySelector('.note-content');
+                        if (contentDivToFocus) {
+                            ui.switchToEditMode(contentDivToFocus);
+                        }
+                    } else if (notesForCurrentPage.length === 0 && currentPageId) {
+                        // If all notes were deleted, create a new first note.
+                        // This scenario should be rare if the "last note" check above is effective.
+                        // Call a function similar to handleCreateAndFocusFirstNote from app.js init
+                        // For now, just log. This part might need the `handleCreateAndFocusFirstNote` logic.
+                        console.log("All notes deleted. Page is empty.");
+                        // Optionally, call handleCreateAndFocusFirstNote() or similar.
+                    }
+
+
+                    // No need to refresh full page list (fetchAndDisplayPages) unless explicitly needed
                 } catch (error) {
                     console.error('Error deleting note:', error);
                 }
@@ -1172,326 +1225,152 @@ notesContainer.addEventListener('keydown', async (e) => {
         case 'ArrowUp':
         case 'ArrowDown':
             e.preventDefault();
-            const allNotes = Array.from(notesContainer.querySelectorAll('.note-item .note-content'));
-            const currentIndex = allNotes.indexOf(e.target);
-            let nextIndex = -1;
+            const allVisibleNotesContent = Array.from(notesContainer.querySelectorAll('.note-item:not(.note-hidden) .note-content'));
+            const currentVisibleIndex = allVisibleNotesContent.indexOf(e.target);
+            let nextVisibleIndex = -1;
 
             if (e.key === 'ArrowUp') {
-                if (currentIndex > 0) {
-                    nextIndex = currentIndex - 1;
+                if (currentVisibleIndex > 0) {
+                    nextVisibleIndex = currentVisibleIndex - 1;
                 }
             } else { // ArrowDown
-                if (currentIndex < allNotes.length - 1) {
-                    nextIndex = currentIndex + 1;
+                if (currentVisibleIndex < allVisibleNotesContent.length - 1) {
+                    nextVisibleIndex = currentVisibleIndex + 1;
                 }
             }
 
-            if (nextIndex !== -1) {
-                const nextNoteContent = allNotes[nextIndex];
-                if (nextNoteContent.classList.contains('rendered-mode')) {
-                    ui.switchToEditMode(nextNoteContent);
-                } else {
-                    nextNoteContent.focus();
-                }
+            if (nextVisibleIndex !== -1) {
+                const nextNoteContent = allVisibleNotesContent[nextVisibleIndex];
+                // Always switch to edit mode on navigation to ensure consistency
+                ui.switchToEditMode(nextNoteContent);
+                // Move cursor to end of content after focusing
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(nextNoteContent);
+                range.collapse(false); // false to collapse to the end
+                sel.removeAllRanges();
+                sel.addRange(range);
+
             }
             break;
     }
 });
 
-// Note interactions (bullet clicks, task markers)
+// Note interactions (task markers)
 notesContainer.addEventListener('click', async (e) => {
-    // Bullet click for collapse/expand
-    if (e.target.matches('.note-bullet.has-children-bullet')) {
-        const noteId = e.target.dataset.noteId;
-        const noteData = getNoteDataById(noteId);
-
-        if (noteData) {
-            const newCollapsedState = !noteData.collapsed;
-            try {
-                const updatedNote = await notesAPI.updateNote(noteId, { 
-                    collapsed: newCollapsedState 
-                });
-                noteData.collapsed = updatedNote.collapsed;
-                updateNoteDOM(noteData);
-            } catch (error) {
-                console.error('Error updating collapsed state:', error);
-            }
-        }
-    }
     // Task checkbox click
-    else if (e.target.matches('.task-checkbox')) {
+    if (e.target.matches('.task-checkbox')) {
         const checkbox = e.target;
         const noteItem = checkbox.closest('.note-item');
         if (!noteItem) return;
         
         const noteId = noteItem.dataset.noteId;
-        const contentDiv = noteItem.querySelector('.note-content');
+        const contentDiv = noteItem.querySelector('.note-content'); // This is where the raw content is stored/edited
         const noteData = getNoteDataById(noteId);
 
-        if (!noteData || !contentDiv) {
-            console.error('Note data or contentDiv not found for task checkbox click', { noteId, noteData, contentDiv });
+        if (!noteData || !contentDiv || noteId.startsWith('temp-')) {
+            console.error('Note data, contentDiv not found, or temp note for task checkbox click', { noteId, noteData, contentDiv });
+            // Prevent checking if critical data is missing or it's a temp note
+            checkbox.checked = !checkbox.checked; // Revert UI change
             return;
         }
+        
+        // Use rawContent for reliable prefix checking
+        let rawContent = contentDiv.dataset.rawContent || contentDiv.textContent; // Fallback for safety
+        let newRawContent, newStatus, doneAt = null;
+        const isChecked = checkbox.checked; // State AFTER click
 
-        const currentMarkerType = checkbox.dataset.markerType;
-        let newContent, newStatus, doneAt = null;
-        const currentText = contentDiv.innerText; // Get text directly from contentDiv for accurate parsing
-
-        if (currentMarkerType === 'TODO') {
-            newContent = 'DONE ' + currentText.replace(/^TODO\s*/, '');
-            newStatus = 'DONE';
-            doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        } else if (currentMarkerType === 'DONE') {
-            newContent = 'TODO ' + currentText.replace(/^DONE\s*/, '');
-            newStatus = 'TODO';
-        } else if (currentMarkerType === 'CANCELLED') {
-            // Can't change cancelled tasks
-            checkbox.checked = true; // Keep it checked/disabled
+        if (rawContent.startsWith('TODO ')) {
+            if (isChecked) { // Was TODO, now DONE
+                newRawContent = 'DONE ' + rawContent.substring(5);
+                newStatus = 'DONE';
+                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            } else { // Clicked again, back to TODO (should not happen if checkbox is controlled)
+                newRawContent = rawContent; // No change or back to TODO
+                newStatus = 'TODO';
+            }
+        } else if (rawContent.startsWith('DONE ')) {
+            if (!isChecked) { // Was DONE, now TODO
+                newRawContent = 'TODO ' + rawContent.substring(5);
+                newStatus = 'TODO';
+            } else { // Clicked again, back to DONE (should not happen)
+                newRawContent = rawContent;
+                newStatus = 'DONE';
+                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' '); // Keep done_at if already done
+            }
+        } else if (rawContent.startsWith('CANCELLED ')) {
+            // CANCELLED tasks are not interactive, checkbox should be disabled
+            // Revert UI if somehow clicked
+            checkbox.checked = true; 
             return;
         } else {
+            // Not a task, or malformed. Do nothing.
+            console.warn("Clicked task checkbox on a non-task or malformed note content:", rawContent);
+            checkbox.checked = !checkbox.checked; // Revert UI change
             return;
         }
 
         try {
-            // 1. Update note content first
-            const updatedNote = await notesAPI.updateNote(noteId, { content: newContent });
-            noteData.content = updatedNote.content; // Update local cache
-            noteData.updated_at = updatedNote.updated_at; // Update local cache
-            contentDiv.innerHTML = ui.parseAndRenderContent(newContent); // Update UI with parsed content
+            // 1. Update note content
+            const updatedNoteServer = await notesAPI.updateNote(noteId, { content: newRawContent });
+            noteData.content = updatedNoteServer.content; // Update local cache with server response
+            noteData.updated_at = updatedNoteServer.updated_at;
+            contentDiv.dataset.rawContent = updatedNoteServer.content; // Update rawContent dataset
+            
+            // Re-render the content div with the new raw content
+            // If in edit mode, textContent will be set. If rendered, innerHTML will be set.
+            if (contentDiv.classList.contains('edit-mode')) {
+                contentDiv.textContent = updatedNoteServer.content;
+            } else {
+                contentDiv.innerHTML = ui.parseAndRenderContent(updatedNoteServer.content);
+            }
 
-            // 2. Update properties
-            await propertiesAPI.setProperty({
-                entity_type: 'note',
-                entity_id: parseInt(noteId),
-                name: 'status',
-                value: newStatus
-            });
 
+            // 2. Update properties ('status' and 'done_at')
+            await propertiesAPI.setProperty({ entity_type: 'note', entity_id: parseInt(noteId), name: 'status', value: newStatus });
             if (doneAt) {
-                await propertiesAPI.setProperty({
-                    entity_type: 'note',
-                    entity_id: parseInt(noteId),
-                    name: 'done_at',
-                    value: doneAt
-                });
+                await propertiesAPI.setProperty({ entity_type: 'note', entity_id: parseInt(noteId), name: 'done_at', value: doneAt });
             } else {
-                // Ensure 'done_at' property is removed if it exists
-                try {
-                    await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at');
-                } catch (delError) {
-                    // Ignore if property didn't exist (some backends might error)
-                    console.warn('Could not delete done_at property (might not exist):', delError);
-                }
+                try { await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at'); } 
+                catch (delError) { console.warn('Could not delete done_at (might not exist):', delError); }
             }
 
-            // 3. Fetch updated properties for the note
+            // 3. Fetch all properties for the note to update local cache and UI accurately
             const updatedProperties = await propertiesAPI.getProperties('note', parseInt(noteId));
-            noteData.properties = updatedProperties; // Update local cache of properties
+            noteData.properties = updatedProperties;
 
-            // 4. Re-render the properties section for this specific note
-            const propertiesEl = noteItem.querySelector('.note-properties');
-            if (propertiesEl) {
-                ui.renderProperties(propertiesEl, updatedProperties);
-            } else {
-                console.warn('Could not find properties element for note:', noteId);
+            // 4. Re-render the properties section (if it exists as a separate element)
+            // The current ui.renderNote integrates properties into the main content parsing.
+            // If properties are displayed separately (e.g., in a .note-properties div), update that.
+            // For now, parseAndRenderContent on the main contentDiv should handle inline properties.
+            // If a dedicated .note-properties element is used by renderNote, it needs updating here.
+            // Example:
+            // const propertiesEl = noteItem.querySelector('.note-properties');
+            // if (propertiesEl) ui.renderProperties(propertiesEl, updatedProperties);
+
+            // 5. Update global notes data for consistency
+            const noteIndexInGlobal = notesForCurrentPage.findIndex(n => String(n.id) === String(noteId));
+            if (noteIndexInGlobal > -1) {
+                notesForCurrentPage[noteIndexInGlobal] = { ...notesForCurrentPage[noteIndexInGlobal], ...noteData }; // Merge updated data
+                window.notesForCurrentPage = notesForCurrentPage; // Ensure global is updated
             }
 
-            // 5. Update global notes data to keep drag-and-drop changes
-            const updatedNoteIndex = notesForCurrentPage.findIndex(n => n.id === noteData.id);
-            if (updatedNoteIndex > -1) {
-                notesForCurrentPage[updatedNoteIndex] = noteData;
-                window.notesForCurrentPage = notesForCurrentPage;
-            }
-
-            console.log(`Task status updated: ${newStatus}`, { noteId, newContent, doneAt });
+            console.log('Task status updated: ' + newStatus, { noteId, newRawContent, doneAt });
 
         } catch (error) {
             console.error('Error updating task status:', error);
             alert('Failed to update task status: ' + error.message);
-            // Revert UI optimistic update on error
-            contentDiv.innerHTML = ui.parseAndRenderContent(noteData.content); // Revert to original content
-        }
-    }
-});
-
-// Page link clicks
-document.body.addEventListener('click', async (e) => {
-    if (e.target.matches('.page-link[data-page-name]')) {
-        e.preventDefault();
-        const pageName = e.target.dataset.pageName;
-        
-        try {
-            // Try to load the page first
-            const existingPage = await pagesAPI.getPageByName(pageName);
-            
-            if (existingPage && existingPage.id) {
-                // Page exists, load it normally
-                await loadPage(pageName);
+            // Revert UI on error
+            checkbox.checked = !checkbox.checked; // Revert checkbox state
+            contentDiv.dataset.rawContent = noteData.content; // Revert rawContent
+            if (contentDiv.classList.contains('edit-mode')) {
+                contentDiv.textContent = noteData.content;
             } else {
-                // Page doesn't exist, create it
-                console.log(`Creating new page: ${pageName}`);
-                const newPage = await pagesAPI.createPage({ name: pageName });
-                
-                if (newPage && newPage.id) {
-                    // Check if it's a journal page (date format or "Journal")
-                    const journalPattern = /^\d{4}-\d{2}-\d{2}$|^Journal$/i;
-                    if (journalPattern.test(pageName)) {
-                        // Add journal type property
-                        await propertiesAPI.setProperty({
-                            entity_type: 'page',
-                            entity_id: newPage.id,
-                            name: 'type',
-                            value: 'journal'
-                        });
-                    }
-                    
-                    // Refresh page list and load the new page
-                    await fetchAndDisplayPages(newPage.name);
-                    await loadPage(newPage.name, true);
-                } else {
-                    alert(`Failed to create page: ${pageName}`);
-                }
-            }
-        } catch (error) {
-            console.error('Error handling page link click:', error);
-            // If there's an error, try to create the page anyway
-            try {
-                const newPage = await pagesAPI.createPage({ name: pageName });
-                if (newPage && newPage.id) {
-                    const journalPattern = /^\d{4}-\d{2}-\d{2}$|^Journal$/i;
-                    if (journalPattern.test(pageName)) {
-                        await propertiesAPI.setProperty({
-                            entity_type: 'page',
-                            entity_id: newPage.id,
-                            name: 'type',
-                            value: 'journal'
-                        });
-                    }
-                    await fetchAndDisplayPages(newPage.name);
-                    await loadPage(newPage.name, true);
-                } else {
-                    alert(`Failed to create page: ${pageName}`);
-                }
-            } catch (createError) {
-                console.error('Error creating page:', createError);
-                alert(`Failed to create page: ${pageName}`);
+                contentDiv.innerHTML = ui.parseAndRenderContent(noteData.content);
             }
         }
     }
 });
-
-/**
- * Gets the initial page name to load
- * @returns {string} Today's date in YYYY-MM-DD format
- */
-function getInitialPage() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-// Page Properties Modal Handling
-function initPagePropertiesModal() {
-    const titleContainer = document.getElementById('current-page-title-container');
-    const modal = document.getElementById('page-properties-modal');
-    const modalContent = modal ? modal.querySelector('.generic-modal-content') : null;
-
-    console.log('[InitPagePropsModal-Delegated] Initializing...');
-    console.log('[InitPagePropsModal-Delegated] Title Container for listener:', titleContainer);
-    console.log('[InitPagePropsModal-Delegated] Modal element:', modal);
-    console.log('[InitPagePropsModal-Delegated] Modal Content element for close listener:', modalContent);
-
-    if (!titleContainer) {
-        console.warn('[InitPagePropsModal-Delegated] Page title container element not found. Cannot attach delegated listener for gear icon.');
-        return;
-    }
-    if (!modal) {
-        console.warn('[InitPagePropsModal-Delegated] Page properties MODAL element not found. Modal functionality will be disabled.');
-        return;
-    }
-
-    console.log('[InitPagePropsModal-Delegated] Attaching delegated click listener to title container:', titleContainer);
-    titleContainer.addEventListener('click', async (event) => {
-        const gearIcon = event.target.closest('#page-properties-gear');
-        if (!gearIcon) {
-            return; // Click was not on the gear icon or its children
-        }
-
-        console.log('[InitPagePropsModal-Delegated] Gear icon clicked (via delegation). Target:', event.target);
-        if (!modal) {
-            console.error('[InitPagePropsModal-Delegated] Modal element is null or undefined at click time!');
-            return;
-        }
-        console.log('[InitPagePropsModal-Delegated] Current page ID for properties:', currentPageId);
-        
-        if (currentPageId) {
-            try {
-                console.log('[InitPagePropsModal-Delegated] Fetching properties for page:', currentPageId);
-                const properties = await propertiesAPI.getProperties('page', currentPageId);
-                console.log('[InitPagePropsModal-Delegated] Properties fetched for modal:', properties);
-                displayPageProperties(properties);
-            } catch (error) {
-                console.error('[InitPagePropsModal-Delegated] Error fetching page properties for modal:', error);
-                displayPageProperties({}); // Display empty or error state
-            }
-        }
-        
-        console.log('[InitPagePropsModal-Delegated] Current modal classList BEFORE add active:', modal.classList.toString());
-        modal.classList.add('active');
-        console.log('[InitPagePropsModal-Delegated] Current modal classList AFTER add active:', modal.classList.toString());
-        console.log('[InitPagePropsModal-Delegated] Modal display style after adding active class:', window.getComputedStyle(modal).display);
-
-        if (typeof feather !== 'undefined' && feather.replace) {
-            feather.replace();
-        }
-    });
-
-    // Delegated listener for the close button on the modal content
-    if (modalContent) {
-        modalContent.addEventListener('click', (event) => {
-            const closeIcon = event.target.closest('#page-properties-modal-close');
-            if (closeIcon) {
-                console.log('[InitPagePropsModal-Delegated] Modal close icon clicked (via delegation). Target:', event.target);
-                if (!modal) {
-                    console.error('[InitPagePropsModal-Delegated] Modal element is null at close icon click time!');
-                    return;
-                }
-                modal.classList.remove('active');
-                console.log('[InitPagePropsModal-Delegated] Modal display style after removing active class (close icon):', modal ? window.getComputedStyle(modal).display : 'modal not found');
-            } else {
-                // console.log('[InitPagePropsModal-Delegated] Click inside modal content, but not on close icon. Target:', event.target);
-            }
-        });
-    } else {
-        console.warn('[InitPagePropsModal-Delegated] Modal content area not found. Cannot attach delegated listener for close icon.');
-    }
-
-    // Close modal when clicking outside its content (on the backdrop)
-    if (modal) {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                console.log('[InitPagePropsModal-Delegated] Clicked outside modal content, closing modal.');
-                modal.classList.remove('active');
-                console.log('[InitPagePropsModal-Delegated] Modal display style after removing active class (click outside):', window.getComputedStyle(modal).display);
-            }
-        });
-    }
-
-    // Add property button
-    const addBtn = ui.domRefs.addPagePropertyBtn; // Assuming addPagePropertyBtn is still correctly referenced via ui.domRefs
-    if (addBtn) {
-        addBtn.addEventListener('click', async () => {
-            const key = await ui.showGenericInputModal('Enter property name:');
-            if (key && key.trim()) {
-                await addPageProperty(key.trim(), '');
-            }
-        });
-    } else {
-        console.warn('[InitPagePropsModal-Delegated] Add page property button not found via ui.domRefs.');
-    }
-}
 
 // Update displayPageProperties function
 function displayPageProperties(properties) {
@@ -2150,13 +2029,30 @@ async function initializeApp() {
             });
         }
         
+        // Before hiding splash, ensure save indicator is in a clean initial state
+        const initialSaveIndicator = document.getElementById('save-status-indicator');
+        if (initialSaveIndicator) {
+            initialSaveIndicator.className = 'status-saved status-hidden'; // Base classes
+            initialSaveIndicator.innerHTML = '<i data-feather="check-circle"></i>';
+            initialSaveIndicator.title = 'All changes saved';
+            if (typeof feather !== 'undefined' && feather.replace) {
+                feather.replace();
+            }
+        }
+
         if (splashScreen) {
+            if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
+                window.splashAnimations.stop();
+            }
             splashScreen.classList.add('hidden');
         }
         console.log('App initialized successfully');
     } catch (error) {
         console.error('Failed to initialize app:', error);
         if (splashScreen) {
+            if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
+                window.splashAnimations.stop(); // Also stop on error if splash was visible
+            }
             splashScreen.classList.add('hidden');
         }
         // Display a user-friendly error message on the page
@@ -2321,5 +2217,79 @@ async function deletePageProperty(key) {
     } catch (error) {
         console.error('Error deleting page property:', error);
         alert('Failed to delete property');
+    }
+}
+
+/**
+ * Updates the visual save status indicator.
+ * @param {string} newStatus - The new status: 'saved', 'pending', or 'error'.
+ */
+function updateSaveStatusIndicator(newStatus) {
+    const indicator = document.getElementById('save-status-indicator');
+    if (!indicator) {
+        console.warn('Save status indicator element not found.');
+        return;
+    }
+
+    saveStatus = newStatus; // Update global status tracker
+
+    const splashScreen = document.getElementById('splash-screen');
+    const isSplashVisible = splashScreen && !splashScreen.classList.contains('hidden');
+
+    if (isSplashVisible) {
+        indicator.classList.add('status-hidden');
+        indicator.innerHTML = ''; // Clear content when hidden by splash
+        return;
+    } else {
+        indicator.classList.remove('status-hidden');
+    }
+
+    indicator.classList.remove('status-saved', 'status-pending', 'status-error');
+    indicator.classList.add(`status-${newStatus}`);
+
+    let iconHtml = '';
+    switch (newStatus) {
+        case 'saved':
+            iconHtml = '<i data-feather="check-circle"></i>';
+            indicator.title = 'All changes saved';
+            break;
+        case 'pending':
+            iconHtml = `
+                <div class="dot-spinner">
+                    <div class="dot-spinner__dot"></div>
+                    <div class="dot-spinner__dot"></div>
+                    <div class="dot-spinner__dot"></div>
+                </div>`;
+            indicator.title = 'Saving changes...';
+            break;
+        case 'error':
+            iconHtml = '<i data-feather="alert-triangle"></i>';
+            indicator.title = 'Error saving changes. Please try again.';
+            break;
+        default: // Fallback, e.g., to saved state
+            console.warn(`Unknown save status: ${newStatus}. Defaulting to 'saved'.`);
+            saveStatus = 'saved'; // Correct the global status
+            indicator.classList.remove('status-pending', 'status-error'); // Clean up other classes
+            indicator.classList.add(`status-saved`);
+            iconHtml = '<i data-feather="check-circle"></i>';
+            indicator.title = 'All changes saved';
+            break;
+    }
+    indicator.innerHTML = iconHtml;
+
+    // Process Feather Icons for 'saved' and 'error' states
+    if (newStatus === 'saved' || newStatus === 'error') {
+        if (typeof feather !== 'undefined' && feather.replace) {
+            feather.replace({
+                width: '18px',
+                height: '18px',
+                'stroke-width': '2' // Ensure consistent stroke width
+            });
+        } else {
+            // Fallback or warning if Feather Icons is not available
+            console.warn('Feather Icons library not found. Icons for "saved" or "error" status might not render.');
+            if (newStatus === 'saved') indicator.textContent = '✓'; // Simple text fallback
+            if (newStatus === 'error') indicator.textContent = '!'; // Simple text fallback
+        }
     }
 }
