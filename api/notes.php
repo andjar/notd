@@ -357,10 +357,10 @@ if ($method === 'GET') {
             // Parse and save new properties from updated content
             $properties = parsePropertiesFromContent($input['content']);
             savePropertiesForNote($pdo, $noteId, $properties);
+            
+            // Parse and save page properties from updated content
+            savePagePropertiesFromContent($pdo, (int)$existingNote['page_id'], $input['content']);
         }
-        
-        // Parse and save page properties from updated content
-        savePagePropertiesFromContent($pdo, (int)$existingNote['page_id'], $input['content']);
         
         // Fetch updated note
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
