@@ -101,6 +101,12 @@
     --ls-save-status-spinner-color: var(--ls-gray-8); /* Flatly Wet Asphalt */
     --ls-save-status-saved-icon-color: #18bc9c; /* Flatly Success */
     --ls-save-status-error-icon-color: #e74c3c; /* Flatly Danger */
+
+    /* == Splash Screen Animated Bubble Colors - Darkly Light Mode (Flatly-like) == */
+    --ls-splash-bubble-color-1: hsla(207, 71%, 60%, 0.28); /* Flatly Blue variant from flatly.css */
+    --ls-splash-bubble-color-2: rgba(24, 188, 156, 0.25);  /* Flatly Turquoise from flatly.css */
+    --ls-splash-bubble-color-3: hsla(207, 56%, 65%, 0.22); /* Flatly Blue lighter variant from flatly.css */
+    --ls-splash-bubble-color-4: rgba(189, 195, 199, 0.25); /* Flatly Silver from flatly.css */
 }
 
 /* Darkly Theme (Bootswatch) - Dark Mode (Darkly's actual colors) */
@@ -210,6 +216,12 @@
     --ls-save-status-spinner-color: var(--ls-dm-primary); /* Darkly primary for spinner */
     --ls-save-status-saved-icon-color: var(--ls-dm-success); /* Darkly success */
     --ls-save-status-error-icon-color: var(--ls-dm-danger); /* Darkly danger */
+
+    /* == Splash Screen Animated Bubble Colors - Darkly Dark Mode == */
+    --ls-splash-bubble-color-1: hsla(var(--ls-dm-accent-hue), var(--ls-dm-accent-saturation), 30%, 0.3); /* Darkly blue variant */
+    --ls-splash-bubble-color-2: rgba(0, 188, 140, 0.28);    /* Darkly Success green, transparent */
+    --ls-splash-bubble-color-3: hsla(var(--ls-dm-accent-hue), calc(var(--ls-dm-accent-saturation) - 10%), 35%, 0.25); /* Another Darkly blue variant */
+    --ls-splash-bubble-color-4: rgba(253, 126, 20, 0.18);  /* Darkly Orange/Warning, very subtle */
 }
 
 /* == Newly Added Variables - Darkly's Light Mode (Flatly-like) == */

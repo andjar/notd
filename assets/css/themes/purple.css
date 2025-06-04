@@ -117,6 +117,12 @@
     --ls-focused-parent-bullet-text-color: var(--ls-purple-1);
     --ls-show-all-notes-btn-text-color: var(--ls-purple-1);
     --ls-task-badge-todo-text-color: var(--ls-purple-1);
+
+    /* == Splash Screen Animated Bubble Colors - Purple Light == */
+    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 60%, 0.28);
+    --ls-splash-bubble-color-2: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) + 10%), 65%, 0.22);
+    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 70%, 0.25);
+    --ls-splash-bubble-color-4: hsla(var(--ls-gray-hue), 10%, 60%, 0.2);
 }
 
 /* Dark Mode */
@@ -231,4 +237,10 @@
     --ls-focused-parent-bullet-text-color: var(--ls-purple-12);
     --ls-show-all-notes-btn-text-color: var(--ls-purple-12);
     --ls-task-badge-todo-text-color: var(--ls-purple-12);
+
+    /* == Splash Screen Animated Bubble Colors - Purple Dark == */
+    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 30%, 0.3);
+    --ls-splash-bubble-color-2: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) + 5%), 35%, 0.25);
+    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 40%, 0.28);
+    --ls-splash-bubble-color-4: hsla(var(--ls-gray-hue), 5%, 25%, 0.22);
 } 

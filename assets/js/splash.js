@@ -50,12 +50,6 @@ function updatePerimeterDots(timestamp) {
 // --- Background Bubbles ---
 const numBubbles = 20; // Adjusted number, can be tweaked
 const bubbles = [];
-const BUBBLE_COLORS = [
-    'rgba(255, 100, 0, 0.35)',  // Slightly more opaque base for orange
-    'rgba(230, 50, 50, 0.35)',  // Slightly more opaque base for red
-    'rgba(200, 0, 100, 0.3)',   // Magenta
-    'rgba(255, 150, 50, 0.3)'   // Lighter orange
-];
 
 // !!! ADJUST THIS VALUE !!!
 // This should be close to the radius of your central notification orb (the "main bubble").
@@ -71,6 +65,24 @@ function initBackgroundBubbles() {
     if (!bubblesCanvas) return;
     bubblesCanvas.innerHTML = '';
     bubbles.length = 0;
+
+    const computedStyle = getComputedStyle(document.body);
+    const themeBubbleColors = [];
+    const defaultFallbackColors = [ // Fallbacks in case CSS variables are not found
+        'rgba(255, 100, 0, 0.35)',
+        'rgba(230, 50, 50, 0.35)',
+        'rgba(200, 0, 100, 0.3)',
+        'rgba(255, 150, 50, 0.3)'
+    ];
+
+    for (let i = 1; i <= 4; i++) {
+        const colorValue = computedStyle.getPropertyValue(`--ls-splash-bubble-color-${i}`).trim();
+        if (colorValue) {
+            themeBubbleColors.push(colorValue);
+        } else {
+            themeBubbleColors.push(defaultFallbackColors[i-1] || 'rgba(0,0,0,0.1)'); // Extra safety net
+        }
+    }
 
     const canvasCenterX = bubblesCanvas.offsetWidth / 2;
     const canvasCenterY = bubblesCanvas.offsetHeight / 2;
@@ -93,7 +105,7 @@ function initBackgroundBubbles() {
 
         bubbleElement.style.width = `${baseSize}px`;
         bubbleElement.style.height = `${baseSize}px`;
-        bubbleElement.style.backgroundColor = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
+        bubbleElement.style.backgroundColor = themeBubbleColors[Math.floor(Math.random() * themeBubbleColors.length)];
         bubbleElement.style.left = `${x.toFixed(1)}px`;
         bubbleElement.style.top = `${y.toFixed(1)}px`;
         bubbleElement.style.transform = 'scale(0.01)'; // Start very small
@@ -206,7 +218,7 @@ window.splashAnimations = {
     stop: stopSplashAnimation
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('load', () => {
     if (splashScreen && getComputedStyle(splashScreen).display !== 'none' && !splashScreen.classList.contains('hidden')) {
         startSplashAnimation();
     }

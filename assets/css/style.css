@@ -146,6 +146,12 @@
     --ls-focused-parent-bullet-text-color: #ffffff;
     --ls-show-all-notes-btn-text-color: #ffffff;
     --ls-task-badge-todo-text-color: #ffffff;
+
+    /* Splash Screen Animated Bubble Colors - Fallbacks */
+    --ls-splash-bubble-color-1: rgba(255, 100, 0, 0.35);  /* Default: Orangeish */
+    --ls-splash-bubble-color-2: rgba(230, 50, 50, 0.35);   /* Default: Reddish */
+    --ls-splash-bubble-color-3: rgba(200, 0, 100, 0.3);    /* Default: Magentaish */
+    --ls-splash-bubble-color-4: rgba(255, 150, 50, 0.3);   /* Default: Lighter Orangeish */
 }
 
 /* Dark Theme color variables are now sourced from the active theme CSS */

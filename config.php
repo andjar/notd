@@ -2,7 +2,7 @@
 define('DB_PATH', __DIR__ . '/db/database.sqlite');
 define('UPLOADS_DIR', __DIR__ . '/uploads');
 define('APP_BASE_URL', ''); // Set this if your app is in a subdirectory, e.g., /notetaker
-define('ACTIVE_THEME', 'ubuntu'); // Defines the active theme file (e.g., 'default' for 'default.css')
+define('ACTIVE_THEME', 'flatly'); // Defines the active theme file (e.g., 'default' for 'default.css')
 
 // Error reporting (for development)
 ini_set('display_errors', 1); // Enable error display
