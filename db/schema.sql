@@ -28,27 +28,6 @@ CREATE TABLE IF NOT EXISTS Notes (
 CREATE INDEX IF NOT EXISTS idx_notes_page_id ON Notes(page_id);
 CREATE INDEX IF NOT EXISTS idx_notes_parent_note_id ON Notes(parent_note_id);
 
--- FTS5 Virtual Table for Notes Search
-CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts5(
-    content,
-    content_rowid=id,
-    tokenize = 'porter unicode61'
-);
-
--- Triggers to keep Notes_fts synchronized with Notes table
-CREATE TRIGGER IF NOT EXISTS Notes_ai AFTER INSERT ON Notes BEGIN
-    INSERT INTO Notes_fts (rowid, content) VALUES (new.id, new.content);
-END;
-
-CREATE TRIGGER IF NOT EXISTS Notes_bd BEFORE DELETE ON Notes BEGIN
-    INSERT INTO Notes_fts (Notes_fts, rowid, content) VALUES ('delete', old.id, old.content);
-END;
-
-CREATE TRIGGER IF NOT EXISTS Notes_au AFTER UPDATE ON Notes WHEN OLD.content IS NOT NEW.content BEGIN
-    INSERT INTO Notes_fts (Notes_fts, rowid, content) VALUES ('delete', old.id, old.content);
-    INSERT INTO Notes_fts (rowid, content) VALUES (new.id, new.content);
-END;
-
 -- Attachments Table
 CREATE TABLE IF NOT EXISTS Attachments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +63,20 @@ CREATE INDEX IF NOT EXISTS idx_properties_note_id_name ON Properties(note_id, na
 CREATE INDEX IF NOT EXISTS idx_properties_page_id_name ON Properties(page_id, name) WHERE page_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_properties_name_value ON Properties(name, value);
 
+-- Property Definitions Table
+-- This table defines which property names should be treated as internal
+CREATE TABLE IF NOT EXISTS PropertyDefinitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    internal INTEGER NOT NULL DEFAULT 0,
+    description TEXT,
+    auto_apply INTEGER NOT NULL DEFAULT 1, -- Whether to auto-apply to existing properties
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_property_definitions_name ON PropertyDefinitions(name);
+CREATE INDEX IF NOT EXISTS idx_property_definitions_internal ON PropertyDefinitions(internal);
+
 -- Triggers for updated_at (optional, can be handled by PHP)
 CREATE TRIGGER IF NOT EXISTS update_pages_updated_at
 AFTER UPDATE ON Pages FOR EACH ROW
@@ -91,17 +84,25 @@ BEGIN
     UPDATE Pages SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
 END;
 
-CREATE TRIGGER IF NOT EXISTS update_notes_updated_at
-AFTER UPDATE ON Notes FOR EACH ROW
-BEGIN
-    UPDATE Notes SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
-END;
+-- CREATE TRIGGER IF NOT EXISTS update_properties_updated_at
+-- AFTER UPDATE ON Properties FOR EACH ROW
+-- BEGIN
+--     UPDATE Properties SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+-- END;
 
-CREATE TRIGGER IF NOT EXISTS update_properties_updated_at
-AFTER UPDATE ON Properties FOR EACH ROW
+CREATE TRIGGER IF NOT EXISTS update_property_definitions_updated_at
+AFTER UPDATE ON PropertyDefinitions FOR EACH ROW
 BEGIN
-    UPDATE Properties SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+    UPDATE PropertyDefinitions SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
 END;
 
 -- Default Journal Page (if it doesn't exist)
 INSERT OR IGNORE INTO Pages (name) VALUES ('Journal');
+
+-- Insert default property definitions
+INSERT OR IGNORE INTO PropertyDefinitions (name, internal, description, auto_apply) VALUES
+('internal', 1, 'Properties that control note/page visibility', 1),
+('debug', 1, 'Debug and development properties', 1),
+('system', 1, 'System-generated properties', 1),
+('_private', 1, 'Private properties (underscore prefix)', 1),
+('metadata', 1, 'Metadata properties for internal use', 1);

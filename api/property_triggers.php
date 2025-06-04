@@ -15,11 +15,11 @@ function handleInternalPropertyTriggerForNote($pdo, $entityType, $entityId, $pro
         // Ensure $propertyValue is treated as a string for comparison, as it comes from DB or input
         $noteInternalValue = ($propertyValue === 'true' || $propertyValue === '1') ? 1 : 0;
         try {
-            $stmtUpdateNote = $pdo->prepare("UPDATE Notes SET internal = :internalValue WHERE id = :noteId");
-            $stmtUpdateNote->bindParam(':internalValue', $noteInternalValue, PDO::PARAM_INT);
-            $stmtUpdateNote->bindParam(':noteId', $entityId, PDO::PARAM_INT);
-            $stmtUpdateNote->execute();
-            // error_log("Triggered Notes.internal update for note $entityId to $noteInternalValue based on property value: $propertyValue");
+            // $stmtUpdateNote = $pdo->prepare("UPDATE Notes SET internal = :internalValue WHERE id = :noteId");
+            // $stmtUpdateNote->bindParam(':internalValue', $noteInternalValue, PDO::PARAM_INT);
+            // $stmtUpdateNote->bindParam(':noteId', $entityId, PDO::PARAM_INT);
+            // $stmtUpdateNote->execute();
+            error_log("[Trigger Disabled] Would have updated Notes.internal for note $entityId to $noteInternalValue based on property value: $propertyValue");
         } catch (PDOException $e) {
             // Log error, but don't let trigger failure stop main operation usually
             error_log("Error in handleInternalPropertyTriggerForNote: " . $e->getMessage());
@@ -62,9 +62,15 @@ function dispatchPropertyTriggers($pdo, $entityType, $entityId, $propertyName, $
     if (isset($propertyTriggers[$propertyName])) {
         $handlerFunction = $propertyTriggers[$propertyName];
         if (function_exists($handlerFunction)) {
-            call_user_func($handlerFunction, $pdo, $entityType, $entityId, $propertyName, $propertyValue);
+            try {
+                call_user_func($handlerFunction, $pdo, $entityType, $entityId, $propertyName, $propertyValue);
+            } catch (Exception $e) {
+                // Log error but don't re-throw - make trigger errors non-fatal
+                error_log("Error in property trigger handler {$handlerFunction} for property {$propertyName}: " . $e->getMessage());
+            }
         } else {
             error_log("Property trigger handler function not found: {$handlerFunction} for property {$propertyName}");
         }
     }
+    // No registered handler for this property - this is normal and not an error
 } 
