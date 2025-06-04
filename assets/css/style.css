@@ -127,12 +127,6 @@
     --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
     --ls-image-viewer-close-text: var(--ls-primary-text-color);
     --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-    --ls-property-tag-bg: var(--ls-accent-10);
-    --ls-property-tag-text: var(--ls-primary-background-color, #ffffff);
-    --ls-save-status-bg: var(--ls-gray-7);
-    --ls-save-status-spinner-color: var(--ls-primary-text-color);
-    --ls-save-status-saved-icon-color: var(--ls-accent-10); /* Using accent color */
-    --ls-save-status-error-icon-color: var(--color-error);
 
     /* NEWLY ADDED THEMEABLE VARIABLES - FALLBACKS */
     --ls-active-nav-item-text-color: #ffffff;
@@ -2520,4 +2514,135 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     .backlinks-section h4 {
         font-size: var(--ls-font-size-base);
     }
+}
+
+/* Template Menu Styles */
+.template-menu {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    min-width: 300px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.template-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.template-menu-header h3 {
+    margin: 0;
+    font-size: 1.1em;
+    color: var(--text-color);
+}
+
+.template-menu .close-button {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.template-menu .close-button:hover {
+    color: var(--accent-color);
+}
+
+.template-list {
+    padding: 8px 0;
+}
+
+.template-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.template-item:hover {
+    background-color: var(--hover-color);
+}
+
+.template-name {
+    color: var(--text-color);
+    font-size: 0.95em;
+}
+
+/* Page Template Button */
+.page-template-button {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.page-template-button:hover {
+    background-color: var(--hover-color);
+    color: var(--accent-color);
+}
+
+.page-template-button i {
+    width: 16px;
+    height: 16px;
+}
+
+/* Template Autocomplete Styles */
+.template-autocomplete {
+    position: fixed;
+    background: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    box-shadow: var(--ls-shadow-lg);
+    z-index: var(--ls-z-index-dropdown);
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: var(--ls-font-size-sm);
+    min-width: 200px;
+}
+
+.template-autocomplete .template-item {
+    padding: var(--ls-space-2) var(--ls-space-3);
+    cursor: pointer;
+    transition: background-color var(--ls-transition-fast);
+    display: flex;
+    align-items: center;
+}
+
+.template-autocomplete .template-item:hover {
+    background-color: var(--ls-secondary-background-color);
+}
+
+.template-autocomplete .template-name {
+    color: var(--ls-primary-text-color);
+}
+
+.template-autocomplete .template-item.selected {
+    background-color: var(--ls-accent-10);
+    color: var(--ls-primary-text-color);
+}
+
+/* Add a subtle highlight to the matching part of the template name */
+.template-autocomplete .template-name .match {
+    color: var(--ls-accent-10);
+    font-weight: var(--ls-font-weight-medium);
 }

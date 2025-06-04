@@ -208,8 +208,15 @@ const notesAPI = {
      * @returns {Promise<null>}
      */
     deleteNote: (noteId) => {
+        // Get the current page ID from the global state
+        const pageId = window.currentPageId;
+        if (!pageId) {
+            return Promise.reject(new Error('Page ID is required'));
+        }
+
         const bodyWithMethodOverride = {
-            _method: 'DELETE'
+            _method: 'DELETE',
+            page_id: pageId
         };
         return apiRequest(`notes.php?id=${noteId}`, 'POST', bodyWithMethodOverride);
     }
@@ -314,6 +321,46 @@ const searchAPI = {
     getTasks: (status) => apiRequest(`search.php?tasks=${status}`)
 };
 
+/**
+ * API functions for managing templates
+ * @namespace templatesAPI
+ */
+const templatesAPI = {
+    /**
+     * Get available templates
+     * @param {string} type - Template type ('note' or 'page')
+     * @returns {Promise<{success: boolean, data: Array<{name: string, content: string}>}>}
+     */
+    getTemplates: async (type) => {
+        const response = await apiRequest(`templates.php?type=${type}`);
+        // Ensure we always return the expected format
+        if (Array.isArray(response)) {
+            // If we got a direct array, wrap it in the expected format
+            return {
+                success: true,
+                data: response
+            };
+        }
+        // Otherwise return the response as is (should already be in correct format)
+        return response;
+    },
+
+    /**
+     * Create a new template
+     * @param {{type: string, name: string, content: string}} templateData - Template data
+     * @returns {Promise<Object>} Creation confirmation
+     */
+    createTemplate: (templateData) => apiRequest('templates.php', 'POST', templateData),
+
+    /**
+     * Delete a template
+     * @param {string} type - Template type ('note' or 'page')
+     * @param {string} name - Template name
+     * @returns {Promise<Object>} Deletion confirmation
+     */
+    deleteTemplate: (type, name) => apiRequest(`templates.php?type=${type}&name=${name}`, 'DELETE')
+};
+
 // Export all API namespaces
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -321,6 +368,7 @@ if (typeof module !== 'undefined' && module.exports) {
         notesAPI,
         propertiesAPI,
         attachmentsAPI,
-        searchAPI
+        searchAPI,
+        templatesAPI
     };
 }
