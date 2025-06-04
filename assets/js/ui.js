@@ -402,6 +402,7 @@ function switchToEditMode(contentEl) {
     contentEl.classList.remove('rendered-mode');
     contentEl.classList.add('edit-mode');
     contentEl.contentEditable = true;
+    contentEl.style.whiteSpace = 'pre-wrap'; // Preserve line breaks in edit mode
     contentEl.innerHTML = '';
     contentEl.textContent = rawContent;
     contentEl.focus();
@@ -560,6 +561,7 @@ function switchToRenderedMode(contentEl) {
     contentEl.classList.remove('edit-mode');
     contentEl.classList.add('rendered-mode');
     contentEl.contentEditable = false;
+    contentEl.style.whiteSpace = ''; // Reset white-space style
 
     // Only render if we have content
     if (newContent.trim()) {
@@ -2105,3 +2107,436 @@ if (typeof module !== 'undefined' && module.exports) {
         initPagePropertiesModal
     };
 }
+
+/**
+ * Shows the template selection menu for notes (original function, potentially for other uses)
+ * @param {HTMLElement} contentDiv - The note content div
+ * @param {string} templateName - The template name to insert
+ */
+async function handleNoteTemplateInsertion(contentDiv, templateName) {
+    try {
+        const templates = await templatesAPI.getTemplates('note'); // Assuming templatesAPI is available
+        const template = templates.data.find(t => t.name === templateName);
+        
+        if (template) {
+            const currentContent = contentDiv.textContent;
+            // This replacement assumes the command is exactly /templateName
+            const newContent = currentContent.replace(`/${templateName}`, template.content);
+            contentDiv.textContent = newContent;
+            if (contentDiv.dataset.rawContent !== undefined) {
+                contentDiv.dataset.rawContent = newContent;
+            }
+            
+            const noteItem = contentDiv.closest('.note-item');
+            if (noteItem && typeof debouncedSaveNote === 'function') { // Assuming debouncedSaveNote is available
+                debouncedSaveNote(noteItem);
+            }
+        }
+    } catch (error) {
+        console.error('Error inserting note template (legacy):', error);
+    }
+}
+
+/**
+ * Shows the template selection menu for pages
+ * @param {number} pageId - The page ID to insert templates into
+ */
+async function showPageTemplateMenu(pageId) {
+    try {
+        const templates = await templatesAPI.getTemplates('page');
+        
+        const menu = document.createElement('div');
+        menu.className = 'template-menu';
+        menu.innerHTML = `
+            <div class="template-menu-header">
+                <h3>Insert Page Template</h3>
+                <button class="close-button"><i data-feather="x"></i></button>
+            </div>
+            <div class="template-list">
+                ${templates.data.map(template => `
+                    <div class="template-item" data-template-name="${template.name}">
+                        <span class="template-name">${template.name}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        menu.querySelector('.close-button').addEventListener('click', () => menu.remove());
+        
+        menu.querySelectorAll('.template-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const templateName = item.dataset.templateName;
+                const template = templates.data.find(t => t.name === templateName);
+                
+                if (template) {
+                    try {
+                        const notes = JSON.parse(template.content); // Page templates are arrays of notes
+                        for (const noteData of notes) {
+                            await notesAPI.createNote({ // Assuming notesAPI is available
+                                page_id: pageId,
+                                content: noteData.content,
+                                parent_note_id: null 
+                            });
+                        }
+                        window.location.reload(); // Reload to show new notes
+                    } catch (parseError) {
+                        console.error('Error parsing or inserting page template:', parseError);
+                        alert('Failed to insert template. Content might be invalid.');
+                    }
+                }
+                menu.remove();
+            });
+        });
+        
+        document.body.appendChild(menu);
+        if (typeof feather !== 'undefined') feather.replace(); // Assuming feather is available
+    } catch (error) {
+        console.error('Error showing page template menu:', error);
+    }
+}
+
+function addTemplateButtonToPageProperties() {
+    const pagePropertiesButton = document.querySelector('.page-properties-button');
+    if (pagePropertiesButton) {
+        const templateButton = document.createElement('button');
+        templateButton.className = 'page-template-button';
+        templateButton.innerHTML = '<i data-feather="file-text"></i>';
+        templateButton.title = 'Insert Page Template';
+        templateButton.addEventListener('click', () => {
+            if (typeof currentPageId !== 'undefined' && currentPageId) { // Assuming currentPageId is available
+                showPageTemplateMenu(currentPageId);
+            }
+        });
+        
+        pagePropertiesButton.parentNode.insertBefore(templateButton, pagePropertiesButton);
+        if (typeof feather !== 'undefined') feather.replace();
+    }
+}
+
+/**
+ * Template autocomplete dropdown management
+ */
+const templateAutocomplete = {
+    dropdown: null,
+    currentInput: null,
+    templates: [],
+    minChars: 3, // Minimum characters after / to trigger autocomplete
+    debounceTimer: null,
+    activeKeyDownHandler: null,
+
+    init() {
+        this.dropdown = document.createElement('div');
+        this.dropdown.className = 'template-autocomplete';
+        this.dropdown.style.display = 'none';
+        document.body.appendChild(this.dropdown);
+
+        this.loadTemplates().catch(error => {
+            console.error('Error during template initialization:', error);
+        });
+        
+        // Bind click outside handler
+        this._boundHandleDocumentClick = this._handleDocumentClick.bind(this);
+        document.addEventListener('click', this._boundHandleDocumentClick);
+    },
+
+    async loadTemplates() {
+        try {
+            // console.log('Loading templates...');
+            const response = await templatesAPI.getTemplates('note');
+            if (response && response.data) {
+                this.templates = response.data;
+                // console.log('Templates loaded:', this.templates.length);
+            } else {
+                console.warn('No template data found or API error.');
+                this.templates = [];
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+            this.templates = [];
+        }
+    },
+
+    /**
+     * Shows the autocomplete dropdown.
+     * @param {HTMLElement} inputElement - The contenteditable input element.
+     * @param {string} currentFullText - The full text content of the input element.
+     * @param {number} cursorPos - The current cursor position as a character offset from the start of currentFullText.
+     */
+    show(inputElement, currentFullText, cursorPos) {
+        if (!inputElement) return;
+
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+            const textBeforeCursor = currentFullText.substring(0, cursorPos);
+            const match = textBeforeCursor.match(/\/([a-zA-Z0-9_-]*)$/);
+
+            if (!match || match[1].length < this.minChars) {
+                this.hide();
+                return;
+            }
+
+            const searchTerm = match[1].toLowerCase();
+            const commandTyped = match[0]; // e.g., "/tem" - this is what will be replaced
+
+            const matchedTemplates = this.templates.filter(t => 
+                t.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (matchedTemplates.length === 0) {
+                this.hide();
+                return;
+            }
+
+            this.currentInput = inputElement; // Set current input
+
+            // Position dropdown (simplified, consider a robust positioning library for complex layouts)
+            const rect = inputElement.getBoundingClientRect();
+            const lineHeight = parseFloat(getComputedStyle(inputElement).lineHeight) || 20;
+            
+            // Attempt to position near the cursor. This is tricky for multi-line contenteditables.
+            // For simplicity, positioning below the input field.
+            this.dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+            this.dropdown.style.left = `${rect.left + window.scrollX}px`;
+            this.dropdown.style.width = `${Math.max(rect.width, 200)}px`;
+            
+            this.dropdown.innerHTML = matchedTemplates.map((template, index) => `
+                <div class="template-item ${index === 0 ? 'selected' : ''}" 
+                     data-template-name="${template.name}" 
+                     data-index="${index}">
+                    ${template.name}
+                </div>
+            `).join('');
+
+            this.dropdown.querySelectorAll('.template-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const templateName = item.dataset.templateName;
+                    this.selectTemplate(templateName, currentFullText, cursorPos, commandTyped);
+                });
+                item.addEventListener('mouseenter', () => {
+                    this.dropdown.querySelector('.template-item.selected')?.classList.remove('selected');
+                    item.classList.add('selected');
+                });
+            });
+
+            this._removeKeyDownListener(); // Remove old listener
+            this.activeKeyDownHandler = (e) => {
+                this._handleKeyDown(e, matchedTemplates, currentFullText, cursorPos, commandTyped);
+            };
+            inputElement.addEventListener('keydown', this.activeKeyDownHandler, true); // Use capture to potentially override other listeners
+
+            this.dropdown.style.display = 'block';
+        }, 150); // Debounce time
+    },
+
+    hide() {
+        this._removeKeyDownListener();
+        if (this.dropdown) {
+            this.dropdown.style.display = 'none';
+        }
+        this.currentInput = null;
+        clearTimeout(this.debounceTimer);
+    },
+    
+    _removeKeyDownListener() {
+        if (this.currentInput && this.activeKeyDownHandler) {
+            this.currentInput.removeEventListener('keydown', this.activeKeyDownHandler, true);
+            this.activeKeyDownHandler = null;
+        }
+    },
+
+    _handleKeyDown(e, matchedTemplates, originalFullText, originalCursorPos, commandTyped) {
+        if (!this.dropdown || this.dropdown.style.display === 'none') return;
+
+        const items = Array.from(this.dropdown.querySelectorAll('.template-item'));
+        if (items.length === 0) return;
+
+        let currentIndex = items.findIndex(item => item.classList.contains('selected'));
+        
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                currentIndex = (currentIndex + 1) % items.length;
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                currentIndex = (currentIndex - 1 + items.length) % items.length;
+                break;
+            case 'Enter':
+            case 'Tab': // Often users expect Tab to complete as well
+                e.preventDefault();
+                if (currentIndex !== -1 && items[currentIndex]) {
+                    const templateName = items[currentIndex].dataset.templateName;
+                    this.selectTemplate(templateName, originalFullText, originalCursorPos, commandTyped);
+                }
+                return; // Return to prevent further processing
+            case 'Escape':
+                e.preventDefault();
+                this.hide();
+                return; // Return
+            default:
+                return; // Don't interfere with other keys
+        }
+
+        items.forEach(item => item.classList.remove('selected'));
+        if (items[currentIndex]) {
+            items[currentIndex].classList.add('selected');
+            items[currentIndex].scrollIntoView({ block: 'nearest' });
+        }
+    },
+
+    /**
+     * Selects a template and inserts its content.
+     * @param {string} templateName - The name of the template to insert.
+     * @param {string} originalFullText - The full text of the input element when autocomplete was triggered.
+     * @param {number} originalCursorPos - The cursor position within originalFullText.
+     * @param {string} commandTyped - The actual command string (e.g., "/tem") to be replaced.
+     */
+    async selectTemplate(templateName, originalFullText, originalCursorPos, commandTyped) {
+        if (!this.currentInput) return;
+
+        try {
+            const template = this.templates.find(t => t.name === templateName);
+            if (!template) {
+                console.warn('Template not found:', templateName);
+                this.hide();
+                return;
+            }
+
+            const textBeforeCommand = originalFullText.substring(0, originalCursorPos - commandTyped.length);
+            const textAfterCursor = originalFullText.substring(originalCursorPos);
+            
+            const newContent = textBeforeCommand + template.content + textAfterCursor;
+            
+            this.currentInput.textContent = newContent;
+            if (this.currentInput.dataset.rawContent !== undefined) {
+                this.currentInput.dataset.rawContent = newContent;
+            }
+            
+            const newCursorOffset = (textBeforeCommand + template.content).length;
+            this._setCursorPosition(this.currentInput, newCursorOffset);
+            
+            const noteItem = this.currentInput.closest('.note-item');
+            if (noteItem && typeof debouncedSaveNote === 'function') {
+                debouncedSaveNote(noteItem);
+            }
+
+            this.hide();
+        } catch (error) {
+            console.error('Error inserting template:', error);
+            this.hide(); // Ensure dropdown is hidden on error
+        }
+    },
+
+    _setCursorPosition(element, position) {
+        element.focus();
+        const selection = window.getSelection();
+        if (!selection) return;
+    
+        const range = document.createRange();
+        let charCount = 0;
+        let foundNode = null;
+        let offsetInNode = 0;
+    
+        function findNodeRecursive(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                const nextCharCount = charCount + node.textContent.length;
+                if (position >= charCount && position <= nextCharCount) {
+                    foundNode = node;
+                    offsetInNode = position - charCount;
+                    return true; 
+                }
+                charCount = nextCharCount;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                for (let i = 0; i < node.childNodes.length; i++) {
+                    if (findNodeRecursive(node.childNodes[i])) {
+                        return true; 
+                    }
+                }
+            }
+            return false;
+        }
+    
+        if (element.childNodes.length === 0 && position === 0) { // Empty element, position at start
+             range.setStart(element, 0);
+             range.collapse(true);
+             foundNode = element; // Mark as found to use the range
+        } else if (findNodeRecursive(element)) {
+            range.setStart(foundNode, offsetInNode);
+            range.collapse(true); // Collapse to the start of the selection
+        } else { // Fallback: position is out of bounds or element structure is complex
+            range.selectNodeContents(element);
+            range.collapse(false); // Place cursor at the end
+            foundNode = element; // Mark as found to use the range
+        }
+    
+        if (foundNode) { // Only if a valid node/position was determined
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    },
+
+    _handleDocumentClick(e) {
+        if (this.dropdown && this.dropdown.style.display === 'block') {
+            const isClickInsideDropdown = this.dropdown.contains(e.target);
+            const isClickInsideCurrentInput = this.currentInput && this.currentInput.contains(e.target);
+            
+            if (!isClickInsideDropdown && !isClickInsideCurrentInput) {
+                this.hide();
+            }
+        }
+    },
+
+    destroy() { // Call this if the autocomplete system needs to be torn down
+        this.hide();
+        document.removeEventListener('click', this._boundHandleDocumentClick);
+        if (this.dropdown) {
+            this.dropdown.remove();
+            this.dropdown = null;
+        }
+        // console.log('Template autocomplete destroyed.');
+    }
+};
+
+function getCursorCharacterOffsetWithin(element) {
+    let caretOffset = 0;
+    const doc = element.ownerDocument || element.document;
+    const win = doc.defaultView || doc.parentWindow;
+    const sel = win.getSelection();
+    if (sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        if (element.contains(range.startContainer)) { // Ensure selection is within the element
+            const preCaretRange = range.cloneRange();
+            preCaretRange.selectNodeContents(element);
+            preCaretRange.setEnd(range.startContainer, range.startOffset);
+            caretOffset = preCaretRange.toString().length;
+        }
+    }
+    return caretOffset;
+}
+
+function handleNoteInput(e) {
+    if (e.target.matches('.note-content.edit-mode')) {
+        const contentDiv = e.target;
+        const fullText = contentDiv.textContent; // Assumes textContent is the source of truth
+        
+        const cursorPos = getCursorCharacterOffsetWithin(contentDiv);
+
+        const textBeforeCursor = fullText.substring(0, cursorPos);
+        const match = textBeforeCursor.match(/\/([a-zA-Z0-9_-]*)$/);
+
+        if (match) { // A pattern like /cmd is present before cursor
+            // Let `show` method handle minChars check, as it's debounced
+            templateAutocomplete.show(contentDiv, fullText, cursorPos);
+        } else {
+            templateAutocomplete.hide();
+        }
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    templateAutocomplete.init();
+    addTemplateButtonToPageProperties();
+    document.addEventListener('input', handleNoteInput);
+    // console.log('Template features initialized.');
+});
