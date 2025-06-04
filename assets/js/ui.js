@@ -1876,41 +1876,103 @@ function getNestingLevel(noteElement) {
 
 function updateParentVisuals(parentNoteElement) {
     if (!parentNoteElement) return;
-    const childrenContainer = parentNoteElement.querySelector('.note-children');
-    const hasChildren = childrenContainer && childrenContainer.querySelector('.note-item');
+
+    const noteId = parentNoteElement.dataset.noteId;
     const controlsEl = parentNoteElement.querySelector('.note-controls');
+    if (!controlsEl) return;
+
+    // Get all direct children of this note
+    const children = window.notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteId));
+    const hasChildren = children.length > 0;
+
+    // Remove any existing arrow first
+    const existingArrow = controlsEl.querySelector('.note-collapse-arrow');
+    if (existingArrow) {
+        existingArrow.remove();
+    }
 
     if (hasChildren) {
-        parentNoteElement.classList.add('has-children');
-        if (controlsEl) {
-            let arrowEl = controlsEl.querySelector('.note-collapse-arrow');
-            if (!arrowEl) {
-                arrowEl = document.createElement('span');
-                arrowEl.className = 'note-collapse-arrow';
-                // Create SVG directly instead of using i-feather
-                arrowEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
-                arrowEl.dataset.noteId = parentNoteElement.dataset.noteId;
-                arrowEl.dataset.collapsed = parentNoteElement.classList.contains('collapsed') ? 'true' : 'false';
-                
-                // ... rest of the arrow click handler code ...
+        // Create new arrow
+        const arrow = document.createElement('span');
+        arrow.className = 'note-collapse-arrow';
+        arrow.dataset.noteId = noteId;
+        arrow.dataset.collapsed = 'false';
+        arrow.innerHTML = '<i data-feather="chevron-right"></i>';
+        
+        // Insert arrow at the beginning of controls
+        controlsEl.insertBefore(arrow, controlsEl.firstChild);
+        
+        // Add click handler for the arrow
+        arrow.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const isCollapsed = arrow.dataset.collapsed === 'true';
+            const childrenContainer = parentNoteElement.querySelector('.note-children');
+            
+            if (!childrenContainer) return;
 
-                const bulletEl = controlsEl.querySelector('.note-bullet');
-                const dragHandle = controlsEl.querySelector('.note-drag-handle');
-                if (dragHandle) {
-                     controlsEl.insertBefore(arrowEl, dragHandle);
-                } else if (bulletEl) {
-                     controlsEl.insertBefore(arrowEl, bulletEl);
-                } else {
-                     controlsEl.appendChild(arrowEl); 
+            try {
+                // Update UI immediately for responsiveness
+                arrow.dataset.collapsed = (!isCollapsed).toString();
+                childrenContainer.style.display = isCollapsed ? 'block' : 'none';
+                parentNoteElement.classList.toggle('collapsed', !isCollapsed);
+
+                // Update all child notes' visibility
+                const childNotes = childrenContainer.querySelectorAll('.note-item');
+                childNotes.forEach(child => {
+                    child.classList.toggle('note-hidden', !isCollapsed);
+                });
+
+                // Persist collapse state
+                await propertiesAPI.setProperty({
+                    entity_type: 'note',
+                    entity_id: parseInt(noteId),
+                    name: 'collapsed',
+                    value: (!isCollapsed).toString()
+                });
+
+                // Update Feather icons
+                if (typeof feather !== 'undefined' && feather.replace) {
+                    feather.replace();
                 }
+            } catch (error) {
+                console.error('Error updating collapse state:', error);
+                // Revert UI changes on error
+                arrow.dataset.collapsed = isCollapsed.toString();
+                childrenContainer.style.display = isCollapsed ? 'none' : 'block';
+                parentNoteElement.classList.toggle('collapsed', isCollapsed);
+                childNotes.forEach(child => {
+                    child.classList.toggle('note-hidden', isCollapsed);
+                });
+                // Show error feedback
+                ui.showGenericConfirmModal('Error', 'Failed to save collapse state. Please try again.');
+            }
+        });
+
+        // Add has-children class to parent
+        parentNoteElement.classList.add('has-children');
+
+        // Check for persisted collapse state
+        const noteData = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
+        if (noteData && noteData.properties && noteData.properties.collapsed === 'true') {
+            arrow.dataset.collapsed = 'true';
+            const childrenContainer = parentNoteElement.querySelector('.note-children');
+            if (childrenContainer) {
+                childrenContainer.style.display = 'none';
+                parentNoteElement.classList.add('collapsed');
+                const childNotes = childrenContainer.querySelectorAll('.note-item');
+                childNotes.forEach(child => {
+                    child.classList.add('note-hidden');
+                });
             }
         }
     } else {
+        // Remove has-children class if no children
         parentNoteElement.classList.remove('has-children');
-        const arrowEl = controlsEl ? controlsEl.querySelector('.note-collapse-arrow') : null;
-        if (arrowEl) {
-            arrowEl.remove();
-        }
+    }
+
+    // Update Feather icons
+    if (typeof feather !== 'undefined' && feather.replace) {
+        feather.replace();
     }
 }
 

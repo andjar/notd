@@ -324,19 +324,19 @@ async function handleCreateAndFocusFirstNote() {
         return;
     }
     try {
+        // Create note with a placeholder content to ensure it's saved
         const savedNote = await notesAPI.createNote({
             page_id: currentPageId,
-            content: '', // Initial content is empty
+            content: ' ', // Use a space instead of empty string to ensure it's saved
             parent_note_id: null
-            // order_index will be handled by the backend, typically as the first/next available
+            // order_index will be handled by the backend
         });
 
         if (savedNote) {
             notesForCurrentPage.push(savedNote);
             window.notesForCurrentPage = notesForCurrentPage; // Update global
 
-            // Ensure notesContainer is empty or ready for the first note.
-            // ui.displayNotes would have left it empty if notesForCurrentPage was empty.
+            // Ensure notesContainer is empty or ready for the first note
             if(notesContainer.innerHTML.includes("empty-page-hint") || notesContainer.children.length === 0) {
                 notesContainer.innerHTML = ''; // Clear any hints or placeholders
             }
@@ -348,9 +348,22 @@ async function handleCreateAndFocusFirstNote() {
 
             const contentDiv = noteEl.querySelector('.note-content');
             if (contentDiv) {
-                // Set initial rawContent to empty string to ensure proper tracking
-                contentDiv.dataset.rawContent = '';
+                // Set initial rawContent to match the saved content
+                contentDiv.dataset.rawContent = savedNote.content;
+                // Clear the content div before switching to edit mode
+                contentDiv.textContent = '';
                 ui.switchToEditMode(contentDiv);
+                
+                // Add a one-time input handler to ensure first content is saved
+                const initialInputHandler = async (e) => {
+                    const currentContent = contentDiv.textContent.trim();
+                    if (currentContent !== '') {
+                        contentDiv.dataset.rawContent = currentContent;
+                        await saveNoteImmediately(noteEl);
+                        contentDiv.removeEventListener('input', initialInputHandler);
+                    }
+                };
+                contentDiv.addEventListener('input', initialInputHandler);
             }
              // Initialize Feather icons if new elements with icons were added
             if (typeof feather !== 'undefined' && feather.replace) {
@@ -804,63 +817,59 @@ notesContainer.addEventListener('keydown', async (e) => {
         const selection = window.getSelection();
         const cursorPos = selection.anchorOffset;
 
+        // Function to check and handle shortcuts at a specific position
+        const handleShortcutAtPosition = (pos) => {
+            if (pos < 2) return false; // Need at least 2 chars before cursor for shortcuts
+            
+            const shortcut = text.substring(pos - 2, pos);
+            if (shortcut === ':t' && e.key === ' ') {
+                e.preventDefault();
+                replaceTextAtCursor(2, '{tag::}', 6);
+                return true;
+            } else if (shortcut === ':d' && e.key === ' ') {
+                e.preventDefault();
+                const today = new Date().toISOString().slice(0, 10);
+                replaceTextAtCursor(2, `{date::${today}}`, 18);
+                return true;
+            } else if (shortcut === ':r' && e.key === ' ') {
+                e.preventDefault();
+                const now = new Date().toISOString();
+                replaceTextAtCursor(2, `{timestamp::${now}}`, 12 + now.length + 1);
+                return true;
+            } else if (shortcut === ':k' && e.key === ' ') {
+                e.preventDefault();
+                replaceTextAtCursor(2, '{keyword::}', 10);
+                return true;
+            }
+            return false;
+        };
+
+        // Check for shortcuts at current cursor position and up to 10 chars back
+        // This allows handling multiple shortcuts in sequence
+        for (let i = cursorPos; i >= Math.max(0, cursorPos - 10); i--) {
+            if (handleShortcutAtPosition(i)) {
+                const noteItemForShortcut = contentDiv.closest('.note-item');
+                if (noteItemForShortcut) {
+                    const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+                    contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
+                    debouncedSaveNote(noteItemForShortcut);
+                }
+                return; // Exit after handling a shortcut
+            }
+        }
+
         // Autoclose brackets
         if (e.key === '[') {
             e.preventDefault();
             insertTextAtCursor('[]', 1);
-            return; // Consume event
+            return;
         } else if (e.key === '{') {
             e.preventDefault();
             insertTextAtCursor('{}', 1);
-            return; // Consume event
+            return;
         } else if (e.key === '(') {
             e.preventDefault();
             insertTextAtCursor('()', 1);
-            return; // Consume event
-        }
-
-        // Check for shortcut triggers (e.g., :t, :d)
-        if (text.substring(cursorPos - 2, cursorPos) === ':t' && e.key === ' ') { // Trigger on space after :t
-            e.preventDefault();
-            replaceTextAtCursor(2, '{tag::}', 6);
-            const noteItemForShortcut = contentDiv.closest('.note-item');
-            if (noteItemForShortcut) {
-                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
-                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
-                debouncedSaveNote(noteItemForShortcut);
-            }
-            return; 
-        } else if (text.substring(cursorPos - 2, cursorPos) === ':d' && e.key === ' ') {
-            e.preventDefault();
-            const today = new Date().toISOString().slice(0, 10);
-            replaceTextAtCursor(2, `{date::${today}}`, 18);
-            const noteItemForShortcut = contentDiv.closest('.note-item');
-            if (noteItemForShortcut) {
-                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
-                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
-                debouncedSaveNote(noteItemForShortcut);
-            }
-            return;
-        } else if (text.substring(cursorPos - 2, cursorPos) === ':r' && e.key === ' ') {
-            e.preventDefault();
-            const now = new Date().toISOString();
-            replaceTextAtCursor(2, `{timestamp::${now}}`, 12 + now.length + 1);
-            const noteItemForShortcut = contentDiv.closest('.note-item');
-            if (noteItemForShortcut) {
-                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
-                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
-                debouncedSaveNote(noteItemForShortcut);
-            }
-            return;
-        } else if (text.substring(cursorPos - 2, cursorPos) === ':k' && e.key === ' ') {
-            e.preventDefault();
-            replaceTextAtCursor(2, '{keyword::}', 10);
-            const noteItemForShortcut = contentDiv.closest('.note-item');
-            if (noteItemForShortcut) {
-                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
-                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
-                debouncedSaveNote(noteItemForShortcut);
-            }
             return;
         }
     }
@@ -889,13 +898,26 @@ notesContainer.addEventListener('keydown', async (e) => {
     switch (e.key) {
         case 'Enter':
             // if (noteId.startsWith('temp-')) return; // This check is now handled above more generally
-            e.preventDefault();
             
             // If in rendered mode, switch to edit mode
             if (contentDiv.classList.contains('rendered-mode')) {
+                e.preventDefault();
                 ui.switchToEditMode(contentDiv);
                 return;
             }
+
+            // Handle shift+enter for multi-line notes
+            if (e.shiftKey) {
+                // Don't prevent default for shift+enter to allow natural line break
+                // Just update content and save
+                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
+                debouncedSaveNote(noteItem);
+                return;
+            }
+            
+            // For regular enter, prevent default and create new note
+            e.preventDefault();
             
             // If in edit mode, create new note (ensure noteData is available)
             if (!noteData) {
@@ -996,77 +1018,134 @@ notesContainer.addEventListener('keydown', async (e) => {
                         console.error("Cannot outdent: parent note data not found.");
                         return;
                     }
+
+                    // Get all children of the note being outdented, including nested children
+                    const getAllChildren = (noteId) => {
+                        const directChildren = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteId));
+                        return directChildren.reduce((acc, child) => {
+                            return [...acc, child, ...getAllChildren(child.id)];
+                        }, []);
+                    };
+                    
+                    const childrenToOutdent = getAllChildren(noteId);
+
+                    // First update the parent note
                     const updatedNote = await notesAPI.updateNote(noteId, {
                         content: currentContentForTab, 
                         parent_note_id: parentNote.parent_note_id,
                         order_index: parentNote.order_index + 1 
                     });
+
+                    // Calculate new order indices for all children
+                    const childrenUpdates = childrenToOutdent.map((child, index) => {
+                        // For each child, find its new parent (either the outdented note or one of its children)
+                        const newParentId = child.parent_note_id === noteId ? 
+                            updatedNote.id : // Direct children of outdented note
+                            childrenToOutdent.find(c => c.id === child.parent_note_id)?.id; // Children of children
+                        
+                        return notesAPI.updateNote(child.id, {
+                            content: child.content,
+                            parent_note_id: newParentId,
+                            order_index: index + 1 // Maintain relative order
+                        });
+                    });
+
+                    // Wait for all updates to complete
+                    const [updatedParent, ...updatedChildren] = await Promise.all([
+                        updatedNote,
+                        ...childrenUpdates
+                    ]);
                     
-                    const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
+                    // Update local state with all changes
+                    const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedParent.id));
                     if (updatedNoteIndex > -1) {
-                        notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedNote };
-                        window.notesForCurrentPage = notesForCurrentPage;
+                        notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedParent };
                     } else {
-                        notesForCurrentPage.push(updatedNote);
-                        window.notesForCurrentPage = notesForCurrentPage;
+                        notesForCurrentPage.push(updatedParent);
                     }
 
-                    const noteElToMove = getNoteElementById(updatedNote.id);
-                    if (noteElToMove) {
+                    // Update children in local state
+                    updatedChildren.forEach(updatedChild => {
+                        const childIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedChild.id));
+                        if (childIndex > -1) {
+                            notesForCurrentPage[childIndex] = { ...notesForCurrentPage[childIndex], ...updatedChild };
+                        } else {
+                            notesForCurrentPage.push(updatedChild);
+                        }
+                    });
+
+                    window.notesForCurrentPage = notesForCurrentPage; // Update global
+
+                    // Get the DOM elements
+                    const noteElToMove = getNoteElementById(updatedParent.id);
+                    const grandParentEl = parentNote.parent_note_id ? getNoteElementById(parentNote.parent_note_id) : notesContainer;
+                    
+                    if (noteElToMove && grandParentEl) {
+                        // Get or create the children container in the grandparent
                         let newParentChildrenContainer;
-                        if (updatedNote.parent_note_id) {
-                            const parentNoteEl = getNoteElementById(updatedNote.parent_note_id);
-                            if (parentNoteEl) {
-                                newParentChildrenContainer = parentNoteEl.querySelector('.note-children');
-                                if (!newParentChildrenContainer) {
-                                    newParentChildrenContainer = document.createElement('div');
-                                    newParentChildrenContainer.className = 'note-children';
-                                    parentNoteEl.appendChild(newParentChildrenContainer);
-                                    if (typeof Sortable !== 'undefined') { Sortable.create(newParentChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', onEnd: handleNoteDrop }); }
+                        if (parentNote.parent_note_id) {
+                            // If moving to a parent's parent, use their children container
+                            newParentChildrenContainer = grandParentEl.querySelector('.note-children');
+                            if (!newParentChildrenContainer) {
+                                newParentChildrenContainer = document.createElement('div');
+                                newParentChildrenContainer.className = 'note-children';
+                                grandParentEl.appendChild(newParentChildrenContainer);
+                                if (typeof Sortable !== 'undefined') {
+                                    Sortable.create(newParentChildrenContainer, {
+                                        group: 'notes',
+                                        animation: 150,
+                                        handle: '.note-bullet',
+                                        onEnd: handleNoteDrop
+                                    });
                                 }
                             }
                         } else {
-                            newParentChildrenContainer = notesContainer;
+                            // If moving to root level, use the notes container
+                            newParentChildrenContainer = grandParentEl;
                         }
 
-                        if (newParentChildrenContainer) {
-                            const siblingsInNewParent = Array.from(newParentChildrenContainer.children)
-                                .filter(child => child.classList.contains('note-item') && child !== noteElToMove)
-                                .map(childEl => ({ id: childEl.dataset.noteId, element: childEl, order_index: (notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId)) || {}).order_index ?? Infinity }))
-                                .sort((a, b) => a.order_index - b.order_index);
+                        // Move the entire subtree (parent + all children)
+                        newParentChildrenContainer.appendChild(noteElToMove);
 
-                            let inserted = false;
-                            for (const sibling of siblingsInNewParent) {
-                                if (updatedNote.order_index <= sibling.order_index) {
-                                    newParentChildrenContainer.insertBefore(noteElToMove, sibling.element);
-                                    inserted = true;
-                                    break;
-                                }
+                        // Update nesting levels for the entire subtree
+                        const updateNestingLevels = (element, baseLevel) => {
+                            element.style.setProperty('--nesting-level', baseLevel);
+                            const childrenContainer = element.querySelector('.note-children');
+                            if (childrenContainer) {
+                                Array.from(childrenContainer.children).forEach(child => {
+                                    updateNestingLevels(child, baseLevel + 1);
+                                });
                             }
-                            if (!inserted) {
-                                newParentChildrenContainer.appendChild(noteElToMove);
-                            }
-                            
-                            const newNestingLevel = ui.getNestingLevel(noteElToMove);
-                            noteElToMove.style.setProperty('--nesting-level', newNestingLevel);
+                        };
 
-                            const oldParentEl = getNoteElementById(noteData.parent_note_id); // Use original parent_note_id for old parent
-                            if(oldParentEl) ui.updateParentVisuals(oldParentEl);
-                            if(updatedNote.parent_note_id) {
-                                 const newParentEl = getNoteElementById(updatedNote.parent_note_id);
-                                 if(newParentEl) ui.updateParentVisuals(newParentEl);
-                            }
+                        // Update nesting levels starting from the moved note
+                        const newBaseLevel = parentNote.parent_note_id ? 
+                            ui.getNestingLevel(grandParentEl) + 1 : // Moving under grandparent
+                            0; // Moving to root level
+                        updateNestingLevels(noteElToMove, newBaseLevel);
 
-                            const tabContentDiv = noteElToMove.querySelector('.note-content');
-                            if (tabContentDiv) {
-                                ui.switchToEditMode(tabContentDiv); 
-                            }
-                        } else {
-                            const notes = await notesAPI.getNotesForPage(currentPageId);
-                            notesForCurrentPage = notes; window.notesForCurrentPage = notes;
-                            ui.displayNotes(notesForCurrentPage, currentPageId);
-                            const updatedNoteElToFocus = getNoteElementById(updatedNote.id);
-                            if (updatedNoteElToFocus) { const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content'); if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv); }
+                        // Update visuals for both old and new parents
+                        const oldParentEl = getNoteElementById(noteData.parent_note_id);
+                        if (oldParentEl) ui.updateParentVisuals(oldParentEl);
+                        if (parentNote.parent_note_id) {
+                            ui.updateParentVisuals(grandParentEl);
+                        }
+
+                        // Focus the outdented note
+                        const tabContentDiv = noteElToMove.querySelector('.note-content');
+                        if (tabContentDiv) {
+                            ui.switchToEditMode(tabContentDiv);
+                        }
+                    } else {
+                        // Fallback: refresh entire page if DOM update fails
+                        const notes = await notesAPI.getNotesForPage(currentPageId);
+                        notesForCurrentPage = notes;
+                        window.notesForCurrentPage = notesForCurrentPage;
+                        ui.displayNotes(notesForCurrentPage, currentPageId);
+                        const updatedNoteElToFocus = getNoteElementById(updatedParent.id);
+                        if (updatedNoteElToFocus) {
+                            const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content');
+                            if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv);
                         }
                     }
                 } catch (error) {
@@ -1084,59 +1163,124 @@ notesContainer.addEventListener('keydown', async (e) => {
                 const newParent = siblings[0]; // Closest preceding sibling at the same level
                 
                 try {
-                    // New order_index will be 0 if it's the first child, or count of existing children.
+                    // Get all children of the note being indented, including nested children
+                    const getAllChildren = (noteId) => {
+                        const directChildren = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteId));
+                        return directChildren.reduce((acc, child) => {
+                            return [...acc, child, ...getAllChildren(child.id)];
+                        }, []);
+                    };
+                    
+                    const childrenToIndent = getAllChildren(noteId);
+                    
+                    // New order_index will be 0 if it's the first child, or count of existing children
                     const newParentChildrenCount = notesForCurrentPage.filter(n => n.parent_note_id === newParent.id).length;
+                    
+                    // First update the parent note
                     const updatedNote = await notesAPI.updateNote(noteId, {
                         content: currentContentForTab, 
                         parent_note_id: newParent.id,
                         order_index: newParentChildrenCount 
                     });
+
+                    // Calculate new order indices for all children
+                    const childrenUpdates = childrenToIndent.map((child, index) => {
+                        // For each child, find its new parent (either the indented note or one of its children)
+                        const newParentId = child.parent_note_id === noteId ? 
+                            updatedNote.id : // Direct children of indented note
+                            childrenToIndent.find(c => c.id === child.parent_note_id)?.id; // Children of children
+                        
+                        return notesAPI.updateNote(child.id, {
+                            content: child.content,
+                            parent_note_id: newParentId,
+                            order_index: index + 1 // Maintain relative order
+                        });
+                    });
+
+                    // Wait for all updates to complete
+                    const [updatedParent, ...updatedChildren] = await Promise.all([
+                        updatedNote,
+                        ...childrenUpdates
+                    ]);
                     
-                    const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
+                    // Update local state with all changes
+                    const updatedNoteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedParent.id));
                     if (updatedNoteIndex > -1) {
-                        notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedNote };
-                        window.notesForCurrentPage = notesForCurrentPage;
+                        notesForCurrentPage[updatedNoteIndex] = { ...notesForCurrentPage[updatedNoteIndex], ...updatedParent };
                     } else {
-                        notesForCurrentPage.push(updatedNote);
-                        window.notesForCurrentPage = notesForCurrentPage;
+                        notesForCurrentPage.push(updatedParent);
                     }
 
-                    const noteElToMove = getNoteElementById(updatedNote.id);
-                    if (noteElToMove) {
-                        let newParentChildrenContainer;
-                        const parentNoteEl = getNoteElementById(updatedNote.parent_note_id); // Should be newParent.id
-                        if (parentNoteEl) {
-                            newParentChildrenContainer = parentNoteEl.querySelector('.note-children');
-                            if (!newParentChildrenContainer) {
-                                newParentChildrenContainer = document.createElement('div');
-                                newParentChildrenContainer.className = 'note-children';
-                                parentNoteEl.appendChild(newParentChildrenContainer);
-                                if (typeof Sortable !== 'undefined') { Sortable.create(newParentChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', onEnd: handleNoteDrop }); }
+                    // Update children in local state
+                    updatedChildren.forEach(updatedChild => {
+                        const childIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedChild.id));
+                        if (childIndex > -1) {
+                            notesForCurrentPage[childIndex] = { ...notesForCurrentPage[childIndex], ...updatedChild };
+                        } else {
+                            notesForCurrentPage.push(updatedChild);
+                        }
+                    });
+
+                    window.notesForCurrentPage = notesForCurrentPage; // Update global
+
+                    // Get the DOM elements
+                    const noteElToMove = getNoteElementById(updatedParent.id);
+                    const newParentEl = getNoteElementById(newParent.id);
+                    
+                    if (noteElToMove && newParentEl) {
+                        // Get or create the children container in the new parent
+                        let newParentChildrenContainer = newParentEl.querySelector('.note-children');
+                        if (!newParentChildrenContainer) {
+                            newParentChildrenContainer = document.createElement('div');
+                            newParentChildrenContainer.className = 'note-children';
+                            newParentEl.appendChild(newParentChildrenContainer);
+                            if (typeof Sortable !== 'undefined') {
+                                Sortable.create(newParentChildrenContainer, {
+                                    group: 'notes',
+                                    animation: 150,
+                                    handle: '.note-bullet',
+                                    onEnd: handleNoteDrop
+                                });
                             }
                         }
 
-                        if (newParentChildrenContainer) {
-                            // Simpler append for indent, as it becomes the last child of the new parent
-                            newParentChildrenContainer.appendChild(noteElToMove);
-                            
-                            const newNestingLevel = ui.getNestingLevel(noteElToMove);
-                            noteElToMove.style.setProperty('--nesting-level', newNestingLevel);
+                        // Move the entire subtree (parent + all children)
+                        newParentChildrenContainer.appendChild(noteElToMove);
 
-                            const oldParentEl = getNoteElementById(noteData.parent_note_id);
-                            if(oldParentEl) ui.updateParentVisuals(oldParentEl);
-                            if(parentNoteEl) ui.updateParentVisuals(parentNoteEl);
-
-
-                            const tabContentDiv = noteElToMove.querySelector('.note-content');
-                            if (tabContentDiv) {
-                                ui.switchToEditMode(tabContentDiv); 
+                        // Update nesting levels for the entire subtree
+                        const updateNestingLevels = (element, baseLevel) => {
+                            element.style.setProperty('--nesting-level', baseLevel);
+                            const childrenContainer = element.querySelector('.note-children');
+                            if (childrenContainer) {
+                                Array.from(childrenContainer.children).forEach(child => {
+                                    updateNestingLevels(child, baseLevel + 1);
+                                });
                             }
-                        } else {
-                             const notes = await notesAPI.getNotesForPage(currentPageId);
-                            notesForCurrentPage = notes; window.notesForCurrentPage = notes;
-                            ui.displayNotes(notesForCurrentPage, currentPageId);
-                            const updatedNoteElToFocus = getNoteElementById(updatedNote.id);
-                            if (updatedNoteElToFocus) { const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content'); if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv); }
+                        };
+
+                        // Update nesting levels starting from the moved note
+                        updateNestingLevels(noteElToMove, ui.getNestingLevel(newParentEl) + 1);
+
+                        // Update visuals for both old and new parents
+                        const oldParentEl = getNoteElementById(noteData.parent_note_id);
+                        if (oldParentEl) ui.updateParentVisuals(oldParentEl);
+                        ui.updateParentVisuals(newParentEl);
+
+                        // Focus the indented note
+                        const tabContentDiv = noteElToMove.querySelector('.note-content');
+                        if (tabContentDiv) {
+                            ui.switchToEditMode(tabContentDiv);
+                        }
+                    } else {
+                        // Fallback: refresh entire page if DOM update fails
+                        const notes = await notesAPI.getNotesForPage(currentPageId);
+                        notesForCurrentPage = notes;
+                        window.notesForCurrentPage = notesForCurrentPage;
+                        ui.displayNotes(notesForCurrentPage, currentPageId);
+                        const updatedNoteElToFocus = getNoteElementById(updatedParent.id);
+                        if (updatedNoteElToFocus) {
+                            const updatedContentDiv = updatedNoteElToFocus.querySelector('.note-content');
+                            if (updatedContentDiv) ui.switchToEditMode(updatedContentDiv);
                         }
                     }
                 } catch (error) {
