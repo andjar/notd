@@ -132,8 +132,8 @@ class PatternProcessor {
             ['priority' => 20]
         );
         
-        // Task status patterns: TODO, DONE, CANCELLED at start of line
-        $this->registerHandler('task_status', '/^(TODO|DONE|CANCELLED)\s+(.*)$/m', 
+        // Task status patterns: TODO, DONE, CANCELLED, DOING, SOMEDAY, WAITING, NLR at start of line
+        $this->registerHandler('task_status', '/^(TODO|DONE|CANCELLED|DOING|SOMEDAY|WAITING|NLR)\s+(.*)$/m', 
             [$this, 'handleTaskStatus'], 
             ['priority' => 5]
         );
@@ -206,73 +206,41 @@ class PatternProcessor {
     
     /**
      * Handler for task status patterns
+     * Supports the following statuses:
+     * - TODO: Task to be done
+     * - DOING: Task in progress
+     * - SOMEDAY: Future task
+     * - DONE: Completed task
+     * - CANCELLED: Cancelled task
+     * - WAITING: Task waiting on something
+     * - NLR: No longer required task
      */
     public function handleTaskStatus($matches, $content, $entityType, $entityId, $context, $pdo) {
         $properties = [];
         $allTaskMetadata = []; // Accumulate metadata for all tasks
         
         foreach ($matches as $match) {
-            $status = $match[1]; // TODO, DONE, CANCELLED
+            $status = $match[1]; // TODO, DONE, CANCELLED, DOING, SOMEDAY, WAITING, NLR
             $taskContent = trim($match[2]);
             
-            // Generate a unique identifier for this task to track status changes
-            $taskId = md5($taskContent); // Simple hash of content as identifier
-            
+            // Save status as an internal property
             $properties[] = [
                 'name' => 'status',
                 'value' => $status,
                 'type' => 'task_status',
                 'raw_match' => $match[0],
-                'task_id' => $taskId // Add task_id to help track status changes
+                'internal' => 1 // Mark as internal property
             ];
             
-            // Add done_at timestamp for DONE tasks, but only if status changed to DONE
+            // Add done_at timestamp for DONE tasks
             if ($status === 'DONE') {
-                // Check if this task was previously DONE
-                $wasDone = false;
-                $previousDoneAt = null;
-                
-                try {
-                    $stmt = $pdo->prepare("
-                        SELECT value 
-                        FROM Properties 
-                        WHERE note_id = ? 
-                        AND name = 'done_at' 
-                        AND EXISTS (
-                            SELECT 1 
-                            FROM Properties p2 
-                            WHERE p2.note_id = Properties.note_id 
-                            AND p2.name = 'status' 
-                            AND p2.value = 'DONE'
-                            AND p2.task_id = ?
-                        )
-                    ");
-                    $stmt->execute([$entityId, $taskId]);
-                    $previousDoneAt = $stmt->fetchColumn();
-                    $wasDone = ($previousDoneAt !== false);
-                } catch (Exception $e) {
-                    error_log("Error checking previous DONE status: " . $e->getMessage());
-                }
-                
-                // Only add/update done_at if this is a new DONE task
-                if (!$wasDone) {
-                    $properties[] = [
-                        'name' => 'done_at',
-                        'value' => date('Y-m-d H:i:s'),
-                        'type' => 'timestamp',
-                        'raw_match' => $match[0],
-                        'task_id' => $taskId
-                    ];
-                } else if ($previousDoneAt) {
-                    // Preserve the original done_at timestamp
-                    $properties[] = [
-                        'name' => 'done_at',
-                        'value' => $previousDoneAt,
-                        'type' => 'timestamp',
-                        'raw_match' => $match[0],
-                        'task_id' => $taskId
-                    ];
-                }
+                $properties[] = [
+                    'name' => 'done_at',
+                    'value' => date('Y-m-d H:i:s'),
+                    'type' => 'timestamp',
+                    'raw_match' => $match[0],
+                    'internal' => 1 // Mark as internal property
+                ];
             }
             
             // Store metadata for each task
@@ -280,14 +248,13 @@ class PatternProcessor {
                 'status' => $status,
                 'content' => $taskContent,
                 'raw_match' => $match[0],
-                'task_id' => $taskId,
-                'done_at' => ($status === 'DONE' ? ($previousDoneAt ?? date('Y-m-d H:i:s')) : null)
+                'done_at' => ($status === 'DONE' ? date('Y-m-d H:i:s') : null)
             ];
         }
         
         return [
             'properties' => $properties,
-            'metadata' => ['tasks' => $allTaskMetadata] // Return array of all task metadata
+            'metadata' => ['tasks' => $allTaskMetadata]
         ];
     }
     
