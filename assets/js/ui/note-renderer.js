@@ -279,12 +279,12 @@ function renderNote(note, nestingLevel = 0) {
                                 setTimeout(() => feedbackUpload.remove(), 3000);
                                 // Refreshing notes requires displayNotes, which might be in a different module now.
                                 // This could be `window.ui.displayNotes` or passed as a callback.
-                                if (window.ui && typeof window.ui.displayNotes === 'function') {
-                                    const notes = await notesAPI.getNotesForPage(note.page_id);
-                                    window.ui.displayNotes(notes, note.page_id);
-                                } else {
-                                    console.warn('displayNotes function not available to refresh after upload.')
-                                }
+                                                if (window.ui && typeof window.ui.displayNotes === 'function') {
+                    const pageData = await notesAPI.getPageData(note.page_id);
+                    window.ui.displayNotes(pageData.notes, note.page_id);
+                } else {
+                    console.warn('displayNotes function not available to refresh after upload.')
+                }
                             } catch (error) {
                                 console.error('Error uploading file:', error);
                                 alert(`Failed to upload file "${file.name}": ${error.message}`);
@@ -390,9 +390,9 @@ function renderNote(note, nestingLevel = 0) {
                     setTimeout(() => feedback.remove(), 3000);
                     
                     if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
-                         const notes = await notesAPI.getNotesForPage(window.currentPageId);
-                         window.notesForCurrentPage = notes; 
-                         window.ui.displayNotes(notes, window.currentPageId); 
+                         const pageData = await notesAPI.getPageData(window.currentPageId);
+                         window.notesForCurrentPage = pageData.notes; 
+                         window.ui.displayNotes(pageData.notes, window.currentPageId); 
                     } else {
                         console.warn('displayNotes function not available for page refresh after D&D upload.')
                     }
@@ -609,9 +609,9 @@ function switchToEditMode(contentEl) {
                     setTimeout(() => feedback.remove(), 3000);
 
                     if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
-                         const notes = await notesAPI.getNotesForPage(window.currentPageId);
-                         window.notesForCurrentPage = notes; 
-                         window.ui.displayNotes(notes, window.currentPageId); 
+                         const pageData = await notesAPI.getPageData(window.currentPageId);
+                         window.notesForCurrentPage = pageData.notes; 
+                         window.ui.displayNotes(pageData.notes, window.currentPageId); 
                     } else {
                         console.warn('displayNotes function not available for page refresh after paste upload.')
                     }
