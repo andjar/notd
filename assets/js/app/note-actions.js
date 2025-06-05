@@ -118,17 +118,21 @@ export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounc
     if (noteId.startsWith('temp-')) return;
 
     const contentDiv = noteEl.querySelector('.note-content');
-    const rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
+    const rawContent = contentDiv.dataset.rawContent; // Changed line
     
     const noteData = getNoteDataById(noteId);
-    if (noteData && noteData.content === rawContent && !noteId.startsWith('new-')) return;
+    // If rawContent is undefined or null (e.g. note was just created and blurred without input), 
+    // provide a default empty string to avoid errors with comparison or API calls.
+    const contentToSave = rawContent !== undefined && rawContent !== null ? rawContent : '';
+
+    if (noteData && noteData.content === contentToSave && !noteId.startsWith('new-')) return;
 
     ui.updateSaveStatusIndicator('pending');
     console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
-    console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
+    console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(contentToSave));
     
     try {
-        const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent }); // Assumes notesAPI is global
+        const updatedNote = await notesAPI.updateNote(noteId, { content: contentToSave }); // Assumes notesAPI is global
         console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
         updateNoteInCurrentPage(updatedNote);
         

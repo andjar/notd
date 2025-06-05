@@ -49,7 +49,8 @@ import {
     handleNoteKeyDown,
     handleTaskCheckboxClick,
     getNoteDataById,
-    getNoteElementById
+    getNoteElementById,
+    debouncedSaveNote // Added import
 } from './app/note-actions.js';
 
 // Import API clients
@@ -224,6 +225,22 @@ if (notesContainer) { // Ensure notesContainer is available before adding listen
     // }, 'notesContainer');
     // For now, this specific input listener is effectively part of handleNoteKeyDown or direct saves.
     // If separate debouncing on general input is still desired, it needs to import debouncedSaveNote.
+
+    // Add the new input event listener here
+    safeAddEventListener(notesContainer, 'input', (e) => {
+        if (e.target.matches('.note-content.edit-mode')) {
+            const noteItem = e.target.closest('.note-item');
+            if (noteItem) {
+                const contentDiv = e.target;
+                // Ensure ui object and its methods are correctly referenced.
+                // Assuming 'ui' is imported and available in this scope.
+                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
+                const normalizedContent = ui.normalizeNewlines(rawTextValue);
+                contentDiv.dataset.rawContent = normalizedContent;
+                debouncedSaveNote(noteItem);
+            }
+        }
+    }, 'notesContainerInput'); // Added a unique name for safeAddEventListener
 }
 
 
