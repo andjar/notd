@@ -1235,104 +1235,132 @@ notesContainer.addEventListener('click', async (e) => {
         if (!noteItem) return;
         
         const noteId = noteItem.dataset.noteId;
-        const contentDiv = noteItem.querySelector('.note-content'); // This is where the raw content is stored/edited
+        const contentDiv = noteItem.querySelector('.note-content');
         const noteData = getNoteDataById(noteId);
 
         if (!noteData || !contentDiv || noteId.startsWith('temp-')) {
             console.error('Note data, contentDiv not found, or temp note for task checkbox click', { noteId, noteData, contentDiv });
-            // Prevent checking if critical data is missing or it's a temp note
-            checkbox.checked = !checkbox.checked; // Revert UI change
+            checkbox.checked = !checkbox.checked;
             return;
         }
         
-        // Use rawContent for reliable prefix checking
-        let rawContent = contentDiv.dataset.rawContent || contentDiv.textContent; // Fallback for safety
+        let rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
         let newRawContent, newStatus, doneAt = null;
-        const isChecked = checkbox.checked; // State AFTER click
+        const isChecked = checkbox.checked;
+        const markerType = checkbox.dataset.markerType;
 
-        if (rawContent.startsWith('TODO ')) {
-            if (isChecked) { // Was TODO, now DONE
-                newRawContent = 'DONE ' + rawContent.substring(5);
-                newStatus = 'DONE';
-                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            } else { // Clicked again, back to TODO (should not happen if checkbox is controlled)
-                newRawContent = rawContent; // No change or back to TODO
-                newStatus = 'TODO';
-            }
-        } else if (rawContent.startsWith('DONE ')) {
-            if (!isChecked) { // Was DONE, now TODO
-                newRawContent = 'TODO ' + rawContent.substring(5);
-                newStatus = 'TODO';
-            } else { // Clicked again, back to DONE (should not happen)
-                newRawContent = rawContent;
-                newStatus = 'DONE';
-                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' '); // Keep done_at if already done
-            }
-        } else if (rawContent.startsWith('CANCELLED ')) {
-            // CANCELLED tasks are not interactive, checkbox should be disabled
-            // Revert UI if somehow clicked
-            checkbox.checked = true; 
-            return;
-        } else {
-            // Not a task, or malformed. Do nothing.
-            console.warn("Clicked task checkbox on a non-task or malformed note content:", rawContent);
-            checkbox.checked = !checkbox.checked; // Revert UI change
-            return;
+        // Handle different task statuses
+        switch (markerType) {
+            case 'TODO':
+                if (isChecked) {
+                    newRawContent = 'DONE ' + rawContent.substring(5);
+                    newStatus = 'DONE';
+                    doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                } else {
+                    newRawContent = rawContent;
+                    newStatus = 'TODO';
+                }
+                break;
+
+            case 'DOING':
+                if (isChecked) {
+                    newRawContent = 'DONE ' + rawContent.substring(6);
+                    newStatus = 'DONE';
+                    doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                } else {
+                    newRawContent = 'TODO ' + rawContent.substring(6);
+                    newStatus = 'TODO';
+                }
+                break;
+
+            case 'SOMEDAY':
+                if (isChecked) {
+                    newRawContent = 'DONE ' + rawContent.substring(8);
+                    newStatus = 'DONE';
+                    doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                } else {
+                    newRawContent = 'TODO ' + rawContent.substring(8);
+                    newStatus = 'TODO';
+                }
+                break;
+
+            case 'DONE':
+                if (!isChecked) {
+                    newRawContent = 'TODO ' + rawContent.substring(5);
+                    newStatus = 'TODO';
+                } else {
+                    newRawContent = rawContent;
+                    newStatus = 'DONE';
+                    doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                }
+                break;
+
+            case 'WAITING':
+                if (isChecked) {
+                    newRawContent = 'DONE ' + rawContent.substring(8);
+                    newStatus = 'DONE';
+                    doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                } else {
+                    newRawContent = 'TODO ' + rawContent.substring(8);
+                    newStatus = 'TODO';
+                }
+                break;
+
+            case 'CANCELLED':
+            case 'NLR':
+                // These statuses are not interactive
+                checkbox.checked = true;
+                return;
+
+            default:
+                console.warn("Unknown task marker type:", markerType);
+                checkbox.checked = !checkbox.checked;
+                return;
         }
 
         try {
-            // 1. Update note content
             const updatedNoteServer = await notesAPI.updateNote(noteId, { content: newRawContent });
-            noteData.content = updatedNoteServer.content; // Update local cache with server response
+            noteData.content = updatedNoteServer.content;
             noteData.updated_at = updatedNoteServer.updated_at;
-            contentDiv.dataset.rawContent = updatedNoteServer.content; // Update rawContent dataset
+            contentDiv.dataset.rawContent = updatedNoteServer.content;
             
-            // Re-render the content div with the new raw content
-            // If in edit mode, textContent will be set. If rendered, innerHTML will be set.
             if (contentDiv.classList.contains('edit-mode')) {
                 contentDiv.textContent = updatedNoteServer.content;
             } else {
                 contentDiv.innerHTML = ui.parseAndRenderContent(updatedNoteServer.content);
             }
 
+            await propertiesAPI.setProperty({ 
+                entity_type: 'note', 
+                entity_id: parseInt(noteId), 
+                name: 'status', 
+                value: newStatus 
+            });
 
-            // 2. Update properties ('status' and 'done_at')
-            await propertiesAPI.setProperty({ entity_type: 'note', entity_id: parseInt(noteId), name: 'status', value: newStatus });
             if (doneAt) {
-                await propertiesAPI.setProperty({ entity_type: 'note', entity_id: parseInt(noteId), name: 'done_at', value: doneAt });
+                await propertiesAPI.setProperty({ 
+                    entity_type: 'note', 
+                    entity_id: parseInt(noteId), 
+                    name: 'done_at', 
+                    value: doneAt 
+                });
             } else {
-                try { await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at'); } 
-                catch (delError) { console.warn('Could not delete done_at (might not exist):', delError); }
+                try {
+                    await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at');
+                } catch (delError) {
+                    console.warn('Could not delete done_at:', delError);
+                }
             }
 
-            // 3. Fetch all properties for the note to update local cache and UI accurately
             const updatedProperties = await propertiesAPI.getProperties('note', parseInt(noteId));
             noteData.properties = updatedProperties;
-
-            // 4. Re-render the properties section (if it exists as a separate element)
-            // The current ui.renderNote integrates properties into the main content parsing.
-            // If properties are displayed separately (e.g., in a .note-properties div), update that.
-            // For now, parseAndRenderContent on the main contentDiv should handle inline properties.
-            // If a dedicated .note-properties element is used by renderNote, it needs updating here.
-            // Example:
-            // const propertiesEl = noteItem.querySelector('.note-properties');
-            // if (propertiesEl) ui.renderProperties(propertiesEl, updatedProperties);
-
-            // 5. Update global notes data for consistency
-            const noteIndexInGlobal = notesForCurrentPage.findIndex(n => String(n.id) === String(noteId));
-            if (noteIndexInGlobal > -1) {
-                notesForCurrentPage[noteIndexInGlobal] = { ...notesForCurrentPage[noteIndexInGlobal], ...noteData }; // Merge updated data
-                window.notesForCurrentPage = notesForCurrentPage; // Ensure global is updated
-            }
-
-            console.log('Task status updated: ' + newStatus, { noteId, newRawContent, doneAt });
-
+            updateNoteInCurrentPage(noteData);
+            console.log('Task status updated:', { noteId, newStatus, newRawContent, doneAt });
         } catch (error) {
             console.error('Error updating task status:', error);
             alert('Failed to update task status: ' + error.message);
-            // Revert UI on error
-            checkbox.checked = !checkbox.checked; // Revert checkbox state
-            contentDiv.dataset.rawContent = noteData.content; // Revert rawContent
+            checkbox.checked = !checkbox.checked;
+            contentDiv.dataset.rawContent = noteData.content;
             if (contentDiv.classList.contains('edit-mode')) {
                 contentDiv.textContent = noteData.content;
             } else {

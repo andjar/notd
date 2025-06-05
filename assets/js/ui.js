@@ -626,7 +626,7 @@ function parseAndRenderContent(rawContent) {
 
     // Handle task markers with checkboxes - don't show the TODO/DONE prefix in content
     if (html.startsWith('TODO ')) {
-        const taskContent = html.substring(5); // Remove "TODO " prefix
+        const taskContent = html.substring(5);
         html = `
             <div class="task-container todo">
                 <div class="task-checkbox-container">
@@ -636,8 +636,30 @@ function parseAndRenderContent(rawContent) {
                 <div class="task-content">${taskContent}</div>
             </div>
         `;
+    } else if (html.startsWith('DOING ')) {
+        const taskContent = html.substring(6);
+        html = `
+            <div class="task-container doing">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="DOING" />
+                    <span class="task-status-badge doing">DOING</span>
+                </div>
+                <div class="task-content">${taskContent}</div>
+            </div>
+        `;
+    } else if (html.startsWith('SOMEDAY ')) {
+        const taskContent = html.substring(8);
+        html = `
+            <div class="task-container someday">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="SOMEDAY" />
+                    <span class="task-status-badge someday">SOMEDAY</span>
+                </div>
+                <div class="task-content">${taskContent}</div>
+            </div>
+        `;
     } else if (html.startsWith('DONE ')) {
-        const taskContent = html.substring(5); // Remove "DONE " prefix
+        const taskContent = html.substring(5);
         html = `
             <div class="task-container done">
                 <div class="task-checkbox-container">
@@ -648,7 +670,7 @@ function parseAndRenderContent(rawContent) {
             </div>
         `;
     } else if (html.startsWith('CANCELLED ')) {
-        const taskContent = html.substring(10); // Remove "CANCELLED " prefix
+        const taskContent = html.substring(10);
         html = `
             <div class="task-container cancelled">
                 <div class="task-checkbox-container">
@@ -656,6 +678,28 @@ function parseAndRenderContent(rawContent) {
                     <span class="task-status-badge cancelled">CANCELLED</span>
                 </div>
                 <div class="task-content cancelled-text">${taskContent}</div>
+            </div>
+        `;
+    } else if (html.startsWith('WAITING ')) {
+        const taskContent = html.substring(8);
+        html = `
+            <div class="task-container waiting">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="WAITING" />
+                    <span class="task-status-badge waiting">WAITING</span>
+                </div>
+                <div class="task-content waiting-text">${taskContent}</div>
+            </div>
+        `;
+    } else if (html.startsWith('NLR ')) {
+        const taskContent = html.substring(4);
+        html = `
+            <div class="task-container nlr">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="NLR" disabled />
+                    <span class="task-status-badge nlr">NLR</span>
+                </div>
+                <div class="task-content nlr-text">${taskContent}</div>
             </div>
         `;
     } else {

@@ -647,27 +647,74 @@ body {
 .task-container {
     display: flex;
     align-items: flex-start;
-    gap: var(--ls-space-1);
-    padding: 2px 0;
+    gap: var(--ls-space-2);
+    padding: var(--ls-space-2);
+    margin: var(--ls-space-1) 0;
+    border-radius: var(--ls-border-radius-medium);
+    border-left: 3px solid transparent;
+    transition: all var(--ls-transition-fast);
 }
 
+.task-container:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+/* Task Status Colors */
+.task-container.todo {
+    border-left-color: var(--ls-accent-10);
+}
+
+.task-container.doing {
+    border-left-color: #f39c12; /* Orange */
+}
+
+.task-container.someday {
+    border-left-color: #9b59b6; /* Purple */
+}
+
+.task-container.done {
+    border-left-color: var(--ls-task-done-border-color);
+}
+
+.task-container.cancelled {
+    border-left-color: var(--ls-task-cancelled-badge-bg);
+}
+
+.task-container.waiting {
+    border-left-color: #3498db; /* Blue */
+}
+
+.task-container.nlr {
+    border-left-color: #95a5a6; /* Gray */
+}
+
+/* Task Checkbox Container */
 .task-checkbox-container {
-    padding-top: calc((var(--ls-font-size-base) * 1.5 - 16px) / 2);
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+    flex-shrink: 0;
+    margin-top: 2px;
 }
 
+/* Task Checkbox */
 .task-checkbox {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    width: 16px;
-    height: 16px;
-    border: 1px solid var(--ls-page-checkbox-border-color);
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--ls-page-checkbox-border-color);
     border-radius: var(--ls-border-radius-low);
     background-color: var(--ls-primary-background-color);
     cursor: pointer;
     position: relative;
-    margin-right: var(--ls-space-2);
-    flex-shrink: 0;
+    transition: all var(--ls-transition-fast);
+}
+
+.task-checkbox:hover {
+    transform: scale(1.1);
+    border-color: var(--ls-accent-10);
 }
 
 .task-checkbox:checked {
@@ -686,6 +733,12 @@ body {
     position: absolute;
     top: 3px;
     left: 5px;
+}
+
+.task-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    background-color: var(--ls-tertiary-background-color);
 }
 
 /* Task Keywords - styling them like tags */
@@ -724,8 +777,108 @@ body {
     text-decoration: none;
 }
 
-.task-status-badge { display: none; }
+.task-status-badge {
+    font-size: 10px;
+    font-weight: var(--ls-font-weight-bold);
+    padding: 2px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    box-shadow: none;
+    font-family: var(--ls-font-family);
+}
 
+.task-status-badge.todo {
+    background: var(--ls-accent-10);
+    color: var(--ls-task-badge-todo-text-color);
+}
+
+.task-status-badge.doing {
+    background: #f39c12;
+    color: #fff;
+}
+
+.task-status-badge.someday {
+    background: #9b59b6;
+    color: #fff;
+}
+
+.task-status-badge.done {
+    background: var(--ls-task-done-badge-bg);
+    color: var(--ls-task-done-badge-text);
+}
+
+.task-status-badge.cancelled {
+    background: var(--ls-task-cancelled-badge-bg);
+    color: var(--ls-task-cancelled-badge-text);
+}
+
+.task-status-badge.waiting {
+    background: #3498db;
+    color: #fff;
+}
+
+.task-status-badge.nlr {
+    background: #95a5a6;
+    color: #fff;
+}
+
+/* Task Content */
+.task-content {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.5;
+    font-size: 0.95em;
+    padding: 2px 0;
+}
+
+/* Task Content States */
+.task-content.done-text {
+    text-decoration: line-through;
+    opacity: 0.75;
+    color: var(--ls-secondary-text-color);
+}
+
+.task-content.cancelled-text {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: var(--ls-tertiary-text-color);
+}
+
+.task-content.waiting-text {
+    color: var(--ls-secondary-text-color);
+    font-style: italic;
+}
+
+.task-content.nlr-text {
+    text-decoration: line-through;
+    opacity: 0.5;
+    color: var(--ls-tertiary-text-color);
+    font-style: italic;
+}
+
+/* Dark Theme Adjustments */
+[data-theme="dark"] .task-container {
+    background: var(--ls-primary-background-color);
+}
+
+[data-theme="dark"] .task-container:hover {
+    background: var(--ls-secondary-background-color);
+}
+
+[data-theme="dark"] .task-checkbox {
+    background-color: var(--ls-secondary-background-color);
+    border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] .task-checkbox:hover {
+    border-color: var(--ls-accent-11);
+}
+
+[data-theme="dark"] .task-checkbox:disabled {
+    background-color: var(--ls-tertiary-background-color);
+}
 
 /* Page Properties */
 #page-properties {
