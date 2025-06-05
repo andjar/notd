@@ -203,10 +203,10 @@ require_once 'config.php';
     <script src="assets/libs/feather.min.js"></script>
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
-    <script src="assets/js/utils.js"></script>
+    <script type="module" src="assets/js/utils.js"></script>
     <script src="assets/js/splash.js"></script>
-    <script src="assets/js/api_client.js"></script>
-    <script src="assets/js/ui.js"></script>
-    <script src="assets/js/app.js"></script>
+    <script type="module" src="assets/js/api_client.js"></script>
+    <script type="module" src="assets/js/ui.js"></script>
+    <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>

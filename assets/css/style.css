@@ -2904,6 +2904,63 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
+/* Template Dropdown Menu */
+.template-autocomplete-dropdown {
+    position: absolute;
+    background-color: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    max-width: 300px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    margin-top: 4px;
+}
+
+.template-autocomplete-dropdown ul {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+}
+
+.template-autocomplete-dropdown li {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 0.95em;
+    color: var(--ls-primary-text-color);
+    transition: all var(--ls-transition-fast);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.template-autocomplete-dropdown li:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+.template-autocomplete-dropdown li.selected {
+    background-color: var(--ls-accent-3);
+    color: var(--ls-accent-11);
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .template-autocomplete-dropdown {
+    background-color: var(--ls-secondary-background-color);
+    border-color: var(--ls-border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .template-autocomplete-dropdown li:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+[data-theme="dark"] .template-autocomplete-dropdown li.selected {
+    background-color: var(--ls-accent-4);
+    color: var(--ls-accent-11);
+}
+
 /* Base link styles */
 a {
     color: var(--ls-link-text-color);
