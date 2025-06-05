@@ -580,6 +580,19 @@ function parseAndRenderContent(rawContent) {
             </div>
         `;
     } else {
+        // Handle inline properties first
+        html = html.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
+            const trimmedKey = key.trim();
+            const trimmedValue = value.trim();
+            if (trimmedKey.toLowerCase() === 'tag') {
+                return `<span class="property-inline property-tag"><span class="property-key">#</span><span class="property-value">${trimmedValue}</span></span>`;
+            } else if (trimmedKey.toLowerCase() === 'alias') {
+                return `<span class="property-inline alias-property"><span class="property-key">Alias</span><span class="property-value">${trimmedValue}</span></span>`;
+            } else {
+                return `<span class="property-inline"><span class="property-key">${trimmedKey}</span><span class="property-value">${trimmedValue}</span></span>`;
+            }
+        });
+
         // Handle page links
         html = html.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
             const trimmedName = pageName.trim();

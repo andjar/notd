@@ -1959,6 +1959,14 @@ textarea:focus {
     font-weight: var(--ls-font-weight-medium);
 }
 
+.property-tag .property-key {
+    color: var(--ls-property-tag-text);
+}
+
+.property-tag .property-value {
+    color: var(--ls-property-tag-text);
+}
+
 .property-inline.alias-property {
     background: var(--ls-accent-01);
     border: 1px solid var(--ls-accent-05);
@@ -2112,33 +2120,6 @@ textarea:focus {
 
 [data-theme="dark"] .attachment-preview {
     background-color: var(--ls-secondary-background-color);
-}
-
-/* Note Properties */
-.property-item.tag {
-    background-color: var(--ls-tertiary-background-color);
-    color: var(--ls-accent-10);
-    border-radius: var(--ls-border-radius-low);
-    padding: 2px 6px;
-    margin-right: 4px;
-    font-size: 0.9em;
-}
-
-.property-item.tag .property-key {
-    color: var(--ls-accent-10);
-    font-weight: var(--ls-font-weight-medium);
-}
-
-.property-item.tag .property-value {
-    color: var(--ls-accent-10);
-}
-
-.note-properties {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
-    font-size: 0.9em;
 }
 
 /* Note Focus States */
