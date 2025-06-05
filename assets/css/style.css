@@ -2750,3 +2750,97 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     margin-top: 5px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
+
+/* Base link styles */
+a {
+    color: var(--ls-link-text-color);
+    text-decoration: none;
+    transition: all var(--ls-transition-fast);
+    position: relative;
+}
+
+a:hover {
+    color: var(--ls-link-text-hover-color);
+    text-decoration: none;
+}
+
+/* Internal links (wiki links) */
+a.wiki-link,
+a[href^="/"],
+a[href^="#"] {
+    color: var(--ls-link-text-color);
+    border-bottom: 1px solid transparent;
+    transition: all var(--ls-transition-fast);
+}
+
+a.wiki-link:hover,
+a[href^="/"]:hover,
+a[href^="#"]:hover {
+    color: var(--ls-link-text-hover-color);
+    border-bottom-color: var(--ls-link-text-hover-color);
+    background-color: var(--ls-accent-3);
+    border-radius: var(--ls-border-radius-low);
+    padding: 0 2px;
+}
+
+/* External links */
+a[href^="http://"],
+a[href^="https://"] {
+    color: var(--ls-accent-9);
+    padding-right: 1.2em;
+}
+
+a[href^="http://"]:hover,
+a[href^="https://"]:hover {
+    color: var(--ls-accent-10);
+}
+
+/* External link icon */
+a[href^="http://"]::after,
+a[href^="https://"]::after {
+    content: "↗";
+    position: absolute;
+    right: 0;
+    top: 0;
+    font-size: 0.8em;
+    opacity: 0.7;
+    transition: all var(--ls-transition-fast);
+}
+
+a[href^="http://"]:hover::after,
+a[href^="https://"]:hover::after {
+    opacity: 1;
+    transform: translate(1px, -1px);
+}
+
+/* Visited link states */
+a:visited {
+    color: var(--ls-tertiary-text-color);
+}
+
+a.wiki-link:visited,
+a[href^="/"]:visited,
+a[href^="#"]:visited {
+    color: var(--ls-link-text-color);
+}
+
+a[href^="http://"]:visited,
+a[href^="https://"]:visited {
+    color: var(--ls-accent-8);
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] a[href^="http://"],
+[data-theme="dark"] a[href^="https://"] {
+    color: var(--ls-accent-10);
+}
+
+[data-theme="dark"] a[href^="http://"]:hover,
+[data-theme="dark"] a[href^="https://"]:hover {
+    color: var(--ls-accent-11);
+}
+
+[data-theme="dark"] a[href^="http://"]:visited,
+[data-theme="dark"] a[href^="https://"]:visited {
+    color: var(--ls-accent-9);
+}
