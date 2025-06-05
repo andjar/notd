@@ -68,44 +68,6 @@ function determinePropertyInternalStatus($pdo, $propertyName, $explicitInternal 
     return 0;
 }
 
-/**
- * Apply property definitions to a specific property
- * @param PDO $pdo Database connection
- * @param int $propertyId Property ID to update
- * @return bool True if updated, false if no change needed
- */
-function applyPropertyDefinitionToProperty($pdo, $propertyId) {
-    try {
-        // Get property details
-        $stmt = $pdo->prepare("SELECT name, internal FROM Properties WHERE id = ?");
-        $stmt->execute([$propertyId]);
-        $property = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$property) {
-            return false;
-        }
-        
-        // Check if definition exists and differs from current value
-        $definedInternal = getPropertyInternalStatusFromDefinition($pdo, $property['name']);
-        if ($definedInternal !== null && $definedInternal !== (int)$property['internal']) {
-            $updateStmt = $pdo->prepare("UPDATE Properties SET internal = ? WHERE id = ?");
-            $updateStmt->execute([$definedInternal, $propertyId]);
-            return true;
-        }
-        
-        return false;
-    } catch (Exception $e) {
-        error_log("Error applying property definition: " . $e->getMessage());
-        return false;
-    }
-}
+// Removed applyPropertyDefinitionToProperty function (now redundant)
 
-/**
- * Trigger to automatically set internal status on new properties
- * Call this after inserting a new property
- * @param PDO $pdo Database connection
- * @param int $propertyId Property ID that was just inserted
- */
-function autoSetPropertyInternalStatus($pdo, $propertyId) {
-    applyPropertyDefinitionToProperty($pdo, $propertyId);
-} 
+// Removed autoSetPropertyInternalStatus function (now redundant) 

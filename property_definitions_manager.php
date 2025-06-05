@@ -1,6 +1,8 @@
 <?php
 require_once 'config.php';
 require_once 'api/db_connect.php';
+// Required for _updateOrAddPropertyAndDispatchTriggers and its dependencies
+require_once 'api/properties.php'; 
 
 $pdo = get_db_connection();
 
@@ -22,6 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new Exception('Property name is required');
                     }
                     
+                    // Ensure the core function is available
+                    if (!function_exists('_updateOrAddPropertyAndDispatchTriggers')) {
+                        throw new Exception('Core property update function _updateOrAddPropertyAndDispatchTriggers is missing. Ensure api/properties.php is included correctly.');
+                    }
+
                     $pdo->beginTransaction();
                     
                     $stmt = $pdo->prepare("
@@ -30,20 +37,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ");
                     $stmt->execute([$name, $internal, $description, $autoApply]);
                     
-                    // Apply to existing properties if auto_apply is enabled
-                    $updatedCount = 0;
+                    $processedCount = 0;
                     if ($autoApply) {
-                        $updateStmt = $pdo->prepare("
-                            UPDATE Properties 
-                            SET internal = ? 
+                        // Fetch existing properties with this name that need their internal status updated
+                        $propStmt = $pdo->prepare("
+                            SELECT id, value, note_id, page_id 
+                            FROM Properties 
                             WHERE name = ? AND internal != ?
                         ");
-                        $updateStmt->execute([$internal, $name, $internal]);
-                        $updatedCount = $updateStmt->rowCount();
+                        $propStmt->execute([$name, $internal]);
+                        $propertiesToUpdate = $propStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                        foreach ($propertiesToUpdate as $property) {
+                            $entityType = $property['note_id'] ? 'note' : 'page';
+                            $entityId = $property['note_id'] ?: $property['page_id'];
+                            
+                            _updateOrAddPropertyAndDispatchTriggers(
+                                $pdo,
+                                $entityType,
+                                $entityId,
+                                $name,             // Property name from the definition
+                                $property['value'], // Existing value of the property
+                                $internal          // Internal status from the new definition
+                            );
+                            $processedCount++;
+                        }
                     }
                     
                     $pdo->commit();
-                    $message = "Property definition saved successfully. Applied to {$updatedCount} existing properties.";
+                    $message = "Property definition saved successfully. Processed {$processedCount} existing properties for update based on auto-apply setting.";
                     $messageType = 'success';
                     break;
                     
@@ -56,30 +78,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     break;
                     
                 case 'apply_all':
+                    // Ensure the core function is available
+                    if (!function_exists('_updateOrAddPropertyAndDispatchTriggers')) {
+                        throw new Exception('Core property update function _updateOrAddPropertyAndDispatchTriggers is missing. Ensure api/properties.php is included correctly.');
+                    }
+
                     $pdo->beginTransaction();
                     
-                    // Get all auto-apply definitions
                     $stmt = $pdo->prepare("SELECT name, internal FROM PropertyDefinitions WHERE auto_apply = 1");
                     $stmt->execute();
                     $definitions = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     
-                    $totalUpdated = 0;
+                    $totalProcessed = 0;
                     foreach ($definitions as $definition) {
-                        $updateStmt = $pdo->prepare("
-                            UPDATE Properties 
-                            SET internal = ? 
+                        $defName = $definition['name'];
+                        $defInternal = (int)$definition['internal'];
+
+                        // Fetch existing properties that need to be updated according to this definition
+                        $propStmt = $pdo->prepare("
+                            SELECT id, value, note_id, page_id 
+                            FROM Properties 
                             WHERE name = ? AND internal != ?
                         ");
-                        $updateStmt->execute([
-                            $definition['internal'], 
-                            $definition['name'], 
-                            $definition['internal']
-                        ]);
-                        $totalUpdated += $updateStmt->rowCount();
+                        $propStmt->execute([$defName, $defInternal]);
+                        $propertiesToUpdate = $propStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                        foreach ($propertiesToUpdate as $property) {
+                            $entityType = $property['note_id'] ? 'note' : 'page';
+                            $entityId = $property['note_id'] ?: $property['page_id'];
+
+                            _updateOrAddPropertyAndDispatchTriggers(
+                                $pdo,
+                                $entityType,
+                                $entityId,
+                                $defName,
+                                $property['value'],
+                                $defInternal
+                            );
+                            $totalProcessed++;
+                        }
                     }
                     
                     $pdo->commit();
-                    $message = "Applied all property definitions to {$totalUpdated} existing properties.";
+                    $message = "Applied all auto-apply property definitions. Processed {$totalProcessed} existing properties for update.";
                     $messageType = 'success';
                     break;
             }
