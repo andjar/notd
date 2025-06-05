@@ -474,9 +474,26 @@ async function handleTransclusions(notes = notesForCurrentPage) {
     console.log(`Fetching content for ${blockIdsArray.length} unique block IDs for transclusion.`);
 
     try {
-        // Assuming notesAPI.getMultipleNotes returns a map of id -> noteObject
-        // If it returns an array, the lookup logic below will need adjustment.
-        const notesMap = await notesAPI.getMultipleNotes(blockIdsArray); 
+        // Fetch notes individually and build the notesMap
+        const notesMap = {};
+        for (const blockId of blockIdsArray) {
+            try {
+                // Assuming a singular getNote method exists, e.g., notesAPI.getNote(id)
+                // Adjust if the actual singular fetch method is named differently (e.g., notesAPI.getNoteById)
+                const note = await notesAPI.getNote(blockId); 
+                if (note) {
+                    notesMap[blockId] = note;
+                } else {
+                    console.warn(`Note not found (or null response) for blockId during individual fetch: ${blockId}`);
+                    // Optionally, add a placeholder or skip if note is not found
+                    // notesMap[blockId] = { content: 'Block not found via individual fetch' }; 
+                }
+            } catch (fetchError) {
+                console.error(`Error fetching individual note for blockId ${blockId}:`, fetchError);
+                // Optionally, add an error placeholder to notesMap
+                // notesMap[blockId] = { content: 'Error loading block via individual fetch' };
+            }
+        }
         
         placeholders.forEach(placeholder => {
             const blockRef = placeholder.dataset.blockRef;
