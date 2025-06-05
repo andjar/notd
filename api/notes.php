@@ -302,6 +302,21 @@ if ($method === 'GET') {
             $pdo->rollBack();
             sendJsonResponse(['success' => false, 'error' => 'Note not found'], 404);
         }
+
+        // --- BEGIN order_index recalculation logic: Step 1 ---
+        $old_parent_note_id = null;
+        $old_order_index = null;
+        $page_id_for_reordering = $existingNote['page_id']; // page_id should not change
+
+        // Only fetch old parent and order if parent_note_id is part of the input,
+        // or if order_index is changing (which might imply a move between siblings lists if parent_note_id is also changing)
+        // For now, to be safe, we fetch if parent_note_id is potentially changing.
+        // The problem description says "If parent_note_id is present in the $input (meaning it might change)"
+        if (array_key_exists('parent_note_id', $input) || array_key_exists('order_index', $input)) {
+            $old_parent_note_id = $existingNote['parent_note_id'];
+            $old_order_index = $existingNote['order_index'];
+        }
+        // --- END order_index recalculation logic: Step 1 ---
         
         // Build the SET part of the SQL query dynamically
         $setClauses = [];
@@ -337,6 +352,66 @@ if ($method === 'GET') {
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute($executeParams);
+
+        // --- BEGIN order_index recalculation logic: Step 2 ---
+        // Retrieve the new parent_note_id and new_order_index for the note.
+        // These are the values that were just written to the database.
+        $new_parent_note_id = array_key_exists('parent_note_id', $input) ? ($input['parent_note_id'] === null ? null : (int)$input['parent_note_id']) : $existingNote['parent_note_id'];
+        $new_order_index = isset($input['order_index']) ? (int)$input['order_index'] : $existingNote['order_index'];
+        // page_id_for_reordering is already fetched from $existingNote earlier.
+        // --- END order_index recalculation logic: Step 2 ---
+
+        // --- BEGIN order_index recalculation logic: Step 3 (Reorder Old Siblings) ---
+        // Check if parent_note_id actually changed and old values were captured
+        if ($old_parent_note_id !== null && $old_order_index !== null) { // Ensure old values were set
+            // Check if the parent has changed OR if the order within the same parent changed significantly
+            // The main condition from description: "if old_parent_note_id is different from new_parent_note_id"
+            // However, if order_index changes within the same parent, old siblings might still need adjustment
+            // For now, strictly following: "if old_parent_note_id is different from new_parent_note_id"
+            
+            $old_parent_id_for_sql = $old_parent_note_id === null ? 0 : $old_parent_note_id;
+            $new_parent_id_for_sql = $new_parent_note_id === null ? 0 : $new_parent_note_id;
+
+            if ($old_parent_id_for_sql != $new_parent_id_for_sql) { // Compare normalized IDs
+                $sqlReorderOld = "
+                    UPDATE Notes
+                    SET order_index = order_index - 1
+                    WHERE page_id = :page_id
+                      AND IFNULL(parent_note_id, 0) = :old_parent_note_id_sql
+                      AND order_index > :old_order_index
+                      AND id != :note_id
+                ";
+                $stmtReorderOld = $pdo->prepare($sqlReorderOld);
+                $stmtReorderOld->bindParam(':page_id', $page_id_for_reordering, PDO::PARAM_INT);
+                $stmtReorderOld->bindParam(':old_parent_note_id_sql', $old_parent_id_for_sql, PDO::PARAM_INT);
+                $stmtReorderOld->bindParam(':old_order_index', $old_order_index, PDO::PARAM_INT);
+                $stmtReorderOld->bindParam(':note_id', $noteId, PDO::PARAM_INT);
+                $stmtReorderOld->execute();
+            }
+        }
+        // --- END order_index recalculation logic: Step 3 ---
+
+        // --- BEGIN order_index recalculation logic: Step 4 (Reorder New Siblings) ---
+        // This needs to run regardless of whether the parent changed, as items in the new list need to make space.
+        if (array_key_exists('order_index', $input) || array_key_exists('parent_note_id', $input)) { // If order or parent changed
+            $new_parent_id_for_sql_step4 = $new_parent_note_id === null ? 0 : $new_parent_note_id;
+            
+            $sqlReorderNew = "
+                UPDATE Notes
+                SET order_index = order_index + 1
+                WHERE page_id = :page_id
+                  AND IFNULL(parent_note_id, 0) = :new_parent_note_id_sql
+                  AND order_index >= :new_order_index
+                  AND id != :note_id 
+            "; // id != :note_id is crucial
+            $stmtReorderNew = $pdo->prepare($sqlReorderNew);
+            $stmtReorderNew->bindParam(':page_id', $page_id_for_reordering, PDO::PARAM_INT);
+            $stmtReorderNew->bindParam(':new_parent_note_id_sql', $new_parent_id_for_sql_step4, PDO::PARAM_INT);
+            $stmtReorderNew->bindParam(':new_order_index', $new_order_index, PDO::PARAM_INT);
+            $stmtReorderNew->bindParam(':note_id', $noteId, PDO::PARAM_INT);
+            $stmtReorderNew->execute();
+        }
+        // --- END order_index recalculation logic: Step 4 ---
         
         // If content was updated, process and save properties
         if (isset($input['content'])) {
