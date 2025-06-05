@@ -441,8 +441,6 @@ export async function handleNoteKeyDown(e) {
 
 // --- Event Handler: Task Checkbox Click ---
 export async function handleTaskCheckboxClick(e) {
-    // This function is intended to be called IF e.target.matches('.task-checkbox') is true.
-    // The main event listener in app.js will do this check.
     const checkbox = e.target;
     const noteItem = checkbox.closest('.note-item');
     if (!noteItem) return;
@@ -453,50 +451,144 @@ export async function handleTaskCheckboxClick(e) {
 
     if (!noteData || !contentDiv || noteId.startsWith('temp-')) {
         console.error('Note data, contentDiv not found, or temp note for task checkbox click', { noteId, noteData, contentDiv });
-        checkbox.checked = !checkbox.checked; 
+        checkbox.checked = !checkbox.checked;
         return;
     }
     
     let rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
     let newRawContent, newStatus, doneAt = null;
     const isChecked = checkbox.checked;
+    const markerType = checkbox.dataset.markerType;
 
-    if (rawContent.startsWith('TODO ')) {
-        if (isChecked) { newRawContent = 'DONE ' + rawContent.substring(5); newStatus = 'DONE'; doneAt = new Date().toISOString().slice(0, 19).replace('T', ' '); }
-        else { newRawContent = rawContent; newStatus = 'TODO'; }
-    } else if (rawContent.startsWith('DONE ')) {
-        if (!isChecked) { newRawContent = 'TODO ' + rawContent.substring(5); newStatus = 'TODO'; }
-        else { newRawContent = rawContent; newStatus = 'DONE'; doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');}
-    } else if (rawContent.startsWith('CANCELLED ')) {
-        checkbox.checked = true; return;
-    } else {
-        console.warn("Clicked task checkbox on a non-task or malformed note content:", rawContent);
-        checkbox.checked = !checkbox.checked; return;
+    // Handle different task statuses
+    switch (markerType) {
+        case 'TODO':
+            if (isChecked) {
+                newRawContent = 'DONE ' + rawContent.substring(5);
+                newStatus = 'DONE';
+                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            } else {
+                newRawContent = rawContent;
+                newStatus = 'TODO';
+            }
+            break;
+
+        case 'DOING':
+            if (isChecked) {
+                newRawContent = 'DONE ' + rawContent.substring(6);
+                newStatus = 'DONE';
+                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            } else {
+                newRawContent = 'TODO ' + rawContent.substring(6);
+                newStatus = 'TODO';
+            }
+            break;
+
+        case 'SOMEDAY':
+            if (isChecked) {
+                newRawContent = 'DONE ' + rawContent.substring(8);
+                newStatus = 'DONE';
+                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            } else {
+                newRawContent = 'TODO ' + rawContent.substring(8);
+                newStatus = 'TODO';
+            }
+            break;
+
+        case 'DONE':
+            if (!isChecked) {
+                newRawContent = 'TODO ' + rawContent.substring(5);
+                newStatus = 'TODO';
+            } else {
+                newRawContent = rawContent;
+                newStatus = 'DONE';
+                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            }
+            break;
+
+        case 'WAITING':
+            if (isChecked) {
+                newRawContent = 'DONE ' + rawContent.substring(8);
+                newStatus = 'DONE';
+                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            } else {
+                newRawContent = 'TODO ' + rawContent.substring(8);
+                newStatus = 'TODO';
+            }
+            break;
+
+        case 'CANCELLED':
+        case 'NLR':
+            // These statuses are not interactive
+            checkbox.checked = true;
+            return;
+
+        default:
+            console.warn("Unknown task marker type:", markerType);
+            checkbox.checked = !checkbox.checked;
+            return;
     }
 
     try {
-        const updatedNoteServer = await notesAPI.updateNote(noteId, { content: newRawContent }); // Assumes notesAPI
+        // 1. Update note content
+        const updatedNoteServer = await notesAPI.updateNote(noteId, { content: newRawContent });
         noteData.content = updatedNoteServer.content;
         noteData.updated_at = updatedNoteServer.updated_at;
         contentDiv.dataset.rawContent = updatedNoteServer.content;
-        
-        if (contentDiv.classList.contains('edit-mode')) contentDiv.textContent = updatedNoteServer.content;
-        else contentDiv.innerHTML = ui.parseAndRenderContent(updatedNoteServer.content); // Assumes ui
 
-        await propertiesAPI.setProperty({ entity_type: 'note', entity_id: parseInt(noteId), name: 'status', value: newStatus }); // Assumes propertiesAPI
-        if (doneAt) await propertiesAPI.setProperty({ entity_type: 'note', entity_id: parseInt(noteId), name: 'done_at', value: doneAt });
-        else { try { await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at'); } catch (delError) { console.warn('Could not delete done_at:', delError); } }
+        // Re-render the content div with the new raw content
+        if (contentDiv.classList.contains('edit-mode')) {
+            contentDiv.textContent = updatedNoteServer.content;
+        } else {
+            contentDiv.innerHTML = ui.parseAndRenderContent(updatedNoteServer.content);
+        }
 
+        // 2. Update properties ('status' and 'done_at')
+        await propertiesAPI.setProperty({ 
+            entity_type: 'note', 
+            entity_id: parseInt(noteId), 
+            name: 'status', 
+            value: newStatus 
+        });
+
+        if (doneAt) {
+            await propertiesAPI.setProperty({ 
+                entity_type: 'note', 
+                entity_id: parseInt(noteId), 
+                name: 'done_at', 
+                value: doneAt 
+            });
+        } else {
+            try {
+                await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at');
+            } catch (delError) {
+                console.warn('Could not delete done_at:', delError);
+            }
+        }
+
+        // 3. Fetch all properties for the note to update local cache
         const updatedProperties = await propertiesAPI.getProperties('note', parseInt(noteId));
         noteData.properties = updatedProperties;
+
+        // 4. Update global notes data for consistency
+        const noteIndexInGlobal = notesForCurrentPage.findIndex(n => String(n.id) === String(noteId));
+        if (noteIndexInGlobal > -1) {
+            notesForCurrentPage[noteIndexInGlobal] = { ...notesForCurrentPage[noteIndexInGlobal], ...noteData };
+            window.notesForCurrentPage = notesForCurrentPage;
+        }
+
         updateNoteInCurrentPage(noteData);
-        console.log('Task status updated: ' + newStatus, { noteId, newRawContent, doneAt });
+        console.log('Task status updated:', { noteId, newStatus, newRawContent, doneAt });
     } catch (error) {
         console.error('Error updating task status:', error);
         alert('Failed to update task status: ' + error.message);
+        // Revert UI on error
         checkbox.checked = !checkbox.checked;
         contentDiv.dataset.rawContent = noteData.content;
-        if (contentDiv.classList.contains('edit-mode')) contentDiv.textContent = noteData.content;
-        else contentDiv.innerHTML = ui.parseAndRenderContent(noteData.content); // Assumes ui
+        if (contentDiv.classList.contains('edit-mode')) {
+            contentDiv.textContent = noteData.content;
+        } else {
+            contentDiv.innerHTML = ui.parseAndRenderContent(noteData.content);
+        }
     }
 }

@@ -499,43 +499,11 @@ function switchToRenderedMode(contentEl) {
  * @returns {string} HTML string for display
  */
 function parseAndRenderContent(rawContent) {
-    if (!rawContent) return '';
-    
-    const tempDiv = document.createElement('div');
-    tempDiv.textContent = rawContent;
-    let html = tempDiv.textContent;
+    let html = rawContent || '';
 
-    html = html.replace(/\{([^:}]+)::([^}]+)\}/g, (match, key, value) => {
-        const trimmedKey = key.trim();
-        const trimmedValue = value.trim();
-        
-        if (!trimmedKey || !trimmedValue) return match; 
-        
-        if (trimmedKey.toLowerCase() === 'favorite' && trimmedValue.toLowerCase() === 'true') {
-            return `<span class="property-favorite" data-original="${match}">⭐</span>`;
-        }
-        
-        if (trimmedKey.toLowerCase() === 'alias') {
-            return `<span class="property-inline alias-property" data-original="${match}">
-                <span class="property-key">alias::</span>
-                <span class="page-link-bracket">[[</span>
-                <a href="#" class="page-link" data-page-name="${trimmedValue}">${trimmedValue}</a>
-                <span class="page-link-bracket">]]</span>
-            </span>`;
-        }
-        
-        if (trimmedKey.toLowerCase() === 'tag' || trimmedKey.startsWith('tag-')) {
-            return `<span class="property-tag" data-original="${match}">#${trimmedValue}</span>`;
-        }
-        
-        return `<span class="property-inline" data-original="${match}">
-            <span class="property-key">${trimmedKey}::</span>
-            <span class="property-value">${trimmedValue}</span>
-        </span>`;
-    });
-
+    // Handle task markers with checkboxes - don't show the TODO/DONE prefix in content
     if (html.startsWith('TODO ')) {
-        const taskContent = html.substring(5); 
+        const taskContent = html.substring(5);
         html = `
             <div class="task-container todo">
                 <div class="task-checkbox-container">
@@ -545,8 +513,30 @@ function parseAndRenderContent(rawContent) {
                 <div class="task-content">${taskContent}</div>
             </div>
         `;
+    } else if (html.startsWith('DOING ')) {
+        const taskContent = html.substring(6);
+        html = `
+            <div class="task-container doing">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="DOING" />
+                    <span class="task-status-badge doing">DOING</span>
+                </div>
+                <div class="task-content">${taskContent}</div>
+            </div>
+        `;
+    } else if (html.startsWith('SOMEDAY ')) {
+        const taskContent = html.substring(8);
+        html = `
+            <div class="task-container someday">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="SOMEDAY" />
+                    <span class="task-status-badge someday">SOMEDAY</span>
+                </div>
+                <div class="task-content">${taskContent}</div>
+            </div>
+        `;
     } else if (html.startsWith('DONE ')) {
-        const taskContent = html.substring(5); 
+        const taskContent = html.substring(5);
         html = `
             <div class="task-container done">
                 <div class="task-checkbox-container">
@@ -556,18 +546,41 @@ function parseAndRenderContent(rawContent) {
                 <div class="task-content done-text">${taskContent}</div>
             </div>
         `;
+    } else if (html.startsWith('WAITING ')) {
+        const taskContent = html.substring(8);
+        html = `
+            <div class="task-container waiting">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="WAITING" />
+                    <span class="task-status-badge waiting">WAITING</span>
+                </div>
+                <div class="task-content">${taskContent}</div>
+            </div>
+        `;
     } else if (html.startsWith('CANCELLED ')) {
-        const taskContent = html.substring(10); 
+        const taskContent = html.substring(10);
         html = `
             <div class="task-container cancelled">
                 <div class="task-checkbox-container">
-                    <input type="checkbox" class="task-checkbox" data-marker-type="CANCELLED" disabled />
+                    <input type="checkbox" class="task-checkbox" data-marker-type="CANCELLED" checked disabled />
                     <span class="task-status-badge cancelled">CANCELLED</span>
                 </div>
                 <div class="task-content cancelled-text">${taskContent}</div>
             </div>
         `;
+    } else if (html.startsWith('NLR ')) {
+        const taskContent = html.substring(4);
+        html = `
+            <div class="task-container nlr">
+                <div class="task-checkbox-container">
+                    <input type="checkbox" class="task-checkbox" data-marker-type="NLR" checked disabled />
+                    <span class="task-status-badge nlr">NLR</span>
+                </div>
+                <div class="task-content nlr-text">${taskContent}</div>
+            </div>
+        `;
     } else {
+        // Handle page links
         html = html.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
             const trimmedName = pageName.trim();
             return `<span class="page-link-bracket">[[</span><a href="#" class="page-link" data-page-name="${trimmedName}">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
