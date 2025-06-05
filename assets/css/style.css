@@ -4,7 +4,7 @@
     /* Color-related variables are now sourced from the active theme CSS */
 
     /* Spacing System (User's system is good) */
-    --ls-space-unit: 0.25rem;
+    --ls-space-unit: 0.22rem; /* Reduced from 0.25rem */
     --ls-space-1: var(--ls-space-unit);    /* 4px */
     --ls-space-2: calc(var(--ls-space-unit) * 2);  /* 8px */
     --ls-space-3: calc(var(--ls-space-unit) * 3);  /* 12px */
@@ -420,6 +420,7 @@ body {
 .note-item {
     position: relative;
     --controls-top-offset: calc( (2 * var(--ls-space-1)) + (var(--ls-font-size-base) * 0.8) - (var(--control-icon-size) / 2) ); /* Base for text notes */
+    /* Reduced margin-bottom, if any, or rely on children padding */
 }
 
 .note-header-row {
@@ -427,7 +428,7 @@ body {
     align-items: flex-start;
     position: relative;
     padding-left: calc(var(--nesting-level, 0) * var(--ls-indentation-unit));
-    min-height: calc(var(--ls-font-size-base) * 1.5 + var(--ls-space-1));
+    min-height: calc(var(--ls-font-size-base) * 1.4 + var(--ls-space-1)); /* Reduced min-height */
 }
 
 .note-controls {
@@ -440,8 +441,8 @@ body {
     flex: 1;
     min-width: 0;
     padding-left: var(--content-left-padding);
-    padding-top: var(--ls-space-1);
-    padding-bottom: var(--ls-space-1);
+    padding-top: calc(var(--ls-space-1) * 0.8); /* Reduced padding-top */
+    padding-bottom: calc(var(--ls-space-1) * 0.8); /* Reduced padding-bottom */
     display: flex;
     flex-direction: column;
 }
@@ -646,55 +647,37 @@ body {
 /* Task Container (TODOs) - Styling for LogSeq appearance */
 .task-container {
     display: flex;
-    align-items: flex-start;
-    gap: var(--ls-space-2);
-    padding: var(--ls-space-2);
-    margin: var(--ls-space-1) 0;
-    border-radius: var(--ls-border-radius-medium);
-    border-left: 3px solid transparent;
+    align-items: center; /* Vertically center pill/checkbox with first line of text */
+    gap: var(--ls-space-1); /* Reduced gap */
+    padding: var(--ls-space-1) 0; /* Minimal vertical, no horizontal padding */
+    margin: var(--ls-space-1) 0; /* Minimal vertical margin */
+    border-radius: var(--ls-border-radius-medium); /* Keep radius for potential hover/focus effects if added later */
+    border: none; /* Removed border, especially border-left */
+    background-color: transparent; /* Ensure transparent background */
     transition: all var(--ls-transition-fast);
 }
 
 .task-container:hover {
-    background-color: var(--ls-tertiary-background-color);
+    /* Consider a very subtle background on hover if needed, or remove if pill is main interactive element */
+    /* background-color: var(--ls-tertiary-background-color); */
 }
 
-/* Task Status Colors */
-.task-container.todo {
-    border-left-color: var(--ls-accent-10);
+/* Task Status Colors - these are now primarily for the badge, not container border */
+.task-container.todo .task-status-badge {
+    /* background: var(--ls-accent-10); Handled by specific badge class */
+    /* color: var(--ls-task-badge-todo-text-color); */
 }
+/* Other status colors will be handled by the badge's own classes */
 
-.task-container.doing {
-    border-left-color: #f39c12; /* Orange */
-}
-
-.task-container.someday {
-    border-left-color: #9b59b6; /* Purple */
-}
-
-.task-container.done {
-    border-left-color: var(--ls-task-done-border-color);
-}
-
-.task-container.cancelled {
-    border-left-color: var(--ls-task-cancelled-badge-bg);
-}
-
-.task-container.waiting {
-    border-left-color: #3498db; /* Blue */
-}
-
-.task-container.nlr {
-    border-left-color: #95a5a6; /* Gray */
-}
 
 /* Task Checkbox Container */
 .task-checkbox-container {
     display: flex;
     align-items: center;
-    gap: var(--ls-space-2);
+    gap: var(--ls-space-1); /* Reduced gap */
     flex-shrink: 0;
-    margin-top: 2px;
+    /* margin-top: 2px; Removed, align-items on parent should handle vertical alignment */
+    margin: 0; /* Reset margin */
 }
 
 /* Task Checkbox */
@@ -702,46 +685,47 @@ body {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    width: 18px;
-    height: 18px;
-    border: 2px solid var(--ls-page-checkbox-border-color);
-    border-radius: var(--ls-border-radius-low);
-    background-color: var(--ls-primary-background-color);
+    width: 20px; /* Reduced size */
+    height: 20px; /* Reduced size */
+    border: 1px solid var(--ls-tertiary-text-color); /* Less contrasting border */
+    background-color: transparent; /* Transparent background */
     cursor: pointer;
     position: relative;
     transition: all var(--ls-transition-fast);
+    accent-color: var(--ls-accent-10); /* Ensure checkmark aligns with theme */
 }
 
 .task-checkbox:hover {
     transform: scale(1.1);
-    border-color: var(--ls-accent-10);
+    border-color: var(--ls-accent-9); /* Slightly more contrast on hover */
 }
 
 .task-checkbox:checked {
-    background-color: var(--ls-page-checkbox-color);
-    border-color: var(--ls-page-checkbox-color);
+    background-color: var(--ls-task-done-badge-bg); /* Use accent color for checked background */
+    border-color: var(--ls-accent-10);
 }
 
 .task-checkbox:checked::after {
     content: '';
     display: block;
-    width: 4px;
-    height: 8px;
+    width: 3px; /* Adjusted for smaller checkbox */
+    height: 6px; /* Adjusted for smaller checkbox */
     border: solid var(--ls-task-checkbox-checkmark-color);
     border-width: 0 2px 2px 0;
-    transform: rotate(45deg) translate(-1px, -1px);
+    transform: rotate(45deg) translate(-50%, -50%); /* Center checkmark */
     position: absolute;
-    top: 3px;
-    left: 5px;
+    top: 45%; /* Adjusted for smaller checkbox */
+    left: 30%; /* Adjusted for smaller checkbox */
 }
 
 .task-checkbox:disabled {
     cursor: not-allowed;
     opacity: 0.5;
-    background-color: var(--ls-tertiary-background-color);
+    border-color: var(--ls-gray-5);
+    /* background-color: var(--ls-tertiary-background-color); */
 }
 
-/* Task Keywords - styling them like tags */
+/* Task Keywords - styling them like tags (these are inside .task-content) */
 .task-content .task-keyword {
     font-weight: var(--ls-font-weight-semibold);
     padding: 1px 5px;
@@ -749,7 +733,7 @@ body {
     margin-right: var(--ls-space-1);
     display: inline-block;
     line-height: 1.2;
-    font-size: var(--ls-font-size-sm);
+    font-size: var(--ls-font-size-sm); /* Keep as is or make slightly smaller if needed */
 }
 
 .task-content .task-keyword.todo,
@@ -764,29 +748,29 @@ body {
     color: var(--ls-task-keyword-later-text);
 }
 
-.task-content.done-text,
-.task-content.cancelled-text {
-    text-decoration: line-through;
-    color: var(--ls-tertiary-text-color);
-}
-
-.task-content.done-text .task-keyword.done,
+.task-content.done-text .task-keyword.done, /* This refers to the text content, not the badge */
 .task-content.cancelled-text .task-keyword.cancelled {
     background-color: var(--ls-gray-3);
     color: var(--ls-tertiary-text-color);
-    text-decoration: none;
+    text-decoration: none; /* Keywords themselves are not struck through */
 }
 
+/* .task-content.done-text, (Handled further down) */
+/* .task-content.cancelled-text { (Handled further down) */
+    /* text-decoration: line-through; */
+    /* color: var(--ls-tertiary-text-color); */
+/* } */
+
 .task-status-badge {
-    font-size: 10px;
+    font-size: 9px; /* Keep or adjust slightly if needed */
     font-weight: var(--ls-font-weight-bold);
-    padding: 2px 8px;
-    border-radius: 12px;
+    padding: 3px 8px; /* Adjusted padding for pill shape */
     text-transform: uppercase;
     letter-spacing: 0.5px;
     white-space: nowrap;
-    box-shadow: none;
-    font-family: var(--ls-font-family);
+    box-shadow: none; /* Ensure no shadow */
+    font-family: var(--ls-font-family); /* Ensure consistent font */
+    /* order: -1; /* If moving checkbox container content directly into task-container, this could place pill first */
 }
 
 .task-status-badge.todo {
@@ -795,12 +779,12 @@ body {
 }
 
 .task-status-badge.doing {
-    background: #f39c12;
+    background: #f39c12; /* Orange */
     color: #fff;
 }
 
 .task-status-badge.someday {
-    background: #9b59b6;
+    background: #9b59b6; /* Purple */
     color: #fff;
 }
 
@@ -815,12 +799,12 @@ body {
 }
 
 .task-status-badge.waiting {
-    background: #3498db;
+    background: #3498db; /* Blue */
     color: #fff;
 }
 
 .task-status-badge.nlr {
-    background: #95a5a6;
+    background: #95a5a6; /* Gray */
     color: #fff;
 }
 
@@ -828,9 +812,10 @@ body {
 .task-content {
     flex: 1;
     min-width: 0;
-    line-height: 1.5;
-    font-size: 0.95em;
-    padding: 2px 0;
+    line-height: 1.5; /* Ensure consistent line height */
+    font-size: var(--ls-font-size-base); /* Ensure consistent font size with other notes */
+    padding: 0; /* Remove default padding, rely on parent's gap */
+    /* padding-left: var(--ls-space-1); /* Add small left padding if checkbox is very small or hidden */
 }
 
 /* Task Content States */
@@ -1815,96 +1800,16 @@ textarea:focus {
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 12px;
-    border-radius: var(--ls-border-radius-medium);
-    margin: 6px 0;
-    border-left: 4px solid transparent;
-    background: var(--ls-secondary-background-color);
-    box-shadow: none;
-    transition: background-color 0.2s ease;
+    /* padding: 10px; */ /* Handled by parent .task-container */
+    /* border-radius: var(--ls-border-radius-medium); */
+    /* margin: 4px 0; */ /* Handled by parent .task-container */
+    /* border-left: none; */ /* Removed border from main container */
+    background: transparent; /* Ensure transparent background */
+    /* box-shadow: none; */
+    /* transition: background-color 0.2s ease; */
 }
 
-.task-container:hover {
-    background-color: var(--ls-tertiary-background-color);
-}
 
-.task-container.todo {
-    border-left-color: var(--ls-accent-10);
-}
-
-.task-container.done {
-    border-left-color: var(--ls-task-done-border-color);
-}
-
-.task-container.cancelled {
-    border-left-color: var(--ls-task-cancelled-badge-bg);
-}
-
-.task-checkbox-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-.task-checkbox {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    accent-color: var(--ls-accent-10);
-    border-radius: 3px;
-    transition: transform 0.2s ease;
-}
-
-.task-checkbox:hover {
-    transform: scale(1.1);
-}
-
-.task-checkbox:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.task-status-badge {
-    font-size: 9px;
-    font-weight: bold;
-    padding: 3px 8px;
-    border-radius: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    white-space: nowrap;
-    box-shadow: none;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-.task-status-badge.todo {
-    background: var(--ls-accent-10);
-    color: var(--ls-task-badge-todo-text-color);
-}
-
-.task-status-badge.done {
-    background: var(--ls-task-done-badge-bg);
-    color: var(--ls-task-done-badge-text);
-}
-
-.task-status-badge.cancelled {
-    background: var(--ls-task-cancelled-badge-bg);
-    color: var(--ls-task-cancelled-badge-text);
-}
-
-.task-content {
-    flex: 1;
-    min-width: 0;
-    line-height: 1.5;
-    font-size: 0.95em;
-}
-
-.task-content.done-text {
-    text-decoration: line-through;
-    opacity: 0.75;
-    color: var(--ls-secondary-text-color);
-}
 
 .task-content.cancelled-text {
     text-decoration: line-through;
@@ -1997,25 +1902,24 @@ textarea:focus {
 }
 
 .note-content.rendered-mode {
-    cursor: pointer;
+    cursor: pointer; /* Will be overridden by hover style */
     /* No specific background, rely on hover */
 }
 
 .note-content.rendered-mode:hover {
-    background: var(--ls-gray-2); /* Very subtle hover, was --ls-secondary-background-color */
-    /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); Removed more prominent shadow */
+    cursor: text;
+    background: transparent; /* Removed background var(--ls-gray-2) */
 }
 
 .note-content.edit-mode {
-    background: transparent; /* Make it feel like part of the page */
+    background: transparent; /* Make it feel like part of the page, consistent with rendered-mode:hover */
     /* border: 2px solid var(--ls-accent-10); Removed border */
     outline: none; /* Remove default outline if using custom subtle indicator */
-    /* box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); Removed shadow */
 }
 
 .note-content.edit-mode:focus {
     /* Subtle focus indicator, browser default might be enough or: */
-    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2); /* Subtle glow */
+    outline: none;
 }
 
 /* Empty state placeholder */
