@@ -1,0 +1,8 @@
+[
+    "## Welcome to `notd`! 👋\nThis is your first note. You can use this space to jot down your thoughts, ideas, or anything else you want to remember.",
+    "## Task Management 📝\nYou can create task lists by starting your notes with the special keywords: `TODO`, `DOING`, `DONE`, `WAITING`, `CANCELLED`, `SOMEDAY`, `NLR` (no longer relevant).",
+    "## Shortcuts ⌨️\nUse text expanders to quickly add properties such as `:t` tags or `:k` keywords, `:d` date or `:d` timestamp.",
+    "## Properties ✨\nAdd properties to your notes to organize them further. For example, you can add a {priority::high} property to important notes, set a {favorite::true} or add a {tag::tag}.",
+    "## Templates 🎨\nUse templates to quickly create notes with a consistent format. Just write `/` to get started."
+  ]
+  
