@@ -2220,6 +2220,45 @@ async function initializeApp() {
             splashScreen.classList.add('hidden');
         }
         console.log('App initialized successfully');
+
+        // Initialize splash screen toggle
+        const toggleSplashBtn = document.getElementById('toggle-splash-btn');
+        let isSplashActive = false;
+
+        function showSplashScreen() {
+            splashScreen.classList.remove('hidden');
+            isSplashActive = true;
+            document.body.style.overflow = 'hidden';
+            if (window.splashAnimations && typeof window.splashAnimations.start === 'function') {
+                window.splashAnimations.start();
+            }
+        }
+
+        function hideSplashScreen() {
+            splashScreen.classList.add('hidden');
+            isSplashActive = false;
+            document.body.style.overflow = '';
+            if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
+                window.splashAnimations.stop();
+            }
+        }
+
+        // Handle splash screen toggle button click
+        safeAddEventListener(toggleSplashBtn, 'click', (e) => {
+            e.stopPropagation();
+            if (isSplashActive) {
+                hideSplashScreen();
+            } else {
+                showSplashScreen();
+            }
+        }, 'toggle-splash-btn');
+
+        // Handle click anywhere on splash screen to hide it
+        safeAddEventListener(splashScreen, 'click', () => {
+            if (isSplashActive) {
+                hideSplashScreen();
+            }
+        }, 'splash-screen');
     } catch (error) {
         console.error('Failed to initialize app:', error);
         if (splashScreen) {

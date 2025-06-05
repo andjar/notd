@@ -15,6 +15,10 @@ require_once 'config.php';
 </head>
 <body>
     <div id="splash-screen">
+        <div class="time-date-container">
+            <div id="clock" class="clock">12:00</div>
+            <div id="date" class="date">Monday, 1 January</div>
+        </div>
         <div id="splash-background-bubbles-canvas">
             <!-- Canvas for dynamic bubbles -->
         </div>
@@ -108,6 +112,9 @@ require_once 'config.php';
 
         <div id="save-status-indicator" title="All changes saved">
             <!-- Icon will be injected by JS -->
+        </div>
+        <div id="toggle-splash-btn" title="Toggle Splash Screen">
+            z
         </div>
 
         <!-- Right Sidebar -->

@@ -50,6 +50,12 @@ function updatePerimeterDots(timestamp) {
 // --- Background Bubbles ---
 const numBubbles = 20; // Adjusted number, can be tweaked
 const bubbles = [];
+const BUBBLE_COLORS = [
+    'rgba(255, 100, 0, 0.35)',  // Slightly more opaque base for orange
+    'rgba(230, 50, 50, 0.35)',  // Slightly more opaque base for red
+    'rgba(200, 0, 100, 0.3)',   // Magenta
+    'rgba(255, 150, 50, 0.3)'   // Lighter orange
+];
 
 // !!! ADJUST THIS VALUE !!!
 // This should be close to the radius of your central notification orb (the "main bubble").
@@ -65,24 +71,6 @@ function initBackgroundBubbles() {
     if (!bubblesCanvas) return;
     bubblesCanvas.innerHTML = '';
     bubbles.length = 0;
-
-    const computedStyle = getComputedStyle(document.body);
-    const themeBubbleColors = [];
-    const defaultFallbackColors = [ // Fallbacks in case CSS variables are not found
-        'rgba(255, 100, 0, 0.35)',
-        'rgba(230, 50, 50, 0.35)',
-        'rgba(200, 0, 100, 0.3)',
-        'rgba(255, 150, 50, 0.3)'
-    ];
-
-    for (let i = 1; i <= 4; i++) {
-        const colorValue = computedStyle.getPropertyValue(`--ls-splash-bubble-color-${i}`).trim();
-        if (colorValue) {
-            themeBubbleColors.push(colorValue);
-        } else {
-            themeBubbleColors.push(defaultFallbackColors[i-1] || 'rgba(0,0,0,0.1)'); // Extra safety net
-        }
-    }
 
     const canvasCenterX = bubblesCanvas.offsetWidth / 2;
     const canvasCenterY = bubblesCanvas.offsetHeight / 2;
@@ -105,7 +93,7 @@ function initBackgroundBubbles() {
 
         bubbleElement.style.width = `${baseSize}px`;
         bubbleElement.style.height = `${baseSize}px`;
-        bubbleElement.style.backgroundColor = themeBubbleColors[Math.floor(Math.random() * themeBubbleColors.length)];
+        bubbleElement.style.backgroundColor = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
         bubbleElement.style.left = `${x.toFixed(1)}px`;
         bubbleElement.style.top = `${y.toFixed(1)}px`;
         bubbleElement.style.transform = 'scale(0.01)'; // Start very small
@@ -183,6 +171,31 @@ function updateBackgroundBubbles(timestamp) {
     });
 }
 
+// --- Time and Date Update ---
+function updateTimeDate() {
+    const now = new Date();
+    const clockElement = document.getElementById('clock');
+    const dateElement = document.getElementById('date');
+
+    if (clockElement) {
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        clockElement.textContent = `${hours}:${minutes}`;
+    }
+
+    if (dateElement) {
+        const options = { weekday: 'long', day: 'numeric', month: 'long' };
+        dateElement.textContent = now.toLocaleDateString(undefined, options);
+    }
+}
+
+function startTimeDateUpdates() {
+    updateTimeDate(); // Initial update
+    return setInterval(updateTimeDate, 1000 * 30); // Update every 30 seconds
+}
+
+let timeDateIntervalId = null;
+
 // --- Animation Loop & Control ---
 function animateSplash(timestamp) {
     if (!splashScreen || splashScreen.classList.contains('hidden')) {
@@ -203,6 +216,10 @@ function startSplashAnimation() {
         if (perimeterDotsContainer) initPerimeterDots();
         if (bubblesCanvas) initBackgroundBubbles();
         animationFrameId = requestAnimationFrame(animateSplash);
+        // Start time/date updates when splash screen is shown
+        if (!timeDateIntervalId) {
+            timeDateIntervalId = startTimeDateUpdates();
+        }
     }
 }
 
@@ -211,6 +228,11 @@ function stopSplashAnimation() {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
     }
+    // Stop time/date updates when splash screen is hidden
+    if (timeDateIntervalId) {
+        clearInterval(timeDateIntervalId);
+        timeDateIntervalId = null;
+    }
 }
 
 window.splashAnimations = {
@@ -218,7 +240,7 @@ window.splashAnimations = {
     stop: stopSplashAnimation
 };
 
-window.addEventListener('load', () => {
+document.addEventListener('DOMContentLoaded', () => {
     if (splashScreen && getComputedStyle(splashScreen).display !== 'none' && !splashScreen.classList.contains('hidden')) {
         startSplashAnimation();
     }

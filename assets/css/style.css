@@ -2114,7 +2114,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     left: 0;
     width: 100%;
     height: 100%;
-    background: radial-gradient(ellipse at center, var(--ls-gray-1) 0%, var(--ls-gray-3) 70%, var(--ls-gray-7) 100%);
+    background: radial-gradient(ellipse at center, var(--ls-gray-1) 0%, var(--ls-gray-3) 70%, var(--ls-gray-4) 100%);
     display: flex; /* Kept for existing centering, will be overridden by orb logic */
     justify-content: center; /* Kept for existing centering */
     align-items: center; /* Kept for existing centering */
@@ -2218,13 +2218,13 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 /* Save Status Indicator Styles */
 #save-status-indicator {
     position: fixed;
-    bottom: 15px;
-    right: 15px;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
     padding: 8px;
     border-radius: 50%;
     /* Background color set by theme */
     box-shadow: var(--ls-shadow-md); /* Using your theme's shadow */
-    z-index: var(--ls-z-index-popover, 1060); /* Use theme z-index */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2638,4 +2638,106 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 .template-autocomplete .template-name .match {
     color: var(--ls-accent-10);
     font-weight: var(--ls-font-weight-medium);
+}
+
+#toggle-splash-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 60px; /* Position it to the left of the save indicator */
+    z-index: 1000;
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+    border-radius: 50%;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#toggle-splash-btn:hover {
+    background: var(--surface-hover-color);
+    transform: scale(1.05);
+}
+
+#toggle-splash-btn .icon {
+    font-size: 16px;
+}
+
+#save-status-indicator,
+#toggle-splash-btn {
+    position: fixed;
+    bottom: 20px;
+    padding: 8px;
+    border-radius: 50%;
+    background: var(--ls-primary-background-color);
+    box-shadow: var(--ls-shadow-md);
+    z-index: var(--ls-z-index-popover, 1060);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#save-status-indicator {
+    right: 20px;
+}
+
+#toggle-splash-btn {
+    right: 60px;
+}
+
+#save-status-indicator:hover,
+#toggle-splash-btn:hover {
+    transform: scale(1.05);
+    background: var(--ls-secondary-background-color);
+}
+
+#save-status-indicator svg,
+#toggle-splash-btn svg {
+    width: 16px;
+    height: 16px;
+    color: var(--ls-primary-text-color);
+}
+
+[data-theme="dark"] #save-status-indicator,
+[data-theme="dark"] #toggle-splash-btn {
+    background: var(--ls-primary-background-color);
+    box-shadow: var(--ls-shadow-md);
+}
+
+[data-theme="dark"] #save-status-indicator:hover,
+[data-theme="dark"] #toggle-splash-btn:hover {
+    background: var(--ls-secondary-background-color);
+}
+
+/* Time and Date Container Styles */
+.time-date-container {
+    text-align: center;
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+}
+
+.clock {
+    font-size: 64px;
+    font-weight: 300;
+    color: var(--ls-gray-8);
+    line-height: 1;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.date {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--ls-gray-6);
+    margin-top: 5px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
