@@ -84,7 +84,7 @@ export function initGlobalEventListeners() {
         }, 'splashScreen');
     }
 
-    // Delegated event listener for page links
+    // Delegated event listener for page links in notes container
     if (ui.domRefs.notesContainer) {
         safeAddEventListener(ui.domRefs.notesContainer, 'click', (e) => {
             const pageLink = e.target.closest('a.page-link');
@@ -97,7 +97,20 @@ export function initGlobalEventListeners() {
         }, 'notesContainerPageLinkClick');
     } else {
         console.warn('[event-handlers] Could not find ui.domRefs.notesContainer to attach page-link click listener. Page links in notes might not work.');
-        // As a less ideal fallback, could listen on document.body, but it's better if notesContainer is found.
-        // safeAddEventListener(document.body, 'click', (e) => { ... check for e.target.closest('.note-content a.page-link') ... });
+    }
+
+    // Delegated event listener for page links in backlinks container
+    if (ui.domRefs.backlinksContainer) {
+        safeAddEventListener(ui.domRefs.backlinksContainer, 'click', (e) => {
+            const pageLink = e.target.closest('a.page-link');
+            if (pageLink && pageLink.dataset.pageName) {
+                e.preventDefault();
+                const pageName = pageLink.dataset.pageName;
+                // console.log(`Backlink clicked for: ${pageName}`); // For debugging
+                loadPage(pageName, false); // focusFirstNote = false, consistent with popstate
+            }
+        }, 'backlinksContainerPageLinkClick');
+    } else {
+        console.warn('[event-handlers] Could not find ui.domRefs.backlinksContainer to attach backlink click listener. Backlinks might not work.');
     }
 }
