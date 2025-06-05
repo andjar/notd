@@ -1142,6 +1142,8 @@ textarea:focus {
     font-weight: var(--ls-font-weight-semibold);
     color: var(--ls-primary-text-color);
     line-height: 1.2;
+    border-bottom: 1px solid var(--ls-border-color);
+    padding-bottom: var(--ls-space-2);
 }
 
 .page-title-gear {
@@ -1899,6 +1901,23 @@ textarea:focus {
     padding: 6px 8px; /* Standardized padding */
     line-height: 1.6; /* From original .note-content, ensure consistency */
 }
+
+/* Site-wide heading styles */
+h1, h2, h3, h4, h5, h6 {
+    border-bottom: 1px solid var(--ls-secondary-border-color);
+    padding-bottom: var(--ls-space-1);
+    margin-bottom: var(--ls-space-2);
+    font-family: var(--ls-header-font-family);
+    font-weight: var(--ls-font-weight-medium);
+    color: var(--ls-primary-text-color);
+}
+
+h1 { font-size: var(--ls-font-size-2xl); }
+h2 { font-size: var(--ls-font-size-xl); }
+h3 { font-size: var(--ls-font-size-lg); }
+h4 { font-size: var(--ls-font-size-base); font-weight: var(--ls-font-weight-semibold); }
+h5 { font-size: var(--ls-font-size-sm); font-weight: var(--ls-font-weight-semibold); }
+h6 { font-size: var(--ls-font-size-xs); font-weight: var(--ls-font-weight-semibold); }
 
 .note-content.rendered-mode {
     cursor: pointer; /* Will be overridden by hover style */
