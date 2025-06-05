@@ -1,4 +1,5 @@
 import { ui } from '../ui.js';
+import { propertiesAPI } from '../api_client.js';
 
 import {
     notesForCurrentPage,
