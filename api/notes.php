@@ -8,8 +8,11 @@ $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
 // Handle method overriding for PUT via POST (e.g., for phpdesktop)
-if ($method === 'POST' && isset($input['_method']) && strtoupper($input['_method']) === 'PUT') {
-    $method = 'PUT';
+if ($method === 'POST' && isset($input['_method'])) {
+    $overrideMethod = strtoupper($input['_method']);
+    if ($overrideMethod === 'PUT' || $overrideMethod === 'DELETE') {
+        $method = $overrideMethod;
+    }
     // Optionally, remove _method from $input if it could interfere with validation or processing
     // unset($input['_method']); 
     // However, validateNoteData only checks for 'content', so it's likely fine to leave it.

@@ -37,6 +37,8 @@ import {
     getInitialPage
 } from './app/page-loader.js';
 
+window.loadPage = loadPage; 
+
 // UI and event handling
 import { sidebarState } from './app/sidebar.js';
 import { initGlobalEventListeners } from './app/event-handlers.js';
@@ -62,6 +64,8 @@ import { initializeApp } from './app/app-init.js';
 // Make some variables globally accessible for drag and drop
 // window.currentPageId, window.notesForCurrentPage, window.currentFocusedNoteId are set in state.js
 window.notesAPI = notesAPI;
+window.propertiesAPI = propertiesAPI; 
+window.templatesAPI = templatesAPI; // Add this line
 
 // Get DOM references from UI module
 const {
@@ -441,6 +445,10 @@ async function renamePropertyKey(oldKey, newKey) {
         }
     }
 }
+
+// Expose functions needed by ui.js for page properties modal
+window.displayPageProperties = displayPageProperties;
+window.addPageProperty = addPageProperty;
 
 /**
  * Renames a property key for array properties

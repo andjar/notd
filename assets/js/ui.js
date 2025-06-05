@@ -706,42 +706,85 @@ function updateParentVisuals(parentNoteElement) {
  * Initializes the page properties modal and its event listeners
  */
 function initPagePropertiesModal() {
-    // Note: displayPageProperties and addPageProperty are not defined in this file.
-    // This will cause errors if not addressed by moving them here or to another imported module.
-    const { pagePropertiesGear, pagePropertiesModal, pagePropertiesModalClose, addPagePropertyBtn } = domRefs;
-    if (pagePropertiesGear) {
-        pagePropertiesGear.addEventListener('click', async () => {
-            if (!window.currentPageId || !window.propertiesAPI) return;
-            const properties = await propertiesAPI.getProperties('page', window.currentPageId);
-            // displayPageProperties(properties); // UNDEFINED
-            if (pagePropertiesModal) {
-                 pagePropertiesModal.classList.add('active');
-                 pagePropertiesModal.querySelector('.generic-modal-content').style.transform = 'scale(1)';
+    // domRefs is already destructured at the top of ui.js from './ui/dom-refs.js'
+    // So, direct usage of domRefs.pagePropertiesGear etc. is fine here.
+    // Similarly, showGenericInputModal is a function within the same ui.js module.
+    
+    if (domRefs.pagePropertiesGear) {
+        domRefs.pagePropertiesGear.addEventListener('click', async () => {
+            if (!window.currentPageId || !(window.propertiesAPI && typeof window.propertiesAPI.getProperties === 'function')) {
+                console.error('currentPageId or window.propertiesAPI.getProperties is not available.');
+                alert('Cannot load page properties at the moment.');
+                return;
+            }
+            try {
+                const properties = await window.propertiesAPI.getProperties('page', window.currentPageId);
+                
+                if (typeof window.displayPageProperties === 'function') {
+                    window.displayPageProperties(properties);
+                } else {
+                    console.error('window.displayPageProperties is not defined. Cannot populate property modal.');
+                }
+
+                if (domRefs.pagePropertiesModal) {
+                     domRefs.pagePropertiesModal.classList.add('active');
+                     const modalContent = domRefs.pagePropertiesModal.querySelector('.generic-modal-content');
+                     if (modalContent) {
+                         modalContent.style.transform = 'scale(1)';
+                     }
+                }
+            } catch (error) {
+                console.error("Error fetching or displaying page properties:", error);
+                alert("Error loading page properties.");
             }
         });
     }
-    if (pagePropertiesModalClose) {
-        pagePropertiesModalClose.addEventListener('click', () => {
-            if (pagePropertiesModal) {
-                pagePropertiesModal.classList.remove('active');
-                pagePropertiesModal.querySelector('.generic-modal-content').style.transform = 'scale(0.95)';
+    
+    if (domRefs.pagePropertiesModalClose) {
+        domRefs.pagePropertiesModalClose.addEventListener('click', () => {
+            if (domRefs.pagePropertiesModal) {
+                domRefs.pagePropertiesModal.classList.remove('active');
+                const modalContent = domRefs.pagePropertiesModal.querySelector('.generic-modal-content');
+                if (modalContent) {
+                    modalContent.style.transform = 'scale(0.95)';
+                }
             }
         });
     }
-    if (pagePropertiesModal) {
-        pagePropertiesModal.addEventListener('click', (e) => {
-            if (e.target === pagePropertiesModal) {
-                pagePropertiesModal.classList.remove('active');
-                pagePropertiesModal.querySelector('.generic-modal-content').style.transform = 'scale(0.95)';
-            }
-        });
+    
+    if (domRefs.pagePropertiesModal) {
+         domRefs.pagePropertiesModal.addEventListener('click', (e) => {
+             if (e.target === domRefs.pagePropertiesModal) {
+                 domRefs.pagePropertiesModal.classList.remove('active');
+                 const modalContent = domRefs.pagePropertiesModal.querySelector('.generic-modal-content');
+                 if (modalContent) {
+                     modalContent.style.transform = 'scale(0.95)';
+                 }
+             }
+         });
     }
-    if (addPagePropertyBtn) {
-        addPagePropertyBtn.addEventListener('click', async () => {
-            const result = await showGenericInputModal('Add Property', 'Enter property name and value:'); // Simplified call
+    
+    if (domRefs.addPagePropertyBtn) {
+        domRefs.addPagePropertyBtn.addEventListener('click', async () => {
+            const result = await showGenericInputModal('Add New Page Property', 'Enter as "Property Name: Property Value"');
             if (result) {
-                // await addPageProperty(result.key, result.value); // UNDEFINED
-                console.warn("addPageProperty function is not defined in ui.js scope.");
+                if (typeof window.addPageProperty === 'function') {
+                    const parts = result.split(':');
+                    if (parts.length >= 2) {
+                        const key = parts[0].trim();
+                        const value = parts.slice(1).join(':').trim();
+                        if (key) {
+                            await window.addPageProperty(key, value);
+                        } else {
+                            showGenericConfirmModal('Error', 'Property name cannot be empty.');
+                        }
+                    } else {
+                        showGenericConfirmModal('Error', "Invalid format. Please use 'Property Name: Property Value'");
+                    }
+                } else {
+                    console.error("window.addPageProperty is not defined. Cannot add property.");
+                    showGenericConfirmModal('Error', "Adding property feature is currently unavailable.");
+                }
             }
         });
     }
@@ -777,16 +820,290 @@ function updateSaveStatusIndicator(newStatus) {
 }
 
 // Template related functions (to be potentially moved)
-async function handleNoteTemplateInsertion(contentDiv, templateName) { /* ... */ }
-async function showPageTemplateMenu(pageId) { /* ... */ }
-function addTemplateButtonToPageProperties() { /* ... */ }
-const templateAutocomplete = { /* ... */ init() {}, loadTemplates() {}, show() {}, hide() {}, _removeKeyDownListener() {}, _handleKeyDown() {}, selectTemplate() {}, _setCursorPosition() {}, _handleDocumentClick() {}, destroy() {} }; // Stubbed for brevity
-function getCursorCharacterOffsetWithin(element) { /* ... */ return 0; }
-function handleNoteInput(e) { /* ... */ }
+async function handleNoteTemplateInsertion(contentDiv, templateName) { 
+    console.log('[Templates] handleNoteTemplateInsertion called with:', templateName);
+    // Actual insertion logic is complex and deferred.
+    // For now, just replace the trigger.
+    if (contentDiv && contentDiv.textContent.endsWith('/' + templateName.split(' ')[0])) { // crude match
+        contentDiv.textContent = contentDiv.textContent.replace(/\/[^\s]*$/, `[[Template: ${templateName}]]`);
+    } else if (contentDiv && contentDiv.textContent.includes('/')) {
+         contentDiv.textContent = contentDiv.textContent.replace('/', `[[Template: ${templateName}]]` );
+    }
+    templateAutocomplete.hide();
+}
+async function showPageTemplateMenu(pageId) { console.log('[Templates] showPageTemplateMenu called for pageId:', pageId); }
+function addTemplateButtonToPageProperties() { console.log('[Templates] addTemplateButtonToPageProperties called'); }
+
+const templateAutocomplete = {
+    templates: [],
+    dropdownEl: null,
+    activeTarget: null,
+    selectedIndex: -1,
+
+    async init() {
+        console.log('[Templates] templateAutocomplete.init()');
+        this.dropdownEl = document.createElement('div');
+        this.dropdownEl.className = 'template-autocomplete-dropdown';
+        this.dropdownEl.style.display = 'none';
+        this.dropdownEl.style.position = 'absolute';
+        this.dropdownEl.style.border = '1px solid #ccc';
+        this.dropdownEl.style.backgroundColor = 'white';
+        this.dropdownEl.style.zIndex = '1000';
+        document.body.appendChild(this.dropdownEl);
+        await this.loadTemplates();
+
+        // Add global click listener to hide dropdown
+        document.addEventListener('click', (e) => {
+            if (this.dropdownEl && !this.dropdownEl.contains(e.target) && this.activeTarget !== e.target) {
+                this.hide();
+            }
+        }, true); // Use capture phase
+
+        // Add keyboard navigation
+        document.addEventListener('keydown', this._handleKeyDown.bind(this));
+    },
+
+    _handleKeyDown(e) {
+        if (!this.dropdownEl || this.dropdownEl.style.display !== 'block' || !this.activeTarget) {
+            return;
+        }
+
+        // Only handle keyboard events if the active target is a note content div
+        if (!this.activeTarget.matches('.note-content.edit-mode')) {
+            return;
+        }
+
+        e.stopPropagation(); // Prevent event from bubbling up to note editor
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                if (this.selectedIndex < this.templates.length - 1) {
+                    const items = this.dropdownEl.querySelectorAll('li');
+                    items[this.selectedIndex]?.classList.remove('selected');
+                    this.selectedIndex++;
+                    items[this.selectedIndex]?.classList.add('selected');
+                }
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                if (this.selectedIndex > 0) {
+                    const items = this.dropdownEl.querySelectorAll('li');
+                    items[this.selectedIndex]?.classList.remove('selected');
+                    this.selectedIndex--;
+                    items[this.selectedIndex]?.classList.add('selected');
+                }
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (this.selectedIndex !== -1) {
+                    const templateName = this.templates[this.selectedIndex].name;
+                    this._insertTemplate(this.activeTarget, templateName);
+                }
+                break;
+            case 'Escape':
+                e.preventDefault();
+                this.hide();
+                break;
+        }
+    },
+
+    _insertTemplate(contentDiv, templateName) {
+        if (!contentDiv || !templateName) return;
+
+        try {
+            // Get the current cursor position
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            const range = selection.getRangeAt(0);
+            const cursorPosition = range.startOffset;
+
+            // Get the text content
+            const text = contentDiv.textContent || '';
+            
+            // Find the last '/' before the cursor
+            const lastSlashIndex = text.lastIndexOf('/', cursorPosition);
+            if (lastSlashIndex === -1) return;
+
+            // Create new text with template inserted
+            const beforeSlash = text.substring(0, lastSlashIndex);
+            const afterCursor = text.substring(cursorPosition);
+            const newText = beforeSlash + `[[Template: ${templateName}]]` + afterCursor;
+
+            // Update the content
+            contentDiv.textContent = newText;
+
+            // Set cursor position after the inserted template
+            const newCursorPosition = beforeSlash.length + `[[Template: ${templateName}]]`.length;
+            const newRange = document.createRange();
+            newRange.setStart(contentDiv.firstChild || contentDiv, newCursorPosition);
+            newRange.setEnd(contentDiv.firstChild || contentDiv, newCursorPosition);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+
+            // Trigger input event to ensure note content is saved
+            contentDiv.dispatchEvent(new Event('input', { bubbles: true }));
+        } catch (error) {
+            console.error('[Templates] Error inserting template:', error);
+        } finally {
+            this.hide();
+        }
+    },
+
+    show(targetElement) {
+        this.activeTarget = targetElement;
+        this.selectedIndex = -1; // Reset selection
+        console.log('[Templates] templateAutocomplete.show() called for target:', targetElement);
+        
+        if (!this.dropdownEl) {
+            console.error('[Templates] Dropdown element not initialized.');
+            return;
+        }
+
+        if (!this.templates || this.templates.length === 0) {
+            console.log('[Templates] No templates to show or still loading.');
+            this.dropdownEl.innerHTML = '<li>Loading templates...</li>';
+        } else {
+            this.dropdownEl.innerHTML = ''; // Clear previous items
+            const ul = document.createElement('ul');
+            ul.style.listStyle = 'none';
+            ul.style.margin = '0';
+            ul.style.padding = '5px';
+            
+            // Create all items first
+            const items = this.templates.map((template, index) => {
+                const li = document.createElement('li');
+                li.textContent = template.name;
+                li.style.padding = '5px';
+                li.style.cursor = 'pointer';
+                li.dataset.index = index;
+                li.dataset.templateName = template.name;
+                return li;
+            });
+
+            // Then add event listeners
+            items.forEach((li, index) => {
+                li.addEventListener('mouseover', () => {
+                    if (this.selectedIndex !== -1) {
+                        items[this.selectedIndex].classList.remove('selected');
+                    }
+                    this.selectedIndex = index;
+                    li.classList.add('selected');
+                });
+                li.addEventListener('mouseout', () => {
+                    if (this.selectedIndex !== index) {
+                        li.classList.remove('selected');
+                    }
+                });
+                li.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const templateName = li.dataset.templateName;
+                    if (templateName) {
+                        this._insertTemplate(this.activeTarget, templateName);
+                    }
+                });
+                ul.appendChild(li);
+            });
+
+            this.dropdownEl.appendChild(ul);
+
+            // Auto-select first item
+            if (items.length > 0) {
+                this.selectedIndex = 0;
+                items[0].classList.add('selected');
+            }
+        }
+
+        const rect = targetElement.getBoundingClientRect();
+        this.dropdownEl.style.top = `${rect.bottom + window.scrollY}px`;
+        this.dropdownEl.style.left = `${rect.left + window.scrollX}px`;
+        this.dropdownEl.style.display = 'block';
+        console.log('[Templates] Dropdown displayed with items:', this.templates.length);
+    },
+
+    hide() {
+        if (this.dropdownEl) {
+            this.dropdownEl.style.display = 'none';
+        }
+        this.activeTarget = null;
+        this.selectedIndex = -1;
+        console.log('[Templates] Dropdown hidden');
+    },
+
+    async loadTemplates() {
+        console.log('[Templates] templateAutocomplete.loadTemplates()');
+        if (window.templatesAPI && typeof window.templatesAPI.getTemplates === 'function') {
+            try {
+                // Pass 'note' as the type parameter since this is for note templates
+                const response = await window.templatesAPI.getTemplates('note');
+                // Handle both array and object response formats
+                this.templates = Array.isArray(response) ? response : (response.data || []);
+                console.log('[Templates] Templates loaded:', this.templates);
+                
+                if (this.templates.length === 0) {
+                    this.templates = [{name: "No templates available", content: ""}];
+                }
+            } catch (error) {
+                console.error('[Templates] Error loading templates:', error);
+                this.templates = [{name: "Error loading templates. Please try again.", content: ""}];
+            }
+        } else {
+            console.error('[Templates] window.templatesAPI.getTemplates is not available.');
+            this.templates = [{name: "Template system not available", content: ""}];
+        }
+    }
+};
+
+function getCursorCharacterOffsetWithin(element) { /* ... */ return 0; } // Stubbed
+
+function handleNoteInput(e) {
+    if (e.target && e.target.matches && e.target.matches('.note-content.edit-mode')) {
+        const contentDiv = e.target;
+        const text = contentDiv.textContent || '';
+        
+        // Check if template dropdown is visible
+        const isDropdownVisible = templateAutocomplete.dropdownEl && 
+                                templateAutocomplete.dropdownEl.style.display === 'block';
+        
+        // If dropdown is visible and we're not clicking inside it, hide it
+        if (isDropdownVisible && !templateAutocomplete.dropdownEl.contains(e.target)) {
+            templateAutocomplete.hide();
+            return;
+        }
+
+        // Check for template trigger
+        if (text.endsWith('/')) {
+            console.log('[Templates] Trigger character "/" detected in note input:', text);
+            templateAutocomplete.show(contentDiv);
+        }
+    }
+}
+
+// Add global click handler for template dropdown
+document.addEventListener('click', (e) => {
+    if (templateAutocomplete.dropdownEl && 
+        templateAutocomplete.dropdownEl.style.display === 'block' && 
+        !templateAutocomplete.dropdownEl.contains(e.target) &&
+        !e.target.matches('.note-content.edit-mode')) {
+        templateAutocomplete.hide();
+    }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
-    templateAutocomplete.init();
-    addTemplateButtonToPageProperties();
+    templateAutocomplete.init(); // init will call loadTemplates
+    addTemplateButtonToPageProperties(); // Remains stubbed for now
+    // The 'input' event listener for notesContainer in app.js handles general input.
+    // This document 'input' listener in ui.js is specifically for template autocomplete.
+    // It might conflict or be redundant if app.js notesContainer input listener is too broad.
+    // For now, let's assume this specific one is for templates.
+    // Re-evaluating: The input listener in app.js is for saving notes.
+    // This one in ui.js should be specifically for the template trigger.
+    // It's better to attach this to notesContainer as well for consistency.
+    // However, the original code has `document.addEventListener('input', handleNoteInput);`
+    // Let's keep it for now, but be aware it might need refinement.
+    console.log('[Templates] Adding document input listener for handleNoteInput');
     document.addEventListener('input', handleNoteInput);
 });
 
