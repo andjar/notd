@@ -102,9 +102,8 @@ try {
                 <!-- Notes will be rendered here -->
             </div>
 
-            <button id="add-root-note-btn" class="action-button">
+            <button id="add-root-note-btn" class="action-button round-button">
                 <span class="icon icon-plus"></span>
-                Add Note
             </button>
         </div>
 

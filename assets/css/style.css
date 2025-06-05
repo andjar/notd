@@ -413,7 +413,7 @@ body {
 
 /* Outliner / Notes Container */
 .outliner {
-    margin-top: var(--ls-space-6);
+    margin-top: var(--ls-space-3);
     padding: var(--ls-space-2) 0;
 }
 
@@ -867,7 +867,7 @@ body {
 
 /* Page Properties */
 #page-properties {
-    margin: var(--ls-space-4) 0;
+    margin: var(--ls-space-1) 0;
 }
 .page-properties-list {
     display: flex;
@@ -1005,6 +1005,27 @@ textarea:focus {
     justify-content: center;
 }
 
+/* Round button for compact actions */
+.round-button {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: var(--bullet-left-indent);
+}
+
+.round-button .icon {
+    margin: 0;
+    font-size: 10px;
+}
+
+.round-button:hover {
+    transform: scale(1.05);
+}
+
 /* Sidebar Toggle Buttons */
 .sidebar-toggle {
     position: fixed;
@@ -1123,7 +1144,6 @@ textarea:focus {
     align-items: center;
     justify-content: center;
     gap: var(--ls-space-2);
-    margin-bottom: var(--ls-space-4);
     text-align: center;
 }
 
@@ -1133,7 +1153,6 @@ textarea:focus {
     justify-content: space-between;
     align-items: center;
     padding-top: var(--ls-space-4);
-    padding-bottom: var(--ls-space-4);
 }
 
 #current-page-title {
