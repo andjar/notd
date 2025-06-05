@@ -237,9 +237,74 @@ if ($method === 'GET') {
             unset($note);
         }
         
-        sendJsonResponse(['success' => true, 'data' => $notes]);
+        // START NEW LOGIC FOR GET ?page_id={id}
+
+        // 1. Fetch page details
+        $pageSql = "SELECT * FROM Pages WHERE id = :page_id";
+        // No internal check for pages table itself, assuming pages are always fetchable if they exist.
+        // Visibility of a page would be controlled by other means if necessary (e.g., user permissions, not relevant here).
+        $stmtPage = $pdo->prepare($pageSql);
+        $stmtPage->bindParam(':page_id', $pageId, PDO::PARAM_INT);
+        $stmtPage->execute();
+        $pageDetails = $stmtPage->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pageDetails) {
+            sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
+            return; // Exit
+        }
+
+        // 2. Fetch page properties
+        $pageProperties = [];
+        $pagePropSql = "SELECT name, value, internal FROM Properties WHERE page_id = :page_id AND note_id IS NULL"; // Ensure note_id IS NULL for page-specific properties
+        if (!$includeInternal) {
+            $pagePropSql .= " AND internal = 0";
+        }
+        $pagePropSql .= " ORDER BY name";
+        
+        $stmtPageProps = $pdo->prepare($pagePropSql);
+        $stmtPageProps->bindParam(':page_id', $pageId, PDO::PARAM_INT);
+        $stmtPageProps->execute();
+        $pagePropertiesResult = $stmtPageProps->fetchAll(PDO::FETCH_ASSOC);
+        
+        $pagePropertiesFormatted = [];
+        foreach ($pagePropertiesResult as $prop) {
+            if (!isset($pagePropertiesFormatted[$prop['name']])) {
+                $pagePropertiesFormatted[$prop['name']] = [];
+            }
+            $propEntry = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
+            $pagePropertiesFormatted[$prop['name']][] = $propEntry;
+        }
+
+        foreach ($pagePropertiesFormatted as $name => $values) {
+            if (count($values) === 1) {
+                if (!$includeInternal && $values[0]['internal'] == 0) {
+                    $pagePropertiesFormatted[$name] = $values[0]['value'];
+                } else {
+                    // If includeInternal is true, or if it's false but the property is internal (which shouldn't happen due to SQL filter, but as a safeguard)
+                    $pagePropertiesFormatted[$name] = $values[0];
+                }
+            } else {
+                // For multiple values, always return the array of objects
+                 $pagePropertiesFormatted[$name] = $values;
+            }
+        }
+        $pageDetails['properties'] = $pagePropertiesFormatted;
+
+        // Notes are already fetched and processed with their properties by the existing logic above this new block.
+        // $notes variable already contains the notes with their properties.
+
+        // 3. Construct the final JSON response
+        sendJsonResponse([
+            'success' => true,
+            'data' => [
+                'page' => $pageDetails,
+                'notes' => $notes // $notes is from the original part of the page_id block
+            ]
+        ]);
+        // END NEW LOGIC FOR GET ?page_id={id}
+
     } else {
-        sendJsonResponse(['success' => false, 'error' => 'Either page_id or id is required'], 400);
+        sendJsonResponse(['success' => false, 'error' => 'Either page_id or id is required for GET request'], 400); // Clarified error
     }
 } elseif ($method === 'POST') {
     if (!isset($input['page_id'])) {

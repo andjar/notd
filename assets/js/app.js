@@ -184,24 +184,33 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
                  ui.calendarWidget.setCurrentPage(currentPageName);
             }
 
-            // Use cached properties
+            // Use cached page details, properties, and notes
+            const pageDetails = { // Reconstruct pageDetails from cache
+                id: cachedData.id,
+                name: cachedData.name,
+                alias: cachedData.alias // Ensure alias is cached
+                // Add other relevant page attributes if they are stored in cache
+            };
             const pageProperties = cachedData.properties;
+            notesForCurrentPage = cachedData.notes; // These already include their properties
+
+            console.log('Page details for (cached)', currentPageName, ':', pageDetails);
             console.log('Page properties for (cached)', currentPageName, ':', pageProperties);
+            console.log('Notes for (cached)', currentPageName, ':', notesForCurrentPage.length);
+            
+            window.notesForCurrentPage = notesForCurrentPage; // Update global state
+            
+            // Render UI
             if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
                 ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
             }
-
-            // Use cached notes
-            notesForCurrentPage = cachedData.notes;
-            window.notesForCurrentPage = notesForCurrentPage;
-            ui.displayNotes(notesForCurrentPage, currentPageId); // This will also initialize drag-and-drop
+            ui.displayNotes(notesForCurrentPage, currentPageId);
             ui.updateActivePageLink(currentPageName);
 
-            // Backlinks and transclusions are still fetched live for now
-            // Or they could be part of the cache if deemed necessary
+            // Backlinks are still fetched live
             const backlinks = await searchAPI.getBacklinks(currentPageName);
             displayBacklinks(backlinks);
-            await handleTransclusions(); // Pass notesForCurrentPage if it needs it
+            await handleTransclusions();
 
             if (focusFirstNote) {
                 const firstNote = notesContainer.querySelector('.note-content');
@@ -253,30 +262,41 @@ async function loadPage(pageName, focusFirstNote = false, updateHistory = true) 
             ui.calendarWidget.setCurrentPage(currentPageName);
         }
 
-        // Step 2: Fetch notes, properties, and backlinks in parallel
-        console.log(`Starting parallel fetch for page details: ${currentPageName}`);
-        const [fetchedPageProperties, fetchedNotes, fetchedBacklinks] = await Promise.all([
-            propertiesAPI.getProperties('page', currentPageId),
-            notesAPI.getNotesForPage(currentPageId),
-            searchAPI.getBacklinks(currentPageName) // Uses currentPageName
-        ]);
-        console.log(`Parallel fetch completed for page: ${currentPageName}`);
+        // Step 2: Fetch combined page data (details, notes with properties, page properties)
+        console.log(`Fetching page data using notesAPI.getPageData for: ${currentPageName} (ID: ${currentPageId})`);
+        const pageResponse = await notesAPI.getPageData(currentPageId, { include_internal: false });
 
-        // Assign fetched data
-        const pageProperties = fetchedPageProperties;
-        notesForCurrentPage = fetchedNotes;
+        if (!pageResponse || !pageResponse.page || !pageResponse.notes) {
+            throw new Error('Invalid response structure from getPageData');
+        }
+
+        // Unpack data
+        const pageDetails = pageResponse.page;
+        const pageProperties = pageResponse.page.properties || {};
+        notesForCurrentPage = pageResponse.notes; // These notes already include their properties
         window.notesForCurrentPage = notesForCurrentPage; // Update global
-        const backlinks = fetchedBacklinks;
+
+        // Ensure currentPageId and currentPageName are updated from the definitive source
+        currentPageId = pageDetails.id;
+        currentPageName = pageDetails.name; // This should be the canonical name
+        window.currentPageId = currentPageId;
+        window.currentPageName = currentPageName;
+        
+        // Fetch backlinks separately
+        const backlinks = await searchAPI.getBacklinks(currentPageName);
+        console.log(`Fetched backlinks for page: ${currentPageName}`);
 
         // Step 3: Update the cache with fetched data
         if (currentPageId && currentPageName) {
-            pageDataCache.set(currentPageName, {
-                id: currentPageId,
-                name: currentPageName,
-                notes: notesForCurrentPage,
-                properties: pageProperties,
+            const cacheEntry = {
+                id: pageDetails.id,
+                name: pageDetails.name, // Canonical name
+                alias: pageDetails.alias, // Store alias if present
+                // Potentially store other pageDetails attributes if needed for cache restoration
+                notes: notesForCurrentPage,    // Already includes note properties
+                properties: pageProperties,    // Page properties
                 timestamp: Date.now()
-            });
+            };
             console.log(`Page data for ${currentPageName} fetched from network and cached.`);
         }
 
@@ -550,7 +570,13 @@ const sidebarState = {
 async function prefetchRecentPagesData() {
     console.log("Starting pre-fetch for recent pages.");
     try {
-        const allPages = await pagesAPI.getPages(); // Assumes this returns pages sorted by updated_at or we sort them
+        // Fetch pages with all details included
+        const allPages = await pagesAPI.getPages({
+            include_details: true, 
+            include_internal: false, // Keep pre-fetched data lean
+            followAliases: true,     // Cache against canonical names
+            excludeJournal: false    // Include journal pages if recent
+        });
         
         // Sort pages by updated_at descending if not already sorted by API
         // Assuming 'updated_at' is a string like 'YYYY-MM-DD HH:MM:SS'
@@ -564,25 +590,26 @@ async function prefetchRecentPagesData() {
                 
                 console.log(`Pre-fetching data for page: ${page.name}`);
                 try {
-                    // Fetch necessary data. We need pageId first if not already in `page` object.
-                    // The `page` object from `getPages` might already have the ID.
-                    // If not, an additional getPageByName might be needed, or getPages could be enhanced.
-                    // For this implementation, assume `page.id` is available.
-                    if (!page.id) {
-                        console.warn(`Page ${page.name} from list does not have an ID. Cannot pre-fetch details without another lookup.`);
-                        const detailedPageData = await pagesAPI.getPageByName(page.name); // This is an extra call, ideally getPages includes IDs
-                        if (!detailedPageData || !detailedPageData.id) continue;
-                        page.id = detailedPageData.id; // Augment page object
-                    }
+                    // The 'page' object from pagesAPI.getPages with include_details: true 
+                    // should already contain 'notes' and 'properties'.
+                    // 'page.name' should be canonical due to followAliases: true.
+                    // 'page.id' should also be present.
 
-                    const notes = await notesAPI.getNotesForPage(page.id);
-                    const properties = await propertiesAPI.getProperties('page', page.id);
+                    if (!page.id || !page.name) {
+                        console.warn(`Page object for pre-fetch is missing id or name. Skipping.`, page);
+                        continue;
+                    }
                     
+                    // notes and properties are directly on the page object
+                    const notes = page.notes || []; // Default to empty array if not present
+                    const properties = page.properties || {}; // Default to empty object
+
                     pageDataCache.set(page.name, {
-                        id: page.id, // Store page ID
-                        name: page.name, // Store page name (canonical)
-                        notes,
-                        properties,
+                        id: page.id,
+                        name: page.name, 
+                        alias: page.alias, // Store alias if available
+                        notes: notes,      // These notes should already have their properties
+                        properties: properties, // Page-level properties
                         timestamp: Date.now()
                     });
                     console.log(`Successfully pre-fetched and cached data for page: ${page.name}`);
@@ -2134,9 +2161,11 @@ async function initializeApp() {
         await fetchAndDisplayPages(initialPageName);
             
         // NEW: Start pre-fetching, but don't await it if it should run in background
-        prefetchRecentPagesData(); // Run asynchronously in the background
-
+        prefetchRecentPagesData(); 
+        
         // Add delegated click listener for content images (pasted or from Markdown)
+        // This listener setup should ideally be idempotent or managed to avoid multiple additions if initializeApp can be called multiple times.
+        // For now, assuming initializeApp is called once.
         if (ui.domRefs.notesContainer) {
             ui.domRefs.notesContainer.addEventListener('click', (e) => {
                 const target = e.target;

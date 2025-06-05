@@ -100,12 +100,16 @@ const pagesAPI = {
      * @param {Object} [options={}] - Query options
      * @param {boolean} [options.excludeJournal=false] - Whether to exclude journal pages
      * @param {boolean} [options.followAliases=true] - Whether to follow page aliases
-     * @returns {Promise<Array>} Array of page objects
+     * @param {boolean} [options.include_details=false] - Whether to include page properties and notes (new backend feature)
+     * @param {boolean} [options.include_internal=false] - Whether to include internal properties and notes (if include_details is true)
+     * @returns {Promise<Array>} Array of page objects (potentially detailed if include_details is true)
      */
     getPages: (options = {}) => {
         const params = new URLSearchParams();
         if (options.excludeJournal) params.append('exclude_journal', '1');
         if (options.followAliases === false) params.append('follow_aliases', '0');
+        if (options.include_details) params.append('include_details', '1');
+        if (options.include_internal) params.append('include_internal', '1');
         
         const queryString = params.toString();
         return apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
@@ -168,18 +172,37 @@ const pagesAPI = {
  */
 const notesAPI = {
     /**
-     * Get notes for a page
+     * Get full page data including page details, notes, and properties.
      * @param {number} pageId - Page ID
-     * @returns {Promise<Array<{id: number, content: string, page_id: number, created_at: string, updated_at: string, properties: Object}>>}
+     * @param {Object} [options={}] - Query options
+     * @param {boolean} [options.include_internal=false] - Whether to include internal properties and notes.
+     * @returns {Promise<{page: Object, notes: Array<Object>}>} Object containing page details and an array of notes with their properties.
+     * Expected structure: { page: { ...page_details, properties: { ...page_properties } }, notes: [ { ...note_details, properties: { ...note_properties } }, ... ] }
      */
-    getNotesForPage: (pageId) => apiRequest(`notes.php?page_id=${pageId}`),
+    getPageData: (pageId, options = {}) => {
+        const params = new URLSearchParams();
+        params.append('page_id', pageId.toString());
+        if (options.include_internal) {
+            params.append('include_internal', '1');
+        }
+        return apiRequest(`notes.php?${params.toString()}`);
+    },
 
     /**
      * Get a specific note
      * @param {number} noteId - Note ID
+     * @param {Object} [options={}] - Query options
+     * @param {boolean} [options.include_internal=false] - Whether to include internal properties.
      * @returns {Promise<{id: number, content: string, page_id: number, created_at: string, updated_at: string, properties: Object}>}
      */
-    getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
+    getNote: (noteId, options = {}) => {
+        const params = new URLSearchParams();
+        params.append('id', noteId.toString());
+        if (options.include_internal) {
+            params.append('include_internal', '1');
+        }
+        return apiRequest(`notes.php?${params.toString()}`);
+    },
 
     /**
      * Create a new note

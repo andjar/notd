@@ -46,9 +46,41 @@ function resolvePageAlias($pdo, $pageData, $followAliases = true) {
 
 if ($method === 'GET') {
     $followAliases = !isset($_GET['follow_aliases']) || $_GET['follow_aliases'] !== '0';
+    $include_details = isset($_GET['include_details']) && $_GET['include_details'] === '1';
+    // Default include_internal to false if not provided. This will be used for page props, notes, and note props.
+    $include_internal = isset($_GET['include_internal']) && $_GET['include_internal'] === '1';
+
+    // Helper function to format properties (similar to api/notes.php)
+    // This function will be used for both page properties and note properties.
+    function formatProperties($propertiesResult, $applyIncludeInternalLogic, $isInternalIncluded) {
+        $formattedProperties = [];
+        foreach ($propertiesResult as $prop) {
+            if (!isset($formattedProperties[$prop['name']])) {
+                $formattedProperties[$prop['name']] = [];
+            }
+            $propEntry = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
+            $formattedProperties[$prop['name']][] = $propEntry;
+        }
+
+        foreach ($formattedProperties as $name => $values) {
+            if (count($values) === 1) {
+                if ($applyIncludeInternalLogic && !$isInternalIncluded && $values[0]['internal'] == 0) {
+                    $formattedProperties[$name] = $values[0]['value'];
+                } else {
+                    $formattedProperties[$name] = $values[0];
+                }
+            } else {
+                 // If multiple values, always return array of objects
+                $formattedProperties[$name] = $values;
+            }
+        }
+        return $formattedProperties;
+    }
     
     if (isset($_GET['id'])) {
         // Get page by ID
+        // TODO: If include_details is true here, we might want to also fetch details for the single page.
+        // For now, focusing on the "list all pages" requirement. This part remains unchanged.
         $stmt = $pdo->prepare("SELECT * FROM Pages WHERE id = ?");
         $stmt->execute([(int)$_GET['id']]);
         $page = $stmt->fetch();
@@ -155,17 +187,113 @@ if ($method === 'GET') {
         } else {
             $stmt = $pdo->query("SELECT id, name, alias, updated_at FROM Pages ORDER BY updated_at DESC, name ASC");
         }
-        $pages = $stmt->fetchAll();
-        
-        // Apply alias resolution to all pages if requested
+        $pages = $stmt->fetchAll(); // These are the basic page objects
+
+        // Apply alias resolution FIRST if requested
         if ($followAliases) {
-            $resolvedPages = array_map(function($page) use ($pdo, $followAliases) {
+            $pages = array_map(function($page) use ($pdo, $followAliases) { // Re-assign to $pages
                 return resolvePageAlias($pdo, $page, $followAliases);
             }, $pages);
-            echo json_encode(['success' => true, 'data' => $resolvedPages]);
-        } else {
+            // After resolving aliases, there might be duplicate pages if multiple aliases point to the same target.
+            // We should unique them by ID.
+            $unique_pages = [];
+            $seen_ids = [];
+            foreach ($pages as $page) {
+                if ($page && !in_array($page['id'], $seen_ids)) {
+                    $unique_pages[] = $page;
+                    $seen_ids[] = $page['id'];
+                }
+            }
+            $pages = $unique_pages;
+        }
+
+        if ($include_details) {
+            // Now, $pages contains the final list of pages (aliases resolved if $followAliases was true).
+            // Proceed to fetch details for these pages.
+            $page_ids = array_column($pages, 'id');
+            $detailed_pages = [];
+
+            if (!empty($page_ids)) {
+                // Ensure page_ids are unique just in case, though alias resolution should handle it.
+                $unique_page_ids = array_unique(array_filter($page_ids));
+
+                // 1. Fetch all page properties for the selected pages
+                $pagePropsSql = "SELECT page_id, name, value, internal FROM Properties WHERE page_id IN (" . implode(',', array_fill(0, count($unique_page_ids), '?')) . ") AND note_id IS NULL";
+                if (!$include_internal) {
+                    $pagePropsSql .= " AND internal = 0";
+                }
+                $stmtPageProps = $pdo->prepare($pagePropsSql);
+                $stmtPageProps->execute($unique_page_ids);
+                $allPagePropsResults = $stmtPageProps->fetchAll(PDO::FETCH_ASSOC);
+                $pagePropertiesByPageId = [];
+                foreach ($allPagePropsResults as $prop) {
+                    $pagePropertiesByPageId[$prop['page_id']][] = $prop;
+                }
+
+                // 2. Fetch all notes for the selected pages
+                $notesSql = "SELECT * FROM Notes WHERE page_id IN (" . implode(',', array_fill(0, count($unique_page_ids), '?')) . ")";
+                if (!$include_internal) {
+                    $notesSql .= " AND internal = 0";
+                }
+                $notesSql .= " ORDER BY page_id, order_index ASC"; // Order by page_id for easier grouping
+                $stmtNotes = $pdo->prepare($notesSql);
+                $stmtNotes->execute($unique_page_ids);
+                $allNotesResults = $stmtNotes->fetchAll(PDO::FETCH_ASSOC);
+                
+                $notesByPageId = [];
+                $note_ids = [];
+                foreach ($allNotesResults as $note) {
+                    $notesByPageId[$note['page_id']][] = $note;
+                    $note_ids[] = $note['id'];
+                }
+
+                // 3. Fetch all note properties for the collected note_ids
+                $notePropertiesByNoteId = [];
+                if (!empty($note_ids)) {
+                    $notePropsSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN (" . implode(',', array_fill(0, count($note_ids), '?')) . ")";
+                    if (!$include_internal) {
+                        $notePropsSql .= " AND internal = 0";
+                    }
+                    $stmtNoteProps = $pdo->prepare($notePropsSql);
+                    $stmtNoteProps->execute($note_ids);
+                    $allNotePropsResults = $stmtNoteProps->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($allNotePropsResults as $prop) {
+                        $notePropertiesByNoteId[$prop['note_id']][] = $prop;
+                    }
+                }
+
+                // Assemble the detailed page objects
+                foreach ($pages as $page) {
+                    $page_id = $page['id'];
+                    
+                    // Add page properties
+                    $currentPagePropsResult = $pagePropertiesByPageId[$page_id] ?? [];
+                    $page['properties'] = formatProperties($currentPagePropsResult, true, $include_internal);
+                    
+                    // Add notes with their properties
+                    $page['notes'] = [];
+                    if (isset($notesByPageId[$page_id])) {
+                        foreach ($notesByPageId[$page_id] as $note) {
+                            $note_id = $note['id'];
+                            $currentNotePropsResult = $notePropertiesByNoteId[$note_id] ?? [];
+                            $note['properties'] = formatProperties($currentNotePropsResult, true, $include_internal);
+                            $page['notes'][] = $note;
+                        }
+                    }
+                    $detailed_pages[] = $page;
+                }
+            }
+             $pages = $detailed_pages; // Replace original pages with detailed ones
+        }
+
+        // Apply alias resolution to all pages if requested (after details are added)
+        if ($followAliases) {
+            // Alias resolution has already been handled if $followAliases was true.
+            // So, we just output $pages directly.
             echo json_encode(['success' => true, 'data' => $pages]);
         }
+        // This else is removed as the $followAliases logic is now handled before $include_details
+        // and the final output is unified.
     }
 } elseif ($method === 'POST') {
     if (!isset($input['name']) || empty(trim($input['name']))) {
