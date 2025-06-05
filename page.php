@@ -173,8 +173,9 @@ try {
     </div>
 
     <!-- Scripts -->
-    <script src="assets/js/ui.js"></script>
+    <script type="module" src="assets/js/api_client.js"></script>
+    <script type="module" src="assets/js/ui.js"></script>
     <script src="assets/js/templates.js"></script>
-    <script src="assets/js/app.js"></script>
+    <script type="module" src="assets/js/app.js"></script>
 </body>
 </html> 

@@ -384,14 +384,12 @@ const templatesAPI = {
     deleteTemplate: (type, name) => apiRequest(`templates.php?type=${type}&name=${name}`, 'DELETE')
 };
 
-// Export all API namespaces
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        pagesAPI,
-        notesAPI,
-        propertiesAPI,
-        attachmentsAPI,
-        searchAPI,
-        templatesAPI
-    };
-}
+// Export all API namespaces using ES6 export syntax
+export {
+    pagesAPI,
+    notesAPI,
+    propertiesAPI,
+    attachmentsAPI,
+    searchAPI,
+    templatesAPI
+};

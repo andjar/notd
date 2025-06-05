@@ -9,7 +9,7 @@
  * @param {number} delay - Delay in milliseconds
  * @returns {Function} Debounced function
  */
-function debounce(func, delay) {
+export function debounce(func, delay) { // Added export keyword
     let timeout;
     return function(...args) {
         clearTimeout(timeout);
@@ -147,9 +147,11 @@ function parseContentForDisplay(content) {
 }
 
 // Export functions for use in other modules
+// module.exports might still be useful for CommonJS environments or specific bundler configs
+// but ensure ES6 exports are primary for consistency in this project.
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        debounce,
+        debounce, // This will now export the already ES6-exported function
         generateTempId,
         uuidv4,
         escapeHTML,
@@ -157,4 +159,23 @@ if (typeof module !== 'undefined' && module.exports) {
         parseMarkdown,
         parseContentForDisplay
     };
+}
+
+// Also consider exporting other utilities if they'll be used by other ES6 modules.
+// For now, only explicitly exporting debounce as per immediate requirement.
+// export { generateTempId, uuidv4, escapeHTML, getTodaysJournalPageName, parseMarkdown, parseContentForDisplay };
+
+/**
+ * Safely adds an event listener to an element if it exists
+ * @param {HTMLElement|null} element - The element to add the listener to
+ * @param {string} event - The event type
+ * @param {Function} handler - The event handler
+ * @param {string} elementName - Name of the element for logging
+ */
+export function safeAddEventListener(element, event, handler, elementName) {
+    if (!element) {
+        console.warn(`Cannot add ${event} listener: ${elementName} element not found`);
+        return;
+    }
+    element.addEventListener(event, handler);
 }
