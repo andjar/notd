@@ -14,25 +14,16 @@ import {
     currentPageName
 } from './state.js';
 
-// Import UI module
-import { ui } from '../ui.js';
-
 // Import API clients
 import { notesAPI, pagesAPI, searchAPI } from '../api_client.js';
 
 // Import note actions
 import { saveNoteImmediately } from './note-actions.js';
 
-// Assuming ui object is globally available or imported if/when ui.js becomes a module
-// For example: import ui from '../ui.js';
-// For now, we'll use ui directly as if it's global.
-// Destructure necessary domRefs, assuming 'ui' is accessible.
-const { notesContainer, backlinksContainer } = ui.domRefs;
-
-
-// Assuming API objects are globally available or imported if/when api_client.js becomes a module
-// For example: import { pagesAPI, notesAPI, searchAPI } from '../api_client.js';
-// For now, we'll use them as if they are global (e.g. pagesAPI.getPages).
+// Remove direct destructuring of ui.domRefs
+// const { notesContainer, backlinksContainer } = ui.domRefs;
+const notesContainer = document.querySelector('#notes-container');
+const backlinksContainer = document.querySelector('#backlinks-container');
 
 /**
  * Gets today's date in YYYY-MM-DD format for journal pages
@@ -58,7 +49,7 @@ export function getInitialPage() { // <-- EXPORT ADDED
  * Handles transclusions in notes
  * @param {Array} notes - Array of notes to process (optional, defaults to current page notes read from state)
  */
-async function handleTransclusions(notesToProcess = notesForCurrentPage) {
+export async function handleTransclusions(notesToProcess = notesForCurrentPage) {
     const placeholders = document.querySelectorAll('.transclusion-placeholder');
     if (placeholders.length === 0) {
         console.log('No transclusion placeholders found.');
@@ -91,39 +82,69 @@ async function handleTransclusions(notesToProcess = notesForCurrentPage) {
         const notesMap = {};
         for (const blockId of blockIdsArray) {
             try {
-                const note = await notesAPI.getNote(blockId); 
+                const note = await notesAPI.getNote(blockId);
                 if (note) {
                     notesMap[blockId] = note;
                 } else {
                     console.warn(`Note not found (or null response) for blockId during individual fetch: ${blockId}`);
+                    // Update placeholders for this blockId
+                    placeholders.forEach(placeholder => {
+                        if (placeholder.dataset.blockRef === blockId) {
+                            placeholder.textContent = 'Block not found';
+                            placeholder.classList.add('error');
+                        }
+                    });
+                    // Ensure this blockId is not in notesMap or is handled in the rendering loop
+                    delete notesMap[blockId]; 
                 }
             } catch (fetchError) {
                 console.error(`Error fetching individual note for blockId ${blockId}:`, fetchError);
+                // Update placeholders for this blockId
+                placeholders.forEach(placeholder => {
+                    if (placeholder.dataset.blockRef === blockId) {
+                        placeholder.textContent = 'Error loading block';
+                        placeholder.classList.add('error');
+                    }
+                });
+                // Ensure this blockId is not in notesMap or is handled in the rendering loop
+                delete notesMap[blockId]; 
             }
         }
-        
+
         placeholders.forEach(placeholder => {
             const blockRef = placeholder.dataset.blockRef;
             if (!blockRef || blockRef.trim() === '') {
+                // This case is already handled when blockIdsSet is populated, 
+                // but as a safeguard, we skip further processing.
                 return;
             }
+
+            // If placeholder already has an error class, it means it was handled in the fetch loop
+            if (placeholder.classList.contains('error')) {
+                return;
+            }
+            
             const note = notesMap[blockRef];
             if (note && note.content) {
-                ui.renderTransclusion(placeholder, note.content, blockRef);
-            } else if (note) {
+                window.ui.renderTransclusion(placeholder, note.content, blockRef);
+            } else if (note) { // Note exists but content might be empty/missing
                 console.warn(`Content is empty or missing for blockRef ${blockRef}. Note data:`, note);
                 placeholder.textContent = 'Block content is empty';
                 placeholder.classList.add('error');
-            } else {
-                console.warn(`Block not found for blockRef ${blockRef}.`);
-                placeholder.textContent = 'Block not found';
+            } else { 
+                // This case should ideally be covered by the error handling within the fetch loop.
+                // However, if a blockId made it here without being in notesMap (e.g., due to deletion),
+                // it implies it wasn't found or an error occurred.
+                console.warn(`Block not found for blockRef ${blockRef} in rendering loop (should have been caught earlier).`);
+                placeholder.textContent = 'Block not found'; // Or 'Error loading block' if more appropriate
                 placeholder.classList.add('error');
             }
         });
-    } catch (error) {
+    } catch (error) { // This is a general error for the whole transclusion process
         console.error('Error loading multiple transclusions:', error);
         placeholders.forEach(placeholder => {
-            if (placeholder.dataset.blockRef && placeholder.dataset.blockRef.trim() !== '') {
+            // Only update placeholders that haven't already been marked with an error
+            if (placeholder.dataset.blockRef && placeholder.dataset.blockRef.trim() !== '' && !placeholder.classList.contains('error')) {
                 placeholder.textContent = 'Error loading block';
                 placeholder.classList.add('error');
             }
@@ -188,9 +209,9 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
                 history.pushState({ pageName: cachedData.name }, '', newUrl.toString());
             }
 
-            ui.updatePageTitle(cachedData.name);
-            if (ui.calendarWidget && typeof ui.calendarWidget.setCurrentPage === 'function') {
-                 ui.calendarWidget.setCurrentPage(cachedData.name);
+            window.ui.updatePageTitle(cachedData.name);
+            if (window.ui.calendarWidget && typeof window.ui.calendarWidget.setCurrentPage === 'function') {
+                window.ui.calendarWidget.setCurrentPage(cachedData.name);
             }
 
             const pageDetails = { 
@@ -205,17 +226,17 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
             console.log('Page properties for (cached)', cachedData.name, ':', pageProperties);
             console.log('Notes for (cached)', cachedData.name, ':', notesForCurrentPage.length);
             
-            if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
-                ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
+            if (window.ui.domRefs.pagePropertiesContainer && typeof window.ui.renderPageInlineProperties === 'function') {
+                window.ui.renderPageInlineProperties(pageProperties, window.ui.domRefs.pagePropertiesContainer);
             }
-            ui.displayNotes(notesForCurrentPage, cachedData.id);
-            ui.updateActivePageLink(cachedData.name);
+            window.ui.displayNotes(notesForCurrentPage, cachedData.id);
+            window.ui.updateActivePageLink(cachedData.name);
 
             const backlinks = await searchAPI.getBacklinks(cachedData.name);
             displayBacklinks(backlinks);
             await handleTransclusions(); 
 
-            if (focusFirstNote && notesContainer) { // Ensure notesContainer is available
+            if (focusFirstNote && notesContainer) {
                 const firstNoteEl = notesContainer.querySelector('.note-content');
                 if (firstNoteEl) firstNoteEl.focus();
             }
@@ -233,8 +254,8 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
             pageNameToLoad = getInitialPage();
         }
 
-        if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
-        if (ui.domRefs.pagePropertiesContainer) ui.domRefs.pagePropertiesContainer.innerHTML = ''; 
+        if (notesContainer) notesContainer.innerHTML = '<p>Loading page...</p>';
+        if (window.ui.domRefs.pagePropertiesContainer) window.ui.domRefs.pagePropertiesContainer.innerHTML = ''; 
 
         const pageData = await pagesAPI.getPageByName(pageNameToLoad);
         if (!pageData) {
@@ -250,9 +271,9 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
             history.pushState({ pageName: pageData.name }, '', newUrl.toString());
         }
 
-        ui.updatePageTitle(pageData.name);
-        if (ui.calendarWidget && typeof ui.calendarWidget.setCurrentPage === 'function') {
-            ui.calendarWidget.setCurrentPage(pageData.name);
+        window.ui.updatePageTitle(pageData.name);
+        if (window.ui.calendarWidget && typeof window.ui.calendarWidget.setCurrentPage === 'function') {
+            window.ui.calendarWidget.setCurrentPage(pageData.name);
         }
 
         console.log(`Fetching page data using notesAPI.getPageData for: ${pageData.name} (ID: ${pageData.id})`);
@@ -286,23 +307,23 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         }
 
         console.log('Page properties for ', pageDetails.name, ':', pageProperties);
-        if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
-            ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
+        if (window.ui.domRefs.pagePropertiesContainer && typeof window.ui.renderPageInlineProperties === 'function') {
+            window.ui.renderPageInlineProperties(pageProperties, window.ui.domRefs.pagePropertiesContainer);
         }
 
-        ui.displayNotes(notesForCurrentPage, pageDetails.id); 
-        ui.updateActivePageLink(pageDetails.name);
+        window.ui.displayNotes(notesForCurrentPage, pageDetails.id); 
+        window.ui.updateActivePageLink(pageDetails.name);
         displayBacklinks(backlinks);
         await handleTransclusions(); 
 
-        if (focusFirstNote && notesContainer) { // Ensure notesContainer
+        if (focusFirstNote && notesContainer) {
             const firstNoteEl = notesContainer.querySelector('.note-content');
             if (firstNoteEl) firstNoteEl.focus();
         }
     } catch (error) {
         console.error('Error loading page:', error);
         setCurrentPageName(`Error: ${pageNameToLoad}`);
-        ui.updatePageTitle(currentPageName); 
+        window.ui.updatePageTitle(currentPageName); 
         if (notesContainer) { 
             notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
         }
@@ -310,7 +331,6 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         window.blockPageLoad = false; 
     }
 
-    // Use currentPageId from state for the condition
     if (notesForCurrentPage.length === 0 && currentPageId) { 
         await handleCreateAndFocusFirstNote(currentPageId); 
     }
@@ -338,14 +358,14 @@ async function handleCreateAndFocusFirstNote(pageIdToUse) {
                 if(notesContainer.innerHTML.includes("empty-page-hint") || notesContainer.children.length === 0) {
                     notesContainer.innerHTML = ''; 
                 }
-                const noteEl = ui.renderNote(savedNote, 0); // Assuming ui.renderNote exists
+                const noteEl = window.ui.renderNote(savedNote, 0); // Assuming ui.renderNote exists
                 notesContainer.appendChild(noteEl);
                 
                 const contentDiv = noteEl.querySelector('.note-content');
                 if (contentDiv) {
                     contentDiv.dataset.rawContent = savedNote.content;
                     contentDiv.textContent = '';
-                    ui.switchToEditMode(contentDiv);
+                    window.ui.switchToEditMode(contentDiv);
                     
                     const initialInputHandler = async (e) => {
                         const currentContent = contentDiv.textContent.trim();
@@ -433,15 +453,14 @@ export async function prefetchRecentPagesData() {
  * @param {string} [activePageName] - Name of the page to mark as active
  */
 export async function fetchAndDisplayPages(activePageName) {
-    // Ensure ui.domRefs.pageListContainer is available
-    const pageListContainer = ui.domRefs.pageListContainer; 
+    const pageListContainer = window.ui.domRefs.pageListContainer; 
     if (!pageListContainer) {
         console.error("pageListContainer not found in fetchAndDisplayPages");
         return;
     }
     try {
-        const pages = await pagesAPI.getPages(); // Assumes pagesAPI is global
-        ui.updatePageList(pages, activePageName || currentPageName); // Assumes ui.updatePageList is global
+        const pages = await pagesAPI.getPages();
+        window.ui.updatePageList(pages, activePageName || currentPageName);
     } catch (error) {
         console.error('Error fetching pages:', error);
         pageListContainer.innerHTML = '<li>Error loading pages.</li>';

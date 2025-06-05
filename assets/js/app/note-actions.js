@@ -1,4 +1,4 @@
-import { ui } from '../ui.js';
+// import { ui } from '../ui.js';
 
 import {
     notesForCurrentPage,
@@ -12,9 +12,9 @@ import {
     // setCurrentFocusedNoteId, // Not directly used by functions moved here yet, but might be needed by future note actions
 } from './state.js';
 
-// Assuming ui object is globally available.
-// Destructure common UI elements/functions if needed, or use ui.method() directly.
-const { notesContainer } = ui.domRefs; // notesContainer is frequently used.
+// Use window.ui instead of direct import
+// const { notesContainer } = ui.domRefs;
+const notesContainer = document.querySelector('#notes-container');
 
 // Assuming API objects are globally available.
 // e.g. notesAPI, propertiesAPI
@@ -92,25 +92,24 @@ export async function saveNoteImmediately(noteEl) {
     }
 
     const contentDiv = noteEl.querySelector('.note-content');
-    const rawTextValue = ui.getRawTextWithNewlines(contentDiv); // Assumes ui is global
-    const rawContent = ui.normalizeNewlines(rawTextValue); // Assumes ui is global
+    const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
+    const rawContent = window.ui.normalizeNewlines(rawTextValue);
     
-    ui.updateSaveStatusIndicator('pending'); 
+    window.ui.updateSaveStatusIndicator('pending'); 
     console.log('[DEBUG IMMEDIATE SAVE] Attempting to save noteId:', noteId);
     console.log('[DEBUG IMMEDIATE SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
 
     try {
-        const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent }); // Assumes notesAPI is global
+        const updatedNote = await notesAPI.updateNote(noteId, { content: rawContent });
         console.log('[DEBUG IMMEDIATE SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
         updateNoteInCurrentPage(updatedNote);
         
-        ui.updateNoteElement(updatedNote.id, updatedNote); // Assumes ui is global
-        ui.updateSaveStatusIndicator('saved');
+        window.ui.updateNoteElement(updatedNote.id, updatedNote);
+        window.ui.updateSaveStatusIndicator('saved');
     } catch (error) {
         console.error('Error updating note (immediately):', error);
-        ui.updateSaveStatusIndicator('error');
+        window.ui.updateSaveStatusIndicator('error');
     }
-    // finally block removed as updateSaveStatusIndicator is called in try/catch
 }
 
 export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounce is imported/available
@@ -127,7 +126,7 @@ export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounc
 
     if (noteData && noteData.content === contentToSave && !noteId.startsWith('new-')) return;
 
-    ui.updateSaveStatusIndicator('pending');
+    window.ui.updateSaveStatusIndicator('pending');
     console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
     console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(contentToSave));
     
@@ -136,11 +135,11 @@ export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounc
         console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
         updateNoteInCurrentPage(updatedNote);
         
-        ui.updateNoteElement(updatedNote.id, updatedNote); // Assumes ui is global
-        ui.updateSaveStatusIndicator('saved');
+        window.ui.updateNoteElement(updatedNote.id, updatedNote); // Assumes ui is global
+        window.ui.updateSaveStatusIndicator('saved');
     } catch (error) {
         console.error('Error updating note (debounced):', error);
-        ui.updateSaveStatusIndicator('error');
+        window.ui.updateSaveStatusIndicator('error');
     }
     // finally block removed as updateSaveStatusIndicator is called in try/catch
 }, 1000);
@@ -163,12 +162,12 @@ export async function handleAddRootNote() {
 
         if (savedNote) {
             addNoteToCurrentPage(savedNote);
-            const noteEl = ui.addNoteElement(savedNote, notesContainer, 0); // Assumes ui is global
+            const noteEl = window.ui.addNoteElement(savedNote, notesContainer, 0); // Assumes ui is global
 
             const contentDiv = noteEl ? noteEl.querySelector('.note-content') : null;
             if (contentDiv) {
                 contentDiv.dataset.rawContent = '';
-                ui.switchToEditMode(contentDiv); // Assumes ui is global
+                window.ui.switchToEditMode(contentDiv); // Assumes ui is global
                 
                 const initialInputHandler = async (e) => {
                     const currentContent = contentDiv.textContent;
@@ -209,8 +208,8 @@ async function handleShortcutExpansion(e, contentDiv) {
     if (shortcutHandled) {
         const noteItemForShortcut = contentDiv.closest('.note-item');
         if (noteItemForShortcut) {
-            const rawTextValue = ui.getRawTextWithNewlines(contentDiv); // Assumes ui is global
-            contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue); // Assumes ui is global
+            const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv); // Assumes ui is global
+            contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue); // Assumes ui is global
             debouncedSaveNote(noteItemForShortcut);
         }
         return true;
@@ -229,12 +228,12 @@ function handleAutocloseBrackets(e) {
 async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     if (contentDiv.classList.contains('rendered-mode')) {
         e.preventDefault();
-        ui.switchToEditMode(contentDiv); // Assumes ui is global
+        window.ui.switchToEditMode(contentDiv); // Assumes ui is global
         return;
     }
     if (e.shiftKey) {
-        const rawTextValue = ui.getRawTextWithNewlines(contentDiv); // Assumes ui is global
-        contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue); // Assumes ui is global
+        const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv); // Assumes ui is global
+        contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue); // Assumes ui is global
         debouncedSaveNote(noteItem);
         return;
     }
@@ -266,7 +265,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
                         Sortable.create(parentChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', ghostClass: 'note-ghost', chosenClass: 'note-chosen', dragClass: 'note-drag', onEnd: handleNoteDrop }); // handleNoteDrop would need to be imported or defined
                     }
                 }
-                newNoteNestingLevel = ui.getNestingLevel(parentNoteEl) + 1; // Assumes ui is global
+                newNoteNestingLevel = window.ui.getNestingLevel(parentNoteEl) + 1; // Assumes ui is global
             }
         } else {
              const rootNotes = Array.from(notesContainer.children).filter(child => child.classList.contains('note-item'));
@@ -282,9 +281,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
             if (savedNote.order_index <= sibling.order_index) { beforeElement = sibling.element; break; }
         }
         
-        const newNoteEl = ui.addNoteElement(savedNote, parentChildrenContainer, newNoteNestingLevel, beforeElement); // Assumes ui is global
+        const newNoteEl = window.ui.addNoteElement(savedNote, parentChildrenContainer, newNoteNestingLevel, beforeElement); // Assumes ui is global
         const newContentDiv = newNoteEl ? newNoteEl.querySelector('.note-content') : null;
-        if (newContentDiv) ui.switchToEditMode(newContentDiv); // Assumes ui is global
+        if (newContentDiv) window.ui.switchToEditMode(newContentDiv); // Assumes ui is global
     } catch (error) { console.error('Error creating sibling note:', error); }
 }
 
@@ -297,7 +296,7 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
     const originalNoteData = JSON.parse(JSON.stringify(noteData));
     const originalParentDomElement = noteItem.parentElement.closest('.note-item') || notesContainer;
     const originalNextSibling = noteItem.nextElementSibling;
-    const originalNestingLevel = ui.getNestingLevel(noteItem); // Assumes ui is global
+    const originalNestingLevel = window.ui.getNestingLevel(noteItem); // Assumes ui is global
 
     let newParentNoteIdToSet = null; // For API call
     let newOrderIndex = noteData.order_index;
@@ -321,9 +320,9 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
         // Update DOM
         const newParentDomElement = newParentNoteIdToSet ? getNoteElementById(newParentNoteIdToSet) : notesContainer;
         if (!newParentDomElement && newParentNoteIdToSet) { console.error("Could not find new parent in DOM for outdent"); return; }
-        const newNestingLevel = newParentNoteIdToSet ? ui.getNestingLevel(newParentDomElement) + 1 : 0;
+        const newNestingLevel = newParentNoteIdToSet ? window.ui.getNestingLevel(newParentDomElement) + 1 : 0;
         const parentNoteElement = getNoteElementById(oldParentId);
-        ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, parentNoteElement ? parentNoteElement.nextElementSibling : null); // Assumes ui is global
+        window.ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, parentNoteElement ? parentNoteElement.nextElementSibling : null); // Assumes ui is global
     } else { // Indent
         const siblings = notesForCurrentPage.filter(n => n.parent_note_id === noteData.parent_note_id && n.order_index < noteData.order_index).sort((a, b) => b.order_index - a.order_index);
         if (siblings.length === 0) return;
@@ -339,10 +338,10 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
         // Update DOM
         const newParentDomElement = getNoteElementById(newParentNoteData.id);
         if (!newParentDomElement) { console.error("Could not find new parent in DOM for indent"); return; }
-        const newNestingLevel = ui.getNestingLevel(newParentDomElement) + 1; // Assumes ui is global
-        ui.moveNoteElement(noteItem, newParentDomElement, newNestingLevel); // Assumes ui is global
+        const newNestingLevel = window.ui.getNestingLevel(newParentDomElement) + 1; // Assumes ui is global
+        window.ui.moveNoteElement(noteItem, newParentDomElement, newNestingLevel); // Assumes ui is global
     }
-    ui.switchToEditMode(contentDiv); // Assumes ui is global
+    window.ui.switchToEditMode(contentDiv); // Assumes ui is global
 
     try {
         await notesAPI.updateNote(noteData.id, { content: noteData.content, parent_note_id: newParentNoteIdToSet, order_index: newOrderIndex }); // Assumes notesAPI is global
@@ -353,9 +352,9 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
         // For simplicity in this step, full revert is omitted but would be needed in production.
         // notesForCurrentPage[notesForCurrentPage.findIndex(n => n.id === noteData.id)] = originalNoteData;
         // ui.moveNoteElement(noteItem, originalParentDomElement, originalNestingLevel, originalNextSibling);
-        setNotesForCurrentPage(JSON.parse(sessionStorage.getItem('backupNotesBeforeTab')) || notesForCurrentPage); //簡易的なバックアップ・リストア
-        ui.displayNotes(notesForCurrentPage, currentPageId); // Re-render all
-        ui.switchToEditMode(contentDiv);
+        window.ui.setNotesForCurrentPage(JSON.parse(sessionStorage.getItem('backupNotesBeforeTab')) || notesForCurrentPage); //簡易的なバックアップ・リストア
+        window.ui.displayNotes(notesForCurrentPage, currentPageId); // Re-render all
+        window.ui.switchToEditMode(contentDiv);
     }
 }
 
@@ -379,10 +378,10 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
         try {
             await notesAPI.deleteNote(noteData.id); // Assumes notesAPI is global
             removeNoteFromCurrentPageById(noteData.id);
-            ui.removeNoteElement(noteData.id); // Assumes ui is global
+            window.ui.removeNoteElement(noteData.id); // Assumes ui is global
             if (noteToFocusAfterDelete) {
                 const contentDivToFocus = noteToFocusAfterDelete.querySelector('.note-content');
-                if (contentDivToFocus) ui.switchToEditMode(contentDivToFocus); // Assumes ui is global
+                if (contentDivToFocus) window.ui.switchToEditMode(contentDivToFocus); // Assumes ui is global
             } else if (notesForCurrentPage.length === 0 && currentPageId) { console.log("All notes deleted. Page is empty."); }
         } catch (error) { console.error('Error deleting note:', error); }
     }
@@ -398,7 +397,7 @@ function handleArrowKey(e, contentDiv) {
 
     if (nextVisibleIndex !== -1) {
         const nextNoteContent = allVisibleNotesContent[nextVisibleIndex];
-        ui.switchToEditMode(nextNoteContent); // Assumes ui is global
+        window.ui.switchToEditMode(nextNoteContent); // Assumes ui is global
         const range = document.createRange();
         const sel = window.getSelection();
         range.selectNodeContents(nextNoteContent);
@@ -542,7 +541,7 @@ export async function handleTaskCheckboxClick(e) {
         if (contentDiv.classList.contains('edit-mode')) {
             contentDiv.textContent = updatedNoteServer.content;
         } else {
-            contentDiv.innerHTML = ui.parseAndRenderContent(updatedNoteServer.content);
+            contentDiv.innerHTML = window.ui.parseAndRenderContent(updatedNoteServer.content);
         }
 
         // 2. Only handle done_at property directly (status is handled by pattern processor)
@@ -587,7 +586,7 @@ export async function handleTaskCheckboxClick(e) {
         if (contentDiv.classList.contains('edit-mode')) {
             contentDiv.textContent = noteData.content;
         } else {
-            contentDiv.innerHTML = ui.parseAndRenderContent(noteData.content);
+            contentDiv.innerHTML = window.ui.parseAndRenderContent(noteData.content);
         }
     }
 }

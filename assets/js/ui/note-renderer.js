@@ -5,6 +5,7 @@
  */
 
 import { domRefs } from './dom-refs.js';
+import { handleTransclusions } from '../app/page-loader.js';
 // The path to api_client.js is ../../api_client.js if note-renderer.js is in assets/js/ui/
 // Adjust if api_client.js is elsewhere, e.g. assets/js/api_client.js
 import { attachmentsAPI, notesAPI } from '../api_client.js';
@@ -491,6 +492,9 @@ function switchToRenderedMode(contentEl) {
     } else {
         contentEl.innerHTML = '';
     }
+
+    // Call handleTransclusions here
+    handleTransclusions();
 }
 
 /**
