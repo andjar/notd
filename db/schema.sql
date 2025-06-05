@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS Pages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
     alias TEXT,
+    active INTEGER NOT NULL DEFAULT 1, -- 1 for active, 0 for inactive/historical
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS Notes (
     order_index INTEGER NOT NULL DEFAULT 0,
     collapsed INTEGER NOT NULL DEFAULT 0,
     internal INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1, -- 1 for active, 0 for inactive/historical
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (page_id) REFERENCES Pages(id) ON DELETE CASCADE,
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS Properties (
     name TEXT NOT NULL,
     value TEXT,
     internal INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1, -- 1 for active, 0 for inactive/historical
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (note_id) REFERENCES Notes(id) ON DELETE CASCADE,
@@ -56,11 +59,12 @@ CREATE TABLE IF NOT EXISTS Properties (
         (note_id IS NOT NULL AND page_id IS NULL) OR
         (note_id IS NULL AND page_id IS NOT NULL)
     ),
-    UNIQUE (note_id, name),
     UNIQUE (page_id, name)
 );
-CREATE INDEX IF NOT EXISTS idx_properties_note_id_name ON Properties(note_id, name) WHERE note_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_properties_page_id_name ON Properties(page_id, name) WHERE page_id IS NOT NULL;
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_properties_note_id_name ON Properties(note_id, name);
+CREATE INDEX IF NOT EXISTS idx_properties_page_id_name ON Properties(page_id, name);
 CREATE INDEX IF NOT EXISTS idx_properties_name_value ON Properties(name, value);
 
 -- Property Definitions Table

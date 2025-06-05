@@ -59,6 +59,8 @@ class PatternProcessor {
             return $a['options']['priority'] <=> $b['options']['priority'];
         });
         
+        error_log("[PATTERN_PROCESSOR_DEBUG] Sorted handlers: " . json_encode(array_keys($sortedHandlers)));
+        
         foreach ($sortedHandlers as $name => $handler) {
             try {
                 error_log("[PATTERN_PROCESSOR_DEBUG] Executing handler: {$name}");
@@ -73,6 +75,7 @@ class PatternProcessor {
                     if (isset($handlerResult['properties']) && $handler['options']['extract_properties']) {
                         $results['properties'] = array_merge($results['properties'], $handlerResult['properties']);
                         error_log("[PATTERN_PROCESSOR_DEBUG] Merged properties from {$name}: " . json_encode($handlerResult['properties']));
+                        error_log("[PATTERN_PROCESSOR_DEBUG] Current total properties: " . json_encode($results['properties']));
                     }
                     
                     // Update content if handler modifies it
@@ -284,10 +287,11 @@ class PatternProcessor {
     /**
      * Save processed properties to database
      * Note: This method assumes the caller has already deleted any existing properties
-     * that should be removed. It will use INSERT for new properties and UPDATE for
-     * existing ones (based on task_id for task properties).
+     * that should be removed. It will use REPLACE INTO to handle both insert and update
      */
     public function saveProperties($properties, $entityType, $entityId) {
+        error_log("[PATTERN_PROCESSOR_DEBUG] Saving properties for {$entityType} {$entityId}: " . json_encode($properties));
+        
         // Group properties by name for efficient processing
         $propertiesByName = [];
         foreach ($properties as $property) {
@@ -298,31 +302,33 @@ class PatternProcessor {
             $propertiesByName[$name][] = $property;
         }
         
+        error_log("[PATTERN_PROCESSOR_DEBUG] Grouped properties: " . json_encode($propertiesByName));
+        
         // Process each property group
         foreach ($propertiesByName as $name => $propertyGroup) {
             try {
                 // Determine internal status once per property name
-                $internal = determinePropertyInternalStatus($this->pdo, $name);
+                $internal = isset($propertyGroup[0]['internal']) ? $propertyGroup[0]['internal'] : 0;
+                error_log("[PATTERN_PROCESSOR_DEBUG] Processing property group '{$name}' with internal={$internal}");
                 
-                // For task properties, we need to handle task_id
-                $isTaskProperty = ($name === 'status' || $name === 'done_at');
+                // For status properties, we want to keep history, so use INSERT
+                // For done_at and other properties, use REPLACE to handle both insert and update
+                $isStatusProperty = ($name === 'status');
                 
-                if ($isTaskProperty) {
-                    // For task properties, use INSERT ... ON DUPLICATE KEY UPDATE
-                    $stmt = $this->pdo->prepare("
-                        INSERT INTO Properties (note_id, page_id, name, value, internal, task_id)
-                        VALUES (?, NULL, ?, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE
-                            value = VALUES(value),
-                            internal = VALUES(internal)
-                    ");
-                } else {
-                    // For regular properties, use simple INSERT
-                    $stmt = $this->pdo->prepare("
+                if ($isStatusProperty) {
+                    $sql = "
                         INSERT INTO Properties (note_id, page_id, name, value, internal)
                         VALUES (?, NULL, ?, ?, ?)
-                    ");
+                    ";
+                } else {
+                    $sql = "
+                        REPLACE INTO Properties (note_id, page_id, name, value, internal)
+                        VALUES (?, NULL, ?, ?, ?)
+                    ";
                 }
+                
+                error_log("[PATTERN_PROCESSOR_DEBUG] Using SQL: " . $sql);
+                $stmt = $this->pdo->prepare($sql);
                 
                 foreach ($propertyGroup as $property) {
                     $params = [
@@ -332,20 +338,19 @@ class PatternProcessor {
                         $internal
                     ];
                     
-                    if ($isTaskProperty && isset($property['task_id'])) {
-                        $params[] = $property['task_id'];
-                    }
-                    
+                    error_log("[PATTERN_PROCESSOR_DEBUG] Executing with params: " . json_encode($params));
                     $stmt->execute($params);
                     
                     // Dispatch triggers only once per property name
                     if ($property === reset($propertyGroup)) {
+                        error_log("[PATTERN_PROCESSOR_DEBUG] Dispatching trigger for {$name}");
                         dispatchPropertyTriggers($this->pdo, $entityType, $entityId, $name, $property['value']);
                     }
                 }
                 
             } catch (Exception $e) {
-                error_log("Error saving property group '$name' for $entityType $entityId: " . $e->getMessage());
+                error_log("[PATTERN_PROCESSOR_ERROR] Error saving property group '$name' for $entityType $entityId: " . $e->getMessage());
+                error_log("[PATTERN_PROCESSOR_ERROR] Stack trace: " . $e->getTraceAsString());
                 throw $e; // Re-throw to allow transaction rollback
             }
         }

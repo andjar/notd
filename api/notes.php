@@ -1,6 +1,9 @@
 <?php
+require_once '../config.php';
 require_once 'db_connect.php';
 require_once 'property_triggers.php';
+require_once 'pattern_processor.php';
+require_once 'property_parser.php';
 
 header('Content-Type: application/json');
 $pdo = get_db_connection();
@@ -33,94 +36,17 @@ function validateNoteData($data) {
     return true;
 }
 
-// Helper function to parse properties from note content
-function parsePropertiesFromContent($content) {
-    $properties = [];
-    // Match {property::value} patterns (existing logic)
-    if (preg_match_all('/\{([^:]+)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
-        foreach ($matches as $match) {
-            $propertyName = trim($match[1]);
-            $propertyValue = trim($match[2]);
-            if (!empty($propertyName) && !empty($propertyValue)) {
-                // Allow multiple properties with the same name (e.g. multiple tags)
-                $properties[] = [
-                    'name' => $propertyName,
-                    'value' => $propertyValue
-                ];
-            }
-        }
-    }
-
-    // Match [[PageName]] patterns for 'links_to_page'
-    $linkedPages = []; // To track unique page names for links
-    if (preg_match_all('/\[\[([^\]]+)\]\]/', $content, $linkMatches, PREG_SET_ORDER)) {
-        foreach ($linkMatches as $linkMatch) {
-            $pageName = trim($linkMatch[1]);
-            // Avoid adding empty page names or self-references like [[]]
-            if (!empty($pageName) && !in_array($pageName, $linkedPages)) {
-                $properties[] = [
-                    'name' => 'links_to_page',
-                    'value' => $pageName
-                ];
-                $linkedPages[] = $pageName; // Add to tracker
-            }
-        }
-    }
-    return $properties;
-}
-
-// Helper function to save properties for a note
-function savePropertiesForNote($pdo, $noteId, $properties) {
-    foreach ($properties as $property) {
-        try {
-            // Save the property
-            $stmt = $pdo->prepare("
-                REPLACE INTO Properties (note_id, page_id, name, value, internal)
-                VALUES (?, NULL, ?, ?, 0)
-            ");
-            $stmt->execute([$noteId, $property['name'], $property['value']]);
-            
-            // Dispatch triggers
-            dispatchPropertyTriggers($pdo, 'note', $noteId, $property['name'], $property['value']);
-        } catch (Exception $e) {
-            error_log("Error saving property {$property['name']} for note {$noteId}: " . $e->getMessage());
-        }
-    }
-}
-
-// Helper function to save page-level properties from note content
-function savePagePropertiesFromContent($pdo, $pageId, $content) {
-    // Parse page-level properties (like alias) from content
-    $pageProperties = [];
-    if (preg_match_all('/\{(alias)::([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
-        foreach ($matches as $match) {
-            $propertyName = trim($match[1]);
-            $propertyValue = trim($match[2]);
-            if (!empty($propertyName) && !empty($propertyValue)) {
-                $pageProperties[] = [
-                    'name' => $propertyName,
-                    'value' => $propertyValue
-                ];
-            }
-        }
+// Helper function to process note content and extract properties
+function processNoteContent($pdo, $content, $entityType, $entityId) {
+    $processor = getPatternProcessor();
+    $results = $processor->processContent($content, $entityType, $entityId);
+    
+    // Save the extracted properties
+    if (!empty($results['properties'])) {
+        $processor->saveProperties($results['properties'], $entityType, $entityId);
     }
     
-    // Save page properties
-    foreach ($pageProperties as $property) {
-        try {
-            // Save the property to the page
-            $stmt = $pdo->prepare("
-                REPLACE INTO Properties (page_id, note_id, name, value, internal)
-                VALUES (?, NULL, ?, ?, 0)
-            ");
-            $stmt->execute([$pageId, $property['name'], $property['value']]);
-            
-            // Dispatch triggers (this will trigger our alias handler)
-            dispatchPropertyTriggers($pdo, 'page', $pageId, $property['name'], $property['value']);
-        } catch (Exception $e) {
-            error_log("Error saving page property {$property['name']} for page {$pageId}: " . $e->getMessage());
-        }
-    }
+    return $results;
 }
 
 if ($method === 'GET') {
@@ -339,12 +265,8 @@ if ($method === 'GET') {
         
         $noteId = $pdo->lastInsertId();
         
-        // Parse and save properties from note content
-        $properties = parsePropertiesFromContent($input['content']);
-        savePropertiesForNote($pdo, $noteId, $properties);
-        
-        // Parse and save page properties from note content
-        savePagePropertiesFromContent($pdo, (int)$input['page_id'], $input['content']);
+        // Process note content and save properties
+        processNoteContent($pdo, $input['content'], 'note', $noteId);
         
         // Fetch the created note
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
@@ -416,18 +338,14 @@ if ($method === 'GET') {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($executeParams);
         
-        // If content was updated, parse and save properties
+        // If content was updated, process and save properties
         if (isset($input['content'])) {
-            // First, delete existing non-internal properties for this note
-            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND internal = 0");
+            // Delete existing properties EXCEPT status properties to preserve history
+            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND name != 'status'");
             $stmtDeleteProps->execute([$noteId]);
             
-            // Parse and save new properties from updated content
-            $properties = parsePropertiesFromContent($input['content']);
-            savePropertiesForNote($pdo, $noteId, $properties);
-            
-            // Parse and save page properties from updated content
-            savePagePropertiesFromContent($pdo, (int)$existingNote['page_id'], $input['content']);
+            // Process note content and save properties
+            processNoteContent($pdo, $input['content'], 'note', $noteId);
         }
         
         // Fetch updated note
