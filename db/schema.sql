@@ -100,9 +100,6 @@ BEGIN
     UPDATE PropertyDefinitions SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
 END;
 
--- Default Journal Page (if it doesn't exist)
-INSERT OR IGNORE INTO Pages (name) VALUES ('Journal');
-
 -- Insert default property definitions
 INSERT OR IGNORE INTO PropertyDefinitions (name, internal, description, auto_apply) VALUES
 ('internal', 1, 'Properties that control note/page visibility', 1),
