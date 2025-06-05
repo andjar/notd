@@ -113,10 +113,6 @@
     --ls-show-all-notes-btn-text-color: #ffffff;
     --ls-task-badge-todo-text-color: #ffffff;
 
-    /* Splash Screen (Example, matching Flatly) */
-    --ls-splash-bg-color: var(--ls-gray-9); /* Midnight Blue */
-    --ls-splash-orb-bg-color: rgba(52, 152, 219, 0.2); /* Transparent Peter River */
-
     /* == Splash Screen Animated Bubble Colors - Flatly Light == */
     --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 60%, 0.28); /* Flatly Blue variant */
     --ls-splash-bubble-color-2: rgba(24, 188, 156, 0.25); /* Flatly Turquoise/Success, transparent */
@@ -191,7 +187,7 @@
     
     /* Splash Screen - Dark Mode (Example) */
     --ls-splash-bg-color: var(--ls-gray-1); 
-    --ls-splash-orb-bg-color: rgba(52, 152, 219, 0.3); 
+    --ls-splash-orb-bg-color: rgba(52, 152, 219); 
 
     /* Newly Added Variables - Flatly Dark (Derived) */
     --ls-calendar-today-bg: var(--ls-accent-10);

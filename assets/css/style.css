@@ -102,12 +102,6 @@
     /* Transclusion specific variables */
     --ls-transclusion-error-bg: hsl(0 100% 97%);
 
-    /* Splash screen specific variables */
-    --ls-splash-screen-bg: rgb(50, 30, 45);
-    --ls-splash-orb-bg: rgba(40, 20, 35, 0.6);
-    --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
-    --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
-
     /* Define fallbacks for NEW variables here, to be overridden by themes */
     --ls-modal-close-danger-hover-bg: rgba(220, 38, 38, 0.1);
     --ls-button-danger-bg: #dc2626;
@@ -120,8 +114,7 @@
     --ls-task-cancelled-badge-bg: var(--ls-gray-8);
     --ls-task-cancelled-badge-text: var(--ls-primary-background-color, #ffffff);
     --ls-transclusion-error-bg: hsl(0, 100%, 97%);
-    --ls-splash-screen-bg: rgb(50, 30, 45);
-    --ls-splash-orb-bg: rgba(40, 20, 35, 0.6);
+    --ls-splash-orb-bg: var(--ls-gray-8);
     --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
     --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
     --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
@@ -2121,7 +2114,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--ls-splash-screen-bg);
+    background: radial-gradient(ellipse at center, var(--ls-gray-1) 0%, var(--ls-gray-3) 70%, var(--ls-gray-7) 100%);
     display: flex; /* Kept for existing centering, will be overridden by orb logic */
     justify-content: center; /* Kept for existing centering */
     align-items: center; /* Kept for existing centering */
