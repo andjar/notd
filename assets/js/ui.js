@@ -860,51 +860,88 @@ const templateAutocomplete = {
         }, true); // Use capture phase
 
         // Add keyboard navigation
-        document.addEventListener('keydown', this._handleKeyDown.bind(this));
+        // Storing the bound function reference for potential future removal (e.g., in a destroy method)
+        this._boundKeyDownHandler = this._handleKeyDown.bind(this);
+        document.addEventListener('keydown', this._boundKeyDownHandler, true); // true for capture phase
     },
 
     _handleKeyDown(e) {
+        // If dropdown is not active, do nothing and let event propagate.
         if (!this.dropdownEl || this.dropdownEl.style.display !== 'block' || !this.activeTarget) {
-            return;
+            return; 
         }
 
-        // Only handle keyboard events if the active target is a note content div
+        // If dropdown IS active, then we will handle specific keys.
+        // The activeTarget check ensures context.
         if (!this.activeTarget.matches('.note-content.edit-mode')) {
-            return;
+            // console.log('[Templates] _handleKeyDown: Dropdown is active, but target is not a note content div in edit mode.');
+            // This path should ideally not be hit if show() correctly sets activeTarget
+            // and hide() clears it / click-away logic is sound.
+            // If it does, letting event propagate might be okay, or we could hide().
+            return; 
         }
-
-        e.stopPropagation(); // Prevent event from bubbling up to note editor
+        
+        // console.log('[Templates] _handleKeyDown CAPTURE key:', e.key, 'SelectedIndex:', this.selectedIndex);
 
         switch (e.key) {
             case 'ArrowDown':
-                e.preventDefault();
-                if (this.selectedIndex < this.templates.length - 1) {
+                e.preventDefault(); // Must be first
+                e.stopPropagation(); // Then stop others
+                // console.log('[Templates] ArrowDown CAPTURE. Current selectedIndex:', this.selectedIndex, 'Templates length:', this.templates ? this.templates.length : 'undefined');
+                if (this.templates && this.templates.length > 0 && this.selectedIndex < this.templates.length - 1) {
                     const items = this.dropdownEl.querySelectorAll('li');
-                    items[this.selectedIndex]?.classList.remove('selected');
+                    if (this.selectedIndex > -1 && items[this.selectedIndex]) {
+                        items[this.selectedIndex].classList.remove('selected');
+                    }
                     this.selectedIndex++;
-                    items[this.selectedIndex]?.classList.add('selected');
+                    if (items[this.selectedIndex]) {
+                        items[this.selectedIndex].classList.add('selected');
+                        // console.log('[Templates] ArrowDown CAPTURE: New selectedIndex:', this.selectedIndex, 'Item:', items[this.selectedIndex].textContent);
+                    }
                 }
                 break;
             case 'ArrowUp':
-                e.preventDefault();
-                if (this.selectedIndex > 0) {
+                e.preventDefault(); // Must be first
+                e.stopPropagation(); // Then stop others
+                // console.log('[Templates] ArrowUp CAPTURE. Current selectedIndex:', this.selectedIndex);
+                if (this.templates && this.templates.length > 0 && this.selectedIndex > 0) {
                     const items = this.dropdownEl.querySelectorAll('li');
-                    items[this.selectedIndex]?.classList.remove('selected');
+                    if (items[this.selectedIndex]) { // current item
+                        items[this.selectedIndex].classList.remove('selected');
+                    }
                     this.selectedIndex--;
-                    items[this.selectedIndex]?.classList.add('selected');
+                    if (items[this.selectedIndex]) { // new current item
+                        items[this.selectedIndex].classList.add('selected');
+                        // console.log('[Templates] ArrowUp CAPTURE: New selectedIndex:', this.selectedIndex, 'Item:', items[this.selectedIndex].textContent);
+                    }
                 }
                 break;
             case 'Enter':
-                e.preventDefault();
-                if (this.selectedIndex !== -1) {
+                e.preventDefault(); // Must be first
+                e.stopPropagation(); // Then stop others
+                // console.log('[Templates] Enter CAPTURE. SelectedIndex:', this.selectedIndex);
+                if (this.selectedIndex !== -1 && this.templates && this.templates[this.selectedIndex]) {
                     const templateName = this.templates[this.selectedIndex].name;
+                    // console.log('[Templates] Enter CAPTURE: Attempting to insert template:', templateName);
                     this._insertTemplate(this.activeTarget, templateName);
+                } else {
+                    // console.log('[Templates] Enter CAPTURE: no item selected or templates array issue.');
+                    this.hide(); // Hide if no selection or issue with templates
                 }
                 break;
             case 'Escape':
-                e.preventDefault();
+                e.preventDefault(); // Must be first
+                e.stopPropagation(); // Then stop others
+                // console.log('[Templates] Escape CAPTURE. Hiding dropdown.');
                 this.hide();
                 break;
+            default:
+                // If the dropdown is active but we don't handle the key (e.g., typing a letter),
+                // we let the event propagate by doing nothing here. This allows typing into the
+                // note content, which might be desired for filtering later or if the user decides
+                // not to use a template. The problem of the dropdown disappearing on typing
+                // will be handled by other logic (e.g., in handleNoteInput or by filtering).
+                break; 
         }
     },
 
@@ -926,21 +963,43 @@ const templateAutocomplete = {
             const lastSlashIndex = text.lastIndexOf('/', cursorPosition);
             if (lastSlashIndex === -1) return;
 
-            // Create new text with template inserted
+            // Find the template object
+            const template = this.templates.find(t => t.name === templateName);
+            if (!template) {
+                console.error(`[Templates] Template "${templateName}" not found.`);
+                this.hide(); // Still hide the dropdown
+                return;
+            }
+
+            const templateContent = template.content || '';
+
+            // Create new text with template content inserted
             const beforeSlash = text.substring(0, lastSlashIndex);
             const afterCursor = text.substring(cursorPosition);
-            const newText = beforeSlash + `[[Template: ${templateName}]]` + afterCursor;
+            const newText = beforeSlash + templateContent + afterCursor;
 
             // Update the content
             contentDiv.textContent = newText;
 
             // Set cursor position after the inserted template
-            const newCursorPosition = beforeSlash.length + `[[Template: ${templateName}]]`.length;
+            const newCursorPosition = beforeSlash.length + templateContent.length;
             const newRange = document.createRange();
-            newRange.setStart(contentDiv.firstChild || contentDiv, newCursorPosition);
-            newRange.setEnd(contentDiv.firstChild || contentDiv, newCursorPosition);
+
+            // Ensure contentDiv has a text node if it's empty, otherwise setStart might fail
+            if (contentDiv.childNodes.length === 0) {
+                contentDiv.appendChild(document.createTextNode(''));
+            }
+            // Try to set range on firstChild, fallback to contentDiv itself if no child or firstChild is not a text node
+            const nodeToSetCursorIn = (contentDiv.firstChild && contentDiv.firstChild.nodeType === Node.TEXT_NODE) ? contentDiv.firstChild : contentDiv;
+            const maxOffset = nodeToSetCursorIn.nodeType === Node.TEXT_NODE ? nodeToSetCursorIn.textContent.length : nodeToSetCursorIn.childNodes.length;
+            
+            newRange.setStart(nodeToSetCursorIn, Math.min(newCursorPosition, maxOffset));
+            newRange.setEnd(nodeToSetCursorIn, Math.min(newCursorPosition, maxOffset));
             selection.removeAllRanges();
             selection.addRange(newRange);
+
+            // Update dataset for save mechanism
+            contentDiv.dataset.rawContent = contentDiv.textContent;
 
             // Trigger input event to ensure note content is saved
             contentDiv.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1059,26 +1118,106 @@ const templateAutocomplete = {
 function getCursorCharacterOffsetWithin(element) { /* ... */ return 0; } // Stubbed
 
 function handleNoteInput(e) {
-    if (e.target && e.target.matches && e.target.matches('.note-content.edit-mode')) {
-        const contentDiv = e.target;
-        const text = contentDiv.textContent || '';
-        
-        // Check if template dropdown is visible
-        const isDropdownVisible = templateAutocomplete.dropdownEl && 
-                                templateAutocomplete.dropdownEl.style.display === 'block';
-        
-        // If dropdown is visible and we're not clicking inside it, hide it
-        if (isDropdownVisible && !templateAutocomplete.dropdownEl.contains(e.target)) {
-            templateAutocomplete.hide();
+    if (!e.target || !e.target.matches || !e.target.matches('.note-content.edit-mode')) {
+        // console.log('[Templates] handleNoteInput: Event target is not a note content div in edit mode.');
+        return;
+    }
+    const contentDiv = e.target;
+    const text = contentDiv.textContent || '';
+    
+    // Determine cursor position carefully
+    let cursorPosition = 0;
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        // Ensure the cursor is within the contentDiv.
+        // If range.startContainer is contentDiv itself, startOffset is char offset or child index.
+        // If range.startContainer is a text node inside contentDiv, startOffset is char offset within text node.
+        // For simplicity, assuming cursor is directly in contentDiv or its direct text node.
+        // A more robust way might involve traversing from range.startContainer up to contentDiv.
+        if (contentDiv.contains(range.startContainer)) {
+             cursorPosition = range.startOffset;
+             // If startContainer is not contentDiv itself but a child (e.g. text node)
+             // we might need to sum offsets of previous siblings if contentDiv has mixed content.
+             // However, note-content is usually a single text block or gets replaced.
+             // For this specific case, this should be mostly fine.
+        } else {
+            // Cursor is not within the contentDiv that received the input event. Strange.
+            // console.log('[Templates] handleNoteInput: Cursor not in the target contentDiv.');
             return;
         }
-
-        // Check for template trigger
-        if (text.endsWith('/')) {
-            console.log('[Templates] Trigger character "/" detected in note input:', text);
-            templateAutocomplete.show(contentDiv);
-        }
+    } else {
+        // console.log('[Templates] handleNoteInput: No selection or range.');
+        // If no selection, we might not be able to determine where to show dropdown.
+        // However, an input event usually implies there's a cursor/selection.
+        return; 
     }
+
+    const isDropdownVisible = templateAutocomplete.dropdownEl && 
+                            templateAutocomplete.dropdownEl.style.display === 'block';
+
+    let shouldShowDropdown = false;
+    let shouldHideDropdown = false;
+    // let potentialFilterText = ""; // For future filtering logic
+
+    // Analyze text around cursor to decide whether to show/hide/keep open
+    if (cursorPosition > 0) {
+        const textBeforeCursor = text.substring(0, cursorPosition);
+        const lastCharIndexInTextBeforeCursor = textBeforeCursor.length - 1;
+        
+        if (lastCharIndexInTextBeforeCursor >= 0 && textBeforeCursor[lastCharIndexInTextBeforeCursor] === '/') {
+            // If the character right before cursor is '/', show.
+            shouldShowDropdown = true;
+        } else {
+            // If not '/', check if we are in "template typing mode"
+            // This means: dropdown is already visible, and the text from the last '/' 
+            // to the cursor is a valid non-empty sequence without spaces/newlines.
+            if (isDropdownVisible) {
+                const lastSlashGlobalIndex = textBeforeCursor.lastIndexOf('/');
+                if (lastSlashGlobalIndex !== -1) {
+                    const textAfterSlash = textBeforeCursor.substring(lastSlashGlobalIndex + 1);
+                    // If textAfterSlash is empty, it means cursor is right after / - handled by previous 'if'
+                    // If textAfterSlash is not empty, check if it's a valid filter prefix
+                    if (textAfterSlash.length > 0 && !textAfterSlash.includes(' ') && !textAfterSlash.includes('\n')) {
+                        // Likely typing a template name. Keep dropdown open.
+                        shouldShowDropdown = true; // Effectively "keep open"
+                        // potentialFilterText = textAfterSlash;
+                    } else {
+                        // Invalid char after slash (space, newline) or slash was deleted. Hide.
+                        shouldHideDropdown = true;
+                    }
+                } else {
+                    // No '/' found before cursor while dropdown is visible. Hide.
+                    shouldHideDropdown = true;
+                }
+            }
+            // If dropdown is not visible and char before cursor is not '/', do nothing.
+        }
+    } else if (isDropdownVisible) { 
+        // Cursor is at the beginning of the text (cursorPosition === 0), but dropdown is visible.
+        // This implies the trigger '/' was deleted.
+        shouldHideDropdown = true;
+    }
+    // If text is empty, and dropdown is visible, hide it.
+    if (text.length === 0 && isDropdownVisible) {
+        shouldHideDropdown = true;
+    }
+
+
+    if (shouldShowDropdown) {
+        // If it should be shown (or kept open)
+        if (!isDropdownVisible) {
+            // console.log('[Templates] handleNoteInput: Showing dropdown.');
+            templateAutocomplete.show(contentDiv); 
+        }
+        // If it's already visible, do nothing here, just don't hide it.
+        // Later, filtering logic would go here:
+        // templateAutocomplete.filter(potentialFilterText);
+    } else if (shouldHideDropdown && isDropdownVisible) {
+        // console.log('[Templates] handleNoteInput: Hiding dropdown.');
+        templateAutocomplete.hide();
+    }
+    // Otherwise, do nothing (e.g. dropdown not visible, no trigger).
 }
 
 // Add global click handler for template dropdown
