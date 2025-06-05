@@ -314,6 +314,7 @@ class PatternProcessor {
                 // For status properties, we want to keep history, so use INSERT
                 // For done_at and other properties, use REPLACE to handle both insert and update
                 $isStatusProperty = ($name === 'status');
+                $isDoneAtProperty = ($name === 'done_at');
                 
                 if ($isStatusProperty) {
                     $sql = "
@@ -321,8 +322,17 @@ class PatternProcessor {
                         VALUES (?, NULL, ?, ?, ?)
                     ";
                 } else {
+                    // For done_at and other properties, use REPLACE to ensure only one value exists
+                    if ($isDoneAtProperty) {
+                        // First delete any existing done_at properties
+                        $deleteSql = "DELETE FROM Properties WHERE note_id = ? AND name = 'done_at'";
+                        $deleteStmt = $this->pdo->prepare($deleteSql);
+                        $deleteStmt->execute([$entityId]);
+                        error_log("[PATTERN_PROCESSOR_DEBUG] Deleted existing done_at for note {$entityId}");
+                    }
+                    
                     $sql = "
-                        REPLACE INTO Properties (note_id, page_id, name, value, internal)
+                        INSERT INTO Properties (note_id, page_id, name, value, internal)
                         VALUES (?, NULL, ?, ?, ?)
                     ";
                 }

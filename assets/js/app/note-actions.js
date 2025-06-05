@@ -530,8 +530,10 @@ export async function handleTaskCheckboxClick(e) {
     }
 
     try {
-        // 1. Update note content
+        // 1. Update note content - this will trigger pattern processor to set status
+        console.log('[TASK_DEBUG] Updating note content:', { noteId, newRawContent });
         const updatedNoteServer = await notesAPI.updateNote(noteId, { content: newRawContent });
+        console.log('[TASK_DEBUG] Note content updated:', updatedNoteServer);
         noteData.content = updatedNoteServer.content;
         noteData.updated_at = updatedNoteServer.updated_at;
         contentDiv.dataset.rawContent = updatedNoteServer.content;
@@ -543,24 +545,21 @@ export async function handleTaskCheckboxClick(e) {
             contentDiv.innerHTML = ui.parseAndRenderContent(updatedNoteServer.content);
         }
 
-        // 2. Update properties ('status' and 'done_at')
-        await propertiesAPI.setProperty({ 
-            entity_type: 'note', 
-            entity_id: parseInt(noteId), 
-            name: 'status', 
-            value: newStatus 
-        });
-
+        // 2. Only handle done_at property directly (status is handled by pattern processor)
         if (doneAt) {
+            console.log('[TASK_DEBUG] Setting done_at property:', { noteId, doneAt });
             await propertiesAPI.setProperty({ 
                 entity_type: 'note', 
                 entity_id: parseInt(noteId), 
                 name: 'done_at', 
                 value: doneAt 
             });
+            console.log('[TASK_DEBUG] done_at property set');
         } else {
             try {
+                console.log('[TASK_DEBUG] Deleting done_at property for note:', noteId);
                 await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at');
+                console.log('[TASK_DEBUG] done_at property deleted');
             } catch (delError) {
                 console.warn('Could not delete done_at:', delError);
             }

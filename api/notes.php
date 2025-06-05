@@ -340,12 +340,17 @@ if ($method === 'GET') {
         
         // If content was updated, process and save properties
         if (isset($input['content'])) {
+            error_log("[NOTES_API_DEBUG] Processing note content for note {$noteId}");
+            error_log("[NOTES_API_DEBUG] Content: " . $input['content']);
+            
             // Delete existing properties EXCEPT status properties to preserve history
             $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND name != 'status'");
             $stmtDeleteProps->execute([$noteId]);
+            error_log("[NOTES_API_DEBUG] Deleted existing non-status properties");
             
             // Process note content and save properties
-            processNoteContent($pdo, $input['content'], 'note', $noteId);
+            $results = processNoteContent($pdo, $input['content'], 'note', $noteId);
+            error_log("[NOTES_API_DEBUG] Pattern processor results: " . json_encode($results));
         }
         
         // Fetch updated note
