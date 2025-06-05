@@ -14,6 +14,7 @@
     
     /* Typography */
     --ls-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --ls-header-font-family: 'Ubuntu', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --ls-font-size-xs: 0.75rem;
     --ls-font-size-sm: 0.875rem;
     --ls-font-size-base: 1rem;
@@ -237,6 +238,7 @@ body {
 }
 
 .app-title-main {
+    font-family: var(--ls-header-font-family);
     font-size: var(--ls-page-title-size);
     font-weight: var(--ls-font-weight-bold);
     color: var(--ls-primary-text-color);
@@ -245,8 +247,9 @@ body {
 }
 
 .app-title {
+    font-family: var(--ls-header-font-family);
     font-size: var(--ls-font-size-2xl);
-    font-weight: var(--ls-font-weight-bold);
+    font-weight: var(--ls-font-weight-medium);
     color: var(--ls-primary-text-color);
     text-decoration: none;
     display: block;
@@ -996,6 +999,7 @@ textarea:focus {
 }
 
 #current-page-title {
+    font-family: var(--ls-header-font-family);
     font-size: var(--ls-page-title-size);
     font-weight: var(--ls-font-weight-semibold);
     color: var(--ls-primary-text-color);
@@ -1032,8 +1036,9 @@ textarea:focus {
 }
 
 .generic-modal-title { /* Was .page-properties-modal-title */
+    font-family: var(--ls-header-font-family);
     font-size: var(--ls-font-size-xl);
-    font-weight: var(--ls-font-weight-semibold);
+    font-weight: var(--ls-font-weight-medium);
     color: var(--ls-primary-text-color);
 }
 
@@ -2190,8 +2195,9 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 
 #splash-orb-text {
     color: var(--ls-splash-orb-text-color);
-    font-family: var(--ls-font-family, sans-serif);
-    font-size: 1.1em;
+    font-family: var(--ls-header-font-family);
+    font-size: 1.5em;
+    font-weight: 400;
     text-align: center;
     line-height: 1.3;
 }
@@ -2359,8 +2365,9 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 .backlinks-section h4 {
+    font-family: var(--ls-header-font-family);
     font-size: var(--ls-font-size-lg);
-    font-weight: var(--ls-font-weight-semibold);
+    font-weight: var(--ls-font-weight-medium);
     color: var(--ls-primary-text-color);
     margin-bottom: var(--ls-space-4);
     display: flex;
@@ -2535,8 +2542,10 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 .template-menu-header h3 {
+    font-family: var(--ls-header-font-family);
     margin: 0;
     font-size: 1.1em;
+    font-weight: var(--ls-font-weight-medium);
     color: var(--text-color);
 }
 
@@ -2737,7 +2746,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 .date {
     font-size: 18px;
     font-weight: 400;
-    color: var(--ls-gray-6);
+    color: var(--ls-gray-7);
     margin-top: 5px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
