@@ -2,7 +2,8 @@
 import { loadPage } from './page-loader.js';
 import { safeAddEventListener } from '../utils.js';
 // Assuming 'ui' is global and provides ui.domRefs. If not, it would need to be imported.
-// import ui from '../ui.js'; 
+    // import { ui } from '../ui.js'; // If ui is a module, it needs to be imported like this.
+                                  // Given the existing code uses `ui.domRefs`, it's assumed to be available.
 
 export function initGlobalEventListeners() {
     // Handle browser back/forward navigation
@@ -81,5 +82,22 @@ export function initGlobalEventListeners() {
         safeAddEventListener(splashScreen, 'click', () => { 
             if(isSplashActive) hideSplashScreen(); 
         }, 'splashScreen');
+    }
+
+    // Delegated event listener for page links
+    if (ui.domRefs.notesContainer) {
+        safeAddEventListener(ui.domRefs.notesContainer, 'click', (e) => {
+            const pageLink = e.target.closest('a.page-link');
+            if (pageLink && pageLink.dataset.pageName) {
+                e.preventDefault();
+                const pageName = pageLink.dataset.pageName;
+                // console.log(`Page link clicked for: ${pageName}`); // For debugging
+                loadPage(pageName, false); // focusFirstNote = false, consistent with popstate
+            }
+        }, 'notesContainerPageLinkClick');
+    } else {
+        console.warn('[event-handlers] Could not find ui.domRefs.notesContainer to attach page-link click listener. Page links in notes might not work.');
+        // As a less ideal fallback, could listen on document.body, but it's better if notesContainer is found.
+        // safeAddEventListener(document.body, 'click', (e) => { ... check for e.target.closest('.note-content a.page-link') ... });
     }
 }

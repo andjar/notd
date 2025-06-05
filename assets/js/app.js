@@ -136,10 +136,12 @@ Object.entries(criticalElements).forEach(([name, element]) => {
 async function fetchAndDisplayPages(activePageName) {
     try {
         const pages = await pagesAPI.getPages();
-        updatePageList(pages, activePageName || currentPageName);
+        window.ui.updatePageList(pages, activePageName || currentPageName);
     } catch (error) {
         console.error('Error fetching pages:', error);
-        pageListContainer.innerHTML = '<li>Error loading pages.</li>';
+        if (window.ui.domRefs.pageListContainer) {
+            window.ui.domRefs.pageListContainer.innerHTML = '<li>Error loading pages.</li>';
+        }
     }
 }
 

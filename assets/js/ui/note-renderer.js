@@ -9,6 +9,15 @@ import { handleTransclusions } from '../app/page-loader.js';
 // The path to api_client.js is ../../api_client.js if note-renderer.js is in assets/js/ui/
 // Adjust if api_client.js is elsewhere, e.g. assets/js/api_client.js
 import { attachmentsAPI, notesAPI } from '../api_client.js';
+import {
+    showSuggestions,
+    hideSuggestions,
+    navigateSuggestions,
+    getSelectedSuggestion,
+    // We might need to set allPagesForSuggestions if it's not handled globally
+    // For now, assuming it's populated elsewhere or will be handled in a future step.
+    // setAllPagesForSuggestions
+} from './page-link-suggestions.js';
 
 
 // Anticipatory imports - these files/exports might not exist yet.
@@ -17,6 +26,95 @@ import { attachmentsAPI, notesAPI } from '../api_client.js';
 // import { showGenericConfirmModal } from './modals.js'; // Potentially for error handling if needed directly by render functions.
 
 // Globals assumed to be available: feather, Sortable, marked, window.notesForCurrentPage, window.currentPageId, displayNotes (potentially from main ui object for callbacks)
+
+// Helper function to get link query info
+/**
+ * Checks if the cursor is inside a [[link query]] and returns information.
+ * @param {HTMLElement} contentEl The content editable element.
+ * @returns {{ query: string, triggerPosition: { top: number, left: number}, replaceStartOffset: number, replaceEndOffset: number } | null}
+ */
+function getLinkQueryInfo(contentEl) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return null;
+
+    const range = selection.getRangeAt(0);
+    const fullText = contentEl.textContent;
+    const cursorPosGlobal = range.startOffset; // Cursor position relative to contentEl.firstChild (if text node) or contentEl
+
+    // Try to get cursor position relative to the start of contentEl's text content.
+    // This is simplified; robust cursor offset calculation in contentEditable is complex.
+    // We assume that selection.anchorOffset gives a usable global offset within contentEl's text.
+    // For more complex structures inside contentEl, this might need adjustment.
+    const globalCursorPos = selection.anchorOffset;
+
+    // Search backwards from cursor for "[["
+    const textBeforeGlobalCursor = fullText.substring(0, globalCursorPos);
+    let openBracketIndex = textBeforeGlobalCursor.lastIndexOf('[[');
+
+    if (openBracketIndex === -1) return null;
+
+    // Check if there's a complete link (with ]]) between the [[ and cursor
+    const textBetweenOpenBracketAndCursor = fullText.substring(openBracketIndex + 2, globalCursorPos);
+    if (textBetweenOpenBracketAndCursor.includes(']]')) {
+         // This '[[' is part of a completed link that is before the cursor.
+        return null;
+    }
+
+    const query = textBetweenOpenBracketAndCursor;
+    const textAfterGlobalCursor = fullText.substring(globalCursorPos);
+
+    let rect;
+    const clientRects = range.getClientRects();
+    if (clientRects.length > 0) {
+        rect = clientRects[0];
+    } else {
+        // Fallback for empty content or specific situations
+        const tempSpan = document.createElement('span');
+        tempSpan.appendChild(document.createTextNode('\u200B')); // Zero-width space
+        range.insertNode(tempSpan); // Insert at current cursor position
+        rect = tempSpan.getBoundingClientRect();
+        tempSpan.remove(); // Clean up
+    }
+    if (!rect) return null; // Cannot determine position
+
+    const position = { 
+        top: rect.bottom + window.scrollY, 
+        left: rect.left + window.scrollX 
+    };
+
+    // Look for the closing ]] after the cursor - this indicates auto-close
+    const closingBracketIndex = fullText.indexOf(']]', globalCursorPos);
+    
+    if (closingBracketIndex !== -1 && closingBracketIndex === globalCursorPos) {
+        // Cursor is right before the ]]
+        return {
+            query: query,
+            triggerPosition: position,
+            replaceStartOffset: openBracketIndex,      // global offset of '[['
+            replaceEndOffset: closingBracketIndex + 2, // global offset after ']]'
+            hasAutoClose: true
+        };
+    } else if (closingBracketIndex !== -1 && closingBracketIndex < globalCursorPos + 10) {
+        // Cursor is near the ]] (within 10 characters) - likely auto-closed
+        return {
+            query: query,
+            triggerPosition: position,
+            replaceStartOffset: openBracketIndex,      // global offset of '[['
+            replaceEndOffset: closingBracketIndex + 2, // global offset after ']]'
+            hasAutoClose: true
+        };
+    } else {
+        // No closing ]] found nearby - not auto-closed
+        return {
+            query: query,
+            triggerPosition: position,
+            replaceStartOffset: openBracketIndex,      // global offset of '[[' 
+            replaceEndOffset: globalCursorPos,         // global offset of cursor
+            hasAutoClose: false
+        };
+    }
+}
+
 
 /**
  * Renders a single note element with proper structure and event handling
@@ -349,7 +447,17 @@ function switchToEditMode(contentEl) {
 
     const rawContent = contentEl.dataset.rawContent || '';
     const noteId = contentEl.dataset.noteId;
-    
+
+    // --- Suggestion UI integration ---
+    let suggestionBoxVisible = false; // To track visibility for keydown listener
+
+    // Ensure page-link-suggestions UI is initialized (idempotent)
+    // This should ideally be called once when the app loads, but calling here ensures it.
+    // If initSuggestionUI is not exported from page-link-suggestions.js, this call needs to be removed
+    // or page-link-suggestions.js needs to export it and be modified to be idempotent.
+    // For now, assuming initSuggestionUI is called elsewhere (e.g. main app setup)
+    // and the elements are ready.
+
     contentEl.classList.remove('rendered-mode');
     contentEl.classList.add('edit-mode');
     contentEl.contentEditable = true;
@@ -359,11 +467,106 @@ function switchToEditMode(contentEl) {
     contentEl.focus();
 
     const handleBlur = () => {
+        // Delay hiding suggestions to allow click on suggestion item
+        setTimeout(() => {
+            if (!suggestionBoxVisible) { // Check if a suggestion click is processing
+                 hideSuggestions();
+            }
+        }, 150); // Small delay to catch clicks on suggestions
         switchToRenderedMode(contentEl);
         contentEl.removeEventListener('blur', handleBlur);
-        contentEl.removeEventListener('paste', handlePasteImage); 
+        contentEl.removeEventListener('paste', handlePasteImage);
+        contentEl.removeEventListener('input', handleInputForSuggestions);
+        contentEl.removeEventListener('keydown', handleKeydownForSuggestions);
     };
     contentEl.addEventListener('blur', handleBlur);
+
+    const handleInputForSuggestions = () => {
+        const queryInfo = getLinkQueryInfo(contentEl);
+        if (queryInfo) {
+            // console.log('Query for suggestions:', queryInfo.query, queryInfo.triggerPosition);
+            showSuggestions(queryInfo.query, queryInfo.triggerPosition);
+            suggestionBoxVisible = true;
+        } else {
+            hideSuggestions();
+            suggestionBoxVisible = false;
+        }
+    };
+    contentEl.addEventListener('input', handleInputForSuggestions);
+
+    const handleKeydownForSuggestions = (event) => {
+        if (!suggestionBoxVisible) return;
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            navigateSuggestions(event.key);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            const selectedPageName = getSelectedSuggestion();
+            if (selectedPageName) {
+                const currentText = contentEl.textContent;
+                const queryInfo = getLinkQueryInfo(contentEl); 
+
+                if (queryInfo) {
+                    // Get text before and after the link to be replaced
+                    const textBeforeLink = currentText.substring(0, queryInfo.replaceStartOffset);
+                    const textAfterLink = currentText.substring(queryInfo.replaceEndOffset);
+                    
+                    const newText = `${textBeforeLink}[[${selectedPageName}]]${textAfterLink}`;
+                    contentEl.textContent = newText;
+                    contentEl.dataset.rawContent = newText; 
+
+                    // Set cursor position after the inserted link "[[selectedPageName]]"
+                    const newCursorPosition = (textBeforeLink + `[[${selectedPageName}]]`).length;
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    
+                    let targetNodeForCursor = contentEl.firstChild;
+                    if (!targetNodeForCursor || targetNodeForCursor.nodeType !== Node.TEXT_NODE) {
+                        if (!contentEl.firstChild) contentEl.appendChild(document.createTextNode(''));
+                        targetNodeForCursor = contentEl.firstChild; 
+                    }
+                    
+                    // Ensure newCursorPosition is not out of bounds for the targetNode
+                    const charLengthOfTargetNode = targetNodeForCursor.textContent ? targetNodeForCursor.textContent.length : 0;
+                    const finalCursorPos = Math.min(newCursorPosition, charLengthOfTargetNode);
+
+                    range.setStart(targetNodeForCursor, finalCursorPos);
+                    range.setEnd(targetNodeForCursor, finalCursorPos);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    
+                    hideSuggestions();
+                    suggestionBoxVisible = false;
+
+                    // Trigger an 'input' event
+                    const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+                    contentEl.dispatchEvent(inputEvent);
+                } else {
+                     // If queryInfo is null (e.g. cursor moved out of link context)
+                    hideSuggestions();
+                    suggestionBoxVisible = false;
+                }
+            } else { 
+                // No suggestion selected, default 'Enter' behavior might be to insert newline
+                // or just hide suggestions if that's preferred over default.
+                hideSuggestions();
+                suggestionBoxVisible = false;
+                // Allow default Enter behavior if no suggestion selected (might insert newline)
+                // To prevent newline, ensure event.preventDefault() was called earlier unconditionally for Enter
+                // For now, it's prevented, so this path just hides suggestions.
+            }
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            hideSuggestions();
+            suggestionBoxVisible = false;
+        } else if (event.key === 'Tab' && suggestionBoxVisible) { // Added Tab to hide suggestions
+            event.preventDefault(); // Prevent focus change
+            hideSuggestions();
+            suggestionBoxVisible = false;
+        }
+    };
+    contentEl.addEventListener('keydown', handleKeydownForSuggestions);
 
     const handlePasteImage = async (event) => {
         if (String(noteId).startsWith('temp-')) {
@@ -482,7 +685,11 @@ function switchToRenderedMode(contentEl) {
     contentEl.classList.remove('edit-mode');
     contentEl.classList.add('rendered-mode');
     contentEl.contentEditable = false;
-    contentEl.style.whiteSpace = ''; 
+    contentEl.style.whiteSpace = '';
+
+    // Ensure suggestions are hidden when switching to rendered mode
+    hideSuggestions();
+    // suggestionBoxVisible = false; // This variable is local to switchToEditMode
 
     if (newContent.trim()) {
         const tempDiv = document.createElement('div');
@@ -495,6 +702,9 @@ function switchToRenderedMode(contentEl) {
 
     // Call handleTransclusions here
     handleTransclusions();
+    // Ensure suggestion box is hidden if it was somehow left open
+    // This is a fallback, should be handled by blur or selection.
+    hideSuggestions();
 }
 
 /**

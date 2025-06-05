@@ -1150,18 +1150,17 @@ textarea:focus {
     padding: var(--ls-space-1);
     border-radius: var(--ls-border-radius-low);
     transition: all var(--ls-transition-fast);
+    opacity: 0;
+}
+
+.page-title-container:hover .page-title-gear {
+    opacity: 1;
 }
 
 .page-title-gear:hover {
     color: var(--ls-primary-text-color);
     background: var(--ls-secondary-background-color);
 }
-
-/* Page properties modal - Remove most of these as it now uses .generic-modal */
-/* .page-properties-modal { ... } */
-/* .page-properties-modal.active { ... } */
-/* .page-properties-modal-content { ... } */
-/* .page-properties-modal.active .page-properties-modal-content { ... } */
 
 /* Keep header and title styling if generic-modal doesn't cover it sufficiently or for specific adjustments */
 .generic-modal-header { /* Was .page-properties-modal-header */
@@ -2938,4 +2937,41 @@ a[href^="https://"]:visited {
 [data-theme="dark"] a[href^="http://"]:visited,
 [data-theme="dark"] a[href^="https://"]:visited {
     color: var(--ls-accent-9);
+}
+
+
+/* Page Link Suggestion Box Styles */
+#page-link-suggestion-box {
+    display: none; /* Initially hidden */
+    position: absolute; /* For positioning near the cursor */
+    background-color: var(--color-background-secondary, var(--ls-secondary-background-color, #fff)); /* Fallback to LS var then to #fff */
+    border: 1px solid var(--color-border, var(--ls-border-color, #ccc)); /* Fallback to LS var then to #ccc */
+    border-radius: 4px; /* Or var(--ls-border-radius-low) */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Or var(--ls-shadow-sm) */
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: var(--ls-z-index-dropdown, 1000); /* Use LS z-index var */
+    min-width: 200px;
+}
+
+#page-link-suggestion-box ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+#page-link-suggestion-box li {
+    padding: 8px 12px; /* Or var(--ls-space-2) var(--ls-space-3) */
+    cursor: pointer;
+    font-size: 0.9em; /* Or var(--ls-font-size-sm) */
+    color: var(--ls-primary-text-color); /* Use LS text color */
+}
+
+#page-link-suggestion-box li:hover {
+    background-color: var(--color-background-hover, var(--ls-tertiary-background-color, #f0f0f0)); /* Fallback to LS var */
+}
+
+#page-link-suggestion-box li.selected {
+    background-color: var(--color-primary, var(--ls-accent-10, #007bff)); /* Fallback to LS var */
+    color: var(--color-background-primary, var(--ls-active-nav-item-text-color, #fff)); /* Fallback to LS var */
 }

@@ -217,11 +217,57 @@ async function handleShortcutExpansion(e, contentDiv) {
     return false;
 }
 
-function handleAutocloseBrackets(e) {
+function handleAutocloseBrackets(e) { // e.target is the contentEditable div
     let handled = false;
-    if (e.key === '[') { e.preventDefault(); insertTextAtCursor('[]', 1); handled = true; }
-    else if (e.key === '{') { e.preventDefault(); insertTextAtCursor('{}', 1); handled = true; }
-    else if (e.key === '(') { e.preventDefault(); insertTextAtCursor('()', 1); handled = true; }
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return false;
+    const range = selection.getRangeAt(0);
+    const editor = e.target; // This is the contentEditable div
+
+    if (e.key === '[') {
+        e.preventDefault();
+        // Get text immediately before the current cursor position within the editor
+        const textNode = range.startContainer;
+        let textBeforeCursor = "";
+        if (textNode.nodeType === Node.TEXT_NODE) {
+            textBeforeCursor = textNode.textContent.substring(0, range.startOffset);
+        } else { 
+            // Fallback or more complex logic might be needed if cursor is not in a simple text node
+            // For now, using editor.textContent and range.startOffset as a general approach
+            // This might be less accurate if the DOM inside contentEditable is complex.
+            // However, for typical text entry, range.startContainer is often the text node.
+            textBeforeCursor = editor.textContent.substring(0, range.startOffset);
+        }
+        
+        if (textBeforeCursor.endsWith('[')) {
+            // User typed '[' when the char before was already '['.
+            // Initial state (e.g.): X[|Y (cursor is |)
+            // After this `insertTextAtCursor` call, we want X[[|]]Y
+            // `insertTextAtCursor('[]', 1)` will insert '[]' at the cursor position,
+            // and place the cursor at offset 1 within the newly inserted '[]'.
+            // So, X[|Y becomes X[[]|]]Y. This is the correct behavior.
+            insertTextAtCursor('[]', 1);
+        } else {
+            // Standard case: insert '[]', cursor in middle.
+            // e.g. X|Y becomes X[|]Y
+            insertTextAtCursor('[]', 1);
+        }
+        handled = true;
+    } else if (e.key === '{') {
+        e.preventDefault();
+        insertTextAtCursor('{}', 1);
+        handled = true;
+    } else if (e.key === '(') {
+        e.preventDefault();
+        insertTextAtCursor('()', 1);
+        handled = true;
+    }
+
+    // After modification, dispatch an input event so note-renderer's listeners are triggered
+    if (handled) {
+        // Ensure the event is dispatched on the correct element that has the 'input' listeners (contentDiv)
+        editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    }
     return handled;
 }
 

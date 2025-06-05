@@ -12,6 +12,7 @@ import { sidebarState } from './sidebar.js';
 import { loadPage, prefetchRecentPagesData, getInitialPage, fetchAndDisplayPages } from './page-loader.js';
 import { initGlobalEventListeners } from './event-handlers.js';
 import { initGlobalSearch, initPageSearchModal } from './search.js';
+import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js';
 
 // Import UI module
 import { ui } from '../ui.js';
@@ -34,7 +35,11 @@ async function initializeApp() {
         
         initGlobalSearch();
         initPageSearchModal();
-        initGlobalEventListeners(); 
+        initGlobalEventListeners();
+        
+        // Initialize page link suggestions
+        initSuggestionUI();
+        fetchAllPages(); // Asynchronously fetch page names
         
         const urlParams = new URLSearchParams(window.location.search);
         const initialPageName = urlParams.get('page') || getInitialPage(); 
