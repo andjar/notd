@@ -358,16 +358,20 @@ class PatternProcessor {
                 $isStatusProperty = ($name === 'status');
                 $isDoneAtProperty = ($name === 'done_at');
                 
+                // Set the appropriate ID column based on entity type
+                $idColumn = ($entityType === 'note') ? 'note_id' : 'page_id';
+                $otherIdColumn = ($entityType === 'note') ? 'page_id' : 'note_id';
+                
                 if ($isStatusProperty) {
                     $sql = "
-                        INSERT INTO Properties (note_id, page_id, name, value, internal)
+                        INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, internal)
                         VALUES (?, NULL, ?, ?, ?)
                     ";
                 } else {
                     // For 'done_at' and other non-status properties, use REPLACE INTO.
                     // This handles both insert and update, making the explicit delete for 'done_at' unnecessary.
                     $sql = "
-                        REPLACE INTO Properties (note_id, page_id, name, value, internal)
+                        REPLACE INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, internal)
                         VALUES (?, NULL, ?, ?, ?)
                     ";
                 }

@@ -1,7 +1,7 @@
 <?php
 require_once '../config.php';
 require_once 'db_connect.php';
-require_once 'property_triggers.php'; // Include the trigger system
+require_once 'property_trigger_service.php'; // New trigger service
 require_once 'response_utils.php'; // Include the new response utility
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
@@ -98,7 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $propertyRow = $stmtGetValue->fetch(PDO::FETCH_ASSOC);
 
             if ($propertyRow) {
-                dispatchPropertyTriggers($pdo, $entityType, $entityId, $propertyName, $propertyRow['value']);
+                // Use the new trigger service
+                $triggerService = new PropertyTriggerService($pdo);
+                $triggerService->dispatch($entityType, $entityId, $propertyName, $propertyRow['value']);
             } else {
                 // This case should ideally not happen if we checked for property existence before update
                 error_log("Could not retrieve property value after updating internal status for {$propertyName} on {$entityType} {$entityId}");

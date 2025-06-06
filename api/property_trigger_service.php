@@ -57,38 +57,63 @@ class PropertyTriggerService {
     
     // Placeholder for other trigger handlers if any, e.g., status changes, etc.
 
+    /**
+     * Dispatch triggers for a property change
+     * @param string $entityType Entity type ('note' or 'page')
+     * @param int $entityId Entity ID
+     * @param string $propertyName Property name
+     * @param mixed $propertyValue Property value
+     */
     public function dispatch($entityType, $entityId, $propertyName, $propertyValue) {
-        error_log("PropertyTriggerService dispatch: entityType={$entityType}, entityId={$entityId}, propertyName={$propertyName}, value={$propertyValue}");
-
-        // Define triggers internally. This could be made more dynamic if needed.
-        $triggers = [
-            'note' => [
-                'internal' => [$this, 'handleInternalPropertyForNote'],
-                // Add other note-specific property triggers here
-                // 'status' => [$this, 'handleStatusPropertyForNote'], 
-            ],
-            'page' => [
-                'alias' => [$this, 'handleAliasPropertyForPage'],
-                // Add other page-specific property triggers here
-            ]
-        ];
-
-        if (isset($triggers[$entityType]) && isset($triggers[$entityType][$propertyName])) {
-            $handler = $triggers[$entityType][$propertyName];
-            if (is_callable($handler)) {
-                try {
-                    call_user_func($handler, $entityId, $propertyName, $propertyValue);
-                    error_log("Executed trigger for {$entityType} {$entityId}, property {$propertyName}");
-                } catch (Exception $e) {
-                    error_log("Error executing trigger for {$entityType} {$entityId}, property {$propertyName}: " . $e->getMessage());
-                    // Optionally re-throw or handle more gracefully
+        error_log("[PROPERTY_TRIGGER_DEBUG] Dispatching trigger for {$entityType} {$entityId}, property: {$propertyName}");
+        error_log("[PROPERTY_TRIGGER_DEBUG] Property value: " . json_encode($propertyValue));
+        
+        // Get available triggers for this entity type
+        $triggers = $this->getTriggersForEntityType($entityType);
+        error_log("[PROPERTY_TRIGGER_DEBUG] Available triggers: " . json_encode(array_keys($triggers)));
+        
+        // Check if we have a handler for this property
+        if (isset($triggers[$propertyName])) {
+            $handler = $triggers[$propertyName];
+            error_log("[PROPERTY_TRIGGER_DEBUG] Found handler for {$propertyName}");
+            
+            try {
+                if (is_callable($handler)) {
+                    error_log("[PROPERTY_TRIGGER_DEBUG] Executing handler for {$propertyName}");
+                    $handler($entityId, $propertyName, $propertyValue);
+                    error_log("[PROPERTY_TRIGGER_DEBUG] Handler executed successfully");
+                } else {
+                    error_log("[PROPERTY_TRIGGER_ERROR] Handler for {$propertyName} is not callable");
                 }
-            } else {
-                error_log("Handler not callable for {$entityType} {$entityId}, property {$propertyName}");
+            } catch (Exception $e) {
+                error_log("[PROPERTY_TRIGGER_ERROR] Error executing handler for {$propertyName}: " . $e->getMessage());
+                error_log("[PROPERTY_TRIGGER_ERROR] Stack trace: " . $e->getTraceAsString());
+                throw $e; // Re-throw to be caught by caller
             }
         } else {
-            error_log("No trigger found for {$entityType}, property {$propertyName}");
+            error_log("[PROPERTY_TRIGGER_DEBUG] No trigger found for {$propertyName}");
         }
+    }
+    
+    /**
+     * Get available triggers for an entity type
+     * @param string $entityType Entity type ('note' or 'page')
+     * @return array Map of property names to handler functions
+     */
+    private function getTriggersForEntityType($entityType) {
+        $triggers = [];
+        
+        if ($entityType === 'note') {
+            $triggers = [
+                'internal' => [$this, 'handleInternalPropertyForNote']
+            ];
+        } elseif ($entityType === 'page') {
+            $triggers = [
+                'alias' => [$this, 'handleAliasPropertyForPage']
+            ];
+        }
+        
+        return $triggers;
     }
 }
 ?>
