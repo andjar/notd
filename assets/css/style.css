@@ -1401,66 +1401,170 @@ textarea:focus {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--ls-generic-modal-backdrop-bg);
-    backdrop-filter: blur(4px);
-    z-index: var(--ls-z-index-modal);
-    align-items: center;
-    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
     opacity: 0;
-    transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+    transition: opacity 0.2s ease-in-out;
 }
 
 .generic-modal.active {
     display: flex;
     opacity: 1;
+    align-items: center;
+    justify-content: center;
 }
 
 .generic-modal-content {
-    background: var(--ls-primary-background-color);
-    padding: var(--ls-space-8);
-    border-radius: 16px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    background-color: var(--ls-primary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    padding: var(--ls-space-4);
     width: 90%;
-    max-width: 500px;
-    max-height: 80vh;
+    max-width: 600px;
+    max-height: 90vh;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--ls-space-6);
-    border: 1px solid var(--ls-border-color);
     transform: scale(0.95);
-    transition: transform 0.3s ease;
+    transition: transform 0.2s ease-in-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .generic-modal.active .generic-modal-content {
     transform: scale(1);
 }
 
-.generic-modal-input-field {
-    width: 100%;
-    padding: var(--ls-space-4);
-    border: 2px solid var(--ls-border-color);
-    border-radius: var(--ls-border-radius-medium);
-    background: var(--ls-primary-background-color);
-    color: var(--ls-primary-text-color);
-    font-size: var(--ls-font-size-base);
-    box-shadow: none;
-    transition: border-color var(--ls-transition-fast), box-shadow var(--ls-transition-fast);
+/* Page Properties Modal Specific Styles */
+#page-properties-modal .generic-modal-content {
+    min-width: 300px;
 }
 
-.generic-modal-input-field:focus {
+#page-properties-modal .generic-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--ls-space-4);
+    padding-bottom: var(--ls-space-4);
+    border-bottom: 1px solid var(--ls-border-color);
+}
+
+#page-properties-modal .generic-modal-title {
+    font-family: var(--ls-header-font-family);
+    font-size: var(--ls-font-size-xl);
+    font-weight: var(--ls-font-weight-medium);
+    color: var(--ls-primary-text-color);
+    margin: 0;
+}
+
+#page-properties-modal .modal-header-icons {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+}
+
+#page-properties-modal .page-encryption-icon,
+#page-properties-modal .page-properties-modal-close {
+    color: var(--ls-secondary-text-color);
+    cursor: pointer;
+    padding: var(--ls-space-1);
+    border-radius: var(--ls-border-radius-medium);
+    transition: all var(--ls-transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+}
+
+#page-properties-modal .page-encryption-icon:hover,
+#page-properties-modal .page-properties-modal-close:hover {
+    color: var(--ls-primary-text-color);
+    background: var(--ls-tertiary-background-color);
+}
+
+#page-properties-modal .page-encryption-icon svg.feather,
+#page-properties-modal .page-properties-modal-close svg.feather {
+    width: 18px;
+    height: 18px;
+}
+
+#page-properties-list {
+    margin-bottom: var(--ls-space-4);
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+#page-properties-list .page-property-item {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+    padding: var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+    background-color: var(--ls-tertiary-background-color);
+    margin-bottom: var(--ls-space-2);
+}
+
+#page-properties-list .page-property-key {
+    color: var(--ls-accent-10);
+    font-weight: var(--ls-font-weight-medium);
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+    min-width: 100px;
     outline: none;
+}
+
+#page-properties-list .page-property-value {
+    flex: 1;
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-low);
+    background-color: var(--ls-primary-background-color);
+    color: var(--ls-primary-text-color);
+    outline: none;
+}
+
+#page-properties-list .page-property-value:focus {
     border-color: var(--ls-accent-10);
-    box-shadow: 0 0 0 3px hsl(var(--ls-accent-10-hsl) / 0.1);
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+
+#page-properties-list .page-property-delete {
+    color: var(--ls-secondary-text-color);
+    background: none;
+    border: none;
+    padding: var(--ls-space-1);
+    cursor: pointer;
+    border-radius: var(--ls-border-radius-low);
+    transition: all var(--ls-transition-fast);
+}
+
+#page-properties-list .page-property-delete:hover {
+    color: var(--ls-error-color);
+    background-color: var(--ls-tertiary-background-color);
 }
 
 .generic-modal-actions {
     display: flex;
-    gap: var(--ls-space-3);
     justify-content: flex-end;
+    gap: var(--ls-space-2);
     margin-top: var(--ls-space-4);
+    padding-top: var(--ls-space-4);
+    border-top: 1px solid var(--ls-border-color);
+}
+
+.add-property-btn {
+    background-color: var(--ls-accent-10);
+    color: white;
+    border: none;
+    padding: var(--ls-space-2) var(--ls-space-4);
+    border-radius: var(--ls-border-radius-low);
+    cursor: pointer;
+    transition: all var(--ls-transition-fast);
+}
+
+.add-property-btn:hover {
+    background-color: var(--ls-accent-9);
 }
 
 /* Button variants (danger already defined in original and uses hex, keep for now) */
