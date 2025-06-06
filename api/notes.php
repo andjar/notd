@@ -38,15 +38,9 @@ function validateNoteData($data) {
 
 // Helper function to process note content and extract properties
 function processNoteContent($pdo, $content, $entityType, $entityId) {
-    $processor = getPatternProcessor();
-    $results = $processor->processContent($content, $entityType, $entityId);
-    
-    // Save the extracted properties
-    if (!empty($results['properties'])) {
-        $processor->saveProperties($results['properties'], $entityType, $entityId);
-    }
-    
-    return $results;
+    // This now correctly syncs properties with the database and returns the parsed properties.
+    // The entityType parameter is not used by syncNotePropertiesFromContent but is kept for compatibility.
+    return syncNotePropertiesFromContent($pdo, $entityId, $content);
 }
 
 if ($method === 'GET') {
@@ -55,7 +49,6 @@ if ($method === 'GET') {
     if (isset($_GET['id'])) {
         // Get single note
         $noteId = (int)$_GET['id'];
-        error_log("[NOTES_API_DEBUG] Getting single note with ID: " . $noteId);
         $sql = "SELECT * FROM Notes WHERE id = :id";
         if (!$includeInternal) {
             $sql .= " AND internal = 0";
@@ -66,7 +59,6 @@ if ($method === 'GET') {
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($note) {
-            error_log("[NOTES_API_DEBUG] Found note: " . json_encode($note));
             // Get properties for the note
             $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id";
             if (!$includeInternal) {
@@ -77,7 +69,6 @@ if ($method === 'GET') {
             $stmtProps->bindParam(':note_id', $note['id'], PDO::PARAM_INT);
             $stmtProps->execute();
             $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
-            error_log("[NOTES_API_DEBUG] Found properties: " . json_encode($propertiesResult));
             
             $note['properties'] = [];
             foreach ($propertiesResult as $prop) {
@@ -101,17 +92,12 @@ if ($method === 'GET') {
                 }
             }
             
-            error_log("[NOTES_API_DEBUG] Final note with properties: " . json_encode($note));
             sendJsonResponse(['success' => true, 'data' => $note]);
         } else {
-            error_log("[NOTES_API_DEBUG] Note not found or is internal");
             sendJsonResponse(['success' => false, 'error' => 'Note not found or is internal'], 404); // Updated error message
         }
     } elseif (isset($_GET['page_id'])) {
         try {
-            error_log("[NOTES_API_DEBUG] Starting page load for page_id: " . $_GET['page_id']);
-            
-            // Get notes for a page
             $pageId = (int)$_GET['page_id'];
             $notesSql = "SELECT * FROM Notes WHERE page_id = :page_id";
             if (!$includeInternal) {
@@ -119,12 +105,10 @@ if ($method === 'GET') {
             }
             $notesSql .= " ORDER BY order_index ASC";
             
-            error_log("[NOTES_API_DEBUG] Executing notes query: " . $notesSql);
             $stmt = $pdo->prepare($notesSql);
             $stmt->bindParam(':page_id', $pageId, PDO::PARAM_INT);
             $stmt->execute();
             $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            error_log("[NOTES_API_DEBUG] Found " . count($notes) . " notes");
             
             $noteIds = array_column($notes, 'id');
             
@@ -134,7 +118,6 @@ if ($method === 'GET') {
             unset($note);
 
             if (!empty($noteIds)) {
-                error_log("[NOTES_API_DEBUG] Fetching properties for " . count($noteIds) . " notes");
                 $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
                 $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
                 if (!$includeInternal) {
@@ -145,7 +128,6 @@ if ($method === 'GET') {
                 $stmtProps = $pdo->prepare($propSql);
                 $stmtProps->execute($noteIds);
                 $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
-                error_log("[NOTES_API_DEBUG] Found " . count($propertiesResult) . " properties");
                 
                 $propertiesByNote = [];
                 foreach ($propertiesResult as $prop) {
@@ -179,8 +161,6 @@ if ($method === 'GET') {
             }
             
             // START NEW LOGIC FOR GET ?page_id={id}
-            error_log("[NOTES_API_DEBUG] Fetching page details");
-            // 1. Fetch page details
             $pageSql = "SELECT * FROM Pages WHERE id = :page_id";
             $stmtPage = $pdo->prepare($pageSql);
             $stmtPage->bindParam(':page_id', $pageId, PDO::PARAM_INT);
@@ -188,14 +168,11 @@ if ($method === 'GET') {
             $pageDetails = $stmtPage->fetch(PDO::FETCH_ASSOC);
 
             if (!$pageDetails) {
-                error_log("[NOTES_API_DEBUG] Page not found for ID: " . $pageId);
                 sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
                 return;
             }
-            error_log("[NOTES_API_DEBUG] Found page: " . json_encode($pageDetails));
 
             // 2. Fetch page properties
-            error_log("[NOTES_API_DEBUG] Fetching page properties");
             $pageProperties = [];
             $pagePropSql = "SELECT name, value, internal FROM Properties WHERE page_id = :page_id AND note_id IS NULL";
             if (!$includeInternal) {
@@ -207,7 +184,6 @@ if ($method === 'GET') {
             $stmtPageProps->bindParam(':page_id', $pageId, PDO::PARAM_INT);
             $stmtPageProps->execute();
             $pagePropertiesResult = $stmtPageProps->fetchAll(PDO::FETCH_ASSOC);
-            error_log("[NOTES_API_DEBUG] Found " . count($pagePropertiesResult) . " page properties");
             
             $pagePropertiesFormatted = [];
             foreach ($pagePropertiesResult as $prop) {
@@ -237,7 +213,6 @@ if ($method === 'GET') {
             // $notes variable already contains the notes with their properties.
 
             // 3. Construct the final JSON response
-            error_log("[NOTES_API_DEBUG] Constructing final response");
             $response = [
                 'success' => true,
                 'data' => [
@@ -245,86 +220,73 @@ if ($method === 'GET') {
                     'notes' => $notes // $notes is from the original part of the page_id block
                 ]
             ];
-            error_log("[NOTES_API_DEBUG] Final response: " . json_encode($response));
             sendJsonResponse($response);
             // END NEW LOGIC FOR GET ?page_id={id}
 
         } catch (Exception $e) {
-            error_log("[NOTES_API_ERROR] Error loading page: " . $e->getMessage());
-            error_log("[NOTES_API_ERROR] Stack trace: " . $e->getTraceAsString());
-            sendJsonResponse(['success' => false, 'error' => 'Internal server error: ' . $e->getMessage()], 500);
+            sendJsonResponse(['success' => false, 'error' => 'An error occurred while fetching notes: ' . $e->getMessage()], 500);
         }
     } else {
-        sendJsonResponse(['success' => false, 'error' => 'Either page_id or id is required for GET request'], 400);
+        // Get all notes (consider pagination for performance)
+        // This is a placeholder and might need a more robust implementation
+        $sql = "SELECT * FROM Notes";
+        if (!$includeInternal) {
+            $sql .= " WHERE internal = 0";
+        }
+        $sql .= " ORDER BY created_at DESC";
+        $stmt = $pdo->query($sql);
+        $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        sendJsonResponse(['success' => true, 'data' => $notes]);
     }
 } elseif ($method === 'POST') {
-    // Added check for invalid JSON payload
-    if ($input === null) {
-        error_log("[NOTES_API_ERROR] Invalid JSON payload received");
-        sendJsonResponse(['success' => false, 'error' => 'Invalid JSON payload or empty request body'], 400);
+    // Validate input
+    if (!isset($input['page_id']) || !is_numeric($input['page_id'])) {
+        sendJsonResponse(['success' => false, 'error' => 'A valid page_id is required.'], 400);
     }
 
-    if (!isset($input['page_id'])) {
-        error_log("[NOTES_API_ERROR] Missing page_id in POST request");
-        sendJsonResponse(['success' => false, 'error' => 'Page ID is required'], 400);
-    }
-    
+    $pageId = (int)$input['page_id'];
+    $content = isset($input['content']) ? $input['content'] : '';
+
     try {
-        error_log("[NOTES_API_DEBUG] Starting note creation for page_id: " . $input['page_id']);
-        validateNoteData($input);
-        
         $pdo->beginTransaction();
-        
-        // Get max order_index for the page
-        $stmt = $pdo->prepare("SELECT MAX(order_index) as max_order FROM Notes WHERE page_id = ?");
-        $stmt->execute([(int)$input['page_id']]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        $orderIndex = ($result['max_order'] ?? 0) + 1;
-        error_log("[NOTES_API_DEBUG] New note will have order_index: " . $orderIndex);
-        
-        // Insert new note
-        $stmt = $pdo->prepare("
-            INSERT INTO Notes (page_id, content, parent_note_id, order_index, internal, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
-        ");
-        $stmt->execute([
-            (int)$input['page_id'],
-            $input['content'],
-            isset($input['parent_note_id']) ? (int)$input['parent_note_id'] : null,
-            $orderIndex
-        ]);
-        
+
+        // 1. Create the note
+        $stmt = $pdo->prepare("INSERT INTO Notes (page_id, content) VALUES (:page_id, :content)");
+        $stmt->execute([':page_id' => $pageId, ':content' => $content]);
         $noteId = $pdo->lastInsertId();
-        error_log("[NOTES_API_DEBUG] Created note with ID: " . $noteId);
-        
-        // Process note content and save properties
-        error_log("[NOTES_API_DEBUG] Processing note content for properties");
-        processNoteContent($pdo, $input['content'], 'note', $noteId);
-        
-        // Fetch the created note
-        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
-        $stmt->execute([$noteId]);
-        $note = $stmt->fetch(PDO::FETCH_ASSOC);
-        $note['properties'] = [];
-        
+
+        // 2. Parse and save properties from the content
+        $properties = processNoteContent($pdo, $content, 'note', $noteId);
+
         $pdo->commit();
-        error_log("[NOTES_API_DEBUG] Note creation completed successfully");
-        sendJsonResponse(['success' => true, 'data' => $note]);
-    } catch (PDOException $e) {
-        error_log("[NOTES_API_ERROR] Database error during note creation: " . $e->getMessage());
-        error_log("[NOTES_API_ERROR] Stack trace: " . $e->getTraceAsString());
-        $pdo->rollBack();
-        sendJsonResponse(['success' => false, 'error' => 'Failed to create note: ' . $e->getMessage()], 500);
+
+        // 3. Fetch the newly created note to return it
+        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = :id");
+        $stmt->execute([':id' => $noteId]);
+        $newNote = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Attach the parsed properties to the response
+        $newNote['properties'] = $properties;
+
+        sendJsonResponse(['success' => true, 'data' => $newNote], 201); // 201 Created
+
     } catch (Exception $e) {
-        error_log("[NOTES_API_ERROR] General error during note creation: " . $e->getMessage());
-        error_log("[NOTES_API_ERROR] Stack trace: " . $e->getTraceAsString());
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        sendJsonResponse(['success' => false, 'error' => 'Failed to create note: ' . $e->getMessage()], 500);
+        error_log("Failed to create note: " . $e->getMessage());
+        sendJsonResponse(['success' => false, 'error' => 'Failed to create note.', 'details' => $e->getMessage()], 500);
     }
 } elseif ($method === 'PUT') {
-    if (!isset($_GET['id'])) {
+    // For phpdesktop compatibility, also check for ID in request body when using method override
+    $noteId = null;
+    if (isset($_GET['id'])) {
+        $noteId = (int)$_GET['id'];
+    } elseif (isset($input['id'])) {
+        $noteId = (int)$input['id'];
+    }
+    
+    if (!$noteId) {
         sendJsonResponse(['success' => false, 'error' => 'Note ID is required'], 400);
     }
     
@@ -333,8 +295,6 @@ if ($method === 'GET') {
 
     try {
         $pdo->beginTransaction();
-        
-        $noteId = (int)$_GET['id'];
 
         // Check if note exists
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
@@ -458,17 +418,8 @@ if ($method === 'GET') {
         
         // If content was updated, process and save properties
         if (isset($input['content'])) {
-            error_log("[NOTES_API_DEBUG] Processing note content for note {$noteId}");
-            error_log("[NOTES_API_DEBUG] Content: " . $input['content']);
-            
-            // Delete existing properties EXCEPT status properties to preserve history
-            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND name != 'status'");
-            $stmtDeleteProps->execute([$noteId]);
-            error_log("[NOTES_API_DEBUG] Deleted existing non-status properties");
-            
             // Process note content and save properties
             $results = processNoteContent($pdo, $input['content'], 'note', $noteId);
-            error_log("[NOTES_API_DEBUG] Pattern processor results: " . json_encode($results));
         }
         
         // Fetch updated note
@@ -510,10 +461,19 @@ if ($method === 'GET') {
         sendJsonResponse(['success' => true, 'data' => $note]);
     } catch (PDOException $e) {
         $pdo->rollBack();
+        error_log("Failed to update note: " . $e->getMessage());
         sendJsonResponse(['success' => false, 'error' => 'Failed to update note: ' . $e->getMessage()], 500);
     }
 } elseif ($method === 'DELETE') {
-    if (!isset($_GET['id'])) {
+    // For phpdesktop compatibility, also check for ID in request body when using method override
+    $noteId = null;
+    if (isset($_GET['id'])) {
+        $noteId = (int)$_GET['id'];
+    } elseif (isset($input['id'])) {
+        $noteId = (int)$input['id'];
+    }
+    
+    if (!$noteId) {
         sendJsonResponse(['success' => false, 'error' => 'Note ID is required'], 400);
     }
     
@@ -522,7 +482,7 @@ if ($method === 'GET') {
         
         // Check if note exists
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
-        $stmt->execute([(int)$_GET['id']]);
+        $stmt->execute([$noteId]);
         if (!$stmt->fetch()) {
             $pdo->rollBack();
             sendJsonResponse(['success' => false, 'error' => 'Note not found'], 404);
@@ -530,14 +490,14 @@ if ($method === 'GET') {
         
         // Delete properties first (due to foreign key constraint)
         $stmt = $pdo->prepare("DELETE FROM Properties WHERE note_id = ?"); // Corrected column name
-        $stmt->execute([(int)$_GET['id']]);
+        $stmt->execute([$noteId]);
         
         // Delete the note
         $stmt = $pdo->prepare("DELETE FROM Notes WHERE id = ?");
-        $stmt->execute([(int)$_GET['id']]);
+        $stmt->execute([$noteId]);
         
         $pdo->commit();
-        sendJsonResponse(['success' => true, 'data' => ['deleted_note_id' => (int)$_GET['id']]]);
+        sendJsonResponse(['success' => true, 'data' => ['deleted_note_id' => $noteId]]);
     } catch (PDOException $e) {
         $pdo->rollBack();
         sendJsonResponse(['success' => false, 'error' => 'Failed to delete note: ' . $e->getMessage()], 500);

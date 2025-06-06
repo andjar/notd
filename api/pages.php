@@ -114,99 +114,72 @@ if ($method === 'GET') {
         $pageName = Validator::sanitizeString($_GET['name']); // Sanitized
 
         try {
-            $pdo->beginTransaction();
-            
+            // First, try to fetch the page by name. DataManager should handle this.
+            // Let's assume getPageDetailsByName combines fetching page and its properties.
+            // If DataManager doesn't have this, we can construct it.
+            // For now, we manually query and then use DataManager for properties.
             $stmt = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-            $stmt->execute([$pageName]); // Use validated and sanitized name
-            $page = $stmt->fetch();
+            $stmt->execute([$pageName]);
+            $page = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($page) {
-                // Handle special case for journal pages
-                $today_journal_name = date('Y-m-d');
-                if (strtolower($pageName) === strtolower($today_journal_name) || 
-                    (strtolower($pageName) === 'journal' && !$page)) {
-                    
-                    // Double-check if page exists (race condition prevention)
-                    $stmt_check = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                    $stmt_check->execute([$pageName]);
-                    $existing_page = $stmt_check->fetch();
-                    
-                    if (!$existing_page) {
-                        $insert_stmt = $pdo->prepare("INSERT INTO Pages (name, updated_at) VALUES (?, CURRENT_TIMESTAMP)");
-                        $insert_stmt->execute([$pageName]);
-                        $page_id = $pdo->lastInsertId();
-                        
-                        // Add journal property if it's a journal page
-                        if (isJournalPage($pageName)) {
-                            addJournalProperty($pdo, $page_id);
-                        }
-                        
-                        $stmt_new = $pdo->prepare("SELECT * FROM Pages WHERE id = ?");
-                        $stmt_new->execute([$page_id]);
-                        $page = $stmt_new->fetch();
-                    } else {
-                        $page = $existing_page;
-                    }
-                }
+                // Page exists. Now, fetch its properties.
+                $page['properties'] = $dataManager->getPageProperties($page['id'], $include_internal);
                 
-                $pdo->commit();
-                // Potentially resolve alias if $followAliases is true
+                // Handle alias resolution
                 if ($followAliases && !empty($page['alias'])) {
                     $stmt = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
                     $stmt->execute([$page['alias']]);
                     $aliasedPageInfo = $stmt->fetch(PDO::FETCH_ASSOC);
                     if ($aliasedPageInfo) {
-                        // If alias found, fetch details for the aliased page
-                        // This might involve another call to DataManager or direct fetch + property assembly.
-                        // For now, returning the aliased page's basic info for simplicity.
-                        // A full fetch would be: $page = $dataManager->getPageDetailsById($aliasedPageInfo['id'], $include_internal);
-                        $page = $aliasedPageInfo; // Simplified: just return the basic aliased page
-                         // To include properties for the aliased page:
-                        $page['properties'] = $dataManager->getPageProperties($page['id'], $include_internal);
-
+                        $aliasedPageInfo['properties'] = $dataManager->getPageProperties($aliasedPageInfo['id'], $include_internal);
+                        $page = $aliasedPageInfo; // Replace original page with aliased one
                     }
                 }
                 ApiResponse::success($page);
             } else {
-                // Try to create journal page if name matches pattern
-                $today_journal_name_pattern = '/^\d{4}-\d{2}-\d{2}$/';
-                if (preg_match($today_journal_name_pattern, $pageName) || strtolower($pageName) === 'journal') {
+                // Page not found. Check if it's a date-based name for auto-creation.
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName)) {
+                    $pdo->beginTransaction();
+                    
+                    // Create the page
                     $insert_stmt = $pdo->prepare("INSERT INTO Pages (name, updated_at) VALUES (?, CURRENT_TIMESTAMP)");
                     $insert_stmt->execute([$pageName]);
-                    $page_id = $pdo->lastInsertId();
+                    $pageId = $pdo->lastInsertId();
                     
-                    // Add journal property since this is definitely a journal page
-                    addJournalProperty($pdo, $page_id);
-                    
-                    $stmt_new = $pdo->prepare("SELECT * FROM Pages WHERE id = ?");
-                    $stmt_new->execute([$page_id]);
-                    $page = $stmt_new->fetch();
+                    // Add the 'type: journal' property
+                    addJournalProperty($pdo, $pageId);
                     
                     $pdo->commit();
-                    // Similar alias resolution logic if $followAliases is true
-                    if ($followAliases && !empty($page['alias'])) {
-                        // ... (alias resolution as above)
-                    }
-                    ApiResponse::success($page);
+                    
+                    // Fetch the complete new page details
+                    $newPage = $dataManager->getPageDetailsById($pageId, $include_internal);
+                    ApiResponse::success($newPage);
                 } else {
-                    $pdo->commit();
+                    // Not a date-based name and page doesn't exist.
                     ApiResponse::error('Page not found', 404);
                 }
             }
         } catch (PDOException $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            // Handle unique constraint violation, which indicates a race condition.
             if ($e->getCode() == 23000 || str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
-                // If it failed due to UNIQUE, re-fetch it
-                $stmt_refetch = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                $stmt_refetch->execute([$pageName]); // Use validated name
-                $page = $stmt_refetch->fetch();
-                // Alias resolution for refetched page
-                if ($followAliases && !empty($page['alias'])) {
-                    // ... (alias resolution as above)
+                // The page was likely created by another process between our SELECT and INSERT.
+                // We can try fetching it again.
+                $stmt = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
+                $stmt->execute([$pageName]);
+                $page = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($page) {
+                    $page['properties'] = $dataManager->getPageProperties($page['id'], $include_internal);
+                    ApiResponse::success($page);
+                } else {
+                    // This case is unlikely but possible if the other process rolled back.
+                    ApiResponse::error('Failed to resolve page creation race condition.', 500, ['details' => $e->getMessage()]);
                 }
-                ApiResponse::success($page);
             } else {
-                ApiResponse::error('Failed to create page: ' . $e->getMessage(), 500);
+                ApiResponse::error('Database error.', 500, ['details' => $e->getMessage()]);
             }
         }
     } else {

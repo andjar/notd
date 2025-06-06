@@ -53,32 +53,21 @@ function syncNotePropertiesFromContent($pdo, $noteId, $content) {
         }
     }
     
-    $pdo->beginTransaction();
-    try {
-        // 1. Delete all existing, non-internal properties for this note, EXCEPT for 'status' properties.
-        // We only sync non-internal properties. Internal ones are managed separately.
-        // 'status' properties are preserved to maintain task history.
-        $stmtDelete = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND internal = 0 AND name != 'status'");
-        $stmtDelete->execute([$noteId]);
-        
-        // 2. Insert the new properties found in the content.
-        $stmtInsert = $pdo->prepare(
-            "INSERT INTO Properties (note_id, name, value, internal) VALUES (?, ?, ?, ?)"
-        );
-        
-        foreach ($newProperties as $prop) {
-            // Determine the internal status for the property before inserting.
-            $internalStatus = determinePropertyInternalStatus($pdo, $prop['name']);
-            $stmtInsert->execute([$noteId, $prop['name'], $prop['value'], $internalStatus]);
-        }
-        
-        $pdo->commit();
-    } catch (Exception $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-        // Log error or re-throw
-        error_log("Failed to sync properties for note $noteId: " . $e->getMessage());
-        throw $e;
+    // The transaction is now handled by the calling function (e.g., the POST/PUT handler in notes.php)
+    // 1. Delete all existing, non-internal properties for this note, EXCEPT for 'status' properties.
+    $stmtDelete = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND internal = 0 AND name != 'status'");
+    $stmtDelete->execute([$noteId]);
+    
+    // 2. Insert the new properties found in the content.
+    $stmtInsert = $pdo->prepare(
+        "INSERT INTO Properties (note_id, name, value, internal) VALUES (?, ?, ?, ?)"
+    );
+    
+    foreach ($newProperties as $prop) {
+        // Determine the internal status for the property before inserting.
+        $internalStatus = determinePropertyInternalStatus($pdo, $prop['name']);
+        $stmtInsert->execute([$noteId, $prop['name'], $prop['value'], $internalStatus]);
     }
+
+    return $propertiesFromContent;
 } 

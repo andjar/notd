@@ -57,11 +57,12 @@ function getPropertyInternalStatusFromDefinition($pdo, $propertyName) {
 
 /**
  * Determine if a property should be internal based on its name and any explicit setting
+ * @param PDO $pdo Database connection
  * @param string $propertyName The name of the property
  * @param bool|null $explicitInternal Explicit internal setting (if provided)
  * @return bool Whether the property should be internal
  */
-function determinePropertyInternalStatus($propertyName, $explicitInternal = null) {
+function determinePropertyInternalStatus($pdo, $propertyName, $explicitInternal = null) {
     error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Determining internal status for property: {$propertyName}");
     error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Explicit internal value: " . ($explicitInternal === null ? 'null' : ($explicitInternal ? 'true' : 'false')));
     
@@ -72,9 +73,11 @@ function determinePropertyInternalStatus($propertyName, $explicitInternal = null
     }
     
     // Otherwise, check the property definitions
-    $internalStatus = getPropertyInternalStatusFromDefinition($propertyName);
-    error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Internal status from definition: " . ($internalStatus ? 'true' : 'false'));
-    return $internalStatus;
+    $internalStatus = getPropertyInternalStatusFromDefinition($pdo, $propertyName);
+    error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Internal status from definition: " . ($internalStatus !== null ? $internalStatus : 'null'));
+    
+    // If no definition is found, default to non-internal (0).
+    return $internalStatus === null ? 0 : (int)$internalStatus;
 }
 
 // Removed applyPropertyDefinitionToProperty function (now redundant)
