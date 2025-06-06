@@ -89,7 +89,7 @@ try {
             <div class="page-header">
                 <div id="current-page-title-container" class="page-title-container">
                     <h1 id="current-page-title">Loading...</h1>
-                    <i data-feather="settings" class="page-title-gear" id="page-properties-gear"></i>
+                    <i data-feather="settings" class="page-title-gear" id="page-properties-gear" data-preserve-id="true"></i>
                 </div>
             </div>
 
@@ -137,7 +137,10 @@ try {
         <div class="generic-modal-content">
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
-                <i data-feather="x" class="page-properties-modal-close" id="page-properties-modal-close"></i>
+                <div class="modal-header-icons">
+                    <i data-feather="key" class="page-encryption-icon" id="page-encryption-icon" title="Set page encryption"></i>
+                    <i data-feather="x" class="page-properties-modal-close" id="page-properties-modal-close"></i>
+                </div>
             </div>
             <div id="page-properties-list" class="page-properties-list"></div>
             <div class="generic-modal-actions">
@@ -173,6 +176,7 @@ try {
     </div>
 
     <!-- Scripts -->
+    <script src="assets/libs/sjcl.js"></script>
     <script type="module" src="assets/js/api_client.js"></script>
     <script type="module" src="assets/js/ui.js"></script>
     <script src="assets/js/templates.js"></script>

@@ -16,6 +16,8 @@ export function displayPageProperties(properties) {
     pagePropertiesList.innerHTML = '';
     if (!properties || Object.keys(properties).length === 0) {
         pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
+        // Still set up the encryption listener even if no properties exist
+        setupPagePropertiesModalListeners();
         return;
     }
     Object.entries(properties).forEach(([key, value]) => {
@@ -105,6 +107,10 @@ export function displayPageProperties(properties) {
     pagePropertiesList.addEventListener('keydown', propertyEventListener);
     pagePropertiesList.addEventListener('click', propertyEventListener);
     pagePropertiesList.addEventListener('change', propertyEventListener);
+    
+    // Set up the encryption icon listener
+    setupPagePropertiesModalListeners();
+    
     if (typeof feather !== 'undefined' && feather.replace) feather.replace();
 }
 
@@ -247,5 +253,129 @@ export async function deletePageProperty(key) {
         }
     } catch (error) {
         console.error('Error deleting page property:', error); alert('Failed to delete property');
+    }
+}
+
+/**
+ * Waits for sjcl library to be available with full functionality
+ */
+function waitForSjcl(maxAttempts = 20) {
+    return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const checkSjcl = () => {
+            attempts++;
+            if (typeof window.sjcl !== 'undefined' && 
+                window.sjcl.hash && 
+                window.sjcl.hash.sha256 && 
+                window.sjcl.hash.sha256.hash &&
+                window.sjcl.codec &&
+                window.sjcl.codec.hex) {
+                resolve(window.sjcl);
+            } else if (attempts >= maxAttempts) {
+                console.error('SJCL check failed. Current state:', {
+                    sjclExists: typeof window.sjcl !== 'undefined',
+                    hasHash: window.sjcl?.hash,
+                    hasSha256: window.sjcl?.hash?.sha256,
+                    hasHashMethod: window.sjcl?.hash?.sha256?.hash,
+                    hasCodec: window.sjcl?.codec,
+                    hasHex: window.sjcl?.codec?.hex
+                });
+                reject(new Error('SJCL library failed to load completely after maximum attempts'));
+            } else {
+                setTimeout(checkSjcl, 100); // Wait 100ms and try again
+            }
+        };
+        checkSjcl();
+    });
+}
+
+/**
+ * Handles setting up page encryption by prompting for a password and storing the hashed version
+ */
+export async function setupPageEncryption() {
+    if (!currentPageId) {
+        console.warn('No current page ID available for encryption setup');
+        return;
+    }
+
+    try {
+        // Check if page is already encrypted
+        const properties = await propertiesAPI.getProperties('page', currentPageId);
+        if (properties.encrypt) {
+            const confirmed = await ui.showGenericConfirmModal(
+                'Page Already Encrypted', 
+                'This page is already encrypted. Do you want to change the encryption password?'
+            );
+            if (!confirmed) return;
+        }
+
+        // Prompt user for password
+        const password = await ui.showGenericInputModal('Set Encryption Password', 'Enter a password to encrypt this page:');
+        if (!password || password.trim() === '') {
+            return; // User cancelled or entered empty password
+        }
+
+        // Confirm password
+        const confirmPassword = await ui.showGenericInputModal('Confirm Password', 'Please confirm your password:');
+        if (confirmPassword !== password) {
+            alert('Passwords do not match. Please try again.');
+            return;
+        }
+
+        // Wait for sjcl library to be available and hash the password
+        try {
+            const sjcl = await waitForSjcl();
+            const hashedPassword = sjcl.hash.sha256.hash(password);
+            const hashedPasswordHex = sjcl.codec.hex.fromBits(hashedPassword);
+
+            // Add/update the encrypt property
+            await propertiesAPI.setProperty({ 
+                entity_type: 'page', 
+                entity_id: currentPageId, 
+                name: 'encrypt', 
+                value: hashedPasswordHex 
+            });
+
+            // Refresh the properties display
+            const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
+            displayPageProperties(updatedProperties);
+            if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
+                ui.renderPageInlineProperties(updatedProperties, ui.domRefs.pagePropertiesContainer);
+            }
+
+            alert('Page encryption has been set successfully. The page will require the password when accessed.');
+
+        } catch (sjclError) {
+            console.error('Error with SJCL library or encryption setup:', sjclError);
+            alert('Encryption library not available or failed to load. Please reload the page and try again.');
+        }
+
+    } catch (error) {
+        console.error('Error setting up page encryption:', error);
+        alert('Failed to set up page encryption. Please try again.');
+    }
+}
+
+/**
+ * Sets up event listeners for the page properties modal, including the encryption icon
+ */
+export function setupPagePropertiesModalListeners() {
+    const encryptionIcon = document.getElementById('page-encryption-icon');
+    if (encryptionIcon) {
+        // Remove existing listener if any
+        const existingListener = encryptionIcon._encryptionClickListener;
+        if (existingListener) {
+            encryptionIcon.removeEventListener('click', existingListener);
+        }
+
+        // Add new listener
+        const encryptionClickListener = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await setupPageEncryption();
+        };
+
+        encryptionIcon._encryptionClickListener = encryptionClickListener;
+        encryptionIcon.addEventListener('click', encryptionClickListener);
     }
 }
