@@ -2,7 +2,7 @@
 import { notesAPI } from '../api_client.js';
 // import { notesForCurrentPage, updateNoteInCurrentPage } from '../app/state.js'; // state.js is used by kanban-app.js, direct use here is reduced
 import { parseAndRenderContent } from './note-renderer.js'; // For rendering card content, if needed
-import Sortable from '../../libs/Sortable.min.js'; // Ensure this path is correct
+// Sortable is loaded globally via script tag, no need to import
 
 // Define Kanban Columns
 const KANBAN_COLUMNS = [

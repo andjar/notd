@@ -2,7 +2,7 @@ import { notesAPI } from './api_client.js';
 import { displayKanbanBoard } from './ui/kanban-board.js';
 import { setNotesForCurrentPage, notesForCurrentPage } from './app/state.js'; // To store fetched notes
 
-document.addEventListener('DOMContentLoaded', async () => {
+export async function initializeKanban() {
     const kanbanRootElement = document.getElementById('kanban-root');
 
     if (!kanbanRootElement) {
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (kanbanRootElement) {
             kanbanRootElement.innerHTML = ''; // Clear "Loading..." message
-            displayKanbanBoard(kanbanRootElement, notesForCurrentPage()); // notesForCurrentPage from state.js
+            displayKanbanBoard(kanbanRootElement, notesForCurrentPage); // Removed function call parentheses
         }
 
     } catch (error) {
@@ -65,4 +65,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             kanbanRootElement.innerHTML = '<p class="error-message">Error loading Kanban board. Please try again later.</p>';
         }
     }
-});
+}
