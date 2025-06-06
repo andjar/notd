@@ -229,7 +229,7 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
 
             if (pageProperties && pageProperties.encrypt) {
                 // Ensure it's a string and not an array/object if properties can have multiple values
-                const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt.value;
+                const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt;
                 currentPageEncryptionKey = encryptionPropValue;
 
                 // Clear existing notes and show password prompt
@@ -398,7 +398,7 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
 
         if (pageProperties && pageProperties.encrypt) {
             // Ensure it's a string and not an array/object if properties can have multiple values
-            const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt.value;
+            const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt;
             currentPageEncryptionKey = encryptionPropValue;
 
             // Clear existing notes and show password prompt
