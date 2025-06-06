@@ -3,14 +3,9 @@ require_once '../config.php';
 require_once 'db_connect.php';
 require_once 'property_triggers.php';
 require_once 'properties.php';
+require_once 'response_utils.php'; // Include the new response utility
 
-header('Content-Type: application/json');
-
-function send_json_response($data, $status = 200) {
-    http_response_code($status);
-    echo json_encode($data);
-    exit;
-}
+// header('Content-Type: application/json'); // Will be handled by ApiResponse
 
 function applyPropertyDefinitionsToExisting($pdo, $propertyName = null) {
     if (!function_exists('_updateOrAddPropertyAndDispatchTriggers')) {
@@ -85,25 +80,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         
         if (isset($_GET['apply_all'])) {
             $updatedCount = applyPropertyDefinitionsToExisting($pdo);
-            send_json_response([
-                'success' => true, 
-                'message' => "Applied property definitions to {$updatedCount} existing properties"
-            ]);
+            ApiResponse::success(['message' => "Applied property definitions to {$updatedCount} existing properties"]);
         } else {
             $stmt = $pdo->prepare("SELECT * FROM PropertyDefinitions ORDER BY name");
             $stmt->execute();
             $definitions = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            send_json_response(['success' => true, 'data' => $definitions]);
+            ApiResponse::success($definitions);
         }
     } catch (Exception $e) {
-        send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
     }
 
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) {
-        send_json_response(['error' => 'Invalid JSON'], 400);
+        ApiResponse::error('Invalid JSON', 400);
+        exit; // Ensure script termination
     }
     
     try {
@@ -113,25 +106,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             if ($input['action'] === 'apply_definition') {
                 $propertyName = isset($input['name']) ? $input['name'] : null;
                 if (!$propertyName) {
-                    send_json_response(['error' => 'Property name required'], 400);
+                    ApiResponse::error('Property name required', 400);
+                    exit; // Ensure script termination
                 }
                 
                 $updatedCount = applyPropertyDefinitionsToExisting($pdo, $propertyName);
-                send_json_response([
-                    'success' => true, 
-                    'message' => "Applied definition for '{$propertyName}' to {$updatedCount} existing properties"
-                ]);
+                ApiResponse::success(['message' => "Applied definition for '{$propertyName}' to {$updatedCount} existing properties"]);
                 
             } elseif ($input['action'] === 'delete') {
                 $id = isset($input['id']) ? (int)$input['id'] : null;
                 if (!$id) {
-                    send_json_response(['error' => 'Definition ID required'], 400);
+                    ApiResponse::error('Definition ID required', 400);
+                    exit; // Ensure script termination
                 }
                 
                 $stmt = $pdo->prepare("DELETE FROM PropertyDefinitions WHERE id = ?");
                 $stmt->execute([$id]);
                 
-                send_json_response(['success' => true, 'message' => 'Property definition deleted']);
+                ApiResponse::success(['message' => 'Property definition deleted']);
             }
         } else {
             $name = isset($input['name']) ? trim($input['name']) : null;
@@ -140,7 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $autoApply = isset($input['auto_apply']) ? (int)$input['auto_apply'] : 1;
             
             if (!$name) {
-                send_json_response(['error' => 'Property name is required'], 400);
+                ApiResponse::error('Property name is required', 400);
+                exit; // Ensure script termination
             }
             
             $pdo->beginTransaction();
@@ -159,16 +152,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             
             $pdo->commit();
-            send_json_response(['success' => true, 'message' => $message]);
+            ApiResponse::success(['message' => $message]);
         }
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
     }
-
+    exit; // Ensure script termination after POST
 } else {
-    send_json_response(['error' => 'Method not allowed'], 405);
+    ApiResponse::error('Method not allowed', 405);
 }
-?> 
+?>

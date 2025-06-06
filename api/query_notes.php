@@ -28,15 +28,15 @@
  */
 require_once '../config.php';
 require_once 'db_connect.php';
+require_once 'response_utils.php'; // Include the new response utility
 
-header('Content-Type: application/json');
+// header('Content-Type: application/json'); // Will be handled by ApiResponse
 
 $pdo = get_db_connection();
 $input = json_decode(file_get_contents('php://input'), true);
 
 if (!isset($input['sql_query'])) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Missing sql_query parameter.']);
+    ApiResponse::error('Missing sql_query parameter.', 400);
     exit;
 }
 
@@ -62,8 +62,7 @@ foreach ($allowedPatterns as $pattern) {
 }
 
 if (!$patternMatched) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Query must be one of the allowed patterns: SELECT id FROM Notes WHERE..., SELECT [DISTINCT] N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE..., or SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE...). Invalid query: ' . substr($sqlQuery, 0, 100)]);
+    ApiResponse::error('Query must be one of the allowed patterns: SELECT id FROM Notes WHERE..., SELECT [DISTINCT] N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE..., or SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE...). Invalid query: ' . substr($sqlQuery, 0, 100), 400);
     exit;
 }
 
@@ -84,8 +83,7 @@ $forbiddenPatterns = [
 
 // Check for semicolons not at the very end of the query
 if (strpos($sqlQuery, ';') !== false && strpos($sqlQuery, ';') !== strlen($sqlQuery) - 1) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Semicolons are only allowed at the very end of the query.']);
+    ApiResponse::error('Semicolons are only allowed at the very end of the query.', 400);
     exit;
 }
 // Remove trailing semicolon if present, for consistency before further checks
@@ -95,8 +93,7 @@ if (substr($sqlQuery, -1) === ';') {
 
 foreach ($forbiddenPatterns as $pattern) {
     if (preg_match($pattern, $sqlQuery)) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Query contains forbidden SQL keywords/characters or comments. Pattern: ' . $pattern]);
+        ApiResponse::error('Query contains forbidden SQL keywords/characters or comments. Pattern: ' . $pattern, 400);
         exit;
     }
 }
@@ -112,8 +109,7 @@ $allowedPagesColumns = ['id', 'name', 'alias', 'active', 'created_at', 'updated_
 // This regex looks for table names that are not in our allowed list
 if (preg_match('/\bFROM\s+(?!(?:Notes|Properties|Pages)\b)\w+/i', $sqlQuery) ||
     preg_match('/\bJOIN\s+(?!(?:Notes|Properties|Pages)\b)\w+/i', $sqlQuery)) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Query references unauthorized tables. Only Notes, Properties, and Pages are allowed.']);
+    ApiResponse::error('Query references unauthorized tables. Only Notes, Properties, and Pages are allowed.', 400);
     exit;
 }
 
@@ -125,7 +121,7 @@ try {
     $noteIds = $stmtGetIds->fetchAll(PDO::FETCH_COLUMN, 0);
 
     if (empty($noteIds)) {
-        echo json_encode(['success' => true, 'data' => []]);
+        ApiResponse::success([]);
         exit;
     }
 
@@ -138,20 +134,18 @@ try {
     $stmtFetchNotes->execute($noteIds);
     $notes = $stmtFetchNotes->fetchAll(PDO::FETCH_ASSOC);
 
-    echo json_encode(['success' => true, 'data' => $notes]);
+    ApiResponse::success($notes);
 
 } catch (PDOException $e) {
     // Log the detailed error to server logs for debugging
     error_log("Database error in query_notes.php: " . $e->getMessage());
     error_log("Offending SQL (potentially): " . $sqlQuery);
 
-    http_response_code(500); // Internal Server Error
     // Provide a generic error message to the client
-    echo json_encode(['success' => false, 'error' => 'A database error occurred.']);
+    ApiResponse::error('A database error occurred.', 500);
 } catch (Exception $e) {
     error_log("General error in query_notes.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'An unexpected error occurred.']);
+    ApiResponse::error('An unexpected error occurred.', 500);
 }
 
 ?>

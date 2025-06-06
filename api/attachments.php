@@ -7,11 +7,13 @@ error_log("FILES data: " . print_r($_FILES, true));
 try {
     require_once 'db_connect.php';
     require_once '../config.php';
+    require_once 'response_utils.php'; // Include the new response utility
+    require_once 'validator_utils.php'; // Include the new Validator
 
     error_log("Required files loaded successfully");
     error_log("UPLOADS_DIR: " . UPLOADS_DIR);
 
-    header('Content-Type: application/json');
+    // header('Content-Type: application/json'); // Will be handled by ApiResponse
     
     error_log("Attempting to get database connection");
     $pdo = get_db_connection();
@@ -127,14 +129,20 @@ try {
     if ($method === 'POST') {
         error_log("=== POST METHOD PROCESSING ===");
         
-        if (!isset($_POST['note_id']) || !isset($_FILES['attachmentFile'])) {
-            error_log("Missing required parameters - note_id or attachmentFile");
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'note_id and attachmentFile are required']);
+        // Validate note_id from POST data
+        $validationRulesPOST = ['note_id' => 'required|isPositiveInteger'];
+        $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
+        if (!empty($errorsPOST)) {
+            ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
             exit;
         }
+        $note_id = (int)$_POST['note_id']; // Validated
 
-        $note_id = (int)$_POST['note_id'];
+        // File presence check
+        if (!isset($_FILES['attachmentFile'])) {
+            ApiResponse::error('attachmentFile is required.', 400);
+            exit;
+        }
         $file = $_FILES['attachmentFile'];
 
         // Debug logging
@@ -155,8 +163,7 @@ try {
             if (!$note) {
                 error_log("Note not found for ID: $note_id");
                 $pdo->rollBack();
-                http_response_code(404);
-                echo json_encode(['success' => false, 'error' => 'Note not found']);
+                ApiResponse::error('Note not found', 404);
                 exit;
             }
 
@@ -208,7 +215,7 @@ try {
             $attachment = $attachment_stmt->fetch();
 
             $pdo->commit();
-            echo json_encode(['success' => true, 'data' => $attachment]);
+            ApiResponse::success($attachment);
 
         } catch (RuntimeException $e) {
             if (isset($full_path) && file_exists($full_path)) {
@@ -217,8 +224,7 @@ try {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            ApiResponse::error($e->getMessage(), 400);
         } catch (PDOException $e) {
             if (isset($full_path) && file_exists($full_path)) {
                 unlink($full_path);
@@ -226,20 +232,20 @@ try {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to save attachment: ' . $e->getMessage()]);
+            ApiResponse::error('Failed to save attachment: ' . $e->getMessage(), 500);
         }
     } elseif ($method === 'GET') {
-        if (!isset($_GET['note_id'])) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'note_id is required for fetching attachments']);
+        $validationRules = ['note_id' => 'required|isPositiveInteger'];
+        $errors = Validator::validate($_GET, $validationRules);
+        if (!empty($errors)) {
+            ApiResponse::error('Invalid input for note ID.', 400, $errors);
             exit;
         }
-        $note_id = (int)$_GET['note_id'];
+        $note_id = (int)$_GET['note_id']; // Validated
 
         try {
             $stmt = $pdo->prepare("SELECT id, name, path, type, created_at FROM Attachments WHERE note_id = ? ORDER BY created_at DESC");
-            $stmt->execute([$note_id]);
+            $stmt->execute([$note_id]); // Use validated note_id
             $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // Add full URL to path for client consumption if needed, or handle on client
@@ -248,20 +254,23 @@ try {
                 $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path']; 
             }
 
-            echo json_encode(['success' => true, 'data' => $attachments]);
+            ApiResponse::success($attachments);
 
         } catch (PDOException $e) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to fetch attachments: ' . $e->getMessage()]);
+            ApiResponse::error('Failed to fetch attachments: ' . $e->getMessage(), 500);
         }
     } elseif ($method === 'DELETE') {
-        if (!isset($_GET['id'])) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Attachment ID is required']);
+        // For DELETE, the 'id' might come from $_GET or from parsed input if _method override is used
+        $id_to_validate = $_GET['id'] ?? ($input['id'] ?? null);
+
+        $validationRules = ['id' => 'required|isPositiveInteger'];
+        // Use a temporary array for validation as $_GET or $input might be the source
+        $errors = Validator::validate(['id' => $id_to_validate], $validationRules); 
+        if (!empty($errors)) {
+            ApiResponse::error('Invalid attachment ID.', 400, $errors);
             exit;
         }
-
-        $attachment_id = (int)$_GET['id'];
+        $attachment_id = (int)$id_to_validate; // Validated
 
         try {
             $pdo->beginTransaction();
@@ -273,8 +282,7 @@ try {
 
             if (!$attachment) {
                 $pdo->rollBack();
-                http_response_code(404);
-                echo json_encode(['success' => false, 'error' => 'Attachment not found']);
+                ApiResponse::error('Attachment not found', 404);
                 exit;
             }
 
@@ -298,26 +306,23 @@ try {
             $page_update_stmt->execute([$attachment['page_id']]);
 
             $pdo->commit();
-            echo json_encode(['success' => true, 'data' => ['deleted_attachment_id' => $attachment_id]]);
+            ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
 
         } catch (RuntimeException $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            ApiResponse::error($e->getMessage(), 500);
         } catch (PDOException $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to delete attachment: ' . $e->getMessage()]);
+            ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
         }
     } else {
-        http_response_code(405);
-        echo json_encode(['success' => false, 'error' => 'Method Not Allowed']);
+        ApiResponse::error('Method Not Allowed', 405);
     }
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'An unexpected error occurred: ' . $e->getMessage()]);
+    // Ensure ApiResponse is used for the final catch-all
+    ApiResponse::error('An unexpected error occurred: ' . $e->getMessage(), 500);
 }

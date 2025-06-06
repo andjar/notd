@@ -1,8 +1,11 @@
 <?php
 require_once 'db_connect.php';
+require_once 'response_utils.php'; // Include the new response utility
+require_once 'data_manager.php';   // Include the new DataManager
 
-header('Content-Type: application/json');
+// header('Content-Type: application/json'); // Will be handled by ApiResponse
 $pdo = get_db_connection();
+$dataManager = new DataManager($pdo); // Instantiate DataManager
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Helper function to get content snippet with context
@@ -40,7 +43,7 @@ if ($method === 'GET') {
             // Full-text search
             $term = sanitize_fts_term($_GET['q']);
             if (empty($term)) {
-                echo json_encode(['success' => true, 'data' => []]);
+                ApiResponse::success([]);
                 exit;
             }
 
@@ -90,13 +93,13 @@ if ($method === 'GET') {
                 }
             }
 
-            echo json_encode(['success' => true, 'data' => $results]);
+            ApiResponse::success($results);
 
         } elseif (isset($_GET['backlinks_for_page_name'])) {
             // Backlink search using 'links_to_page' properties
             $target_page_name = trim($_GET['backlinks_for_page_name']);
             if (empty($target_page_name)) {
-                echo json_encode(['success' => true, 'data' => []]);
+                ApiResponse::success([]);
                 exit;
             }
 
@@ -125,14 +128,13 @@ if ($method === 'GET') {
             }
             unset($result); // release reference
 
-            echo json_encode(['success' => true, 'data' => $results]);
+            ApiResponse::success($results);
 
         } elseif (isset($_GET['tasks'])) {
             // Task search
             $status_filter = strtolower($_GET['tasks']);
             if (!in_array($status_filter, ['todo', 'done'])) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'Invalid task status. Use "todo" or "done"']);
+                ApiResponse::error('Invalid task status. Use "todo" or "done"', 400);
                 exit;
             }
 
@@ -165,32 +167,32 @@ if ($method === 'GET') {
 
             // The old code fetched all properties for each note. Let's keep that for consistency,
             // but the initial selection of notes is now much more efficient.
-            foreach ($results as &$result) {
-                // Snippet generation should use the actual task marker from content,
-                // which might be more complex than just 'TODO' or 'DONE' if content has other text.
-                // For simplicity, we'll use the status_filter for get_content_snippet.
-                // A more robust way would be to find the exact task marker in N.content.
-                $result['content_snippet'] = get_content_snippet($result['content'], $property_value);
+            
+            $noteIds = array_column($results, 'note_id');
+            $propertiesByNoteId = [];
 
-                // Fetch other properties for the note
-                $prop_stmt = $pdo->prepare("SELECT name, value FROM Properties WHERE note_id = ?");
-                $prop_stmt->execute([$result['note_id']]);
-                $note_properties = $prop_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-                $result['properties'] = $note_properties;
+            if (!empty($noteIds)) {
+                // Decide on includeInternal for properties. For task search, usually all properties are relevant.
+                // If a specific include_internal GET param was available for task search, it would be used here.
+                // Defaulting to true for now to get all properties and let formatting handle if some are internal.
+                $includeInternalProperties = true; 
+                $propertiesByNoteId = $dataManager->getPropertiesForNoteIds($noteIds, $includeInternalProperties);
             }
-            unset($result); // release reference
 
-            echo json_encode(['success' => true, 'data' => $results]);
+            foreach ($results as &$result) {
+                $result['content_snippet'] = get_content_snippet($result['content'], $property_value);
+                $result['properties'] = $propertiesByNoteId[$result['note_id']] ?? [];
+            }
+            unset($result);
+
+            ApiResponse::success($results);
 
         } else {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Missing search parameter. Use q, backlinks_for_page_name, or tasks']);
+            ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, or tasks', 400);
         }
     } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Search failed: ' . $e->getMessage()]);
+        ApiResponse::error('Search failed: ' . $e->getMessage(), 500);
     }
 } else {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Method Not Allowed']);
+    ApiResponse::error('Method Not Allowed', 405);
 }
