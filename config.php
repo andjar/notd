@@ -28,7 +28,9 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
             'details' => [
                 'message' => $errstr,
                 'file' => $errfile,
-                'line' => $errline
+                'line' => $errline,
+                'type' => 'error',
+                'errno' => $errno
             ]
         ]);
     } else {
@@ -48,7 +50,9 @@ set_exception_handler(function($e) {
             'details' => [
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
-                'line' => $e->getLine()
+                'line' => $e->getLine(),
+                'type' => 'exception',
+                'trace' => $e->getTraceAsString()
             ]
         ]);
     } else {

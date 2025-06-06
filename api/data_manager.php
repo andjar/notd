@@ -62,18 +62,25 @@ class DataManager {
     }
 
     public function getPageProperties($pageId, $includeInternal = false) {
+        error_log("[DEBUG] getPageProperties called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
+        
         $sql = "SELECT name, value, internal FROM Properties WHERE page_id = :pageId AND note_id IS NULL";
         if (!$includeInternal) {
             $sql .= " AND internal = 0";
         }
         $sql .= " ORDER BY name"; 
+        error_log("[DEBUG] SQL query: " . $sql);
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindParam(':pageId', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $propertiesResult = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("[DEBUG] Raw properties from database: " . json_encode($propertiesResult));
         
-        return $this->_formatProperties($propertiesResult, $includeInternal);
+        $formattedProperties = $this->_formatProperties($propertiesResult, $includeInternal);
+        error_log("[DEBUG] Formatted properties: " . json_encode($formattedProperties));
+        
+        return $formattedProperties;
     }
 
     public function getNoteProperties($noteId, $includeInternal = false) {
@@ -164,27 +171,35 @@ class DataManager {
     }
 
     public function getPageDetailsById($pageId, $includeInternal = false) {
+        error_log("[DEBUG] getPageDetailsById called for pageId: " . $pageId);
+        
         $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = :id");
         $stmt->bindParam(':id', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $page = $stmt->fetch(PDO::FETCH_ASSOC);
+        error_log("[DEBUG] Raw page data from database: " . json_encode($page));
 
         if ($page) {
-            // Assuming 'internal' is not a direct column on Pages table that needs filtering here.
-            // If it were, a similar check to getNoteById for $page['internal'] would be needed.
+            error_log("[DEBUG] Getting page properties");
             $page['properties'] = $this->getPageProperties($pageId, $includeInternal);
+            error_log("[DEBUG] Page properties: " . json_encode($page['properties']));
         }
         return $page;
     }
 
     public function getPageWithNotes($pageId, $includeInternal = false) {
+        error_log("[DEBUG] getPageWithNotes called for pageId: " . $pageId);
+        
         $pageDetails = $this->getPageDetailsById($pageId, $includeInternal);
+        error_log("[DEBUG] getPageDetailsById result: " . json_encode($pageDetails));
 
         if (!$pageDetails) {
+            error_log("[DEBUG] Page not found for ID: " . $pageId);
             return null; 
         }
         
         $notes = $this->getNotesByPageId($pageId, $includeInternal);
+        error_log("[DEBUG] getNotesByPageId result: " . json_encode($notes));
         
         return [
             'page' => $pageDetails,
