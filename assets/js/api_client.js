@@ -220,9 +220,10 @@ const notesAPI = {
     updateNote: (noteId, noteData) => {
         const bodyWithMethodOverride = {
             ...noteData,
+            id: noteId, // Include ID in body for phpdesktop compatibility
             _method: 'PUT' // Add _method parameter for tunneling
         };
-        return apiRequest(`notes.php?id=${noteId}`, 'POST', bodyWithMethodOverride);
+        return apiRequest('notes.php', 'POST', bodyWithMethodOverride);
     },
 
     /**
@@ -238,10 +239,11 @@ const notesAPI = {
         }
 
         const bodyWithMethodOverride = {
+            id: noteId, // Include ID in body for phpdesktop compatibility
             _method: 'DELETE',
             page_id: pageId
         };
-        return apiRequest(`notes.php?id=${noteId}`, 'POST', bodyWithMethodOverride);
+        return apiRequest('notes.php', 'POST', bodyWithMethodOverride);
     }
 };
 
