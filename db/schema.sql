@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS Attachments (
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
     type TEXT,
+    size INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (note_id) REFERENCES Notes(id) ON DELETE SET NULL
 );

@@ -348,14 +348,7 @@ function renderNote(note, nestingLevel = 0) {
     contentWrapperEl.appendChild(attachmentsEl);
 
     if (note.id && (typeof note.id === 'number' || (typeof note.id === 'string' && !note.id.startsWith('temp-')))) {
-        attachmentsAPI.getAttachmentsForNote(note.id)
-            .then(attachments => {
-                renderAttachments(attachmentsEl, attachments, note.id);
-            })
-            .catch(error => {
-                console.error('Failed to load attachments for note:', note.id, error);
-                attachmentsEl.innerHTML = '<small>Could not load attachments.</small>';
-            });
+        renderAttachments(attachmentsEl, note.attachments, note.id);
     }
 
     contentWrapperEl.addEventListener('dragover', (e) => {
@@ -889,104 +882,112 @@ function parseAndRenderContent(rawContent) {
  * @param {Array<Object>} attachments - Array of attachment objects
  * @param {string} noteId - The ID of the note these attachments belong to
  */
-function renderAttachments(container, attachments, noteId) {
-    container.innerHTML = ''; 
-    if (!attachments || attachments.length === 0) {
-        container.style.display = 'none';
-        return;
-    }
-
-    container.style.display = 'flex'; 
-
-    attachments.forEach(attachment => {
-        const attachmentEl = document.createElement('div');
-        attachmentEl.className = 'note-attachment-item';
-        attachmentEl.dataset.attachmentId = attachment.id;
-
-        let previewEl = '';
-        const isImage = attachment.type && attachment.type.startsWith('image/');
-
-        if (isImage) {
-            previewEl = `<img src="${attachment.url}" alt="${attachment.name}" class="attachment-preview-image">`;
-        } else {
-            previewEl = `<i data-feather="file" class="attachment-preview-icon"></i>`;
+async function renderAttachments(container, attachments, noteId) {
+    try {
+        // Fetch attachments for this note
+        const noteAttachments = await attachmentsAPI.getNoteAttachments(noteId);
+        
+        if (!noteAttachments || noteAttachments.length === 0) {
+            return;
         }
 
-        const linkEl = document.createElement('a');
-        linkEl.href = attachment.url;
-        linkEl.className = 'attachment-name';
-        if (!isImage) {
-            linkEl.target = '_blank'; 
-        }
-        linkEl.textContent = attachment.name;
+        const attachmentsContainer = document.createElement('div');
+        attachmentsContainer.className = 'note-attachments';
+        container.appendChild(attachmentsContainer);
 
-        attachmentEl.innerHTML = `
-            <div class="attachment-preview">${previewEl}</div>
-            <div class="attachment-info">
-                ${linkEl.outerHTML} 
-                <span class="attachment-meta">${attachment.type} - ${new Date(attachment.created_at).toLocaleDateString()}</span>
-            </div>
-            <button class="attachment-delete-btn" data-attachment-id="${attachment.id}" data-note-id="${noteId}">
-                <i data-feather="trash-2"></i>
-            </button>
-        `;
+        noteAttachments.forEach(attachment => {
+            const attachmentEl = document.createElement('div');
+            attachmentEl.className = 'note-attachment-item';
+            attachmentEl.dataset.attachmentId = attachment.id;
 
-        container.appendChild(attachmentEl);
+            let previewEl = '';
+            const isImage = attachment.type && attachment.type.startsWith('image/');
 
-        if (isImage) {
-            const imageLinkInDOM = attachmentEl.querySelector('.attachment-name');
-            if (imageLinkInDOM) {
-                imageLinkInDOM.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    if (domRefs.imageViewerModal && domRefs.imageViewerModalImg && domRefs.imageViewerModalClose) {
-                        domRefs.imageViewerModalImg.src = attachment.url;
-                        domRefs.imageViewerModal.classList.add('active');
+            if (isImage) {
+                previewEl = `<img src="${attachment.url}" alt="${attachment.name}" class="attachment-preview-image">`;
+            } else {
+                previewEl = `<i data-feather="file" class="attachment-preview-icon"></i>`;
+            }
 
-                        const closeImageModal = () => {
-                            domRefs.imageViewerModal.classList.remove('active');
-                            domRefs.imageViewerModalImg.src = ''; 
-                            domRefs.imageViewerModalClose.removeEventListener('click', closeImageModal);
-                            domRefs.imageViewerModal.removeEventListener('click', outsideClickHandler);
-                        };
+            const linkEl = document.createElement('a');
+            linkEl.href = attachment.url;
+            linkEl.className = 'attachment-name';
+            if (!isImage) {
+                linkEl.target = '_blank'; 
+            }
+            linkEl.textContent = attachment.name;
 
-                        const outsideClickHandler = (event) => {
-                            if (event.target === domRefs.imageViewerModal) { 
-                                closeImageModal();
+            attachmentEl.innerHTML = `
+                <div class="attachment-preview">${previewEl}</div>
+                <div class="attachment-info">
+                    ${linkEl.outerHTML} 
+                    <span class="attachment-meta">${attachment.type} - ${new Date(attachment.created_at).toLocaleDateString()}</span>
+                </div>
+                <button class="attachment-delete-btn" data-attachment-id="${attachment.id}" data-note-id="${noteId}">
+                    <i data-feather="trash-2"></i>
+                </button>
+            `;
+
+            attachmentsContainer.appendChild(attachmentEl);
+
+            if (isImage) {
+                const imageLinkInDOM = attachmentEl.querySelector('.attachment-name');
+                if (imageLinkInDOM) {
+                    imageLinkInDOM.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (domRefs.imageViewerModal && domRefs.imageViewerModalImg && domRefs.imageViewerModalClose) {
+                            domRefs.imageViewerModalImg.src = attachment.url;
+                            domRefs.imageViewerModal.classList.add('active');
+
+                            const closeImageModal = () => {
+                                domRefs.imageViewerModal.classList.remove('active');
+                                domRefs.imageViewerModalImg.src = ''; 
+                                domRefs.imageViewerModalClose.removeEventListener('click', closeImageModal);
+                                domRefs.imageViewerModal.removeEventListener('click', outsideClickHandler);
+                            };
+
+                            const outsideClickHandler = (event) => {
+                                if (event.target === domRefs.imageViewerModal) { 
+                                    closeImageModal();
+                                }
+                            };
+
+                            domRefs.imageViewerModalClose.addEventListener('click', closeImageModal);
+                            domRefs.imageViewerModal.addEventListener('click', outsideClickHandler);
+                        } else {
+                            console.error('Image viewer modal elements not found.');
+                            window.open(attachment.url, '_blank');
+                        }
+                    });
+                }
+            }
+
+            const deleteBtn = attachmentEl.querySelector('.attachment-delete-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', async () => {
+                    // if (await showGenericConfirmModal('Delete Attachment', `Are you sure you want to delete "${attachment.name}"?`)) {
+                    if (confirm(`Are you sure you want to delete "${attachment.name}"?`)) { // Using confirm as showGenericConfirmModal might not be available yet
+                        try {
+                            await attachmentsAPI.deleteAttachment(attachment.id);
+                            attachmentEl.remove(); 
+                            if (attachmentsContainer.children.length === 0) {
+                                attachmentsContainer.style.display = 'none';
                             }
-                        };
-
-                        domRefs.imageViewerModalClose.addEventListener('click', closeImageModal);
-                        domRefs.imageViewerModal.addEventListener('click', outsideClickHandler);
-                    } else {
-                        console.error('Image viewer modal elements not found.');
-                        window.open(attachment.url, '_blank');
+                        } catch (error) {
+                            console.error('Error deleting attachment:', error);
+                            alert('Failed to delete attachment: ' + error.message);
+                        }
                     }
                 });
             }
-        }
+        });
 
-        const deleteBtn = attachmentEl.querySelector('.attachment-delete-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', async () => {
-                // if (await showGenericConfirmModal('Delete Attachment', `Are you sure you want to delete "${attachment.name}"?`)) {
-                if (confirm(`Are you sure you want to delete "${attachment.name}"?`)) { // Using confirm as showGenericConfirmModal might not be available yet
-                    try {
-                        await attachmentsAPI.deleteAttachment(attachment.id);
-                        attachmentEl.remove(); 
-                        if (container.children.length === 0) {
-                            container.style.display = 'none';
-                        }
-                    } catch (error) {
-                        console.error('Error deleting attachment:', error);
-                        alert('Failed to delete attachment: ' + error.message);
-                    }
-                }
-            });
+        if (typeof feather !== 'undefined' && feather.replace) {
+            feather.replace();
         }
-    });
-
-    if (typeof feather !== 'undefined' && feather.replace) {
-        feather.replace();
+    } catch (error) {
+        console.error('Error rendering attachments:', error);
+        container.innerHTML = '<small>Could not load attachments.</small>';
     }
 }
 

@@ -290,29 +290,58 @@ const propertiesAPI = {
  */
 const attachmentsAPI = {
     /**
-     * Upload an attachment
-     * @param {FormData} formData - FormData containing the file and metadata
-     * @returns {Promise<{id: number, filename: string, mime_type: string, size: number, created_at: string}>}
+     * Get all attachments with optional filtering and pagination
+     * @param {Object} [params={}] - Query parameters
+     * @param {number} [params.page=1] - Page number
+     * @param {number} [params.per_page=10] - Items per page
+     * @param {string} [params.sort_by='created_at'] - Field to sort by
+     * @param {string} [params.sort_order='desc'] - Sort order ('asc' or 'desc')
+     * @param {string} [params.filter_by_name] - Filter by name (partial match)
+     * @param {string} [params.filter_by_type] - Filter by type (exact match)
+     * @returns {Promise<{attachments: Array, pagination: Object}>} Object containing attachments array and pagination info
      */
-    uploadAttachment: (formData) => apiRequest('attachments.php', 'POST', formData),
+    getAllAttachments: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        
+        // Add all provided parameters
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                queryParams.append(key, value);
+            }
+        });
+        
+        return apiRequest(`attachments.php?${queryParams.toString()}`);
+    },
 
     /**
      * Get attachments for a specific note
      * @param {number} noteId - Note ID
-     * @returns {Promise<Array<{id: number, name: string, path: string, type: string, created_at: string}>>}
+     * @returns {Promise<Array>} Array of attachment objects
      */
-    getAttachmentsForNote: (noteId) => apiRequest(`attachments.php?note_id=${noteId}`),
+    getNoteAttachments: (noteId) => {
+        return apiRequest(`attachments.php?note_id=${noteId}`);
+    },
+
+    /**
+     * Upload a new attachment
+     * @param {number} noteId - Note ID
+     * @param {File} file - File to upload
+     * @returns {Promise<Object>} Created attachment object
+     */
+    uploadAttachment: (noteId, file) => {
+        const formData = new FormData();
+        formData.append('note_id', noteId);
+        formData.append('attachmentFile', file);
+        return apiRequest('attachments.php', 'POST', formData);
+    },
 
     /**
      * Delete an attachment
      * @param {number} attachmentId - Attachment ID
-     * @returns {Promise<null>}
+     * @returns {Promise<Object>} Delete confirmation
      */
     deleteAttachment: (attachmentId) => {
-        const bodyWithMethodOverride = {
-            _method: 'DELETE'
-        };
-        return apiRequest(`attachments.php?id=${attachmentId}`, 'POST', bodyWithMethodOverride);
+        return apiRequest(`attachments.php?id=${attachmentId}`, 'DELETE');
     }
 };
 

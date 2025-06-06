@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attachments Dashboard</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/attachments_dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Attachments Dashboard</h1>
+
+        <div class="controls">
+            <input type="text" id="search-bar" placeholder="Search by name...">
+            <select id="type-filter">
+                <option value="">All Types</option>
+                <!-- Common types as placeholders -->
+                <option value="image/jpeg">JPEG Image</option>
+                <option value="image/png">PNG Image</option>
+                <option value="application/pdf">PDF</option>
+                <option value="text/plain">Text File</option>
+                <option value="application/msword">MS Word Document</option>
+                <option value="application/vnd.openxmlformats-officedocument.wordprocessingml.document">MS Word Document (DOCX)</option>
+                <!-- Options will be populated dynamically by JS -->
+            </select>
+        </div>
+
+        <table id="attachments-table">
+            <thead>
+                <tr>
+                    <th data-sort="name">Name</th>
+                    <th data-sort="size">Size</th>
+                    <th data-sort="type">Type</th>
+                    <th data-sort="created_at">Date Uploaded</th>
+                    <th>Preview/Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5">Loading attachments...</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <button id="prev-page" disabled>Previous</button>
+            <span id="page-info">Page 1 of 1</span>
+            <button id="next-page" disabled>Next</button>
+        </div>
+    </div>
+
+    <script src="assets/js/api_client.js" type="module"></script>
+    <script src="assets/js/attachments_dashboard.js" type="module"></script>
+</body>
+</html>

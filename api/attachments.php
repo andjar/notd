@@ -235,29 +235,105 @@ try {
             ApiResponse::error('Failed to save attachment: ' . $e->getMessage(), 500);
         }
     } elseif ($method === 'GET') {
-        $validationRules = ['note_id' => 'required|isPositiveInteger'];
-        $errors = Validator::validate($_GET, $validationRules);
-        if (!empty($errors)) {
-            ApiResponse::error('Invalid input for note ID.', 400, $errors);
-            exit;
-        }
-        $note_id = (int)$_GET['note_id']; // Validated
+        if (isset($_GET['note_id'])) {
+            $note_id = (int)$_GET['note_id'];
+            try {
+                $stmt = $pdo->prepare("SELECT id, name, path, type, size, created_at FROM Attachments WHERE note_id = ? ORDER BY created_at DESC");
+                $stmt->execute([$note_id]);
+                $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                foreach ($attachments as &$attachment) {
+                    $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path']; 
+                }
+                ApiResponse::success($attachments);
+            } catch (PDOException $e) {
+                ApiResponse::error('Failed to fetch attachments for note_id: ' . $e->getMessage(), 500);
+            }
+        } else {
+            // New logic for all attachments
+            $sortBy = $_GET['sort_by'] ?? 'created_at';
+            $sortOrder = $_GET['sort_order'] ?? 'desc';
+            $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $perPage = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+            if ($page < 1) $page = 1;
+            if ($perPage < 1) $perPage = 10;
+            if ($perPage > 100) $perPage = 100; // Max per page
 
-        try {
-            $stmt = $pdo->prepare("SELECT id, name, path, type, created_at FROM Attachments WHERE note_id = ? ORDER BY created_at DESC");
-            $stmt->execute([$note_id]); // Use validated note_id
-            $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Add full URL to path for client consumption if needed, or handle on client
-            foreach ($attachments as &$attachment) {
-                // Assuming UPLOADS_DIR is web-accessible as /uploads/
-                $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path']; 
+            $allowedSortColumns = ['id', 'name', 'path', 'type', 'size', 'created_at'];
+            if (!in_array($sortBy, $allowedSortColumns)) {
+                $sortBy = 'created_at';
+            }
+            if (!in_array(strtolower($sortOrder), ['asc', 'desc'])) {
+                $sortOrder = 'desc';
             }
 
-            ApiResponse::success($attachments);
+            $baseQuery = "SELECT id, name, path, type, size, created_at FROM Attachments";
+            $countQuery = "SELECT COUNT(*) FROM Attachments";
+            $whereClauses = [];
+            $params = []; // For WHERE clauses
 
-        } catch (PDOException $e) {
-            ApiResponse::error('Failed to fetch attachments: ' . $e->getMessage(), 500);
+            if (isset($_GET['filter_by_name']) && !empty($_GET['filter_by_name'])) {
+                $whereClauses[] = "name LIKE ?";
+                $params[] = '%' . $_GET['filter_by_name'] . '%';
+            }
+            if (isset($_GET['filter_by_type']) && !empty($_GET['filter_by_type'])) {
+                $whereClauses[] = "type = ?";
+                $params[] = $_GET['filter_by_type'];
+            }
+
+            if (!empty($whereClauses)) {
+                $filterQueryPart = " WHERE " . implode(" AND ", $whereClauses);
+                $baseQuery .= $filterQueryPart;
+                $countQuery .= $filterQueryPart;
+            }
+
+            try {
+                // Fetch total count
+                $countStmt = $pdo->prepare($countQuery);
+                $countStmt->execute($params);
+                $totalItems = (int)$countStmt->fetchColumn();
+
+                // $sortBy is whitelisted, so direct concatenation is safe.
+                // $sortOrder is also whitelisted ('asc' or 'desc').
+                $baseQuery .= " ORDER BY " . $sortBy . " " . (strtolower($sortOrder) === 'asc' ? 'ASC' : 'DESC');
+
+                $offset = ($page - 1) * $perPage;
+
+                $baseQuery .= " LIMIT ? OFFSET ?";
+                
+                $mainQueryParams = $params; 
+                $mainQueryParams[] = $perPage; 
+                $mainQueryParams[] = $offset;  
+
+                $stmt = $pdo->prepare($baseQuery);
+                
+                // Bind parameters one by one to ensure correct types for LIMIT/OFFSET
+                $paramIndex = 1;
+                foreach ($params as $paramValue) {
+                    $stmt->bindValue($paramIndex++, $paramValue);
+                }
+                $stmt->bindValue($paramIndex++, $perPage, PDO::PARAM_INT);
+                $stmt->bindValue($paramIndex++, $offset, PDO::PARAM_INT);
+                
+                $stmt->execute();
+                $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($attachments as &$attachment) {
+                    $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path'];
+                }
+                
+                ApiResponse::success([
+                    'data' => $attachments,
+                    'pagination' => [
+                        'total_items' => $totalItems,
+                        'per_page' => $perPage,
+                        'current_page' => $page,
+                        'total_pages' => (int)ceil($totalItems / $perPage)
+                    ]
+                ]);
+            } catch (PDOException $e) {
+                ApiResponse::error('Failed to fetch all attachments: ' . $e->getMessage(), 500);
+            }
         }
     } elseif ($method === 'DELETE') {
         // For DELETE, the 'id' might come from $_GET or from parsed input if _method override is used

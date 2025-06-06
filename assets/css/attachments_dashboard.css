@@ -1,0 +1,313 @@
+/* assets/css/attachments_dashboard.css */
+
+/* Inherit base styles from style.css for consistency where possible */
+/* :root variables from style.css will be available if loaded */
+
+body {
+    font-family: var(--ls-font-family, sans-serif); /* Use theme font or fallback */
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: var(--ls-primary-background-color, #f4f4f4); /* Use theme background or fallback */
+    color: var(--ls-primary-text-color, #333); /* Use theme text color or fallback */
+}
+
+.container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: var(--ls-space-6, 20px); /* Use theme spacing or fallback */
+    background-color: var(--ls-secondary-background-color, #fff); /* Use theme secondary background or fallback */
+    box-shadow: var(--ls-shadow-md, 0 0 10px rgba(0,0,0,0.1)); /* Use theme shadow or fallback */
+    border-radius: var(--ls-border-radius-medium, 8px); /* Use theme border radius */
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: var(--ls-space-4, 20px);
+    color: var(--ls-primary-text-color, #333);
+    font-family: var(--ls-header-font-family, sans-serif);
+    font-size: var(--ls-font-size-2xl, 1.5rem); /* Use theme font size */
+}
+
+.controls {
+    margin-bottom: var(--ls-space-4, 20px);
+    display: flex;
+    gap: var(--ls-space-3, 10px); /* Use theme spacing */
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.controls input[type="text"],
+.controls select {
+    padding: var(--ls-space-2, 10px); /* Use theme spacing */
+    border: 1px solid var(--ls-border-color, #ddd); /* Use theme border color */
+    border-radius: var(--ls-border-radius-medium, 4px); /* Use theme border radius */
+    font-size: var(--ls-font-size-base, 16px); /* Use theme font size */
+    background-color: var(--ls-primary-background-color, #fff);
+    color: var(--ls-primary-text-color, #333);
+}
+
+.controls input[type="text"]:focus,
+.controls select:focus {
+    outline: none;
+    border-color: var(--ls-accent-10, #007bff); /* Use theme accent color */
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl, 211, 100%, 50%) / 0.2); /* Use theme focus shadow */
+}
+
+.controls input[type="text"] {
+    flex-grow: 1;
+    min-width: 200px;
+}
+
+.controls select {
+    min-width: 150px;
+    cursor: pointer;
+}
+
+#attachments-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: var(--ls-space-4, 20px);
+    font-size: var(--ls-font-size-sm, 0.875rem); /* Smaller font for table data */
+}
+
+#attachments-table th,
+#attachments-table td {
+    border: 1px solid var(--ls-border-color, #ddd);
+    padding: var(--ls-space-3, 12px); /* Use theme spacing */
+    text-align: left;
+    vertical-align: middle; /* Align cell content vertically */
+}
+
+#attachments-table th {
+    background-color: var(--ls-tertiary-background-color, #f0f0f0); /* Use theme tertiary background */
+    font-weight: var(--ls-font-weight-semibold, 600); /* Use theme font weight */
+}
+
+#attachments-table th[data-sort] {
+    cursor: pointer;
+    position: relative; /* For positioning sort arrows */
+}
+
+#attachments-table th[data-sort]:hover {
+    background-color: var(--ls-quaternary-background-color, #e0e0e0); /* Use theme quaternary background or fallback */
+}
+
+/* Sort indicators */
+#attachments-table th[data-sort].sort-asc::after,
+#attachments-table th[data-sort].sort-desc::after {
+    content: '';
+    position: absolute;
+    right: var(--ls-space-2, 8px);
+    top: 50%;
+    border: 4px solid transparent;
+    transform: translateY(-50%);
+}
+
+#attachments-table th[data-sort].sort-asc::after {
+    border-bottom-color: var(--ls-primary-text-color, #333);
+    margin-top: -6px; /* Adjust to center arrow */
+}
+
+#attachments-table th[data-sort].sort-desc::after {
+    border-top-color: var(--ls-primary-text-color, #333);
+    margin-top: 2px; /* Adjust to center arrow */
+}
+
+
+#attachments-table tbody tr:nth-child(even) {
+    background-color: var(--ls-secondary-background-color, #f9f9f9);
+}
+
+#attachments-table tbody tr:hover {
+    background-color: var(--ls-tertiary-background-color, #f1f1f1);
+}
+
+#attachments-table td a {
+    color: var(--ls-link-text-color, #007bff); /* Use theme link color */
+    text-decoration: none;
+}
+
+#attachments-table td a:hover {
+    color: var(--ls-link-text-hover-color, #0056b3); /* Use theme link hover color */
+    text-decoration: underline;
+}
+
+.attachment-preview-image {
+    max-width: 80px;  /* Slightly smaller for better row height */
+    max-height: 50px; /* Slightly smaller for better row height */
+    object-fit: cover;
+    border-radius: var(--ls-border-radius-low, 4px); /* Use theme border radius */
+    margin-left: var(--ls-space-2, 8px);
+    vertical-align: middle; /* Align with text in cell */
+    border: 1px solid var(--ls-border-color, #ddd);
+}
+
+.pagination {
+    text-align: center;
+    margin-top: var(--ls-space-4, 20px);
+}
+
+.pagination button {
+    padding: var(--ls-space-2, 10px) var(--ls-space-3, 15px);
+    margin: 0 var(--ls-space-1, 5px);
+    border: 1px solid var(--ls-border-color, #ddd);
+    background-color: var(--ls-accent-10, #007bff); /* Use theme accent color */
+    color: var(--ls-active-nav-item-text-color, white); /* Use theme color for text on accent */
+    border-radius: var(--ls-border-radius-medium, 4px);
+    cursor: pointer;
+    transition: background-color 0.3s ease, opacity 0.3s ease;
+    font-size: var(--ls-font-size-sm, 0.875rem);
+}
+
+.pagination button:disabled {
+    background-color: var(--ls-gray-5, #ccc); /* Use theme gray */
+    color: var(--ls-gray-8, #666);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.pagination button:not(:disabled):hover {
+    background-color: var(--ls-accent-11, #0056b3); /* Use theme accent hover */
+}
+
+.pagination #page-info {
+    margin: 0 var(--ls-space-2, 10px);
+    font-size: var(--ls-font-size-base, 16px);
+    vertical-align: middle;
+}
+
+/* Responsive adjustments */
+
+/* Tablet and larger phones */
+@media (max-width: 768px) {
+    .container {
+        width: 95%;
+        padding: var(--ls-space-4, 15px);
+    }
+
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .controls input[type="text"],
+    .controls select {
+        width: 100%;
+        margin-bottom: var(--ls-space-2, 10px);
+    }
+
+    #attachments-table th,
+    #attachments-table td {
+        padding: var(--ls-space-2, 8px);
+        font-size: var(--ls-font-size-xs, 0.75rem); /* Even smaller for more compact view */
+    }
+    
+    /* Responsive table for 768px: Stacked layout but less aggressive than 480px */
+    /* Or, keep it tabular but ensure it doesn't overflow. Forcing scroll is also an option. */
+    /* For this example, we'll keep it tabular but reduce padding/font. */
+    /* If a stacked view is desired here, copy the 480px styles for table stacking. */
+
+    .attachment-preview-image {
+        max-width: 60px;
+        max-height: 40px;
+    }
+
+    .pagination button {
+        padding: var(--ls-space-1, 8px) var(--ls-space-2, 12px);
+        font-size: var(--ls-font-size-xs, 0.75rem);
+    }
+
+    .pagination #page-info {
+        font-size: var(--ls-font-size-sm, 0.875rem);
+    }
+}
+
+/* Mobile phones */
+@media (max-width: 480px) {
+    .container {
+        width: 100%;
+        margin: 10px 0;
+        padding: var(--ls-space-2, 10px);
+        border-radius: 0; /* Full width, no radius */
+        box-shadow: none;
+    }
+
+    h1 {
+        font-size: var(--ls-font-size-xl, 1.25rem); /* Adjust H1 size */
+    }
+
+    /* Stacked table for mobile */
+    #attachments-table thead {
+        display: none;
+    }
+
+    #attachments-table tbody,
+    #attachments-table tr,
+    #attachments-table td {
+        display: block;
+        width: 100%;
+    }
+
+    #attachments-table tr {
+        margin-bottom: var(--ls-space-3, 15px);
+        border: 1px solid var(--ls-border-color, #ddd);
+        border-radius: var(--ls-border-radius-low, 4px);
+        padding: var(--ls-space-2, 0); /* Remove padding if td has it all */
+        background-color: var(--ls-secondary-background-color, #fff); /* Ensure rows have background */
+    }
+    
+    #attachments-table tr:nth-child(even) { /* Override alternating color for stacked view */
+        background-color: var(--ls-secondary-background-color, #fff);
+    }
+
+
+    #attachments-table td {
+        text-align: right;
+        padding-left: 45%; /* Space for the label */
+        position: relative;
+        border: none; 
+        border-bottom: 1px dotted var(--ls-secondary-border-color, #eee);
+        padding-top: var(--ls-space-2, 10px);
+        padding-bottom: var(--ls-space-2, 10px);
+        padding-right: var(--ls-space-2, 10px);
+        display: flex; /* For better vertical alignment of content within TD */
+        justify-content: flex-end; /* Align content to the right */
+        align-items: center; /* Align items vertically */
+    }
+
+    #attachments-table td:before {
+        content: attr(data-label);
+        position: absolute;
+        left: var(--ls-space-2, 10px);
+        width: calc(45% - var(--ls-space-4, 20px)); /* Adjust width considering padding */
+        padding-right: var(--ls-space-2, 10px);
+        font-weight: var(--ls-font-weight-semibold, 600);
+        text-align: left;
+        white-space: nowrap;
+        color: var(--ls-accent-10, #007bff); /* Highlight labels */
+    }
+
+    #attachments-table td:last-child {
+        border-bottom: none;
+    }
+
+    .attachment-preview-image {
+        max-width: 40px; /* Smaller preview on mobile */
+        max-height: 30px;
+        margin-left: var(--ls-space-1, 5px);
+    }
+    
+    /* Ensure links within table cells are still readable */
+    #attachments-table td a {
+        display: inline-block; /* Better interaction */
+        margin-right: var(--ls-space-1, 5px); /* Space before image preview if any */
+    }
+}
+
+/* Styles for sort indicators on table headers (already included above, refined) */
+/* #attachments-table th[data-sort] { cursor: pointer; } */
+/* #attachments-table th[data-sort].sort-asc::after { content: ' ▲'; } */
+/* #attachments-table th[data-sort].sort-desc::after { content: ' ▼'; } */
+
