@@ -34,5 +34,6 @@ export const domRefs = {
     // Image Viewer Modal Refs
     imageViewerModal: document.getElementById('image-viewer-modal'),
     imageViewerModalImg: document.getElementById('image-viewer-modal-img'),
-    imageViewerModalClose: document.getElementById('image-viewer-modal-close')
+    imageViewerModalClose: document.getElementById('image-viewer-modal-close'),
+    favoritesContainer: document.getElementById('favorites-container'),
 };

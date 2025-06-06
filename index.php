@@ -125,8 +125,9 @@ require_once 'config.php';
             <div id="right-sidebar" class="sidebar right-sidebar">
                 <div class="sidebar-content">
                     <div class="sidebar-header">
-                        <h3>Page Info</h3>
+                        <h3>Favorites</h3>
                     </div>
+                    <div id="favorites-container"></div>
                     
                     <div class="backlinks-section">
                         <h4>Backlinks</h4>
