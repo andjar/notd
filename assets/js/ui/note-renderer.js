@@ -813,6 +813,14 @@ function parseAndRenderContent(rawContent) {
             return `<span class="page-link-bracket">[[</span><a href="#" class="page-link" data-page-name="${trimmedName}">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
         });
 
+        // Handle SQL Queries SQL{...} - This should happen before Markdown parsing of the query content itself.
+        const sqlQueryRegex = /SQL\{([^}]+)\}/g;
+        html = html.replace(sqlQueryRegex, (match, sqlQuery) => {
+            // Ensure quotes within the SQL query are properly escaped for the HTML attribute
+            const escapedSqlQuery = sqlQuery.replace(/"/g, '&quot;');
+            return `<div class="sql-query-placeholder" data-sql-query="${escapedSqlQuery}">Loading SQL Query...</div>`;
+        });
+
         html = html.replace(/!{{(.*?)}}/g, (match, blockRef) => {
             const trimmedRef = blockRef.trim();
             if (/^\d+$/.test(trimmedRef)) {

@@ -146,6 +146,16 @@ class PatternProcessor {
             [$this, 'handleBlockReferences'], 
             ['priority' => 30]
         );
+
+        // SQL query patterns: SQL{query}
+        $this->registerHandler('sql_queries', '/SQL\{([^}]+)\}/',
+            [$this, 'handleSqlQueries'],
+            [
+                'priority' => 40,
+                'extract_properties' => true,
+                'modify_content' => false
+            ]
+        );
     }
     
     /**
@@ -282,6 +292,35 @@ class PatternProcessor {
         }
         
         return ['properties' => $properties];
+    }
+
+    /**
+     * Handler for SQL query patterns SQL{query}
+     */
+    private function handleSqlQueries($matches, $content, $entityType, $entityId, $context, $pdo) {
+        error_log("[PATTERN_PROCESSOR_DEBUG] Processing SQL query matches: " . json_encode($matches));
+        $properties = [];
+
+        foreach ($matches as $match) {
+            $sqlQuery = trim($match[1]); // Captured SQL query
+            
+            if (!empty($sqlQuery)) {
+                error_log("[PATTERN_PROCESSOR_DEBUG] Processing SQL query: " . $sqlQuery);
+                $properties[] = [
+                    'name' => 'sql_query', // Or a more descriptive name like 'dynamic_sql_query'
+                    'value' => $sqlQuery,
+                    'type' => 'sql_query',
+                    'raw_match' => $match[0] // The full SQL{...} match
+                ];
+                error_log("[PATTERN_PROCESSOR_DEBUG] Stored SQL query property: " . json_encode(end($properties)));
+            } else {
+                error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty SQL query.");
+            }
+        }
+        
+        $result = ['properties' => $properties];
+        error_log("[PATTERN_PROCESSOR_DEBUG] Returning SQL query properties: " . json_encode($result));
+        return $result;
     }
     
     /**

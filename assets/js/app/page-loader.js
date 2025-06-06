@@ -235,6 +235,7 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
             const backlinks = await searchAPI.getBacklinks(cachedData.name);
             displayBacklinks(backlinks);
             await handleTransclusions(); 
+            await handleSqlQueries(); // Call the new SQL query handler
 
             if (focusFirstNote && notesContainer) {
                 const firstNoteEl = notesContainer.querySelector('.note-content');
@@ -315,6 +316,7 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         window.ui.updateActivePageLink(pageDetails.name);
         displayBacklinks(backlinks);
         await handleTransclusions(); 
+        await handleSqlQueries(); // Call the new SQL query handler
 
         if (focusFirstNote && notesContainer) {
             const firstNoteEl = notesContainer.querySelector('.note-content');
@@ -333,6 +335,93 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
 
     if (notesForCurrentPage.length === 0 && currentPageId) { 
         await handleCreateAndFocusFirstNote(currentPageId); 
+    }
+}
+
+
+/**
+ * Handles SQL query placeholders and fetches/renders their results.
+ */
+export async function handleSqlQueries() {
+    const placeholders = document.querySelectorAll('.sql-query-placeholder');
+    if (placeholders.length === 0) {
+        // console.log('No SQL query placeholders found.');
+        return;
+    }
+    console.log(`Found ${placeholders.length} SQL query placeholders.`);
+
+    for (const placeholder of placeholders) {
+        const sqlQuery = placeholder.dataset.sqlQuery;
+        if (!sqlQuery) {
+            placeholder.textContent = 'Error: No SQL query provided in data attribute.';
+            placeholder.classList.add('error');
+            continue;
+        }
+
+        try {
+            // Make an API call to 'api/query_notes.php'
+            const response = await fetch('api/query_notes.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql_query: sqlQuery })
+            });
+
+            if (!response.ok) {
+                // Try to get error message from response body
+                let errorMsg = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorResult = await response.json();
+                    if (errorResult && errorResult.error) {
+                        errorMsg = errorResult.error;
+                    }
+                } catch (e) { /* Ignore if response is not json */ }
+                throw new Error(errorMsg);
+            }
+            
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                placeholder.innerHTML = ''; // Clear "Loading..."
+                if (result.data.length === 0) {
+                    placeholder.textContent = 'Query returned no results.';
+                } else {
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'note-children sql-query-results'; // Added specific class
+
+                    result.data.forEach(noteData => {
+                        const parentNoteItem = placeholder.closest('.note-item');
+                        let nestingLevel = 0;
+                        if (parentNoteItem) {
+                            const currentNesting = parseInt(parentNoteItem.style.getPropertyValue('--nesting-level') || '0');
+                            nestingLevel = currentNesting + 1;
+                        }
+                        // Assuming window.ui.renderNote is available, as seen in other parts of page-loader.js
+                        if (window.ui && typeof window.ui.renderNote === 'function') {
+                            const noteElement = window.ui.renderNote(noteData, nestingLevel);
+                            childrenContainer.appendChild(noteElement);
+                        } else {
+                            console.error('window.ui.renderNote is not available to render SQL query results.');
+                            placeholder.textContent = 'Error: UI function to render notes is missing.';
+                            placeholder.classList.add('error');
+                            return; // Stop processing this placeholder
+                        }
+                    });
+                    placeholder.appendChild(childrenContainer);
+                    if (typeof feather !== 'undefined' && feather.replace) {
+                         feather.replace(); // Refresh icons if any were added
+                    }
+                }
+            } else {
+                placeholder.textContent = `Error: ${result.error || 'Failed to execute SQL query.'}`;
+                placeholder.classList.add('error');
+            }
+            placeholder.classList.add('loaded'); // Add loaded class after processing
+        } catch (error) {
+            console.error('Error fetching SQL query results for query:', sqlQuery, error);
+            placeholder.textContent = `Error loading query results: ${error.message}`;
+            placeholder.classList.add('error');
+            placeholder.classList.add('loaded'); // Add loaded class even on error
+        }
     }
 }
 

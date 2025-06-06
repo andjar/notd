@@ -914,29 +914,67 @@ body {
 }
 
 
-/* Transclusion Styles - align with new variables */
-.transclusion-placeholder {
-    background: var(--ls-secondary-background-color);
-    border: 1px dashed var(--ls-border-color);
-    border-radius: var(--ls-border-radius-low);
+/* Transclusion and SQL Query Placeholder Styles - Minimalistic */
+.transclusion-placeholder,
+.sql-query-placeholder {
+    padding: var(--ls-space-2);
     color: var(--ls-secondary-text-color);
+    font-style: italic;
+    border: 1px dashed var(--ls-border-color);
+    background-color: transparent;
+    border-radius: var(--ls-border-radius-low);
+    margin-bottom: var(--ls-space-2); /* Add some space below placeholders */
 }
+
 .transclusion-placeholder.error {
-    border-color: var(--color-error);
+    border-color: var(--color-error); /* Keep error distinct */
     background: var(--ls-transclusion-error-bg);
     color: var(--color-error);
+    font-style: normal; /* Error message should not be italic */
 }
+
+/* Styles for when SQL query content has loaded */
+.sql-query-placeholder.loaded {
+    border: none; /* Remove border */
+    padding: 0; /* Remove padding */
+    background-color: transparent;
+    font-style: normal; /* Reset font style */
+    margin-top: var(--ls-space-2); /* Maintain spacing if needed */
+    margin-bottom: 0; /* Reset bottom margin as content will have its own */
+}
+
 .transcluded-content {
-    background: var(--ls-secondary-background-color);
-    border: 1px solid var(--ls-border-color);
+    background-color: var(--ls-tertiary-background-color);
+    border: 1px solid var(--ls-secondary-border-color); /* Subtle border for the content box */
     border-radius: var(--ls-border-radius-low);
+    margin-top: 0; /* Placeholder margin-bottom handles spacing */
+    box-shadow: none; /* Ensure no strong shadows */
 }
+
 .transclusion-header {
-    background: var(--ls-tertiary-background-color);
+    background-color: var(--ls-quaternary-background-color, var(--ls-tertiary-background-color)); /* Use quaternary if available, else tertiary */
     border-bottom: 1px solid var(--ls-border-color);
+    padding: var(--ls-space-1) var(--ls-space-2);
 }
-.transclusion-link { color: var(--ls-link-text-color); }
-.transclusion-body { padding: var(--ls-space-2); }
+
+.transclusion-link {
+    color: var(--ls-link-text-color);
+    text-decoration: none;
+    font-size: var(--ls-font-size-sm); /* Slightly smaller for header */
+}
+
+.transclusion-link:hover {
+    color: var(--ls-link-text-hover-color);
+    text-decoration: underline;
+}
+
+.transclusion-body {
+    padding: var(--ls-space-2);
+}
+
+/* .sql-query-results is a .note-children div, so it should inherit default note-children styling. */
+/* No specific styles for .sql-query-results unless overrides are needed. */
+
 
 
 /* Input field base styles - Using new variables */
