@@ -145,7 +145,10 @@ require_once 'config.php';
         <div class="generic-modal-content">
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
-                <i data-feather="x" class="page-properties-modal-close" id="page-properties-modal-close"></i>
+                <div class="modal-header-icons">
+                    <i data-feather="key" class="page-encryption-icon" id="page-encryption-icon" title="Set page encryption"></i>
+                    <i data-feather="x" class="page-properties-modal-close" id="page-properties-modal-close"></i>
+                </div>
             </div>
             <div id="page-properties-list" class="page-properties-list"></div>
             <div class="generic-modal-actions">
@@ -200,6 +203,7 @@ require_once 'config.php';
     </div>
 
     <!-- SCRIPTS -->
+    <script src="assets/libs/sjcl.js"></script>
     <script src="assets/libs/feather.min.js"></script>
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>

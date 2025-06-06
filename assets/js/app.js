@@ -61,6 +61,9 @@ import { notesAPI, propertiesAPI, attachmentsAPI, searchAPI, templatesAPI, pages
 // Import app initialization
 import { initializeApp } from './app/app-init.js';
 
+// Import property editor functions
+import { displayPageProperties as displayPagePropertiesFromEditor } from './app/property-editor.js';
+
 // Make some variables globally accessible for drag and drop
 // window.currentPageId, window.notesForCurrentPage, window.currentFocusedNoteId are set in state.js
 window.notesAPI = notesAPI;
@@ -250,152 +253,9 @@ if (notesContainer) { // Ensure notesContainer is available before adding listen
 }
 
 
-// Update displayPageProperties function
+// Update displayPageProperties function - now uses the one from property-editor.js
 function displayPageProperties(properties) {
-    const pagePropertiesList = ui.domRefs.pagePropertiesList;
-    console.log('displayPageProperties called with:', properties);
-    console.log('pagePropertiesList element:', pagePropertiesList);
-    
-    if (!pagePropertiesList) {
-        console.error('pagePropertiesList element not found!');
-        return;
-    }
-
-    // Clear existing content and event listeners
-    pagePropertiesList.innerHTML = '';
-    
-    if (!properties || Object.keys(properties).length === 0) {
-        console.log('No properties to display in modal');
-        pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
-        return;
-    }
-
-    Object.entries(properties).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-            // Handle array properties - show each value separately but allow editing
-            value.forEach((singleValue, index) => {
-                const propItem = document.createElement('div');
-                propItem.className = 'page-property-item';
-                propItem.innerHTML = `
-                    <span class="page-property-key" contenteditable="true" data-original-key="${key}" data-is-array="true" data-array-index="${index}">${key}</span>
-                    <span class="page-property-separator">:</span>
-                    <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${singleValue}" value="${singleValue}" />
-                    <button class="page-property-delete" data-property="${key}" data-array-index="${index}" title="Delete this ${key} value">×</button>
-                `;
-                pagePropertiesList.appendChild(propItem);
-            });
-        } else {
-            // Handle single value properties
-            const propItem = document.createElement('div');
-            propItem.className = 'page-property-item';
-            propItem.innerHTML = `
-                <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
-                <span class="page-property-separator">:</span>
-                <input type="text" class="page-property-value" data-property="${key}" data-original-value="${value || ''}" value="${value || ''}" />
-                <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
-            `;
-            pagePropertiesList.appendChild(propItem);
-        }
-    });
-
-    // Remove any existing event listeners to prevent duplicates
-    const existingListener = pagePropertiesList._propertyEventListener;
-    if (existingListener) {
-        pagePropertiesList.removeEventListener('blur', existingListener, true);
-        pagePropertiesList.removeEventListener('keydown', existingListener);
-        pagePropertiesList.removeEventListener('click', existingListener);
-        pagePropertiesList.removeEventListener('change', existingListener);
-    }
-
-    // Create new event listener function
-    const propertyEventListener = async (e) => {
-        // Handle property value editing (change event for input fields)
-        if (e.type === 'change' && e.target.matches('.page-property-value')) {
-            const key = e.target.dataset.property;
-            const newValue = e.target.value.trim();
-            const originalValue = e.target.dataset.originalValue;
-            const arrayIndex = e.target.dataset.arrayIndex;
-            
-            if (newValue !== originalValue) {
-                if (arrayIndex !== undefined) {
-                    // Handle array property value update
-                    await updateArrayPropertyValue(key, parseInt(arrayIndex), newValue);
-                } else {
-                    // Handle single property value update
-                    await updatePageProperty(key, newValue);
-                }
-                e.target.dataset.originalValue = newValue;
-            }
-        }
-        
-        // Handle property key editing (blur event)
-        else if (e.type === 'blur' && e.target.matches('.page-property-key')) {
-            const originalKey = e.target.dataset.originalKey;
-            const newKey = e.target.textContent.trim();
-            const isArray = e.target.dataset.isArray === 'true';
-            const arrayIndex = e.target.dataset.arrayIndex;
-            
-            if (newKey !== originalKey && newKey !== '') {
-                if (isArray) {
-                    // For array properties, we need to handle renaming more carefully
-                    await renameArrayPropertyKey(originalKey, newKey, parseInt(arrayIndex));
-                } else {
-                    // Handle single property key rename
-                    await renamePropertyKey(originalKey, newKey);
-                }
-                e.target.dataset.originalKey = newKey;
-            } else if (newKey === '') {
-                // Reset to original key if empty
-                e.target.textContent = originalKey;
-            }
-        }
-        
-        // Handle Enter key to commit changes
-        else if (e.type === 'keydown' && e.key === 'Enter') {
-            if (e.target.matches('.page-property-value')) {
-                // For input fields, trigger change event
-                e.target.dispatchEvent(new Event('change', { bubbles: true }));
-            } else if (e.target.matches('.page-property-key')) {
-                // For contenteditable keys, trigger blur
-                e.target.blur();
-            }
-        }
-        
-        // Handle property deletion (click event)
-        else if (e.type === 'click' && e.target.matches('.page-property-delete')) {
-            const key = e.target.dataset.property;
-            const arrayIndex = e.target.dataset.arrayIndex;
-            
-            let confirmMessage;
-            if (arrayIndex !== undefined) {
-                confirmMessage = `Are you sure you want to delete this "${key}" value?`;
-            } else {
-                confirmMessage = `Are you sure you want to delete the property "${key}"?`;
-            }
-            
-            const confirmed = await ui.showGenericConfirmModal('Delete Property', confirmMessage);
-            if (confirmed) {
-                if (arrayIndex !== undefined) {
-                    await deleteArrayPropertyValue(key, parseInt(arrayIndex));
-                } else {
-                    await deletePageProperty(key);
-                }
-            }
-        }
-    };
-
-    // Store reference to the listener for cleanup
-    pagePropertiesList._propertyEventListener = propertyEventListener;
-
-    // Add event listeners
-    pagePropertiesList.addEventListener('blur', propertyEventListener, true);
-    pagePropertiesList.addEventListener('keydown', propertyEventListener);
-    pagePropertiesList.addEventListener('click', propertyEventListener);
-    pagePropertiesList.addEventListener('change', propertyEventListener); // Add change listener for input fields
-
-    if (typeof feather !== 'undefined' && feather.replace) {
-        feather.replace(); // Ensure Feather icons are re-applied
-    }
+    displayPagePropertiesFromEditor(properties);
 }
 
 /**

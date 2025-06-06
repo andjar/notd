@@ -710,34 +710,97 @@ function initPagePropertiesModal() {
     // So, direct usage of domRefs.pagePropertiesGear etc. is fine here.
     // Similarly, showGenericInputModal is a function within the same ui.js module.
     
-    if (domRefs.pagePropertiesGear) {
-        domRefs.pagePropertiesGear.addEventListener('click', async () => {
-            if (!window.currentPageId || !(window.propertiesAPI && typeof window.propertiesAPI.getProperties === 'function')) {
-                console.error('currentPageId or window.propertiesAPI.getProperties is not available.');
-                alert('Cannot load page properties at the moment.');
-                return;
-            }
-            try {
-                const properties = await window.propertiesAPI.getProperties('page', window.currentPageId);
-                
-                if (typeof window.displayPageProperties === 'function') {
-                    window.displayPageProperties(properties);
-                } else {
-                    console.error('window.displayPageProperties is not defined. Cannot populate property modal.');
+    // Use a more robust approach that works even if Feather Icons replaces the element
+    const attachGearClickListener = () => {
+        // Try multiple selectors to find the gear icon
+        const gearElement = document.getElementById('page-properties-gear') || 
+                           document.querySelector('.page-title-gear') ||
+                           document.querySelector('[data-feather="settings"]') ||
+                           document.querySelector('svg.feather-settings');
+        
+        if (gearElement && !gearElement.hasAttribute('data-properties-listener-attached')) {
+            gearElement.setAttribute('data-properties-listener-attached', 'true');
+            gearElement.addEventListener('click', async () => {
+                console.log('Page properties gear clicked');
+                if (!window.currentPageId || !(window.propertiesAPI && typeof window.propertiesAPI.getProperties === 'function')) {
+                    console.error('currentPageId or window.propertiesAPI.getProperties is not available.');
+                    alert('Cannot load page properties at the moment.');
+                    return;
                 }
+                try {
+                    const properties = await window.propertiesAPI.getProperties('page', window.currentPageId);
+                    
+                    if (typeof window.displayPageProperties === 'function') {
+                        window.displayPageProperties(properties);
+                    } else {
+                        console.error('window.displayPageProperties is not defined. Cannot populate property modal.');
+                    }
 
-                if (domRefs.pagePropertiesModal) {
-                     domRefs.pagePropertiesModal.classList.add('active');
-                     const modalContent = domRefs.pagePropertiesModal.querySelector('.generic-modal-content');
-                     if (modalContent) {
-                         modalContent.style.transform = 'scale(1)';
-                     }
+                    if (domRefs.pagePropertiesModal) {
+                         domRefs.pagePropertiesModal.classList.add('active');
+                         const modalContent = domRefs.pagePropertiesModal.querySelector('.generic-modal-content');
+                         if (modalContent) {
+                             modalContent.style.transform = 'scale(1)';
+                         }
+                    }
+                } catch (error) {
+                    console.error("Error fetching or displaying page properties:", error);
+                    alert("Error loading page properties.");
                 }
-            } catch (error) {
-                console.error("Error fetching or displaying page properties:", error);
-                alert("Error loading page properties.");
+            });
+            console.log('Page properties gear click listener attached successfully');
+        } else if (!gearElement) {
+            console.warn('Page properties gear element not found');
+        }
+    };
+    
+    // Try to attach immediately
+    attachGearClickListener();
+    
+    // Also try after a short delay to handle cases where Feather Icons hasn't processed yet
+    setTimeout(attachGearClickListener, 100);
+    
+    // And try after Feather Icons replacement if it happens later
+    setTimeout(attachGearClickListener, 500);
+    
+    // Also use event delegation as a backup approach
+    const pageHeaderContainer = document.querySelector('.page-header') || document.querySelector('#current-page-title-container');
+    if (pageHeaderContainer && !pageHeaderContainer.hasAttribute('data-properties-delegation-attached')) {
+        pageHeaderContainer.setAttribute('data-properties-delegation-attached', 'true');
+        pageHeaderContainer.addEventListener('click', async (e) => {
+            // Check if the clicked element is the gear icon (works for both <i> and <svg>)
+            if (e.target.matches('#page-properties-gear, .page-title-gear, [data-feather="settings"], svg.feather-settings') ||
+                e.target.closest('#page-properties-gear, .page-title-gear, [data-feather="settings"], svg.feather-settings')) {
+                
+                console.log('Page properties gear clicked via delegation');
+                if (!window.currentPageId || !(window.propertiesAPI && typeof window.propertiesAPI.getProperties === 'function')) {
+                    console.error('currentPageId or window.propertiesAPI.getProperties is not available.');
+                    alert('Cannot load page properties at the moment.');
+                    return;
+                }
+                try {
+                    const properties = await window.propertiesAPI.getProperties('page', window.currentPageId);
+                    
+                    if (typeof window.displayPageProperties === 'function') {
+                        window.displayPageProperties(properties);
+                    } else {
+                        console.error('window.displayPageProperties is not defined. Cannot populate property modal.');
+                    }
+
+                    if (domRefs.pagePropertiesModal) {
+                         domRefs.pagePropertiesModal.classList.add('active');
+                         const modalContent = domRefs.pagePropertiesModal.querySelector('.generic-modal-content');
+                         if (modalContent) {
+                             modalContent.style.transform = 'scale(1)';
+                         }
+                    }
+                } catch (error) {
+                    console.error("Error fetching or displaying page properties:", error);
+                    alert("Error loading page properties.");
+                }
             }
         });
+        console.log('Page properties gear delegation listener attached successfully');
     }
     
     if (domRefs.pagePropertiesModalClose) {

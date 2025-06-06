@@ -14,6 +14,9 @@ import {
     currentPageName
 } from './state.js';
 
+window.currentPageEncryptionKey = null;
+window.decryptionPassword = null;
+
 // Import API clients
 import { notesAPI, pagesAPI, searchAPI } from '../api_client.js';
 
@@ -187,6 +190,8 @@ function displayBacklinks(backlinksData) {
  * @param {boolean} [updateHistory=true] - Whether to update browser history
  */
 export async function loadPage(pageNameParam, focusFirstNote = false, updateHistory = true) {
+    currentPageEncryptionKey = null;
+    decryptionPassword = null;
     let pageNameToLoad = pageNameParam;
     console.log(`Loading page: ${pageNameToLoad}, focusFirstNote: ${focusFirstNote}, updateHistory: ${updateHistory}`);
     if (window.blockPageLoad) {
@@ -221,6 +226,109 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
             };
             const pageProperties = cachedData.properties;
             setNotesForCurrentPage(cachedData.notes);
+
+            if (pageProperties && pageProperties.encrypt) {
+                // Ensure it's a string and not an array/object if properties can have multiple values
+                const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt.value;
+                currentPageEncryptionKey = encryptionPropValue;
+
+                // Clear existing notes and show password prompt
+                if (notesContainer) notesContainer.innerHTML = ''; // Clear "Loading page..." or old notes
+                if (window.ui.domRefs.pagePropertiesContainer) window.ui.domRefs.pagePropertiesContainer.innerHTML = ''; // Clear properties display too
+                
+                const passwordPromptContainer = document.createElement('div');
+                passwordPromptContainer.id = 'password-prompt-container';
+                passwordPromptContainer.style.padding = '20px';
+                passwordPromptContainer.innerHTML = `
+                    <p>This page is encrypted. Please enter the password to decrypt.</p>
+                    <input type="password" id="decryption-password-input" placeholder="Password" style="margin-right: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button id="decrypt-button" style="padding: 8px 12px; background-color: var(--color-accent, #007bff); color: white; border: none; border-radius: 4px; cursor: pointer;">Decrypt</button>
+                    <p id="decryption-error" style="color: red; margin-top: 10px;"></p>
+                `;
+                if (notesContainer) {
+                    notesContainer.appendChild(passwordPromptContainer);
+                } else {
+                    console.error("Notes container not found for password prompt.");
+                    // Potentially append to main content or body as a fallback, though notesContainer is expected.
+                }
+
+
+                const decryptButton = document.getElementById('decrypt-button');
+                const passwordInput = document.getElementById('decryption-password-input');
+                const errorMessageElement = document.getElementById('decryption-error');
+
+                const handleDecrypt = async () => {
+                    const enteredPassword = passwordInput.value;
+                    if (!enteredPassword) {
+                        errorMessageElement.textContent = 'Please enter a password.';
+                        return;
+                    }
+
+                    try {
+                        // Hash the entered password
+                        const hashedPassword = sjcl.hash.sha256.hash(enteredPassword);
+                        const hashedPasswordHex = sjcl.codec.hex.fromBits(hashedPassword);
+
+                        if (hashedPasswordHex === currentPageEncryptionKey) {
+                            decryptionPassword = enteredPassword; // Store for note decryption
+                            
+                            // Remove password prompt
+                            passwordPromptContainer.remove();
+                            
+                            // Now display the page properties and notes (which will be decrypted by note-renderer)
+                            // This logic is similar to the non-encrypted path, but uses the already fetched data.
+                            // We need to ensure that the original notes (potentially encrypted) are passed to displayNotes.
+
+                            // Re-render page properties (if they were cleared)
+                            if (window.ui.domRefs.pagePropertiesContainer && typeof window.ui.renderPageInlineProperties === 'function') {
+                                window.ui.renderPageInlineProperties(pageProperties, window.ui.domRefs.pagePropertiesContainer);
+                            }
+                            
+                            // Display notes (these are the original notes, decryption happens in note-renderer)
+                            // The notes are already in `notesForCurrentPage` (set by `setNotesForCurrentPage`)
+                            // or `cachedData.notes` if using cache.
+                            let notesToDisplay = notesForCurrentPage; // Default to notes from state
+                            if (hasPageCache(pageNameToLoad) && getPageCache(pageNameToLoad).notes) { // Check if we were in cache path
+                                notesToDisplay = getPageCache(pageNameToLoad).notes;
+                            }
+                            
+                            window.ui.displayNotes(notesToDisplay, currentPageId); // currentPageId is set
+
+                            // Handle transclusions and SQL queries as usual after notes are displayed
+                            await handleTransclusions(notesToDisplay); 
+                            await handleSqlQueries();
+
+                            // Restore focus if needed
+                            if (focusFirstNote && notesContainer) {
+                                const firstNoteEl = notesContainer.querySelector('.note-content');
+                                if (firstNoteEl) firstNoteEl.focus();
+                            }
+
+                        } else {
+                            errorMessageElement.textContent = 'Incorrect password.';
+                            passwordInput.value = ''; // Clear the input
+                        }
+                    } catch (error) {
+                        console.error('Decryption error:', error);
+                        errorMessageElement.textContent = 'An error occurred during decryption.';
+                    }
+                };
+
+                decryptButton.addEventListener('click', handleDecrypt);
+                passwordInput.addEventListener('keypress', (event) => {
+                    if (event.key === 'Enter') {
+                        handleDecrypt();
+                    }
+                });
+                
+                // Important: Stop further execution of normal page rendering for encrypted pages until decrypted
+                window.blockPageLoad = false; // Release the block we set at the start
+                return; // Exit loadPage early, decryption handler will continue
+            } else {
+                // This is the non-encrypted path, ensure keys are null
+                currentPageEncryptionKey = null;
+                decryptionPassword = null;
+            }
 
             console.log('Page details for (cached)', cachedData.name, ':', pageDetails);
             console.log('Page properties for (cached)', cachedData.name, ':', pageProperties);
@@ -287,6 +395,107 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         const pageDetails = pageResponse.page;
         const pageProperties = pageResponse.page.properties || {};
         setNotesForCurrentPage(pageResponse.notes);
+
+        if (pageProperties && pageProperties.encrypt) {
+            // Ensure it's a string and not an array/object if properties can have multiple values
+            const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt.value;
+            currentPageEncryptionKey = encryptionPropValue;
+
+            // Clear existing notes and show password prompt
+            if (notesContainer) notesContainer.innerHTML = ''; // Clear "Loading page..." or old notes
+            if (window.ui.domRefs.pagePropertiesContainer) window.ui.domRefs.pagePropertiesContainer.innerHTML = ''; // Clear properties display too
+            
+            const passwordPromptContainer = document.createElement('div');
+            passwordPromptContainer.id = 'password-prompt-container';
+            passwordPromptContainer.style.padding = '20px';
+            passwordPromptContainer.innerHTML = `
+                <p>This page is encrypted. Please enter the password to decrypt.</p>
+                <input type="password" id="decryption-password-input" placeholder="Password" style="margin-right: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                <button id="decrypt-button" style="padding: 8px 12px; background-color: var(--color-accent, #007bff); color: white; border: none; border-radius: 4px; cursor: pointer;">Decrypt</button>
+                <p id="decryption-error" style="color: red; margin-top: 10px;"></p>
+            `;
+            if (notesContainer) {
+                notesContainer.appendChild(passwordPromptContainer);
+            } else {
+                console.error("Notes container not found for password prompt.");
+                // Potentially append to main content or body as a fallback, though notesContainer is expected.
+            }
+
+
+            const decryptButton = document.getElementById('decrypt-button');
+            const passwordInput = document.getElementById('decryption-password-input');
+            const errorMessageElement = document.getElementById('decryption-error');
+
+            const handleDecrypt = async () => {
+                const enteredPassword = passwordInput.value;
+                if (!enteredPassword) {
+                    errorMessageElement.textContent = 'Please enter a password.';
+                    return;
+                }
+
+                try {
+                    // Hash the entered password
+                    const hashedPassword = sjcl.hash.sha256.hash(enteredPassword);
+                    const hashedPasswordHex = sjcl.codec.hex.fromBits(hashedPassword);
+
+                    if (hashedPasswordHex === currentPageEncryptionKey) {
+                        decryptionPassword = enteredPassword; // Store for note decryption
+                        
+                        // Remove password prompt
+                        passwordPromptContainer.remove();
+                        
+                        // Now display the page properties and notes (which will be decrypted by note-renderer)
+                        // This logic is similar to the non-encrypted path, but uses the already fetched data.
+                        // We need to ensure that the original notes (potentially encrypted) are passed to displayNotes.
+
+                        // Re-render page properties (if they were cleared)
+                        if (window.ui.domRefs.pagePropertiesContainer && typeof window.ui.renderPageInlineProperties === 'function') {
+                            window.ui.renderPageInlineProperties(pageProperties, window.ui.domRefs.pagePropertiesContainer);
+                        }
+                        
+                        // Display notes (these are the original notes, decryption happens in note-renderer)
+                        // The notes are already in `notesForCurrentPage` (set by `setNotesForCurrentPage`)
+                        // or `cachedData.notes` if using cache.
+                        let notesToDisplay = notesForCurrentPage; // Default to notes from state
+                        // No need to check cache here as this is the network path
+                        
+                        window.ui.displayNotes(notesToDisplay, currentPageId); // currentPageId is set
+
+                        // Handle transclusions and SQL queries as usual after notes are displayed
+                        await handleTransclusions(notesToDisplay); 
+                        await handleSqlQueries();
+
+                        // Restore focus if needed
+                        if (focusFirstNote && notesContainer) {
+                            const firstNoteEl = notesContainer.querySelector('.note-content');
+                            if (firstNoteEl) firstNoteEl.focus();
+                        }
+
+                    } else {
+                        errorMessageElement.textContent = 'Incorrect password.';
+                        passwordInput.value = ''; // Clear the input
+                    }
+                } catch (error) {
+                    console.error('Decryption error:', error);
+                    errorMessageElement.textContent = 'An error occurred during decryption.';
+                }
+            };
+
+            decryptButton.addEventListener('click', handleDecrypt);
+            passwordInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    handleDecrypt();
+                }
+            });
+            
+            // Important: Stop further execution of normal page rendering for encrypted pages until decrypted
+            window.blockPageLoad = false; // Release the block we set at the start
+            return; // Exit loadPage early, decryption handler will continue
+        } else {
+            // This is the non-encrypted path, ensure keys are null
+            currentPageEncryptionKey = null;
+            decryptionPassword = null;
+        }
 
         setCurrentPageId(pageDetails.id); 
         setCurrentPageName(pageDetails.name); 
