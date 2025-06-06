@@ -145,10 +145,13 @@ require_once 'config.php';
         <div class="generic-modal-content">
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
-                <div class="modal-header-icons">
+                <!-- modal-header-icons div might be redundant if close button is absolute, or can be kept for other icons -->
+                <div class="modal-header-icons"> 
                     <i data-feather="key" class="page-encryption-icon" id="page-encryption-icon" title="Set page encryption"></i>
-                    <i data-feather="x" class="page-properties-modal-close" id="page-properties-modal-close"></i>
-                </div>
+                    <button class="modal-close-x" aria-label="Close modal" id="page-properties-modal-close" data-target-modal="page-properties-modal">
+                        <i data-feather="x"></i>
+                    </button>
+               </div>
             </div>
             <div id="page-properties-list" class="page-properties-list"></div>
             <div class="generic-modal-actions">
@@ -159,15 +162,19 @@ require_once 'config.php';
 
     <!-- Page Search Modal -->
     <div id="page-search-modal" class="generic-modal">
-        <div class="generic-modal-content page-search-modal-content">
-            <h3 id="page-search-modal-title">Search or Create Page</h3>
-            <input type="text" id="page-search-modal-input" class="generic-modal-input-field" placeholder="Type to search or create...">
+        <div class="generic-modal-content page-search-modal-styling"> <!-- page-search-modal-styling was added in previous step -->
+            <div class="generic-modal-header">
+                <h2 id="page-search-modal-title" class="generic-modal-title">Search or Create Page</h2> <!-- Changed h3 to h2 for consistency with other modal titles -->
+                <button class="modal-close-x" aria-label="Close modal" data-target-modal="page-search-modal">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <input type="text" id="page-search-modal-input" class="generic-modal-input-field" placeholder="Type to search or create..." style="margin-top: var(--ls-space-2);">
             <ul id="page-search-modal-results" class="page-search-results-list">
                 <!-- Results will be populated here by JavaScript -->
             </ul>
             <div class="generic-modal-actions">
                 <button id="page-search-modal-cancel" class="button secondary-button">Cancel</button>
-                <!-- No explicit OK button, Enter in input will handle action -->
             </div>
         </div>
     </div>
@@ -175,8 +182,13 @@ require_once 'config.php';
     <!-- Generic Input Modal -->
     <div id="generic-input-modal" class="generic-modal">
         <div class="generic-modal-content">
-            <h2 id="generic-input-modal-title" class="generic-modal-title">Input Required</h2>
-            <input type="text" id="generic-input-modal-input" class="generic-modal-input-field">
+            <div class="generic-modal-header">
+                <h2 id="generic-input-modal-title" class="generic-modal-title">Input Required</h2>
+                <button class="modal-close-x" aria-label="Close modal" data-target-modal="generic-input-modal">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <input type="text" id="generic-input-modal-input" class="generic-modal-input-field" style="margin-top: var(--ls-space-2);"> <!-- Added small margin-top for spacing from new header -->
             <div class="generic-modal-actions">
                 <button id="generic-input-modal-cancel" class="button secondary-button">Cancel</button>
                 <button id="generic-input-modal-ok" class="button primary-button">OK</button>
@@ -187,8 +199,13 @@ require_once 'config.php';
     <!-- Generic Confirm Modal -->
     <div id="generic-confirm-modal" class="generic-modal">
         <div class="generic-modal-content">
-            <h2 id="generic-confirm-modal-title" class="generic-modal-title">Confirm Action</h2>
-            <p id="generic-confirm-modal-message">Are you sure?</p>
+            <div class="generic-modal-header">
+                <h2 id="generic-confirm-modal-title" class="generic-modal-title">Confirm Action</h2>
+                <button class="modal-close-x" aria-label="Close modal" data-target-modal="generic-confirm-modal">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <p id="generic-confirm-modal-message" style="margin-top: var(--ls-space-2);">Are you sure?</p> <!-- Added small margin-top -->
             <div class="generic-modal-actions">
                 <button id="generic-confirm-modal-cancel" class="button secondary-button">Cancel</button>
                 <button id="generic-confirm-modal-ok" class="button primary-button">OK</button>

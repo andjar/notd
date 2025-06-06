@@ -138,8 +138,12 @@ try {
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
                 <div class="modal-header-icons">
-                    <i data-feather="key" class="page-encryption-icon" id="page-encryption-icon" title="Set page encryption"></i>
-                    <i data-feather="x" class="page-properties-modal-close" id="page-properties-modal-close"></i>
+                    <button class="modal-icon-button" id="page-encryption-icon" title="Set page encryption">
+                        <i data-feather="key"></i>
+                    </button>
+                    <button class="modal-icon-button" id="page-properties-modal-close" aria-label="Close modal">
+                        <i data-feather="x"></i>
+                    </button>
                 </div>
             </div>
             <div id="page-properties-list" class="page-properties-list"></div>
@@ -151,9 +155,14 @@ try {
 
     <!-- Page Search Modal -->
     <div id="page-search-modal" class="generic-modal">
-        <div class="generic-modal-content page-search-modal-content">
-            <h3 id="page-search-modal-title">Search or Create Page</h3>
-            <input type="text" id="page-search-modal-input" class="generic-modal-input-field" placeholder="Type to search or create...">
+        <div class="generic-modal-content page-search-modal-styling">
+            <div class="generic-modal-header">
+                <h2 id="page-search-modal-title" class="generic-modal-title">Search or Create Page</h2>
+                <button class="modal-close-x" aria-label="Close modal" data-target-modal="page-search-modal">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <input type="text" id="page-search-modal-input" class="generic-modal-input-field" placeholder="Type to search or create..." style="margin-top: var(--ls-space-2);">
             <ul id="page-search-modal-results" class="page-search-results-list">
                 <!-- Results will be populated here by JavaScript -->
             </ul>

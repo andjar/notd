@@ -1263,10 +1263,10 @@ textarea:focus {
     display: flex;
     align-items: center;
     gap: var(--ls-space-2);
+    margin-left: auto; /* Push icons to the right */
 }
 
-/* Encryption icon styling */
-.page-encryption-icon {
+.modal-icon-button {
     color: var(--ls-secondary-text-color);
     cursor: pointer;
     padding: var(--ls-space-1);
@@ -1281,9 +1281,19 @@ textarea:focus {
     border: none;
 }
 
-.page-encryption-icon:hover {
+.modal-icon-button:hover {
     color: var(--ls-primary-text-color);
     background: var(--ls-tertiary-background-color);
+}
+
+.modal-icon-button svg.feather {
+    width: 18px;
+    height: 18px;
+}
+
+/* Encryption icon styling */
+.page-encryption-icon {
+    /* These styles are now handled by .modal-icon-button */
 }
 
 /* Ensure feather icons are sized correctly in the encryption button */
@@ -1403,8 +1413,8 @@ textarea:focus {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    background-color: var(--ls-generic-modal-backdrop-bg, rgba(0, 0, 0, 0.6));
+    z-index: var(--ls-z-index-modal, 1050);
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
 }
@@ -1426,7 +1436,7 @@ textarea:focus {
     overflow-y: auto;
     transform: scale(0.95);
     transition: transform 0.2s ease-in-out;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--ls-shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1));
 }
 
 .generic-modal.active .generic-modal-content {
@@ -1463,24 +1473,12 @@ textarea:focus {
 
 #page-properties-modal .page-encryption-icon,
 #page-properties-modal .page-properties-modal-close {
-    color: var(--ls-secondary-text-color);
-    cursor: pointer;
-    padding: var(--ls-space-1);
-    border-radius: var(--ls-border-radius-medium);
-    transition: all var(--ls-transition-fast);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: transparent;
-    border: none;
+    /* These styles are now handled by .modal-icon-button */
 }
 
 #page-properties-modal .page-encryption-icon:hover,
 #page-properties-modal .page-properties-modal-close:hover {
-    color: var(--ls-primary-text-color);
-    background: var(--ls-tertiary-background-color);
+    /* These styles are now handled by .modal-icon-button */
 }
 
 #page-properties-modal .page-encryption-icon svg.feather,
@@ -1584,7 +1582,7 @@ textarea:focus {
 }
 
 /* Page Search Modal Specific Styles */
-.page-search-modal-content {
+.page-search-modal-styling {
     max-width: 700px;
 }
 .page-search-results-list {
@@ -3227,4 +3225,71 @@ a[href^="https://"]:visited {
 
 .show-more-favorites-btn:hover {
     background-color: var(--button-hover-bg);
+}
+
+/* Standard Modal Close Button */
+.modal-close-x {
+    background: transparent;
+    border: none;
+    color: var(--ls-secondary-text-color);
+    cursor: pointer;
+    padding: var(--ls-space-1);
+    border-radius: var(--ls-border-radius-medium);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--ls-transition-fast);
+    position: absolute; /* Added for positioning */
+    top: var(--ls-space-3); /* Adjust as needed */
+    right: var(--ls-space-3); /* Adjust as needed */
+}
+
+.modal-close-x:hover {
+    color: var(--ls-primary-text-color);
+    background-color: var(--ls-tertiary-background-color);
+}
+
+.modal-close-x svg.feather {
+    width: 20px; /* Slightly larger for easier clicking */
+    height: 20px;
+    stroke-width: 2.5; /* Bolder X */
+}
+
+/* Adjust .generic-modal-header if it exists, or define it */
+/* It's better to ensure .generic-modal-header is styled to accommodate the absolute positioned close button */
+.generic-modal-header {
+    display: flex;
+    justify-content: space-between; /* This will push title and (placeholder for) close button apart */
+    align-items: center;
+    padding-bottom: var(--ls-space-3); /* Add some padding if not already there */
+    border-bottom: 1px solid var(--ls-border-color); /* Common header style */
+    margin-bottom: var(--ls-space-4); /* Space after header */
+    position: relative; /* For positioning context of the close button */
+}
+
+/* Ensure title doesn't overlap with an absolute positioned close button if header is flex space-between */
+.generic-modal-title {
+    margin-right: var(--ls-space-8); /* Add margin to prevent overlap with close button */
+}
+
+.generic-modal-input-field {
+    width: 100%;
+    padding: var(--ls-space-2) var(--ls-space-3);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-medium);
+    background: var(--ls-primary-background-color);
+    color: var(--ls-primary-text-color);
+    font-size: var(--ls-font-size-sm);
+    transition: border-color var(--ls-transition-fast), box-shadow var(--ls-transition-fast);
+    box-shadow: none;
+}
+
+.generic-modal-input-field:focus {
+    outline: none;
+    border-color: var(--ls-accent-10);
+    box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+
+.generic-modal-input-field::placeholder {
+    color: var(--ls-tertiary-text-color);
 }

@@ -635,6 +635,11 @@ if (pageSearchModalCancel) {
     safeAddEventListener(pageSearchModalCancel, 'click', closeSearchOrCreatePageModal, 'pageSearchModalCancel');
 }
 
+const pageSearchModalCloseXBtn = pageSearchModal ? pageSearchModal.querySelector('.modal-close-x') : null;
+if (pageSearchModalCloseXBtn) {
+    safeAddEventListener(pageSearchModalCloseXBtn, 'click', closeSearchOrCreatePageModal, 'pageSearchModalCloseXBtn');
+}
+
 if (pageSearchModalInput) {
     pageSearchModalInput.addEventListener('input', (e) => {
         renderPageSearchResults(e.target.value);

@@ -312,18 +312,16 @@ function showGenericInputModal(title, defaultValue = '') {
             return;
         }
 
-        titleEl.textContent = title;
-        inputEl.value = defaultValue;
-        modal.classList.add('active');
-        inputEl.focus();
-        inputEl.select();
-
+        // Define all handlers first
         const closeHandler = (value) => {
             modal.classList.remove('active');
             okBtn.removeEventListener('click', okHandler);
             inputEl.removeEventListener('keypress', enterKeyHandler);
             cancelBtn.removeEventListener('click', cancelHandler);
             document.removeEventListener('keydown', escapeKeyHandler);
+            if (closeButtonX) {
+                closeButtonX.removeEventListener('click', cancelHandler);
+            }
             resolve(value);
         };
 
@@ -347,10 +345,23 @@ function showGenericInputModal(title, defaultValue = '') {
             }
         };
 
+        // Now set up the modal
+        titleEl.textContent = title;
+        inputEl.value = defaultValue;
+        modal.classList.add('active');
+        inputEl.focus();
+        inputEl.select();
+
+        const closeButtonX = modal.querySelector('.modal-close-x');
+        if (closeButtonX) {
+            closeButtonX.addEventListener('click', cancelHandler);
+        }
+
+        // Add event listeners
         okBtn.addEventListener('click', okHandler);
         inputEl.addEventListener('keypress', enterKeyHandler);
         cancelBtn.addEventListener('click', cancelHandler);
-        document.addEventListener('keydown', escapeKeyHandler); 
+        document.addEventListener('keydown', escapeKeyHandler);
     });
 }
 
@@ -379,11 +390,19 @@ function showGenericConfirmModal(title, message) {
         modal.classList.add('active');
         okBtn.focus();
 
+        const closeButtonX = modal.querySelector('.modal-close-x');
+        if (closeButtonX) {
+            closeButtonX.addEventListener('click', cancelHandler);
+        }
+
         const closeHandler = (value) => {
             modal.classList.remove('active');
             okBtn.removeEventListener('click', okHandler);
             cancelBtn.removeEventListener('click', cancelHandler);
             document.removeEventListener('keydown', escapeKeyHandler);
+            if (closeButtonX) {
+                closeButtonX.removeEventListener('click', cancelHandler);
+            }
             resolve(value);
         };
 
