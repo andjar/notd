@@ -1258,6 +1258,40 @@ textarea:focus {
     background: var(--ls-tertiary-background-color); /* Subtle hover */
 }
 
+/* Modal header icons container */
+.modal-header-icons {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-2);
+}
+
+/* Encryption icon styling */
+.page-encryption-icon {
+    color: var(--ls-secondary-text-color);
+    cursor: pointer;
+    padding: var(--ls-space-1);
+    border-radius: var(--ls-border-radius-medium);
+    transition: all var(--ls-transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+}
+
+.page-encryption-icon:hover {
+    color: var(--ls-primary-text-color);
+    background: var(--ls-tertiary-background-color);
+}
+
+/* Ensure feather icons are sized correctly in the encryption button */
+.page-encryption-icon svg.feather {
+    width: 18px;
+    height: 18px;
+}
+
 /* Styles for the list and items within the page properties modal remain */
 #page-properties-list {
     display: flex; /* Arrange pills in a row */
