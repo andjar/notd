@@ -1,0 +1,132 @@
+/* assets/css/kanban.css */
+
+body.kanban-page-body {
+    /* Styles specific to the body when kanban.php is active, if needed */
+    /* background-color: var(--color-background-secondary); */
+    /* display: flex; */
+    /* flex-direction: column; */
+    /* min-height: 100vh; */
+}
+
+.kanban-app-container {
+    /* Match app-container from style.css if full consistency is desired, or make it simpler */
+    /* For now, keeping it simple */
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Full viewport height */
+    overflow: hidden; /* Prevent body scroll if content overflows, board itself will scroll */
+}
+
+.kanban-header {
+    padding: 10px 20px;
+    background-color: var(--color-background-primary, #f8f9fa);
+    border-bottom: 1px solid var(--color-border, #dee2e6);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.kanban-header h1 {
+    margin: 0;
+    font-size: 1.5em;
+    color: var(--color-text-primary, #212529);
+}
+
+/* Styling for #kanban-root which gets .kanban-board-active */
+.kanban-root.kanban-board-active {
+    display: flex;
+    flex-direction: row; /* Columns side-by-side */
+    overflow-x: auto;  /* Allow horizontal scrolling for columns */
+    overflow-y: hidden; /* Prevent vertical scrolling at the board level */
+    flex-grow: 1;
+    padding: 15px;
+    background-color: var(--color-background-secondary, #e9ecef); /* A slightly different background for the board area */
+    gap: 15px; /* Space between columns */
+}
+
+.kanban-column {
+    flex: 0 0 300px; /* Fixed width for columns, no shrinking/growing */
+    max-width: 300px;
+    background-color: var(--color-background-tertiary, #f1f3f5); /* Column background */
+    border-radius: var(--border-radius-medium, 6px);
+    box-shadow: var(--shadow-small, 0 1px 3px rgba(0,0,0,0.1));
+    display: flex;
+    flex-direction: column; /* Stack title and card container vertically */
+    max-height: 100%; /* Ensure column does not overflow board vertically */
+}
+
+.kanban-column h3 {
+    padding: 10px 15px;
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 500;
+    border-bottom: 1px solid var(--color-border-light, #e0e0e0);
+    color: var(--color-text-secondary, #495057);
+    background-color: var(--color-background-primary, #f8f9fa); /* Slight contrast for header */
+    border-top-left-radius: var(--border-radius-medium, 6px);
+    border-top-right-radius: var(--border-radius-medium, 6px);
+}
+
+.kanban-column-cards {
+    flex-grow: 1; /* Allows this area to take available vertical space */
+    padding: 10px;
+    overflow-y: auto; /* Allow vertical scrolling for cards within a column */
+    min-height: 80px; /* Minimum height for drop target visibility */
+}
+
+.kanban-card {
+    background-color: var(--color-background-primary, #fff);
+    border-radius: var(--border-radius-small, 4px);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow-extra-small, 0 1px 2px rgba(0,0,0,0.05));
+    cursor: grab;
+    font-size: 0.95em;
+    color: var(--color-text-primary, #343a40);
+    border: 1px solid var(--color-border-lighter, #e9ecef);
+}
+
+.kanban-card:last-child {
+    margin-bottom: 0;
+}
+
+.kanban-card:hover {
+    border-color: var(--color-accent, #007bff);
+    box-shadow: var(--shadow-small, 0 2px 4px rgba(0,0,0,0.08));
+}
+
+/* Sortable.js feedback classes */
+.kanban-ghost {
+    opacity: 0.4;
+    background-color: var(--color-accent-hover, #0056b3);
+    border: 1px dashed var(--color-accent, #007bff);
+}
+
+.kanban-chosen {
+    background-color: var(--color-background-highlight, #e6f7ff); /* A light blue or yellow */
+    box-shadow: var(--shadow-medium, 0 4px 8px rgba(0,0,0,0.1));
+    transform: scale(1.02); /* Slightly larger */
+    cursor: grabbing;
+}
+
+.kanban-drag {
+    /* This class is applied to the element being dragged by Sortable */
+    /* Often similar to chosen, but can be distinct if needed */
+}
+
+.loading-message,
+.error-message {
+    width: 100%;
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2em;
+    color: var(--color-text-secondary);
+}
+
+.error-message {
+    color: var(--color-error, #dc3545);
+}
+
+/* Ensure app-container on kanban.php takes full height if not already default */
+/* html, body { height: 100%; margin: 0; } /* Might be too global, check style.css */
