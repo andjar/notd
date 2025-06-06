@@ -13,59 +13,68 @@ function getPropertyInternalStatusFromDefinition($pdo, $propertyName) {
     static $definitionCache = [];
     static $tableExists = null;
     
+    error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Getting internal status from definition for: {$propertyName}");
+    
     // Check if PropertyDefinitions table exists (cache the result)
     if ($tableExists === null) {
         try {
+            error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Checking if PropertyDefinitions table exists");
             $stmt = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='PropertyDefinitions'");
             $tableExists = (bool)$stmt->fetch();
+            error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] PropertyDefinitions table exists: " . ($tableExists ? 'yes' : 'no'));
         } catch (Exception $e) {
+            error_log("[PROPERTY_AUTO_INTERNAL_ERROR] Error checking PropertyDefinitions table: " . $e->getMessage());
             $tableExists = false;
         }
     }
     
     // If table doesn't exist, return null (no definition available)
     if (!$tableExists) {
+        error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] PropertyDefinitions table does not exist, returning null");
         return null;
     }
     
     // Use cache to avoid repeated database queries
     if (!isset($definitionCache[$propertyName])) {
         try {
+            error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Querying PropertyDefinitions for: {$propertyName}");
             $stmt = $pdo->prepare("SELECT internal FROM PropertyDefinitions WHERE name = ?");
             $stmt->execute([$propertyName]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             $definitionCache[$propertyName] = $result ? (int)$result['internal'] : null;
+            error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Definition found: " . ($definitionCache[$propertyName] === null ? 'no' : 'yes'));
         } catch (Exception $e) {
+            error_log("[PROPERTY_AUTO_INTERNAL_ERROR] Error querying PropertyDefinitions: " . $e->getMessage());
             // If query fails, cache null result
             $definitionCache[$propertyName] = null;
         }
+    } else {
+        error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Using cached definition for: {$propertyName}");
     }
     
     return $definitionCache[$propertyName];
 }
 
 /**
- * Set property internal status based on definitions when creating/updating properties
- * This should be called before inserting or updating a property
- * @param PDO $pdo Database connection
- * @param string $propertyName Property name
- * @param int|null $explicitInternal Explicitly set internal status (overrides definitions)
- * @return int Internal status to use (0 or 1)
+ * Determine if a property should be internal based on its name and any explicit setting
+ * @param string $propertyName The name of the property
+ * @param bool|null $explicitInternal Explicit internal setting (if provided)
+ * @return bool Whether the property should be internal
  */
-function determinePropertyInternalStatus($pdo, $propertyName, $explicitInternal = null) {
-    // If explicitly set, use that value
+function determinePropertyInternalStatus($propertyName, $explicitInternal = null) {
+    error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Determining internal status for property: {$propertyName}");
+    error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Explicit internal value: " . ($explicitInternal === null ? 'null' : ($explicitInternal ? 'true' : 'false')));
+    
+    // If an explicit internal value is provided, use it
     if ($explicitInternal !== null) {
-        return (int)$explicitInternal;
+        error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Using explicit internal value: " . ($explicitInternal ? 'true' : 'false'));
+        return $explicitInternal;
     }
     
-    // Check property definitions
-    $definedInternal = getPropertyInternalStatusFromDefinition($pdo, $propertyName);
-    if ($definedInternal !== null) {
-        return $definedInternal;
-    }
-    
-    // Default to public (not internal)
-    return 0;
+    // Otherwise, check the property definitions
+    $internalStatus = getPropertyInternalStatusFromDefinition($propertyName);
+    error_log("[PROPERTY_AUTO_INTERNAL_DEBUG] Internal status from definition: " . ($internalStatus ? 'true' : 'false'));
+    return $internalStatus;
 }
 
 // Removed applyPropertyDefinitionToProperty function (now redundant)

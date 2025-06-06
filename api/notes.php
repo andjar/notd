@@ -1,7 +1,7 @@
 <?php
 require_once '../config.php';
 require_once 'db_connect.php';
-require_once 'property_triggers.php';
+require_once 'property_trigger_service.php';
 require_once 'pattern_processor.php';
 require_once 'property_parser.php';
 
@@ -55,6 +55,7 @@ if ($method === 'GET') {
     if (isset($_GET['id'])) {
         // Get single note
         $noteId = (int)$_GET['id'];
+        error_log("[NOTES_API_DEBUG] Getting single note with ID: " . $noteId);
         $sql = "SELECT * FROM Notes WHERE id = :id";
         if (!$includeInternal) {
             $sql .= " AND internal = 0";
@@ -65,6 +66,7 @@ if ($method === 'GET') {
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($note) {
+            error_log("[NOTES_API_DEBUG] Found note: " . json_encode($note));
             // Get properties for the note
             $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id";
             if (!$includeInternal) {
@@ -75,6 +77,7 @@ if ($method === 'GET') {
             $stmtProps->bindParam(':note_id', $note['id'], PDO::PARAM_INT);
             $stmtProps->execute();
             $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
+            error_log("[NOTES_API_DEBUG] Found properties: " . json_encode($propertiesResult));
             
             $note['properties'] = [];
             foreach ($propertiesResult as $prop) {
@@ -98,151 +101,178 @@ if ($method === 'GET') {
                 }
             }
             
+            error_log("[NOTES_API_DEBUG] Final note with properties: " . json_encode($note));
             sendJsonResponse(['success' => true, 'data' => $note]);
         } else {
+            error_log("[NOTES_API_DEBUG] Note not found or is internal");
             sendJsonResponse(['success' => false, 'error' => 'Note not found or is internal'], 404); // Updated error message
         }
     } elseif (isset($_GET['page_id'])) {
-        // Get notes for a page
-        $pageId = (int)$_GET['page_id'];
-        $notesSql = "SELECT * FROM Notes WHERE page_id = :page_id";
-        if (!$includeInternal) {
-            $notesSql .= " AND internal = 0";
-        }
-        $notesSql .= " ORDER BY order_index ASC";
-        
-        $stmt = $pdo->prepare($notesSql);
-        $stmt->bindParam(':page_id', $pageId, PDO::PARAM_INT);
-        $stmt->execute();
-        $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $noteIds = array_column($notes, 'id');
-        
-        foreach ($notes as &$note) {
-            $note['properties'] = []; // Initialize properties
-        }
-        unset($note);
-
-        if (!empty($noteIds)) {
-            $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
-            $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
-            if (!$includeInternal) {
-                $propSql .= " AND internal = 0";
-            }
-            $propSql .= " ORDER BY name"; // Added order
-
-            $stmtProps = $pdo->prepare($propSql);
-            $stmtProps->execute($noteIds);
-            $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            error_log("[NOTES_API_DEBUG] Starting page load for page_id: " . $_GET['page_id']);
             
-            $propertiesByNote = [];
-            foreach ($propertiesResult as $prop) {
-                $currentNoteId = $prop['note_id'];
-                if (!isset($propertiesByNote[$currentNoteId])) {
-                    $propertiesByNote[$currentNoteId] = [];
-                }
-                $propName = $prop['name'];
-                if (!isset($propertiesByNote[$currentNoteId][$propName])) {
-                    $propertiesByNote[$currentNoteId][$propName] = [];
-                }
-                $propertiesByNote[$currentNoteId][$propName][] = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
+            // Get notes for a page
+            $pageId = (int)$_GET['page_id'];
+            $notesSql = "SELECT * FROM Notes WHERE page_id = :page_id";
+            if (!$includeInternal) {
+                $notesSql .= " AND internal = 0";
             }
+            $notesSql .= " ORDER BY order_index ASC";
+            
+            error_log("[NOTES_API_DEBUG] Executing notes query: " . $notesSql);
+            $stmt = $pdo->prepare($notesSql);
+            $stmt->bindParam(':page_id', $pageId, PDO::PARAM_INT);
+            $stmt->execute();
+            $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            error_log("[NOTES_API_DEBUG] Found " . count($notes) . " notes");
+            
+            $noteIds = array_column($notes, 'id');
             
             foreach ($notes as &$note) {
-                if (isset($propertiesByNote[$note['id']])) {
-                    foreach ($propertiesByNote[$note['id']] as $name => $values) {
-                        if (count($values) === 1) {
-                             if (!$includeInternal && $values[0]['internal'] == 0) {
-                                $note['properties'][$name] = $values[0]['value'];
+                $note['properties'] = []; // Initialize properties
+            }
+            unset($note);
+
+            if (!empty($noteIds)) {
+                error_log("[NOTES_API_DEBUG] Fetching properties for " . count($noteIds) . " notes");
+                $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
+                $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
+                if (!$includeInternal) {
+                    $propSql .= " AND internal = 0";
+                }
+                $propSql .= " ORDER BY name";
+
+                $stmtProps = $pdo->prepare($propSql);
+                $stmtProps->execute($noteIds);
+                $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
+                error_log("[NOTES_API_DEBUG] Found " . count($propertiesResult) . " properties");
+                
+                $propertiesByNote = [];
+                foreach ($propertiesResult as $prop) {
+                    $currentNoteId = $prop['note_id'];
+                    if (!isset($propertiesByNote[$currentNoteId])) {
+                        $propertiesByNote[$currentNoteId] = [];
+                    }
+                    $propName = $prop['name'];
+                    if (!isset($propertiesByNote[$currentNoteId][$propName])) {
+                        $propertiesByNote[$currentNoteId][$propName] = [];
+                    }
+                    $propertiesByNote[$currentNoteId][$propName][] = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
+                }
+                
+                foreach ($notes as &$note) {
+                    if (isset($propertiesByNote[$note['id']])) {
+                        foreach ($propertiesByNote[$note['id']] as $name => $values) {
+                            if (count($values) === 1) {
+                                 if (!$includeInternal && $values[0]['internal'] == 0) {
+                                    $note['properties'][$name] = $values[0]['value'];
+                                } else {
+                                    $note['properties'][$name] = $values[0];
+                                }
                             } else {
-                                $note['properties'][$name] = $values[0];
+                                $note['properties'][$name] = $values; // Keep as array of objects for lists
                             }
-                        } else {
-                            $note['properties'][$name] = $values; // Keep as array of objects for lists
                         }
                     }
                 }
+                unset($note);
             }
-            unset($note);
-        }
-        
-        // START NEW LOGIC FOR GET ?page_id={id}
+            
+            // START NEW LOGIC FOR GET ?page_id={id}
+            error_log("[NOTES_API_DEBUG] Fetching page details");
+            // 1. Fetch page details
+            $pageSql = "SELECT * FROM Pages WHERE id = :page_id";
+            $stmtPage = $pdo->prepare($pageSql);
+            $stmtPage->bindParam(':page_id', $pageId, PDO::PARAM_INT);
+            $stmtPage->execute();
+            $pageDetails = $stmtPage->fetch(PDO::FETCH_ASSOC);
 
-        // 1. Fetch page details
-        $pageSql = "SELECT * FROM Pages WHERE id = :page_id";
-        // No internal check for pages table itself, assuming pages are always fetchable if they exist.
-        // Visibility of a page would be controlled by other means if necessary (e.g., user permissions, not relevant here).
-        $stmtPage = $pdo->prepare($pageSql);
-        $stmtPage->bindParam(':page_id', $pageId, PDO::PARAM_INT);
-        $stmtPage->execute();
-        $pageDetails = $stmtPage->fetch(PDO::FETCH_ASSOC);
-
-        if (!$pageDetails) {
-            sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
-            return; // Exit
-        }
-
-        // 2. Fetch page properties
-        $pageProperties = [];
-        $pagePropSql = "SELECT name, value, internal FROM Properties WHERE page_id = :page_id AND note_id IS NULL"; // Ensure note_id IS NULL for page-specific properties
-        if (!$includeInternal) {
-            $pagePropSql .= " AND internal = 0";
-        }
-        $pagePropSql .= " ORDER BY name";
-        
-        $stmtPageProps = $pdo->prepare($pagePropSql);
-        $stmtPageProps->bindParam(':page_id', $pageId, PDO::PARAM_INT);
-        $stmtPageProps->execute();
-        $pagePropertiesResult = $stmtPageProps->fetchAll(PDO::FETCH_ASSOC);
-        
-        $pagePropertiesFormatted = [];
-        foreach ($pagePropertiesResult as $prop) {
-            if (!isset($pagePropertiesFormatted[$prop['name']])) {
-                $pagePropertiesFormatted[$prop['name']] = [];
+            if (!$pageDetails) {
+                error_log("[NOTES_API_DEBUG] Page not found for ID: " . $pageId);
+                sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
+                return;
             }
-            $propEntry = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
-            $pagePropertiesFormatted[$prop['name']][] = $propEntry;
-        }
+            error_log("[NOTES_API_DEBUG] Found page: " . json_encode($pageDetails));
 
-        foreach ($pagePropertiesFormatted as $name => $values) {
-            if (count($values) === 1) {
-                if (!$includeInternal && $values[0]['internal'] == 0) {
-                    $pagePropertiesFormatted[$name] = $values[0]['value'];
-                } else {
-                    // If includeInternal is true, or if it's false but the property is internal (which shouldn't happen due to SQL filter, but as a safeguard)
-                    $pagePropertiesFormatted[$name] = $values[0];
+            // 2. Fetch page properties
+            error_log("[NOTES_API_DEBUG] Fetching page properties");
+            $pageProperties = [];
+            $pagePropSql = "SELECT name, value, internal FROM Properties WHERE page_id = :page_id AND note_id IS NULL";
+            if (!$includeInternal) {
+                $pagePropSql .= " AND internal = 0";
+            }
+            $pagePropSql .= " ORDER BY name";
+            
+            $stmtPageProps = $pdo->prepare($pagePropSql);
+            $stmtPageProps->bindParam(':page_id', $pageId, PDO::PARAM_INT);
+            $stmtPageProps->execute();
+            $pagePropertiesResult = $stmtPageProps->fetchAll(PDO::FETCH_ASSOC);
+            error_log("[NOTES_API_DEBUG] Found " . count($pagePropertiesResult) . " page properties");
+            
+            $pagePropertiesFormatted = [];
+            foreach ($pagePropertiesResult as $prop) {
+                if (!isset($pagePropertiesFormatted[$prop['name']])) {
+                    $pagePropertiesFormatted[$prop['name']] = [];
                 }
-            } else {
-                // For multiple values, always return the array of objects
-                 $pagePropertiesFormatted[$name] = $values;
+                $propEntry = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
+                $pagePropertiesFormatted[$prop['name']][] = $propEntry;
             }
+
+            foreach ($pagePropertiesFormatted as $name => $values) {
+                if (count($values) === 1) {
+                    if (!$includeInternal && $values[0]['internal'] == 0) {
+                        $pagePropertiesFormatted[$name] = $values[0]['value'];
+                    } else {
+                        // If includeInternal is true, or if it's false but the property is internal (which shouldn't happen due to SQL filter, but as a safeguard)
+                        $pagePropertiesFormatted[$name] = $values[0];
+                    }
+                } else {
+                    // For multiple values, always return the array of objects
+                     $pagePropertiesFormatted[$name] = $values;
+                }
+            }
+            $pageDetails['properties'] = $pagePropertiesFormatted;
+
+            // Notes are already fetched and processed with their properties by the existing logic above this new block.
+            // $notes variable already contains the notes with their properties.
+
+            // 3. Construct the final JSON response
+            error_log("[NOTES_API_DEBUG] Constructing final response");
+            $response = [
+                'success' => true,
+                'data' => [
+                    'page' => $pageDetails,
+                    'notes' => $notes // $notes is from the original part of the page_id block
+                ]
+            ];
+            error_log("[NOTES_API_DEBUG] Final response: " . json_encode($response));
+            sendJsonResponse($response);
+            // END NEW LOGIC FOR GET ?page_id={id}
+
+        } catch (Exception $e) {
+            error_log("[NOTES_API_ERROR] Error loading page: " . $e->getMessage());
+            error_log("[NOTES_API_ERROR] Stack trace: " . $e->getTraceAsString());
+            sendJsonResponse(['success' => false, 'error' => 'Internal server error: ' . $e->getMessage()], 500);
         }
-        $pageDetails['properties'] = $pagePropertiesFormatted;
-
-        // Notes are already fetched and processed with their properties by the existing logic above this new block.
-        // $notes variable already contains the notes with their properties.
-
-        // 3. Construct the final JSON response
-        sendJsonResponse([
-            'success' => true,
-            'data' => [
-                'page' => $pageDetails,
-                'notes' => $notes // $notes is from the original part of the page_id block
-            ]
-        ]);
-        // END NEW LOGIC FOR GET ?page_id={id}
-
     } else {
-        sendJsonResponse(['success' => false, 'error' => 'Either page_id or id is required for GET request'], 400); // Clarified error
+        sendJsonResponse(['success' => false, 'error' => 'Either page_id or id is required for GET request'], 400);
     }
 } elseif ($method === 'POST') {
+    // Added check for invalid JSON payload
+    if ($input === null) {
+        error_log("[NOTES_API_ERROR] Invalid JSON payload received");
+        sendJsonResponse(['success' => false, 'error' => 'Invalid JSON payload or empty request body'], 400);
+    }
+
     if (!isset($input['page_id'])) {
+        error_log("[NOTES_API_ERROR] Missing page_id in POST request");
         sendJsonResponse(['success' => false, 'error' => 'Page ID is required'], 400);
     }
     
-    validateNoteData($input);
-    
     try {
+        error_log("[NOTES_API_DEBUG] Starting note creation for page_id: " . $input['page_id']);
+        validateNoteData($input);
+        
         $pdo->beginTransaction();
         
         // Get max order_index for the page
@@ -250,12 +280,13 @@ if ($method === 'GET') {
         $stmt->execute([(int)$input['page_id']]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         $orderIndex = ($result['max_order'] ?? 0) + 1;
+        error_log("[NOTES_API_DEBUG] New note will have order_index: " . $orderIndex);
         
         // Insert new note
         $stmt = $pdo->prepare("
             INSERT INTO Notes (page_id, content, parent_note_id, order_index, internal, created_at, updated_at)
             VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
-        "); // Added 'internal' column with default 0
+        ");
         $stmt->execute([
             (int)$input['page_id'],
             $input['content'],
@@ -264,8 +295,10 @@ if ($method === 'GET') {
         ]);
         
         $noteId = $pdo->lastInsertId();
+        error_log("[NOTES_API_DEBUG] Created note with ID: " . $noteId);
         
         // Process note content and save properties
+        error_log("[NOTES_API_DEBUG] Processing note content for properties");
         processNoteContent($pdo, $input['content'], 'note', $noteId);
         
         // Fetch the created note
@@ -275,9 +308,19 @@ if ($method === 'GET') {
         $note['properties'] = [];
         
         $pdo->commit();
+        error_log("[NOTES_API_DEBUG] Note creation completed successfully");
         sendJsonResponse(['success' => true, 'data' => $note]);
     } catch (PDOException $e) {
+        error_log("[NOTES_API_ERROR] Database error during note creation: " . $e->getMessage());
+        error_log("[NOTES_API_ERROR] Stack trace: " . $e->getTraceAsString());
         $pdo->rollBack();
+        sendJsonResponse(['success' => false, 'error' => 'Failed to create note: ' . $e->getMessage()], 500);
+    } catch (Exception $e) {
+        error_log("[NOTES_API_ERROR] General error during note creation: " . $e->getMessage());
+        error_log("[NOTES_API_ERROR] Stack trace: " . $e->getTraceAsString());
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         sendJsonResponse(['success' => false, 'error' => 'Failed to create note: ' . $e->getMessage()], 500);
     }
 } elseif ($method === 'PUT') {

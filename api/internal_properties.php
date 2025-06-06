@@ -1,15 +1,10 @@
 <?php
 require_once '../config.php';
 require_once 'db_connect.php';
-require_once 'property_triggers.php'; // Include the trigger system
+require_once 'property_trigger_service.php'; // New trigger service
+require_once 'response_utils.php'; // Include the new response utility
 
-header('Content-Type: application/json');
-
-function send_json_response($data, $status = 200) {
-    http_response_code($status);
-    echo json_encode($data);
-    exit;
-}
+// header('Content-Type: application/json'); // Will be handled by ApiResponse
 
 $entityType = null;
 $entityId = null;
@@ -21,7 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $propertyName = isset($_GET['name']) ? htmlspecialchars($_GET['name'], ENT_QUOTES, 'UTF-8') : null;
 
     if (!$entityType || !$entityId || !$propertyName) {
-        send_json_response(['error' => 'Missing required GET parameters: entity_type, entity_id, name'], 400);
+        ApiResponse::error('Missing required GET parameters: entity_type, entity_id, name', 400);
+        exit; // Ensure script termination
     }
 
     try {
@@ -36,31 +32,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($result) {
-            send_json_response(['name' => $propertyName, 'internal' => (int)$result['internal']]);
+            ApiResponse::success(['name' => $propertyName, 'internal' => (int)$result['internal']]);
         } else {
-            send_json_response(['error' => 'Property not found'], 404);
+            ApiResponse::error('Property not found', 404);
         }
     } catch (Exception $e) {
-        send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
     }
 
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) {
-        send_json_response(['error' => 'Invalid JSON'], 400);
+        ApiResponse::error('Invalid JSON', 400);
+        exit; // Ensure script termination
     }
 
     $entityType = isset($input['entity_type']) ? htmlspecialchars($input['entity_type'], ENT_QUOTES, 'UTF-8') : null;
     $entityId = isset($input['entity_id']) ? filter_var($input['entity_id'], FILTER_VALIDATE_INT) : null;
     $propertyName = isset($input['name']) ? $input['name'] : null;
-    $internalFlag = isset($input['internal']) ? filter_var($input['internal'], FILTER_VALIDATE_INT) : null;
+    $internalFlag = isset($input['internal']) ? filter_var($input['internal'], FILTER_VALIDATE_INT, ['options' => ['default' => null]]) : null;
+
 
     if (!$entityType || !$entityId || !$propertyName || $internalFlag === null) {
-        send_json_response(['error' => 'Missing required POST parameters: entity_type, entity_id, name, internal'], 400);
+        ApiResponse::error('Missing required POST parameters: entity_type, entity_id, name, internal', 400);
+        exit; // Ensure script termination
     }
 
     if ($internalFlag !== 0 && $internalFlag !== 1) {
-        send_json_response(['error' => 'Invalid internal flag value. Must be 0 or 1.'], 400);
+        ApiResponse::error('Invalid internal flag value. Must be 0 or 1.', 400);
+        exit; // Ensure script termination
     }
 
     try {
@@ -75,7 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $existingProperty = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
         if (!$existingProperty) {
-            send_json_response(['error' => 'Property not found. Cannot set internal status for a non-existent property.'], 404);
+            ApiResponse::error('Property not found. Cannot set internal status for a non-existent property.', 404);
+            exit; // Ensure script termination
         }
 
         $stmt = $pdo->prepare("UPDATE Properties SET internal = :internal WHERE {$idColumn} = :entityId AND name = :name");
@@ -97,22 +98,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $propertyRow = $stmtGetValue->fetch(PDO::FETCH_ASSOC);
 
             if ($propertyRow) {
-                dispatchPropertyTriggers($pdo, $entityType, $entityId, $propertyName, $propertyRow['value']);
+                // Use the new trigger service
+                $triggerService = new PropertyTriggerService($pdo);
+                $triggerService->dispatch($entityType, $entityId, $propertyName, $propertyRow['value']);
             } else {
                 // This case should ideally not happen if we checked for property existence before update
                 error_log("Could not retrieve property value after updating internal status for {$propertyName} on {$entityType} {$entityId}");
             }
 
-            send_json_response(['success' => true, 'message' => 'Property internal status updated.']);
+            ApiResponse::success(['message' => 'Property internal status updated.']);
         } else {
-            send_json_response(['error' => 'Failed to update property internal status'], 500);
+            ApiResponse::error('Failed to update property internal status', 500);
         }
     } catch (Exception $e) {
-        send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
     }
-
+    exit; // Ensure script termination after POST
 } else {
-    send_json_response(['error' => 'Method not allowed'], 405);
+    ApiResponse::error('Method not allowed', 405);
 }
 
-?> 
+?>

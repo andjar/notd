@@ -7,16 +7,11 @@ require_once '../template_processor.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-header('Content-Type: application/json');
+// header('Content-Type: application/json'); // Will be handled by ApiResponse
+require_once 'response_utils.php'; // Include the new response utility
 
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
-
-function sendJsonResponse($data, $statusCode = 200) {
-    http_response_code($statusCode);
-    echo json_encode($data);
-    exit;
-}
 
 // Log function for debugging
 function logError($message, $context = []) {
@@ -31,7 +26,8 @@ function logError($message, $context = []) {
 if ($method === 'POST' || $method === 'PUT') {
     if (!isset($input['type']) || !in_array($input['type'], ['note', 'page'])) {
         logError("Invalid template type", ['type' => $input['type'] ?? 'not set']);
-        sendJsonResponse(['success' => false, 'error' => 'Invalid template type'], 400);
+        ApiResponse::error('Invalid template type', 400);
+        exit;
     }
 }
 
@@ -44,7 +40,8 @@ try {
         
         if (!in_array($type, ['note', 'page'])) {
             logError("Invalid template type in GET", ['type' => $type]);
-            sendJsonResponse(['success' => false, 'error' => 'Invalid template type'], 400);
+            ApiResponse::error('Invalid template type', 400);
+            exit;
         }
 
         try {
@@ -74,12 +71,9 @@ try {
             
             logError("Sending template data", ['count' => count($templateData)]);
             // Ensure we always send the response in the expected format
-            $response = [
-                'success' => true,
-                'data' => $templateData
-            ];
+            $response = $templateData; // ApiResponse.success will wrap it with 'success' and 'data'
             logError("Final response structure", ['response' => $response]);
-            sendJsonResponse($response);
+            ApiResponse::success($response);
         } catch (Exception $e) {
             logError("Error in template processing", [
                 'error' => $e->getMessage(),
@@ -90,43 +84,41 @@ try {
     }
     else if ($method === 'POST') {
         if (!isset($input['name']) || !isset($input['content'])) {
-            sendJsonResponse(['success' => false, 'error' => 'Template name and content are required'], 400);
+            ApiResponse::error('Template name and content are required', 400);
+            exit;
         }
 
         $processor = new TemplateProcessor($input['type']);
         $success = $processor->addTemplate($input['name'], $input['content']);
         
         if ($success) {
-            sendJsonResponse(['success' => true, 'message' => 'Template created successfully']);
+            ApiResponse::success(['message' => 'Template created successfully']);
         } else {
-            sendJsonResponse(['success' => false, 'error' => 'Failed to create template'], 500);
+            ApiResponse::error('Failed to create template', 500);
         }
     }
     else if ($method === 'DELETE') {
         if (!isset($_GET['name']) || !isset($_GET['type'])) {
-            sendJsonResponse(['success' => false, 'error' => 'Template name and type are required'], 400);
+            ApiResponse::error('Template name and type are required', 400);
+            exit;
         }
 
         $processor = new TemplateProcessor($_GET['type']);
         $success = $processor->deleteTemplate($_GET['name']);
         
         if ($success) {
-            sendJsonResponse(['success' => true, 'message' => 'Template deleted successfully']);
+            ApiResponse::success(['message' => 'Template deleted successfully']);
         } else {
-            sendJsonResponse(['success' => false, 'error' => 'Failed to delete template'], 500);
+            ApiResponse::error('Failed to delete template', 500);
         }
     }
     else {
-        sendJsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+        ApiResponse::error('Method not allowed', 405);
     }
 } catch (Exception $e) {
     logError("Unhandled exception", [
         'error' => $e->getMessage(),
         'trace' => $e->getTraceAsString()
     ]);
-    sendJsonResponse([
-        'success' => false, 
-        'error' => $e->getMessage(),
-        'details' => 'Check server logs for more information'
-    ], 500);
-} 
+    ApiResponse::error($e->getMessage(), 500, 'Check server logs for more information');
+}

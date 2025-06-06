@@ -1,7 +1,8 @@
 <?php
 // Unified Pattern Processing System
 require_once 'db_connect.php';
-require_once 'property_triggers.php';
+// require_once 'property_triggers.php'; // Old trigger system replaced
+require_once 'property_trigger_service.php'; // New trigger service
 
 /**
  * Pattern Processing Registry and Engine
@@ -10,9 +11,11 @@ require_once 'property_triggers.php';
 class PatternProcessor {
     private $handlers = [];
     private $pdo;
+    private $propertyTriggerService; // Add service instance
     
     public function __construct($pdo) {
         $this->pdo = $pdo;
+        $this->propertyTriggerService = new PropertyTriggerService($pdo); // Instantiate service
         $this->registerDefaultHandlers();
     }
     
@@ -355,28 +358,25 @@ class PatternProcessor {
                 $isStatusProperty = ($name === 'status');
                 $isDoneAtProperty = ($name === 'done_at');
                 
+                // Set the appropriate ID column based on entity type
+                $idColumn = ($entityType === 'note') ? 'note_id' : 'page_id';
+                $otherIdColumn = ($entityType === 'note') ? 'page_id' : 'note_id';
+                
                 if ($isStatusProperty) {
                     $sql = "
-                        INSERT INTO Properties (note_id, page_id, name, value, internal)
+                        INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, internal)
                         VALUES (?, NULL, ?, ?, ?)
                     ";
                 } else {
-                    // For done_at and other properties, use REPLACE to ensure only one value exists
-                    if ($isDoneAtProperty) {
-                        // First delete any existing done_at properties
-                        $deleteSql = "DELETE FROM Properties WHERE note_id = ? AND name = 'done_at'";
-                        $deleteStmt = $this->pdo->prepare($deleteSql);
-                        $deleteStmt->execute([$entityId]);
-                        error_log("[PATTERN_PROCESSOR_DEBUG] Deleted existing done_at for note {$entityId}");
-                    }
-                    
+                    // For 'done_at' and other non-status properties, use REPLACE INTO.
+                    // This handles both insert and update, making the explicit delete for 'done_at' unnecessary.
                     $sql = "
-                        INSERT INTO Properties (note_id, page_id, name, value, internal)
+                        REPLACE INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, internal)
                         VALUES (?, NULL, ?, ?, ?)
                     ";
                 }
                 
-                error_log("[PATTERN_PROCESSOR_DEBUG] Using SQL: " . $sql);
+                error_log("[PATTERN_PROCESSOR_DEBUG] Using SQL for property '{$name}': " . trim($sql));
                 $stmt = $this->pdo->prepare($sql);
                 
                 foreach ($propertyGroup as $property) {
@@ -393,7 +393,8 @@ class PatternProcessor {
                     // Dispatch triggers only once per property name
                     if ($property === reset($propertyGroup)) {
                         error_log("[PATTERN_PROCESSOR_DEBUG] Dispatching trigger for {$name}");
-                        dispatchPropertyTriggers($this->pdo, $entityType, $entityId, $name, $property['value']);
+                        // Use the service to dispatch triggers
+                        $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
                     }
                 }
                 

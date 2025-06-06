@@ -1,7 +1,8 @@
 <?php
 require_once 'config.php';
 require_once 'api/db_connect.php';
-require_once 'api/property_triggers.php'; // Include the trigger system
+// require_once 'api/property_triggers.php'; // Old trigger system replaced
+require_once 'api/property_trigger_service.php'; // New trigger service
 
 $pdo = get_db_connection();
 
@@ -37,7 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $entityType = $propertyData['note_id'] ? 'note' : 'page';
                     $entityId = $propertyData['note_id'] ?: $propertyData['page_id'];
                     
-                    dispatchPropertyTriggers($pdo, $entityType, $entityId, $propertyData['name'], $propertyData['value']);
+                    // Use the new trigger service
+                    $triggerService = new PropertyTriggerService($pdo);
+                    $triggerService->dispatch($entityType, $entityId, $propertyData['name'], $propertyData['value']);
                 }
             }
         }

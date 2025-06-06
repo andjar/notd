@@ -1,17 +1,18 @@
 <?php
 require_once '../config.php';
 require_once 'db_connect.php';
-require_once 'property_triggers.php';
+// require_once 'property_triggers.php'; // Old trigger system replaced
+require_once 'property_trigger_service.php'; // New trigger service
 require_once 'property_auto_internal.php';
+require_once 'response_utils.php'; // Include the new response utility
+require_once 'data_manager.php';   // Include the new DataManager
+require_once 'validator_utils.php'; // Include the new Validator
 
-header('Content-Type: application/json');
+// header('Content-Type: application/json'); // Will be handled by ApiResponse
 
-function send_json_response($data, $status = 200) {
-    http_response_code($status);
-    echo json_encode($data);
-    exit;
-}
-
+// This specific validation can be replaced by Validator class or kept if it has special logic (like tag normalization)
+// For now, let's assume Validator can handle 'name' and 'value' presence, but tag normalization is specific.
+// We might call Validator first, then this if basic checks pass.
 function validate_property_data($data) {
     if (!isset($data['name']) || !isset($data['value'])) {
         return false;
@@ -72,73 +73,45 @@ function _updateOrAddPropertyAndDispatchTriggers($pdo, $entityType, $entityId, $
     }
     $stmt->execute([$entityId, $validatedName, $validatedValue, $finalInternal]);
     
-    // Dispatch triggers
-    dispatchPropertyTriggers($pdo, $entityType, $entityId, $validatedName, $validatedValue);
+    // Dispatch triggers using the service
+    $triggerService = new PropertyTriggerService($pdo);
+    $triggerService->dispatch($entityType, $entityId, $validatedName, $validatedValue);
     
     return ['name' => $validatedName, 'value' => $validatedValue, 'internal' => $finalInternal];
 }
 
 // GET /api/properties.php?entity_type=note&entity_id=123
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $entityType = isset($_GET['entity_type']) ? htmlspecialchars($_GET['entity_type'], ENT_QUOTES, 'UTF-8') : null;
-    $entityId = filter_input(INPUT_GET, 'entity_id', FILTER_VALIDATE_INT);
-    $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
-    
-    if (!$entityType || !$entityId) {
-        send_json_response(['error' => 'Missing required parameters'], 400);
+    $validationRules = [
+        'entity_type' => 'required|isValidEntityType',
+        'entity_id' => 'required|isPositiveInteger'
+        // include_internal is boolean, filter_input is fine
+    ];
+    $errors = Validator::validate($_GET, $validationRules);
+    if (!empty($errors)) {
+        ApiResponse::error('Invalid input parameters.', 400, $errors);
+        exit;
     }
-    
-    try {
-        $pdo = get_db_connection();
-        
-        // Base query
-        $sql = "
-            SELECT name, value, internal 
-            FROM Properties 
-            WHERE " . ($entityType === 'page' ? 'page_id' : 'note_id') . " = :entityId";
 
-        // Filter internal properties by default
-        if (!$includeInternal) {
-            $sql .= " AND internal = 0";
+    $entityType = $_GET['entity_type']; // Validated
+    $entityId = (int)$_GET['entity_id']; // Validated
+    $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
+
+    try {
+        $pdo = get_db_connection(); // DataManager needs PDO
+        $dataManager = new DataManager($pdo);
+        $properties = null;
+
+        if ($entityType === 'note') {
+            $properties = $dataManager->getNoteProperties($entityId, $includeInternal);
+        } elseif ($entityType === 'page') {
+            $properties = $dataManager->getPageProperties($entityId, $includeInternal);
         }
-        
-        $sql .= " ORDER BY name, id";
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindParam(':entityId', $entityId, PDO::PARAM_INT);
-        $stmt->execute();
-        
-        // Group properties by name to handle lists
-        $properties = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $name = $row['name'];
-            if (!isset($properties[$name])) {
-                $properties[$name] = [];
-            }
-            // Store as an object to include internal flag if needed, or simplify if only one value
-            $properties[$name][] = ['value' => $row['value'], 'internal' => (int)$row['internal']];
-        }
-        
-        // Convert single values to strings or keep as object if internal flag is relevant
-        foreach ($properties as $name => $values) {
-            if (count($values) === 1) {
-                // If only one property and not specifically including internal, simplify output
-                if (!$includeInternal && $values[0]['internal'] == 0) {
-                     $properties[$name] = $values[0]['value'];
-                } else {
-                    // Otherwise, keep it as an object/array to show the internal flag
-                    $properties[$name] = $values[0];
-                }
-            } else {
-                 // For multiple values (lists), keep them as an array of objects
-                 $properties[$name] = $values;
-            }
-        }
-        
-        send_json_response(['success' => true, 'data' => $properties]);
+        // $properties will be an array, empty if no properties found or entity_id is invalid.
+        ApiResponse::success($properties);
         
     } catch (Exception $e) {
-        send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
     }
 }
 
@@ -146,20 +119,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input) {
-        send_json_response(['error' => 'Invalid JSON'], 400);
+        ApiResponse::error('Invalid JSON', 400);
+        exit; // Ensure script termination
     }
     
     // Check if this is a delete action
     if (isset($input['action']) && $input['action'] === 'delete') {
-        // Handle property deletion via POST
-        $entityType = isset($input['entity_type']) ? htmlspecialchars($input['entity_type'], ENT_QUOTES, 'UTF-8') : null;
-        $rawEntityId = isset($input['entity_id']) ? $input['entity_id'] : null;
-        $entityId = filter_var($rawEntityId, FILTER_VALIDATE_INT, ['options' => ['default' => null]]);
-        $name = isset($input['name']) ? htmlspecialchars($input['name'], ENT_QUOTES, 'UTF-8') : null;
-        
-        if ($entityType === null || $entityId === null || $entityId === false || $name === null) {
-            send_json_response(['success' => false, 'error' => 'DELETE Error: Missing or invalid parameters'], 400);
+        $validationRules = [
+            'entity_type' => 'required|isValidEntityType',
+            'entity_id' => 'required|isPositiveInteger',
+            'name' => 'required|isNotEmpty'
+        ];
+        $errors = Validator::validate($input, $validationRules);
+        if (!empty($errors)) {
+            ApiResponse::error('Invalid input for deleting property.', 400, $errors);
+            exit;
         }
+        
+        $entityType = $input['entity_type']; // Validated
+        $entityId = (int)$input['entity_id']; // Validated
+        $name = $input['name']; // Validated
         
         try {
             $pdo = get_db_connection();
@@ -175,34 +154,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // FUTURE: Consider if delete operations should also have a "before_delete" or "after_delete" trigger mechanism.
             // For now, keeping it simple.
             
-            send_json_response(['success' => true]);
+            ApiResponse::success(null, 200); // Or perhaps a more descriptive success message if needed.
             
         } catch (Exception $e) {
-            send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+            ApiResponse::error('Server error: ' . $e->getMessage(), 500);
         }
         // Important: exit after handling delete action
         exit; 
     }
     
     // Handle regular property creation/update
-    $entityType = isset($input['entity_type']) ? htmlspecialchars($input['entity_type'], ENT_QUOTES, 'UTF-8') : null;
-    $entityId = isset($input['entity_id']) ? filter_var($input['entity_id'], FILTER_VALIDATE_INT) : null;
-    
-    if (!$entityType || !$entityId) {
-        send_json_response(['error' => 'Missing required parameters: entity_type and entity_id'], 400);
+    $validationRules = [
+        'entity_type' => 'required|isValidEntityType',
+        'entity_id' => 'required|isPositiveInteger',
+        'name' => 'required|isNotEmpty', // Name is required
+        'value' => 'required',          // Value is required (can be empty string, so not isNotEmpty)
+        'internal' => 'optional|isBooleanLike'
+    ];
+    $errors = Validator::validate($input, $validationRules);
+    if (!empty($errors)) {
+        ApiResponse::error('Invalid input for creating/updating property.', 400, $errors);
+        exit;
     }
-    
-    $name = isset($input['name']) ? $input['name'] : null;
-    $value = isset($input['value']) ? $input['value'] : null;
-    // The $explicitInternal for a direct POST is the 'internal' field from the input, if provided.
-    $explicitInternal = isset($input['internal']) ? filter_var($input['internal'], FILTER_VALIDATE_INT, ['options' => ['default' => null]]) : null;
-    // If 'internal' key is not present in $input, $explicitInternal will be null, and determinePropertyInternalStatus will use definitions or default.
-    // If 'internal' key IS present, its value (0 or 1) will be used directly.
 
-    if ($name === null || $value === null) { // Changed from (!$name || $value === null) to allow empty string names if desired, though current validation might still restrict.
-        send_json_response(['error' => 'Missing required parameters: name and value'], 400);
+    $entityType = $input['entity_type']; // Validated
+    $entityId = (int)$input['entity_id']; // Validated
+    $name = $input['name']; // Validated
+    $value = $input['value']; // Validated (presence)
+    // 'internal' is optional, Validator ensures it's 0/1 if present
+    $explicitInternal = isset($input['internal']) ? (int)$input['internal'] : null;
+
+    // The specific validate_property_data function can still be used for its tag normalization logic
+    // after basic validation passes.
+    $normalizedPropertyData = validate_property_data(['name' => $name, 'value' => $value]);
+    if (!$normalizedPropertyData) {
+        // This indicates an issue with tag format specifically, as basic presence was validated.
+        ApiResponse::error('Invalid property format (e.g., tag:: without tag name).', 400);
+        exit;
     }
-    
+    $name = $normalizedPropertyData['name']; // Potentially normalized name (though current logic doesn't change it)
+    $value = $normalizedPropertyData['value']; // Potentially normalized value (for tags)
+
     try {
         $pdo = get_db_connection();
         $pdo->beginTransaction();
@@ -217,15 +209,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         
         $pdo->commit();
-        send_json_response(['success' => true, 'property' => $savedProperty]);
+        ApiResponse::success(['property' => $savedProperty]);
         
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        send_json_response(['error' => 'Server error: ' . $e->getMessage()], 500);
+        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
     }
+    exit; // Ensure script termination after POST
 }
 
-// Method not allowed
-send_json_response(['error' => 'Method not allowed'], 405);
+// Method not allowed (if not GET or POST)
+ApiResponse::error('Method not allowed', 405);
