@@ -20,6 +20,28 @@ const notesContainer = document.querySelector('#notes-container');
 // e.g. notesAPI, propertiesAPI
 
 import { debounce } from '../utils.js'; // debounce imported from utils.js
+
+// --- Property Parsing Utility ---
+/**
+ * Parses explicit properties (key::value) from text content.
+ * @param {string} textContent - The text content of the note.
+ * @returns {object} - An object where keys are property names and values are arrays of strings.
+ */
+export function parsePropertiesFromText(textContent) {
+    const properties = {};
+    const regex = /\{([^:}]+)::([^}]+)\}/g; // Matches {key::value}
+    let match;
+    while ((match = regex.exec(textContent)) !== null) {
+        const key = match[1].trim();
+        const value = match[2].trim();
+        if (!properties[key]) {
+            properties[key] = [];
+        }
+        properties[key].push(value);
+    }
+    return properties;
+}
+
 import { handleNoteDrop } from '../ui/note-elements.js'; // Import directly from note-elements.js
 
 import { notesAPI, propertiesAPI } from '../api_client.js';
@@ -97,51 +119,37 @@ export async function saveNoteImmediately(noteEl) {
     
     window.ui.updateSaveStatusIndicator('pending'); 
     console.log('[DEBUG IMMEDIATE SAVE] Attempting to save noteId:', noteId);
-    console.log('[DEBUG IMMEDIATE SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(rawContent));
+    console.log('[DEBUG IMMEDIATE SAVE] Raw content for noteId ' + noteId + ':', JSON.stringify(rawContent));
 
     try {
         let contentToSave = rawContent;
-        // let propertiesToUpdate = {}; // Deferred for property handling strategy
+        const explicitProperties = parsePropertiesFromText(rawContent);
 
         if (window.currentPageEncryptionKey && window.decryptionPassword) {
             try {
                 contentToSave = sjcl.encrypt(window.decryptionPassword, rawContent);
                 // console.log('Encrypting (immediate): Original rawContent:', rawContent);
                 // console.log('Encrypting (immediate): Encrypted contentToSave:', contentToSave);
-                // propertiesToUpdate['encrypted'] = 'true'; // Deferred
+                if (!explicitProperties['encrypted']) {
+                    explicitProperties['encrypted'] = [];
+                }
+                explicitProperties['encrypted'].push('true'); 
             } catch (e) {
                 console.error('Encryption failed (immediate):', e);
                 window.ui.updateSaveStatusIndicator('error');
                 alert('Critical error: Encryption failed. Note not saved. Please try again or contact support.');
                 return; // Do not proceed with saving if encryption fails
             }
-
-            // Add this block *after* successful encryption attempt within the same conditional block:
-            if (window.currentPageEncryptionKey && window.decryptionPassword) { // Check again to be sure we are in the encrypted context
-                try {
-                    await propertiesAPI.setProperty({
-                        entity_type: 'note',
-                        entity_id: parseInt(noteId), // Ensure noteId is number
-                        name: 'encrypted',
-                        value: 'true',
-                        internal: true // Mark as internal property
-                    });
-                    // console.log(`Internal property {encrypted::true} set for note ${noteId}`);
-                } catch (propError) {
-                    console.error(`Failed to set {encrypted::true} property for note ${noteId}:`, propError);
-                    // Decide if this is a critical error. For now, log it and continue,
-                    // as the content itself might have been encrypted successfully.
-                    // Consider adding a specific UI feedback for this if deemed critical.
-                }
-            }
+            // Removed old propertiesAPI.setProperty call for 'encrypted'
         }
         
-        const updatePayload = { content: contentToSave };
-        // if (Object.keys(propertiesToUpdate).length > 0) { // Deferred
-        // }
+        const updatePayload = { 
+            content: contentToSave,
+            properties_explicit: explicitProperties
+        };
         
-        const updatedNote = await notesAPI.updateNote(noteId, updatePayload); // Use contentToSave
-        console.log('[DEBUG IMMEDIATE SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
+        const updatedNote = await notesAPI.updateNote(noteId, updatePayload);
+        console.log('[DEBUG IMMEDIATE SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content), 'Properties:', updatedNote.properties);
         updateNoteInCurrentPage(updatedNote);
         
         window.ui.updateNoteElement(updatedNote.id, updatedNote);
@@ -157,59 +165,51 @@ export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounc
     if (noteId.startsWith('temp-')) return;
 
     const contentDiv = noteEl.querySelector('.note-content');
-    const rawContent = contentDiv.dataset.rawContent; // Changed line
+    const rawContentFromDataset = contentDiv.dataset.rawContent; 
     
     const noteData = getNoteDataById(noteId);
-    // If rawContent is undefined or null (e.g. note was just created and blurred without input), 
-    // provide a default empty string to avoid errors with comparison or API calls.
-    const contentToSave = rawContent !== undefined && rawContent !== null ? rawContent : '';
+    // If rawContentFromDataset is undefined or null, provide a default empty string.
+    const currentRawContent = rawContentFromDataset !== undefined && rawContentFromDataset !== null ? rawContentFromDataset : '';
 
-    if (noteData && noteData.content === contentToSave && !noteId.startsWith('new-')) return;
+    // If note content hasn't changed and it's not a newly created note (which might just be getting its initial save), skip.
+    if (noteData && noteData.content === currentRawContent && !noteId.startsWith('new-')) {
+        // console.log('[DEBUG SAVE] Content unchanged for noteId:', noteId, '. Skipping save.');
+        return;
+    }
 
     window.ui.updateSaveStatusIndicator('pending');
     console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
-    console.log('[DEBUG SAVE] Raw content being sent for noteId ' + noteId + ':', JSON.stringify(contentToSave));
+    console.log('[DEBUG SAVE] Raw content for noteId ' + noteId + ':', JSON.stringify(currentRawContent));
     
     try {
-        let finalContentToSave = contentToSave;
-        // let propertiesToUpdate = {}; // Deferred
+        let finalContentToSave = currentRawContent;
+        const explicitProperties = parsePropertiesFromText(currentRawContent);
 
         if (window.currentPageEncryptionKey && window.decryptionPassword) {
             try {
-                finalContentToSave = sjcl.encrypt(window.decryptionPassword, contentToSave); // Encrypt the original contentToSave
-                // console.log('Encrypting (debounced): Original contentToSave:', contentToSave);
+                finalContentToSave = sjcl.encrypt(window.decryptionPassword, currentRawContent); // Encrypt the original currentRawContent
+                // console.log('Encrypting (debounced): Original currentRawContent:', currentRawContent);
                 // console.log('Encrypting (debounced): Encrypted finalContentToSave:', finalContentToSave);
-                // propertiesToUpdate['encrypted'] = 'true'; // Deferred
+                if (!explicitProperties['encrypted']) {
+                    explicitProperties['encrypted'] = [];
+                }
+                explicitProperties['encrypted'].push('true');
             } catch (e) {
                 console.error('Encryption failed (debounced):', e);
                 window.ui.updateSaveStatusIndicator('error');
                 alert('Critical error: Encryption failed. Note not saved. Please try again or contact support.');
                 return; 
             }
-
-            // Add this block *after* successful encryption attempt:
-            if (window.currentPageEncryptionKey && window.decryptionPassword) { // Check again
-                try {
-                    await propertiesAPI.setProperty({
-                        entity_type: 'note',
-                        entity_id: parseInt(noteId), // Ensure noteId is number
-                        name: 'encrypted',
-                        value: 'true',
-                        internal: true // Mark as internal property
-                    });
-                    // console.log(`Internal property {encrypted::true} set for note ${noteId} (debounced)`);
-                } catch (propError) {
-                    console.error(`Failed to set {encrypted::true} property for note ${noteId} (debounced):`, propError);
-                }
-            }
+            // Removed old propertiesAPI.setProperty call for 'encrypted'
         }
-
-        // const updatePayload = { content: finalContentToSave }; // Deferred
-        // if (Object.keys(propertiesToUpdate).length > 0) { // Deferred
-        // }
         
-        const updatedNote = await notesAPI.updateNote(noteId, { content: finalContentToSave }); // Use finalContentToSave
-        console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content));
+        const updatePayload = {
+            content: finalContentToSave,
+            properties_explicit: explicitProperties
+        };
+        
+        const updatedNote = await notesAPI.updateNote(noteId, updatePayload);
+        console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content), 'Properties:', updatedNote.properties);
         updateNoteInCurrentPage(updatedNote);
         
         window.ui.updateNoteElement(updatedNote.id, updatedNote); // Assumes ui is global

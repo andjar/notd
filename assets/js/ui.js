@@ -541,25 +541,8 @@ function showAllNotesAndLoadPage(pageName) {
     else { console.warn('window.loadPage function not found. Cannot reload page for breadcrumb.'); }
 }
 
-// This function seems to duplicate renderProperties from note-renderer.js
-// It should be reviewed and likely removed or merged.
-function renderNoteProperties(note) {
-    if (!note.properties || Object.keys(note.properties).length === 0) { return ''; }
-    const propertyItems = Object.entries(note.properties).map(([name, value]) => {
-        if (name.toLowerCase() === 'favorite' && String(value).toLowerCase() === 'true') {
-            return `<span class="property-item favorite"><span class="property-favorite">⭐</span></span>`;
-        }
-        if (name.startsWith('tag::')) {
-            const tagName = name.substring(5);
-            return `<span class="property-item tag"><span class="property-key">#</span><span class="property-value">${tagName}</span></span>`;
-        }
-        if (Array.isArray(value)) {
-            return value.map(v => `<span class="property-item"><span class="property-key">${name}</span><span class="property-value">${v}</span></span>`).join('');
-        }
-        return `<span class="property-item"><span class="property-key">${name}</span><span class="property-value">${value}</span></span>`;
-    }).join('');
-    return `<div class="note-properties">${propertyItems}</div>`;
-}
+// renderNoteProperties function was removed from here as it was redundant.
+// The primary renderProperties is in note-renderer.js and exported via ui.renderProperties.
 
 function updateSidebarToggleButtons() {
     const leftToggle = domRefs.toggleLeftSidebarBtn;
@@ -1322,7 +1305,7 @@ export const ui = {
     getNoteAncestors,
     renderBreadcrumbs,
     showAllNotesAndLoadPage,
-    renderNoteProperties,
+    // renderNoteProperties, // Removed
     focusOnNote,
     showAllNotes,
     getNestingLevel,

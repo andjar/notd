@@ -1003,41 +1003,60 @@ function renderProperties(container, properties) {
         return;
     }
 
-    const propertyItems = Object.entries(properties).map(([name, value]) => {
-        if (name.toLowerCase() === 'favorite' && String(value).toLowerCase() === 'true') {
-            return `<span class="property-item favorite">
-                <span class="property-favorite">⭐</span>
-            </span>`;
+    let htmlToSet = '';
+    Object.entries(properties).forEach(([name, propValue]) => {
+        // propValue is expected to be an array of {value: ..., internal: ...} objects
+        // or a single {value: ..., internal: ...} object if simplified by backend (less likely per prompt)
+        const valuesToRender = [];
+
+        if (Array.isArray(propValue)) {
+            propValue.forEach(item => {
+                if (item && typeof item === 'object' && !item.internal) {
+                    valuesToRender.push(item.value);
+                } else if (typeof item !== 'object') { 
+                    // If backend sometimes sends array of simple values (e.g. for non-internal tags)
+                    valuesToRender.push(item);
+                }
+            });
+        } else if (propValue && typeof propValue === 'object' && !propValue.internal) {
+            // Handle cases where backend might send a single object for a single-value property
+            valuesToRender.push(propValue.value);
+        } else if (typeof propValue !== 'object') {
+            // Handle cases where backend might send a simple value directly
+             valuesToRender.push(propValue);
         }
 
-        if (name.startsWith('tag::')) {
-            const tagName = name.substring(5);
-            return `<span class="property-item tag">
-                <span class="property-key">#</span>
-                <span class="property-value">${tagName}</span>
-            </span>`;
+        if (valuesToRender.length > 0) {
+            if (name.toLowerCase() === 'favorite' && valuesToRender.some(v => String(v).toLowerCase() === 'true')) {
+                htmlToSet += `<span class="property-item favorite"><span class="property-favorite">⭐</span></span>`;
+            } else if (name.startsWith('tag::') || name.toLowerCase() === 'tags' || name.toLowerCase() === 'tag') { // accept 'tags' or 'tag' as well
+                const tagName = name.startsWith('tag::') ? name.substring(5) : (valuesToRender.length === 1 ? valuesToRender[0] : name); // Use value if single, else key
+                valuesToRender.forEach(val => {
+                     htmlToSet += `<span class="property-item tag">
+                        <span class="property-key">#</span>
+                        <span class="property-value">${val}</span>
+                    </span>`;
+                });
+            } else {
+                valuesToRender.forEach(val => {
+                    htmlToSet += `<span class="property-item">
+                        <span class="property-key">${name}</span>
+                        <span class="property-value">${val}</span>
+                    </span>`;
+                });
+            }
         }
+    });
 
-        if (Array.isArray(value)) {
-            return value.map(v => `
-                <span class="property-item">
-                    <span class="property-key">${name}</span>
-                    <span class="property-value">${v}</span>
-                </span>
-            `).join('');
-        }
-
-        return `<span class="property-item">
-            <span class="property-key">${name}</span>
-            <span class="property-value">${value}</span>
-        </span>`;
-    }).join('');
-
-    container.innerHTML = propertyItems;
-    container.style.display = 'flex'; 
-    container.style.flexWrap = 'wrap'; 
-    container.style.gap = 'var(--ls-space-2, 8px)'; 
-    container.classList.remove('hidden'); 
+    if (htmlToSet) {
+        container.innerHTML = htmlToSet;
+        container.style.display = 'flex'; 
+        container.style.flexWrap = 'wrap'; 
+        container.style.gap = 'var(--ls-space-2, 8px)'; 
+        container.classList.remove('hidden'); 
+    } else {
+        container.style.display = 'none';
+    }
 }
 
 
