@@ -57,7 +57,14 @@ try {
         function ensure_upload_directory($year, $month) {
             $dir = UPLOADS_DIR . '/' . $year . '/' . $month;
             if (!file_exists($dir)) {
-                mkdir($dir, 0755, true);
+                if (!mkdir($dir, 0755, true)) {
+                    error_log("Failed to create directory: " . $dir);
+                    throw new RuntimeException('Failed to create upload directory: ' . $dir);
+                }
+            }
+            if (!is_writable($dir)) {
+                error_log("Directory not writable: " . $dir);
+                throw new RuntimeException('Upload directory is not writable: ' . $dir);
             }
             return $dir;
         }
