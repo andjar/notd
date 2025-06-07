@@ -1,4 +1,4 @@
-import { initializeKanban } from './kanban.js';
+import { initializeKanban } from './main.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeKanban();

@@ -1,8 +1,0 @@
-{
-    "api_url": "http://your-note-app.com/api/",
-    "feeds": [
-      "https://example.com/path/to/your/feed.xml",
-      "https://another-website.org/rss"
-    ]
-  }
-  

@@ -14,7 +14,7 @@ require_once 'config.php';
     <!-- For now, let's include the main style.css and a new kanban.css -->
     <?php require_once 'assets/css/theme_loader.php'; // If theme consistency is desired ?>
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/kanban.css"> </* Will be created later */>
+    <link rel="stylesheet" href="style.css"> </* Will be created later */>
     <link rel="stylesheet" href="assets/css/icons.css"> </* For feather icon CSS if not covered by JS */>
 </head>
 <body>
@@ -48,8 +48,8 @@ require_once 'config.php';
     <!-- state.js might be needed if kanban-board uses it, or pass data directly -->
     <script type="module" src="assets/js/app/state.js"></script> 
     <script type="module" src="assets/js/ui/note-renderer.js"></script> <!-- If parseAndRenderContent from here is used by kanban-board.js -->
-    <script type="module" src="assets/js/ui/kanban-board.js"></script>
-    <script type="module" src="assets/js/kanban-app.js"></script>  </* Will be created next */>
+    <script type="module" src="ui.js"></script>
+    <script type="module" src="app.js"></script>  </* Will be created next */>
 
     <script>
         // Initialize Feather Icons
