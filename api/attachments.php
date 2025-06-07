@@ -27,103 +27,113 @@ try {
     }
 
     // Constants for file validation
-    define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10MB
-    define('ALLOWED_MIME_TYPES', [
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'application/pdf',
-        'text/plain',
-        'text/markdown',
-        'text/csv',
-        'application/json'
-    ]);
-
-    function generate_unique_filename($original_name) {
-        $extension = pathinfo($original_name, PATHINFO_EXTENSION);
-        return uniqid() . '_' . preg_replace('/[^a-zA-Z0-9.-]/', '_', $original_name);
+    if (!defined('MAX_FILE_SIZE')) {
+        define('MAX_FILE_SIZE', 10 * 1024 * 1024); // 10MB
+    }
+    if (!defined('ALLOWED_MIME_TYPES')) {
+        define('ALLOWED_MIME_TYPES', [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'application/pdf',
+            'text/plain',
+            'text/markdown',
+            'text/csv',
+            'application/json'
+        ]);
     }
 
-    function ensure_upload_directory($year, $month) {
-        $dir = UPLOADS_DIR . '/' . $year . '/' . $month;
-        if (!file_exists($dir)) {
-            mkdir($dir, 0755, true);
+    if (!function_exists('generate_unique_filename')) {
+        function generate_unique_filename($original_name) {
+            $extension = pathinfo($original_name, PATHINFO_EXTENSION);
+            return uniqid() . '_' . preg_replace('/[^a-zA-Z0-9.-]/', '_', $original_name);
         }
-        return $dir;
     }
 
-    function validate_file($file) {
-        error_log("Starting file validation for: " . $file['name']);
-        
-        if (!isset($file['error']) || is_array($file['error'])) {
-            throw new RuntimeException('Invalid file parameter');
-        }
-
-        switch ($file['error']) {
-            case UPLOAD_ERR_OK:
-                break;
-            case UPLOAD_ERR_INI_SIZE:
-            case UPLOAD_ERR_FORM_SIZE:
-                throw new RuntimeException('File exceeds maximum size limit');
-            case UPLOAD_ERR_PARTIAL:
-                throw new RuntimeException('File was only partially uploaded');
-            case UPLOAD_ERR_NO_FILE:
-                throw new RuntimeException('No file was uploaded');
-            case UPLOAD_ERR_NO_TMP_DIR:
-                throw new RuntimeException('Missing temporary folder');
-            case UPLOAD_ERR_CANT_WRITE:
-                throw new RuntimeException('Failed to write file to disk');
-            case UPLOAD_ERR_EXTENSION:
-                throw new RuntimeException('File upload stopped by extension');
-            default:
-                throw new RuntimeException('Unknown upload error');
-        }
-
-        if ($file['size'] > MAX_FILE_SIZE) {
-            throw new RuntimeException('File exceeds maximum size limit of ' . (MAX_FILE_SIZE / 1024 / 1024) . 'MB');
-        }
-
-        // Try to get MIME type with better error handling
-        $mime_type = null;
-        
-        if (class_exists('finfo')) {
-            try {
-                $finfo = new finfo(FILEINFO_MIME_TYPE);
-                $mime_type = $finfo->file($file['tmp_name']);
-                error_log("MIME type detected via finfo: " . $mime_type);
-            } catch (Exception $e) {
-                error_log("finfo failed: " . $e->getMessage());
-                $mime_type = null;
+    if (!function_exists('ensure_upload_directory')) {
+        function ensure_upload_directory($year, $month) {
+            $dir = UPLOADS_DIR . '/' . $year . '/' . $month;
+            if (!file_exists($dir)) {
+                mkdir($dir, 0755, true);
             }
+            return $dir;
         }
-        
-        // Fallback to checking file extension if finfo fails
-        if (!$mime_type) {
-            $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            $mime_map = [
-                'jpg' => 'image/jpeg',
-                'jpeg' => 'image/jpeg',
-                'png' => 'image/png',
-                'gif' => 'image/gif',
-                'webp' => 'image/webp',
-                'pdf' => 'application/pdf',
-                'txt' => 'text/plain',
-                'md' => 'text/markdown',
-                'csv' => 'text/csv',
-                'json' => 'application/json'
-            ];
+    }
+
+    if (!function_exists('validate_file')) {
+        function validate_file($file) {
+            error_log("Starting file validation for: " . $file['name']);
             
-            $mime_type = $mime_map[$extension] ?? 'application/octet-stream';
-            error_log("MIME type detected via extension fallback: " . $mime_type);
-        }
+            if (!isset($file['error']) || is_array($file['error'])) {
+                throw new RuntimeException('Invalid file parameter');
+            }
 
-        if (!in_array($mime_type, ALLOWED_MIME_TYPES)) {
-            throw new RuntimeException('File type not allowed: ' . $mime_type);
-        }
+            switch ($file['error']) {
+                case UPLOAD_ERR_OK:
+                    break;
+                case UPLOAD_ERR_INI_SIZE:
+                case UPLOAD_ERR_FORM_SIZE:
+                    throw new RuntimeException('File exceeds maximum size limit');
+                case UPLOAD_ERR_PARTIAL:
+                    throw new RuntimeException('File was only partially uploaded');
+                case UPLOAD_ERR_NO_FILE:
+                    throw new RuntimeException('No file was uploaded');
+                case UPLOAD_ERR_NO_TMP_DIR:
+                    throw new RuntimeException('Missing temporary folder');
+                case UPLOAD_ERR_CANT_WRITE:
+                    throw new RuntimeException('Failed to write file to disk');
+                case UPLOAD_ERR_EXTENSION:
+                    throw new RuntimeException('File upload stopped by extension');
+                default:
+                    throw new RuntimeException('Unknown upload error');
+            }
 
-        error_log("File validation completed successfully");
-        return $mime_type;
+            if ($file['size'] > MAX_FILE_SIZE) {
+                throw new RuntimeException('File exceeds maximum size limit of ' . (MAX_FILE_SIZE / 1024 / 1024) . 'MB');
+            }
+
+            // Try to get MIME type with better error handling
+            $mime_type = null;
+            
+            if (class_exists('finfo')) {
+                try {
+                    $finfo = new finfo(FILEINFO_MIME_TYPE);
+                    $mime_type = $finfo->file($file['tmp_name']);
+                    error_log("MIME type detected via finfo: " . $mime_type);
+                } catch (Exception $e) {
+                    error_log("finfo failed: " . $e->getMessage());
+                    $mime_type = null;
+                }
+            }
+            
+            // Fallback to checking file extension if finfo fails
+            if (!$mime_type) {
+                $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $mime_map = [
+                    'jpg' => 'image/jpeg',
+                    'jpeg' => 'image/jpeg',
+                    'png' => 'image/png',
+                    'gif' => 'image/gif',
+                    'webp' => 'image/webp',
+                    'pdf' => 'application/pdf',
+                    'txt' => 'text/plain',
+                    'md' => 'text/markdown',
+                    'csv' => 'text/csv',
+                    'json' => 'application/json'
+                ];
+                
+                $mime_type = $mime_map[$extension] ?? 'application/octet-stream';
+                error_log("MIME type detected via extension fallback: " . $mime_type);
+            }
+
+            if (!in_array($mime_type, ALLOWED_MIME_TYPES)) {
+                throw new RuntimeException('File type not allowed: ' . $mime_type);
+            }
+
+            error_log("File validation completed successfully");
+            return $mime_type;
+        }
     }
 
     if ($method === 'POST') {
