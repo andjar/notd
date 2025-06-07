@@ -122,24 +122,28 @@ try {
         throw new Exception("Failed to decode JSON response from pages API. Error: " . json_last_error_msg() . ". Response: " . $page_response_json);
     }
 
-    if (isset($page_response_data['data']['id'])) {
-        $page_id = $page_response_data['data']['id'];
-        error_log("Successfully retrieved page ID: " . $page_id . " for page name: " . $todays_date_string);
-    } elseif (isset($page_response_data['data'][0]['id'])) {
-        // Handle cases where the API might return an array of pages if multiple have the same name (should ideally not happen for date pages)
-        // Or if the structure is slightly different like an array of results.
-        $page_id = $page_response_data['data'][0]['id'];
-        error_log("Successfully retrieved page ID (from array): " . $page_id . " for page name: " . $todays_date_string);
+    // Check for success indicator in the response
+    $is_successful_response = (isset($page_response_data['success']) && $page_response_data['success'] === true) ||
+                              (isset($page_response_data['status']) && $page_response_data['status'] === 'success');
+
+    if ($is_successful_response) {
+        if (isset($page_response_data['data']['id'])) {
+            $page_id = $page_response_data['data']['id'];
+            error_log("Successfully retrieved page ID: " . $page_id . " for page name: " . $todays_date_string);
+        } elseif (isset($page_response_data['data'][0]['id'])) { // Handle array case
+            $page_id = $page_response_data['data'][0]['id'];
+            error_log("Successfully retrieved page ID (from array): " . $page_id . " for page name: " . $todays_date_string);
+        } else {
+            error_log("Warning: Page ID not found in successful API response for '{$todays_date_string}'. Response: " . $page_response_json);
+            // This case implies success was true, but data.id was missing, which is an API contract issue.
+        }
     } else {
-        // If page doesn't exist, the API might return success:false or an empty data array.
-        // For this script, we assume the page for today should exist or be creatable.
-        // If the page.php API doesn't auto-create, this part might need adjustment or a separate page creation call.
-        error_log("Warning: Page ID not found in API response for '{$todays_date_string}'. Response: " . $page_response_json);
-        // Depending on API behavior, we might try to create the page here if it's guaranteed not to exist.
-        // For now, we'll proceed and let note creation fail if page_id is null.
+        // API indicated failure or did not provide a clear success status
+        error_log("Error: Pages API call for '{$todays_date_string}' did not indicate success or returned an error. Response: " . $page_response_json);
+        // No exception thrown here, $page_id will remain null and handled later.
     }
 } catch (Exception $e) {
-    error_log("Error fetching page ID: " . $e->getMessage());
+    error_log("Error fetching page ID during file_get_contents or JSON decode: " . $e->getMessage());
     // Decide if to exit or try to post to a default/error page
     // For now, exiting if page_id cannot be determined.
     exit(1);
