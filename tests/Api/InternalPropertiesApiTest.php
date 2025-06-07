@@ -87,7 +87,7 @@ class InternalPropertiesApiTest extends BaseTestCase
         $response1 = $this->request('GET', 'api/internal_properties.php', [
             'entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'prop1_internal'
         ]);
-        $this->assertEquals('success', $response1['status']);
+        $this->assertTrue($response1['success']);
         $this->assertEquals('prop1_internal', $response1['data']['name']);
         $this->assertEquals(1, $response1['data']['internal']);
 
@@ -95,7 +95,7 @@ class InternalPropertiesApiTest extends BaseTestCase
         $response2 = $this->request('GET', 'api/internal_properties.php', [
             'entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'prop2_public'
         ]);
-        $this->assertEquals('success', $response2['status']);
+        $this->assertTrue($response2['success']);
         $this->assertEquals('prop2_public', $response2['data']['name']);
         $this->assertEquals(0, $response2['data']['internal']);
     }
@@ -122,39 +122,32 @@ class InternalPropertiesApiTest extends BaseTestCase
     {
         // Missing entity_type
         $response = $this->request('GET', 'api/internal_properties.php', ['entity_id' => self::$testNoteId, 'name' => 'p1']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing required GET parameters: entity_type, entity_id, name', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required GET parameters: entity_type, entity_id, name', $response['error']['message']);
 
         // Missing entity_id
         $response = $this->request('GET', 'api/internal_properties.php', ['entity_type' => 'note', 'name' => 'p1']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing required GET parameters: entity_type, entity_id, name', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required GET parameters: entity_type, entity_id, name', $response['error']['message']);
         
         // Missing name
         $response = $this->request('GET', 'api/internal_properties.php', ['entity_type' => 'note', 'entity_id' => self::$testNoteId]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing required GET parameters: entity_type, entity_id, name', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required GET parameters: entity_type, entity_id, name', $response['error']['message']);
 
         // Property not found
         $response = $this->request('GET', 'api/internal_properties.php', [
             'entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'non_existent_prop'
         ]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Property not found', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Property not found', $response['error']['message']);
         
-        // Invalid entity_type (though API might not have specific validation for this string beyond 'note'/'page' for column name choice)
-        // The current API uses htmlspecialchars which doesn't validate against a list. It would likely fail at DB query prep or property not found.
+        // Invalid entity_type
         $response = $this->request('GET', 'api/internal_properties.php', [
             'entity_type' => 'invalid', 'entity_id' => self::$testNoteId, 'name' => 'p1'
         ]);
-         $this->assertEquals('error', $response['status']); // Expecting error due to bad SQL or property not found logic path.
-         // The message might vary, e.g., "Property not found" or a DB error if the column name becomes invalid.
-         // Given the code, if $idColumn is not 'page_id' or 'note_id', it might try ` = :entityId` which is invalid SQL.
-         // However, the current script uses $idColumn = ($entityType === 'page') ? 'page_id' : 'note_id'; so 'invalid' becomes 'note_id'.
-         // So it would try to find it and likely result in "Property not found".
-         $this->assertEquals('Property not found', $response['message']);
-
-
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Property not found', $response['error']['message']);
     }
 
     // --- Test POST /api/internal_properties.php ---
@@ -165,7 +158,7 @@ class InternalPropertiesApiTest extends BaseTestCase
         // Set to internal=1
         $postData1 = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'note_prop_to_toggle', 'internal' => 1];
         $response1 = $this->request('POST', 'api/internal_properties.php', $postData1);
-        $this->assertEquals('success', $response1['status']);
+        $this->assertTrue($response1['success']);
         $this->assertEquals('Property internal status updated.', $response1['data']['message']);
         $dbProp1 = $this->getPropertyDirectly('note', self::$testNoteId, 'note_prop_to_toggle');
         $this->assertEquals(1, $dbProp1['internal']);
@@ -224,23 +217,23 @@ class InternalPropertiesApiTest extends BaseTestCase
     {
         // Missing fields
         $response = $this->request('POST', 'api/internal_properties.php', ['entity_id' => self::$testNoteId, 'name' => 'p1', 'internal' => 1]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing required POST parameters: entity_type, entity_id, name, internal', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required POST parameters: entity_type, entity_id, name, internal', $response['error']['message']);
         
         // Property not found
         $response = $this->request('POST', 'api/internal_properties.php', [
             'entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'non_existent_prop_post', 'internal' => 1
         ]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Property not found. Cannot set internal status for a non-existent property.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Property not found. Cannot set internal status for a non-existent property.', $response['error']['message']);
 
         // Invalid 'internal' value
         $this->addPropertyDirectly('note', self::$testNoteId, 'prop_for_invalid_internal', 'val', 0);
         $response = $this->request('POST', 'api/internal_properties.php', [
             'entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'prop_for_invalid_internal', 'internal' => 2
         ]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid internal flag value. Must be 0 or 1.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid internal flag value. Must be 0 or 1.', $response['error']['message']);
     }
 }
 ?>

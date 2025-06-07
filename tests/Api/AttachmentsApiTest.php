@@ -103,13 +103,12 @@ class AttachmentsApiTest extends BaseTestCase
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
 
         $this->assertIsArray($response, "Response is not an array: " . print_r($response, true));
-        $this->assertEquals('success', $response['status']);
-        $this->assertEquals('File uploaded successfully.', $response['message']);
+        $this->assertTrue($response['success'], "Response should indicate success");
         $this->assertArrayHasKey('data', $response);
         $this->assertArrayHasKey('id', $response['data']);
-        $this->assertEquals('test_image.jpg', $response['data']['filename']);
-        $this->assertEquals(1024, $response['data']['filesize']);
-        $this->assertEquals('image/jpeg', $response['data']['filetype']);
+        $this->assertEquals('test_image.jpg', $response['data']['name']);
+        $this->assertEquals(1024, $response['data']['size']);
+        $this->assertEquals('image/jpeg', $response['data']['type']);
         $this->assertEquals(self::$testNoteId, $response['data']['note_id']);
 
         // Verify file exists in UPLOADS_DIR.
@@ -138,9 +137,8 @@ class AttachmentsApiTest extends BaseTestCase
         // No note_id in $postData
         $response = $this->request('POST', 'api/attachments.php', [], $filesData);
 
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Note ID is required.', $response['message']);
-        // HTTP status code check would be good here if BaseTestCase/request helper sets/returns it
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Note ID is required.', $response['error']['message']);
     }
 
     public function testPostUploadAttachmentFailureInvalidNoteId()
@@ -151,8 +149,8 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
         
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Note not found.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Note not found.', $response['error']['message']);
     }
 
     public function testPostUploadAttachmentFailureNoFile()
@@ -161,8 +159,8 @@ class AttachmentsApiTest extends BaseTestCase
         // $_FILES is empty
         $response = $this->request('POST', 'api/attachments.php', $postData, []);
 
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('No file uploaded or upload error.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('No file uploaded or upload error.', $response['error']['message']);
     }
 
     public function testPostUploadAttachmentFailureUploadErrorIniSize()
@@ -173,8 +171,8 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
         
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('The uploaded file exceeds the upload_max_filesize directive in php.ini.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('The uploaded file exceeds the upload_max_filesize directive in php.ini.', $response['error']['message']);
     }
 
     public function testPostUploadAttachmentFailureUploadErrorFormSize()
@@ -185,8 +183,8 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
         
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.', $response['error']['message']);
     }
     
     public function testPostUploadAttachmentFailureUploadErrorPartial()
@@ -197,8 +195,8 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
         
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('The uploaded file was only partially uploaded.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('The uploaded file was only partially uploaded.', $response['error']['message']);
     }
     
     public function testPostUploadAttachmentFailureUploadErrorNoTmpDir()
@@ -209,8 +207,8 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
         
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing a temporary folder.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing a temporary folder.', $response['error']['message']);
     }
 
     // Note: Testing UPLOAD_ERR_CANT_WRITE and UPLOAD_ERR_EXTENSION would require more complex environment manipulation.
@@ -226,8 +224,8 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
         
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('File exceeds maximum size limit', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertStringContainsString('File exceeds maximum size limit', $response['error']['message']);
     }
     
     public function testPostUploadAttachmentFailureInvalidFileType()
@@ -245,8 +243,8 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/attachments.php', $postData, $filesData);
         
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('File type not allowed', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertStringContainsString('File type not allowed', $response['error']['message']);
     }
 
 
@@ -261,11 +259,11 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('GET', 'api/attachments.php', ['note_id' => self::$testNoteId]);
         
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertCount(2, $response['data']);
-        $this->assertEquals('file1.pdf', $response['data'][0]['filename']);
-        $this->assertEquals('file2.txt', $response['data'][1]['filename']);
+        $this->assertEquals('file1.pdf', $response['data'][0]['name']);
+        $this->assertEquals('file2.txt', $response['data'][1]['name']);
         $this->assertStringContainsString('api/attachments.php?action=download&id=', $response['data'][0]['url']);
     }
 
@@ -278,7 +276,7 @@ class AttachmentsApiTest extends BaseTestCase
 
         $response = $this->request('GET', 'api/attachments.php', ['note_id' => $noteIdWithNoAttachments]);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertCount(0, $response['data']);
         
@@ -290,7 +288,7 @@ class AttachmentsApiTest extends BaseTestCase
         $response = $this->request('GET', 'api/attachments.php', ['note_id' => 88888]);
         // Current API returns success with empty data for non-existent note_id
         // This might be desired, or could be a 404. Test reflects current behavior.
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertCount(0, $response['data']);
     }
@@ -436,9 +434,8 @@ class AttachmentsApiTest extends BaseTestCase
             '_method' => 'DELETE'
         ]);
 
-        $this->assertEquals('success', $deleteResponse['status']);
-        $this->assertEquals('Attachment deleted successfully.', $deleteResponse['message']);
-        // $this->assertEquals($attachmentId, $deleteResponse['data']['deleted_attachment_id']); // If API returns this
+        $this->assertTrue($deleteResponse['success']);
+        $this->assertEquals($attachmentId, $deleteResponse['data']['deleted_attachment_id']);
 
         // Verify file is removed from UPLOADS_DIR
         $this->assertFileDoesNotExist($filePathOnDisk);
@@ -455,8 +452,8 @@ class AttachmentsApiTest extends BaseTestCase
             'id' => 99999, // Non-existent ID
             '_method' => 'DELETE'
         ]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Attachment not found.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Attachment not found.', $response['error']['message']);
     }
 
     public function testDeleteAttachmentFailureNoId()
@@ -464,8 +461,8 @@ class AttachmentsApiTest extends BaseTestCase
         $response = $this->request('POST', 'api/attachments.php', [
             '_method' => 'DELETE' // No ID
         ]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Attachment ID is required for deletion.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Attachment ID is required for deletion.', $response['error']['message']);
     }
 }
 ?>

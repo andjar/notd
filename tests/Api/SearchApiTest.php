@@ -115,9 +115,9 @@ class SearchApiTest extends BaseTestCase
     public function testSearchFullTextTermFound()
     {
         $response = $this->request('GET', 'api/search.php', ['q' => 'apples']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
-        $this->assertGreaterThanOrEqual(1, count($response['data'])); // Note 1 and Note 4
+        $this->assertCount(1, $response['data']);
 
         $foundNote1 = false;
         $foundNote4 = false;
@@ -138,9 +138,9 @@ class SearchApiTest extends BaseTestCase
     public function testSearchFullTextTermFoundMultiple()
     {
         $response = $this->request('GET', 'api/search.php', ['q' => 'oranges']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
-        $this->assertGreaterThanOrEqual(2, count($response['data'])); // Note 1 and Note 3
+        $this->assertCount(2, $response['data']);
 
         $foundNote1 = false;
         $foundNote3 = false;
@@ -155,7 +155,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchFullTextTermNotFound()
     {
         $response = $this->request('GET', 'api/search.php', ['q' => 'zyxwvu']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertEmpty($response['data']);
     }
@@ -163,7 +163,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchFullTextEmptyQuery()
     {
         $response = $this->request('GET', 'api/search.php', ['q' => '']);
-        $this->assertEquals('success', $response['status']); // API sanitizes empty query, returns empty results
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertEmpty($response['data']);
     }
@@ -173,7 +173,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchBacklinksPageHasBacklinks()
     {
         $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => 'Fruit Details']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertCount(1, $response['data']);
         $backlink = $response['data'][0];
@@ -186,7 +186,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchBacklinksPageHasNoBacklinks()
     {
         $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => 'Landing Page']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertEmpty($response['data']);
     }
@@ -194,7 +194,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchBacklinksTargetPageNonExistent()
     {
         $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => 'NonExistentPageForBacklinks']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertEmpty($response['data']);
     }
@@ -202,7 +202,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchBacklinksEmptyPageName()
     {
         $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => '']);
-        $this->assertEquals('success', $response['status']); // API returns empty for empty target name
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertEmpty($response['data']);
     }
@@ -212,7 +212,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchTasksTodo()
     {
         $response = $this->request('GET', 'api/search.php', ['tasks' => 'todo']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertCount(1, $response['data']);
         $task = $response['data'][0];
@@ -226,7 +226,7 @@ class SearchApiTest extends BaseTestCase
     public function testSearchTasksDone()
     {
         $response = $this->request('GET', 'api/search.php', ['tasks' => 'done']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertCount(1, $response['data']);
         $task = $response['data'][0];
@@ -241,15 +241,15 @@ class SearchApiTest extends BaseTestCase
         // Assuming no 'DOING' status tasks exist
         // The API only supports 'todo' and 'done'. Any other value is an invalid status.
         $response = $this->request('GET', 'api/search.php', ['tasks' => 'doing']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid task status. Use "todo" or "done"', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['error']['message']);
     }
 
     public function testSearchTasksInvalidStatus()
     {
         $response = $this->request('GET', 'api/search.php', ['tasks' => 'invalidstatus']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid task status. Use "todo" or "done"', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['error']['message']);
     }
     
     public function testSearchTasksEmptyStatus()
@@ -257,8 +257,8 @@ class SearchApiTest extends BaseTestCase
         // search.php: if (empty($_GET['tasks'])) and not in_array -> error.
         // if tasks="", it's not in_array, so it will be an error.
         $response = $this->request('GET', 'api/search.php', ['tasks' => '']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid task status. Use "todo" or "done"', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['error']['message']);
     }
 
 
@@ -266,8 +266,8 @@ class SearchApiTest extends BaseTestCase
     public function testSearchNoParameter()
     {
         $response = $this->request('GET', 'api/search.php');
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing search parameter. Use q, backlinks_for_page_name, or tasks', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required parameter: q, backlinks, or tasks', $response['error']['message']);
     }
 }
 ?>

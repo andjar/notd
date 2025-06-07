@@ -98,7 +98,8 @@ class PropertiesApiTest extends BaseTestCase
 
         // Default (include_internal=false)
         $responseDefault = $this->request('GET', 'api/properties.php', ['entity_type' => 'note', 'entity_id' => self::$testNoteId]);
-        $this->assertEquals('success', $responseDefault['status']);
+        $this->assertTrue($responseDefault['success']);
+        $this->assertIsArray($responseDefault['data']);
         $this->assertArrayHasKey('color', $responseDefault['data']);
         $this->assertEquals('blue', $responseDefault['data']['color']);
         $this->assertArrayHasKey('tags', $responseDefault['data']);
@@ -109,7 +110,8 @@ class PropertiesApiTest extends BaseTestCase
 
         // include_internal=true
         $responseInternal = $this->request('GET', 'api/properties.php', ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'include_internal' => 'true']);
-        $this->assertEquals('success', $responseInternal['status']);
+        $this->assertTrue($responseInternal['success']);
+        $this->assertIsArray($responseInternal['data']);
         $this->assertEquals('blue', $responseInternal['data']['color']['value']); // Structure changes
         $this->assertEquals(0, $responseInternal['data']['color']['internal']);
         $this->assertArrayHasKey('internal_code', $responseInternal['data']);
@@ -127,13 +129,15 @@ class PropertiesApiTest extends BaseTestCase
 
         // Default (include_internal=false)
         $responseDefault = $this->request('GET', 'api/properties.php', ['entity_type' => 'page', 'entity_id' => self::$testPageId]);
-        $this->assertEquals('success', $responseDefault['status']);
+        $this->assertTrue($responseDefault['success']);
+        $this->assertIsArray($responseDefault['data']);
         $this->assertEquals('draft', $responseDefault['data']['status']);
         $this->assertArrayNotHasKey('internal_ref', $responseDefault['data']);
 
         // include_internal=true
         $responseInternal = $this->request('GET', 'api/properties.php', ['entity_type' => 'page', 'entity_id' => self::$testPageId, 'include_internal' => 'true']);
-        $this->assertEquals('success', $responseInternal['status']);
+        $this->assertTrue($responseInternal['success']);
+        $this->assertIsArray($responseInternal['data']);
         $this->assertEquals('draft', $responseInternal['data']['status']['value']);
         $this->assertEquals(0, $responseInternal['data']['status']['internal']);
         $this->assertArrayHasKey('internal_ref', $responseInternal['data']);
@@ -144,20 +148,20 @@ class PropertiesApiTest extends BaseTestCase
     public function testGetPropertiesFailureCases()
     {
         $response = $this->request('GET', 'api/properties.php', ['entity_id' => self::$testNoteId]); // Missing entity_type
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('Invalid input parameters', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required GET parameters: entity_type, entity_id', $response['error']['message']);
 
         $response = $this->request('GET', 'api/properties.php', ['entity_type' => 'note']); // Missing entity_id
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('Invalid input parameters', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required GET parameters: entity_type, entity_id', $response['error']['message']);
 
-        $response = $this->request('GET', 'api/properties.php', ['entity_type' => 'invalid_type', 'entity_id' => self::$testNoteId]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('Invalid input parameters', $response['message']); // Validator catches this
+        $response = $this->request('GET', 'api/properties.php', ['entity_type' => 'invalid', 'entity_id' => self::$testNoteId]);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid entity type. Must be "note" or "page".', $response['error']['message']);
 
         // Non-existent entity_id (should return empty properties)
         $response = $this->request('GET', 'api/properties.php', ['entity_type' => 'note', 'entity_id' => 99999]);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEmpty($response['data']);
     }
 
@@ -167,10 +171,10 @@ class PropertiesApiTest extends BaseTestCase
         // Create
         $createData = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'size', 'value' => 'M'];
         $responseCreate = $this->request('POST', 'api/properties.php', $createData);
-        $this->assertEquals('success', $responseCreate['status']);
-        $this->assertEquals('size', $responseCreate['data']['property']['name']);
-        $this->assertEquals('M', $responseCreate['data']['property']['value']);
-        $this->assertEquals(0, $responseCreate['data']['property']['internal']); // Default internal status
+        $this->assertTrue($responseCreate['success']);
+        $this->assertEquals('size', $responseCreate['data']['name']);
+        $this->assertEquals('M', $responseCreate['data']['value']);
+        $this->assertEquals(0, $responseCreate['data']['internal']); // Default internal status
 
         $dbProp = $this->getPropertyDirectly('note', self::$testNoteId, 'size');
         $this->assertEquals('M', $dbProp[0]['value']);
@@ -178,8 +182,9 @@ class PropertiesApiTest extends BaseTestCase
         // Update
         $updateData = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'size', 'value' => 'L'];
         $responseUpdate = $this->request('POST', 'api/properties.php', $updateData);
-        $this->assertEquals('success', $responseUpdate['status']);
-        $this->assertEquals('L', $responseUpdate['data']['property']['value']);
+        $this->assertTrue($responseUpdate['success']);
+        $this->assertEquals('size', $responseUpdate['data']['name']);
+        $this->assertEquals('L', $responseUpdate['data']['value']);
         
         $dbPropUpdated = $this->getPropertyDirectly('note', self::$testNoteId, 'size');
         $this->assertEquals('L', $dbPropUpdated[0]['value']);
@@ -189,9 +194,9 @@ class PropertiesApiTest extends BaseTestCase
     {
         $data = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'tag::My Test Tag', 'value' => 'this should be replaced'];
         $response = $this->request('POST', 'api/properties.php', $data);
-        $this->assertEquals('success', $response['status']);
-        $this->assertEquals('tag::My Test Tag', $response['data']['property']['name']);
-        $this->assertEquals('My Test Tag', $response['data']['property']['value']); // Value normalized
+        $this->assertTrue($response['success']);
+        $this->assertEquals('tag::My Test Tag', $response['data']['name']);
+        $this->assertEquals('My Test Tag', $response['data']['value']); // Value normalized
 
         $dbProp = $this->getPropertyDirectly('note', self::$testNoteId, 'tag::My Test Tag');
         $this->assertEquals('My Test Tag', $dbProp[0]['value']);
@@ -202,14 +207,16 @@ class PropertiesApiTest extends BaseTestCase
         // Explicitly internal
         $dataInternal = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'secret_key', 'value' => 'abc', 'internal' => 1];
         $responseInternal = $this->request('POST', 'api/properties.php', $dataInternal);
-        $this->assertEquals(1, $responseInternal['data']['property']['internal']);
+        $this->assertTrue($responseInternal['success']);
+        $this->assertEquals(1, $responseInternal['data']['internal']);
         $dbPropInternal = $this->getPropertyDirectly('note', self::$testNoteId, 'secret_key');
         $this->assertEquals(1, $dbPropInternal[0]['internal']);
 
         // Explicitly public
         $dataPublic = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'public_key', 'value' => 'def', 'internal' => 0];
         $responsePublic = $this->request('POST', 'api/properties.php', $dataPublic);
-        $this->assertEquals(0, $responsePublic['data']['property']['internal']);
+        $this->assertTrue($responsePublic['success']);
+        $this->assertEquals(0, $responsePublic['data']['internal']);
         $dbPropPublic = $this->getPropertyDirectly('note', self::$testNoteId, 'public_key');
         $this->assertEquals(0, $dbPropPublic[0]['internal']);
     }
@@ -222,13 +229,15 @@ class PropertiesApiTest extends BaseTestCase
         // Post without explicit internal status - should pick up from definition
         $data = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'defined_prop', 'value' => 'val1'];
         $response = $this->request('POST', 'api/properties.php', $data);
-        $this->assertEquals(1, $response['data']['property']['internal'], "Should be internal due to definition.");
+        $this->assertTrue($response['success']);
+        $this->assertEquals(1, $response['data']['internal'], "Should be internal due to definition.");
 
         // Post with explicit internal=0 - should override definition if allowed by property_auto_internal.php logic
         // Current property_auto_internal.php: $explicitInternal takes precedence.
         $dataOverride = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'defined_prop', 'value' => 'val2', 'internal' => 0];
         $responseOverride = $this->request('POST', 'api/properties.php', $dataOverride);
-        $this->assertEquals(0, $responseOverride['data']['property']['internal'], "Explicit internal=0 should override definition.");
+        $this->assertTrue($responseOverride['success']);
+        $this->assertEquals(0, $responseOverride['data']['internal'], "Explicit internal=0 should override definition.");
     }
 
 
@@ -236,22 +245,64 @@ class PropertiesApiTest extends BaseTestCase
     {
         $data = ['entity_type' => 'page', 'entity_id' => self::$testPageId, 'name' => 'page_status', 'value' => 'published'];
         $response = $this->request('POST', 'api/properties.php', $data);
-        $this->assertEquals('success', $response['status']);
-        $this->assertEquals('published', $response['data']['property']['value']);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('page_status', $response['data']['name']);
+        $this->assertEquals('published', $response['data']['value']);
         $dbProp = $this->getPropertyDirectly('page', self::$testPageId, 'page_status');
         $this->assertEquals('published', $dbProp[0]['value']);
     }
 
     public function testPostPropertyFailureCases()
     {
-        $response = $this->request('POST', 'api/properties.php', ['entity_id' => self::$testNoteId, 'name' => 'n1', 'value' => 'v1']); // Missing entity_type
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('Invalid input', $response['message']);
+        $response = $this->request('POST', 'api/properties.php', [
+            'entity_type' => 'note',
+            'entity_id' => self::$testNoteId,
+            'name' => 'test_prop',
+            'value' => 'test_value'
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('test_prop', $response['data']['name']);
+        $this->assertEquals('test_value', $response['data']['value']);
 
-        $response = $this->request('POST', 'api/properties.php', ['entity_type' => 'note', 'name' => 'n1', 'value' => 'v1']); // Missing entity_id
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('Invalid input', $response['message']);
-        
+        $response = $this->request('POST', 'api/properties.php', [
+            'entity_type' => 'note',
+            'entity_id' => self::$testNoteId,
+            'name' => 'test_prop',
+            'value' => 'test_value',
+            'internal' => 1
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('test_prop', $response['data']['name']);
+        $this->assertEquals('test_value', $response['data']['value']);
+        $this->assertEquals(1, $response['data']['internal']);
+
+        $response = $this->request('POST', 'api/properties.php', [
+            'entity_type' => 'page',
+            'entity_id' => self::$testPageId,
+            'name' => 'page_prop',
+            'value' => 'page_value'
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('page_prop', $response['data']['name']);
+        $this->assertEquals('page_value', $response['data']['value']);
+
+        $response = $this->request('POST', 'api/properties.php', [
+            'entity_type' => 'note',
+            'entity_id' => self::$testNoteId,
+            'name' => 'test_prop'
+        ]);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required POST parameters: entity_type, entity_id, name, value', $response['error']['message']);
+
+        $response = $this->request('POST', 'api/properties.php', [
+            'entity_type' => 'invalid',
+            'entity_id' => self::$testNoteId,
+            'name' => 'test_prop',
+            'value' => 'test_value'
+        ]);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid entity type. Must be "note" or "page".', $response['error']['message']);
+
         // Non-existent entity_id (properties.php doesn't check existence before REPLACE, triggers might fail)
         // This could lead to an orphaned property or a 500 if a trigger expects a valid entity.
         // The _updateOrAddPropertyAndDispatchTriggers function itself doesn't validate entityId existence.
@@ -263,10 +314,9 @@ class PropertiesApiTest extends BaseTestCase
         // If PropertyTriggerService->dispatch throws on invalid entity, then it would be an error.
         // The current trigger service just logs, so it might appear as success.
         // Let's test for success of property creation, acknowledge trigger might fail silently in current impl.
-         $this->assertEquals('success', $responseInvalidEntity['status'], "Response: ".print_r($responseInvalidEntity, true));
+         $this->assertTrue($responseInvalidEntity['success'], "Response: ".print_r($responseInvalidEntity, true));
          // Clean up orphaned property if created
          self::$pdo->exec("DELETE FROM Properties WHERE entity_id = 88888 AND name = 'orphan_prop'");
-
     }
 
     // --- Test POST /api/properties.php with action=delete ---
@@ -277,7 +327,7 @@ class PropertiesApiTest extends BaseTestCase
 
         $deleteData = ['action' => 'delete', 'entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'temp_color'];
         $response = $this->request('POST', 'api/properties.php', $deleteData);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEmpty($this->getPropertyDirectly('note', self::$testNoteId, 'temp_color'));
     }
 
@@ -288,7 +338,7 @@ class PropertiesApiTest extends BaseTestCase
 
         $deleteData = ['action' => 'delete', 'entity_type' => 'page', 'entity_id' => self::$testPageId, 'name' => 'temp_status'];
         $response = $this->request('POST', 'api/properties.php', $deleteData);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEmpty($this->getPropertyDirectly('page', self::$testPageId, 'temp_status'));
     }
 
@@ -297,13 +347,13 @@ class PropertiesApiTest extends BaseTestCase
         // Missing name
         $deleteData = ['action' => 'delete', 'entity_type' => 'note', 'entity_id' => self::$testNoteId];
         $response = $this->request('POST', 'api/properties.php', $deleteData);
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('Invalid input for deleting property', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required POST parameters: entity_type, entity_id, name', $response['error']['message']);
 
         // Delete non-existent property (should be success - idempotent)
         $deleteData = ['action' => 'delete', 'entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'non_existent_prop'];
         $response = $this->request('POST', 'api/properties.php', $deleteData);
-        $this->assertEquals('success', $response['status']); 
+        $this->assertTrue($response['success']); 
     }
 }
 ?>

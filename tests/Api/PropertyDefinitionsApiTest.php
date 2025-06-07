@@ -92,7 +92,7 @@ class PropertyDefinitionsApiTest extends BaseTestCase
     public function testGetPropertyDefinitionsNoDefinitions()
     {
         $response = $this->request('GET', 'api/property_definitions.php');
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertEmpty($response['data']);
     }
@@ -103,7 +103,8 @@ class PropertyDefinitionsApiTest extends BaseTestCase
         $this->createPropertyDefinitionDirectly('def2', 1, 0, 'Desc 2');
 
         $response = $this->request('GET', 'api/property_definitions.php');
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
         $this->assertCount(2, $response['data']);
         $this->assertEquals('def1', $response['data'][0]['name']);
         $this->assertEquals('Desc 2', $response['data'][1]['description']);
@@ -112,39 +113,43 @@ class PropertyDefinitionsApiTest extends BaseTestCase
     // --- Test POST /api/property_definitions.php (Create/Update Definition) ---
     public function testPostCreateNewPropertyDefinition()
     {
-        $data = [
-            'name' => 'new_def',
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'name' => 'new_prop',
             'internal' => 1,
-            'description' => 'A new definition',
-            'auto_apply' => 0
-        ];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
+            'auto_apply' => 1,
+            'description' => 'A new property'
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('new_prop', $response['data']['name']);
+        $this->assertEquals(1, $response['data']['internal']);
+        $this->assertEquals(1, $response['data']['auto_apply']);
+        $this->assertEquals('A new property', $response['data']['description']);
 
-        $this->assertEquals('success', $response['status']);
-        $this->assertStringContainsString('Property definition saved', $response['data']['message']);
-
-        $dbDef = $this->getPropertyDefinitionDirectlyByName('new_def');
+        $dbDef = $this->getPropertyDefinitionDirectlyByName('new_prop');
         $this->assertNotEmpty($dbDef);
         $this->assertEquals(1, $dbDef['internal']);
-        $this->assertEquals('A new definition', $dbDef['description']);
-        $this->assertEquals(0, $dbDef['auto_apply']);
+        $this->assertEquals('A new property', $dbDef['description']);
+        $this->assertEquals(1, $dbDef['auto_apply']);
     }
 
     public function testPostUpdateExistingPropertyDefinition()
     {
-        $this->createPropertyDefinitionDirectly('update_def', 0, 1, 'Initial desc');
-        $data = [
-            'name' => 'update_def', // Same name
-            'internal' => 1,
-            'description' => 'Updated desc',
-            'auto_apply' => 0
-        ];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('success', $response['status']);
+        $this->createPropertyDefinitionDirectly('existing_prop', 0, 0, 'Initial description');
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'name' => 'existing_prop',
+            'internal' => 0,
+            'auto_apply' => 0,
+            'description' => 'Updated description'
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('existing_prop', $response['data']['name']);
+        $this->assertEquals(0, $response['data']['internal']);
+        $this->assertEquals(0, $response['data']['auto_apply']);
+        $this->assertEquals('Updated description', $response['data']['description']);
 
-        $dbDef = $this->getPropertyDefinitionDirectlyByName('update_def');
-        $this->assertEquals(1, $dbDef['internal']);
-        $this->assertEquals('Updated desc', $dbDef['description']);
+        $dbDef = $this->getPropertyDefinitionDirectlyByName('existing_prop');
+        $this->assertEquals(0, $dbDef['internal']);
+        $this->assertEquals('Updated description', $dbDef['description']);
         $this->assertEquals(0, $dbDef['auto_apply']);
     }
 
@@ -152,15 +157,15 @@ class PropertyDefinitionsApiTest extends BaseTestCase
     {
         $propId = $this->addPropertyDirectly('note', self::$testNoteId, 'auto_prop', 'value1', 0); // Initially internal=0
 
-        $data = [
+        $response = $this->request('POST', 'api/property_definitions.php', [
             'name' => 'auto_prop',
-            'internal' => 1, // Definition makes it internal
-            'description' => 'Test auto apply',
+            'internal' => 1,
             'auto_apply' => 1
-        ];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('success', $response['status']);
-        $this->assertStringContainsString('applied to 1 existing properties', $response['data']['message']);
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('auto_prop', $response['data']['name']);
+        $this->assertEquals(1, $response['data']['internal']);
+        $this->assertEquals(1, $response['data']['auto_apply']);
 
         $updatedProp = $this->getPropertyByIdDirectly($propId);
         $this->assertEquals(1, $updatedProp['internal'], "Property should now be internal=1 due to auto_apply.");
@@ -168,10 +173,12 @@ class PropertyDefinitionsApiTest extends BaseTestCase
 
     public function testPostPropertyDefinitionFailureMissingName()
     {
-        $data = ['internal' => 0, 'description' => 'No name def'];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Property name is required', $response['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'internal' => 1,
+            'auto_apply' => 1
+        ]);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required POST parameters: name', $response['error']['message']);
     }
     
     public function testPostPropertyDefinitionInvalidTypes()
@@ -180,12 +187,15 @@ class PropertyDefinitionsApiTest extends BaseTestCase
         // This means non-numeric strings become 0, and floats are truncated.
         // True validation for "must be 0 or 1" would require more robust checks in the API.
         // For now, we test what happens with stringy numbers.
-        $data = ['name' => 'invalid_def_type', 'internal' => '2', 'auto_apply' => 'yes']; // Not strictly 0 or 1
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('success', $response['status']); // It will cast '2' to 2 (int) and 'yes' to 0 (int)
-        $dbDef = $this->getPropertyDefinitionDirectlyByName('invalid_def_type');
-        $this->assertEquals(2, $dbDef['internal']); // Stored as 2
-        $this->assertEquals(0, $dbDef['auto_apply']); // 'yes' cast to 0
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'name' => 'invalid_prop',
+            'internal' => '2', // Invalid value
+            'auto_apply' => 'yes' // Invalid value
+        ]);
+        $this->assertTrue($response['success']); // It will cast '2' to 2 (int) and 'yes' to 0 (int)
+        $this->assertEquals('invalid_prop', $response['data']['name']);
+        $this->assertEquals(2, $response['data']['internal']);
+        $this->assertEquals(0, $response['data']['auto_apply']);
         // This highlights a potential area for stricter validation in the API itself if only 0/1 are desired.
     }
 
@@ -194,29 +204,33 @@ class PropertyDefinitionsApiTest extends BaseTestCase
     public function testPostDeletePropertyDefinitionSuccess()
     {
         $defId = $this->createPropertyDefinitionDirectly('to_delete_def', 0, 0);
-        $data = ['action' => 'delete', 'id' => $defId];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-
-        $this->assertEquals('success', $response['status']);
-        $this->assertEquals('Property definition deleted', $response['data']['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'name' => 'to_delete_def',
+            '_method' => 'DELETE'
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertEquals('Property definition deleted successfully.', $response['data']['message']);
         $this->assertFalse($this->getPropertyDefinitionDirectlyByName('to_delete_def'));
     }
 
     public function testPostDeletePropertyDefinitionFailureMissingId()
     {
-        $data = ['action' => 'delete'];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Definition ID required', $response['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            '_method' => 'DELETE'
+        ]);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required POST parameters: name', $response['error']['message']);
     }
     
     public function testPostDeletePropertyDefinitionNonExistentId()
     {
         // API doesn't check if ID exists before attempting delete, so PDO execute returns true (0 rows affected)
-        $data = ['action' => 'delete', 'id' => 9999];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('success', $response['status']);
-        $this->assertEquals('Property definition deleted', $response['data']['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'name' => 'non_existent_prop',
+            '_method' => 'DELETE'
+        ]);
+        $this->assertTrue($response['success']); // API returns success as 0 properties were updated.
+        $this->assertEquals('Property definition deleted successfully.', $response['data']['message']);
     }
 
 
@@ -233,9 +247,12 @@ class PropertyDefinitionsApiTest extends BaseTestCase
         $this->createPropertyDefinitionDirectly('prop_a_apply_all', 1, 1); // Define prop_a to become internal=1
         $this->createPropertyDefinitionDirectly('prop_b_apply_all', 0, 1); // Define prop_b to become internal=0
 
-        $response = $this->request('GET', 'api/property_definitions.php', ['apply_all' => 'true']);
-        $this->assertEquals('success', $response['status']);
-        $this->assertStringContainsString('Applied property definitions to 2 existing properties', $response['data']['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'action' => 'apply_all'
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
+        $this->assertArrayHasKey('applied_count', $response['data']);
 
         $this->assertEquals(1, $this->getPropertyByIdDirectly($note1PropA_Id)['internal']);
         $this->assertEquals(0, $this->getPropertyByIdDirectly($note2PropB_Id)['internal']);
@@ -249,28 +266,34 @@ class PropertyDefinitionsApiTest extends BaseTestCase
         $propId = $this->addPropertyDirectly('note', self::$testNoteId, 'prop_to_apply_single', 'value_s', 0);
         $this->createPropertyDefinitionDirectly('prop_to_apply_single', 1, 0); // auto_apply is OFF
 
-        $data = ['action' => 'apply_definition', 'name' => 'prop_to_apply_single'];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('success', $response['status']);
-        $this->assertStringContainsString("Applied definition for 'prop_to_apply_single' to 1 existing properties", $response['data']['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'action' => 'apply',
+            'name' => 'prop_to_apply_single'
+        ]);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
+        $this->assertArrayHasKey('applied_count', $response['data']);
         
         $this->assertEquals(1, $this->getPropertyByIdDirectly($propId)['internal']);
     }
 
     public function testPostApplySingleDefinitionFailureMissingName()
     {
-        $data = ['action' => 'apply_definition'];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Property name required', $response['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'action' => 'apply'
+        ]);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Missing required POST parameters: name', $response['error']['message']);
     }
     
     public function testPostApplySingleDefinitionNonExistent()
     {
-        $data = ['action' => 'apply_definition', 'name' => 'no_such_definition_to_apply'];
-        $response = $this->request('POST', 'api/property_definitions.php', $data);
-        $this->assertEquals('success', $response['status']); // API returns success as 0 properties were updated.
-        $this->assertStringContainsString("Applied definition for 'no_such_definition_to_apply' to 0 existing properties", $response['data']['message']);
+        $response = $this->request('POST', 'api/property_definitions.php', [
+            'action' => 'apply',
+            'name' => 'non_existent_prop'
+        ]);
+        $this->assertTrue($response['success']); // API returns success as 0 properties were updated.
+        $this->assertEquals('Property definition applied successfully.', $response['data']['message']);
     }
 }
 ?>

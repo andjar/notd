@@ -257,5 +257,122 @@ class QueryNotesApiTest extends BaseTestCase
         $this->assertEquals('error', $response['status']);
         $this->assertEquals('Missing sql_query parameter.', $response['message']);
     }
+
+    public function testQueryReturningNoResults()
+    {
+        $query = "SELECT id FROM Notes WHERE content LIKE '%NonExistentUniqueContentString%'";
+        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']);
+        $this->assertEmpty($response['data']);
+    }
+
+    public function testQueryForbiddenKeywords()
+    {
+        $forbiddenQueries = [
+            'DELETE FROM Notes WHERE id = 1',
+            'UPDATE Notes SET content = "new" WHERE id = 1',
+            'INSERT INTO Notes (content) VALUES ("hacked")',
+            'DROP TABLE Notes',
+            'SELECT id FROM Notes; DROP TABLE Pages; --'
+        ];
+
+        foreach ($forbiddenQueries as $query) {
+            $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+            $this->assertEquals('error', $response['status'], "Query should have failed: $query");
+            // The exact message can vary based on which validation rule it hits first.
+            $this->assertMatchesRegularExpression('/(Query must be one of the allowed patterns|Query contains forbidden SQL keywords|Semicolons are only allowed)/', $response['message'], "Message for query: $query");
+        }
+    }
+
+    public function testQueryInvalidStructure()
+    {
+        $invalidQueries = [
+            'SELECT * FROM Notes WHERE id = 1', // API expects specific SELECT id patterns
+            'SELECT name FROM Pages WHERE id = ' . self::$page1Id, // Not an allowed pattern
+        ];
+
+        foreach ($invalidQueries as $query) {
+            $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+            $this->assertEquals('error', $response['status'], "Query structure should be invalid: $query");
+            $this->assertStringContainsString('Query must be one of the allowed patterns', $response['message']);
+        }
+    }
+    
+    public function testQueryUnauthorizedTables()
+    {
+        // Assuming SomeOtherTable does not exist or is not Notes, Properties, Pages
+        // The regex checks for FROM or JOIN followed by something not in the allowed list.
+        // This test might be tricky if SomeOtherTable actually exists in schema from another test.
+        // For now, let's assume it doesn't or the regex is good enough.
+        $query = "SELECT id FROM Notes JOIN SomeOtherTable ON Notes.id = SomeOtherTable.note_id WHERE Notes.id = 1";
+        // To make it more robust, let's try to use a system table if possible, e.g. sqlite_master
+        // However, the regex might not be smart enough for subqueries referencing other tables.
+        // The current regex is: '/\bFROM\s+(?!(?:Notes|Properties|Pages)\b)\w+/i'
+        // This means "FROM " followed by a word not in (Notes|Properties|Pages).
+        // A query like 'SELECT id FROM Notes WHERE id IN (SELECT user_id FROM Users WHERE name = "admin")'
+        // would NOT be caught by this specific regex, but would be by the overall pattern match.
+        // The overall pattern match is stricter.
+        
+        // This query will fail the overall pattern match first.
+        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $this->assertEquals('error', $response['status']);
+        $this->assertStringContainsString('Query must be one of the allowed patterns', $response['message']);
+
+        // A query that passes initial pattern but uses a forbidden table in a sub-query
+        // This is harder to catch with current validation which focuses on the main FROM/JOIN.
+        // The current script's validation might not catch all sub-query table abuses if the main query fits a pattern.
+        // Example: SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE value IN (SELECT secret FROM secrets_table))
+        // This specific case is not explicitly tested as the current validation is pattern-based for the main query.
+    }
+
+
+    public function testQuerySqlComments()
+    {
+        $queriesWithComments = [
+            // "SELECT id FROM Notes WHERE id = 1; -- comment" // This is caught by semicolon check first.
+            "SELECT id FROM Notes WHERE id = 1 -- comment", // No semicolon, but still a comment
+            "SELECT id FROM Notes WHERE id = 1 /* comment */",
+        ];
+        
+        // Test the one without semicolon first, as it's a direct comment violation
+        $responseComment = $this->request('POST', 'api/query_notes.php', ['sql_query' => $queriesWithComments[0]]);
+        $this->assertEquals('error', $responseComment['status']);
+        $this->assertStringContainsString('Query contains forbidden SQL keywords/characters or comments', $responseComment['message']);
+        $this->assertStringContainsString('--', $responseComment['message']);
+
+
+        $responseBlockComment = $this->request('POST', 'api/query_notes.php', ['sql_query' => $queriesWithComments[1]]);
+        $this->assertEquals('error', $responseBlockComment['status']);
+        $this->assertStringContainsString('Query contains forbidden SQL keywords/characters or comments', $responseBlockComment['message']);
+        $this->assertStringContainsString('/*', $responseBlockComment['message']);
+        
+        // Test semicolon not at very end (which also implies a comment or second statement)
+        $responseSemicolonComment = $this->request('POST', 'api/query_notes.php', ['sql_query' => "SELECT id FROM Notes WHERE id = 1; -- comment"]);
+        $this->assertEquals('error', $responseSemicolonComment['status']);
+        $this->assertEquals('Semicolons are only allowed at the very end of the query.', $responseSemicolonComment['message']);
+
+    }
+
+    public function testQueryMultipleStatements()
+    {
+        $query = "SELECT id FROM Notes WHERE id = 1; SELECT id FROM Notes WHERE id = 2";
+        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Semicolons are only allowed at the very end of the query.', $response['message']);
+    }
+
+    // --- Failure Case (Missing sql_query parameter) ---
+    public function testQueryMissingSqlParameter()
+    {
+        $response = $this->request('POST', 'api/query_notes.php', []); // Empty payload
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Missing sql_query parameter.', $response['message']);
+
+        $response = $this->request('POST', 'api/query_notes.php', ['other_param' => 'value']); // No sql_query
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Missing sql_query parameter.', $response['message']);
+    }
 }
 ?>

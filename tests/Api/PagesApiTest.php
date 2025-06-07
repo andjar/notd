@@ -61,8 +61,8 @@ class PagesApiTest extends BaseTestCase
         $data = ['name' => 'Test Page Alpha'];
         $response = $this->request('POST', 'api/pages.php', $data);
 
-        $this->assertEquals('success', $response['status']);
-        $this->assertArrayHasKey('data', $response);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
         $pageData = $response['data'];
         $this->assertEquals('Test Page Alpha', $pageData['name']);
         $this->assertArrayHasKey('id', $pageData);
@@ -77,7 +77,7 @@ class PagesApiTest extends BaseTestCase
         $data = ['name' => 'Test Page Beta', 'alias' => 'tpb'];
         $response = $this->request('POST', 'api/pages.php', $data);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEquals('Test Page Beta', $response['data']['name']);
         $this->assertEquals('tpb', $response['data']['alias']);
         $newPageId = $response['data']['id'];
@@ -93,7 +93,7 @@ class PagesApiTest extends BaseTestCase
         $data = ['name' => $journalName];
         $response = $this->request('POST', 'api/pages.php', $data);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $pageData = $response['data'];
         $this->assertEquals($journalName, $pageData['name']);
         $pageId = $pageData['id'];
@@ -112,7 +112,7 @@ class PagesApiTest extends BaseTestCase
         $data = ['name' => 'Existing Page'];
         $response = $this->request('POST', 'api/pages.php', $data);
 
-        $this->assertEquals('success', $response['status']); // Current API returns existing page
+        $this->assertTrue($response['success']); // Current API returns existing page
         $this->assertEquals('Existing Page', $response['data']['name']);
         // Could assert ID matches the originally created page if we fetch it.
     }
@@ -120,9 +120,9 @@ class PagesApiTest extends BaseTestCase
     public function testPostCreatePageFailureMissingName()
     {
         $response = $this->request('POST', 'api/pages.php', ['alias' => 'some-alias']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertStringContainsString('Invalid input for creating page', $response['message']);
-        $this->assertArrayHasKey('name', $response['details']); // Validator specific detail
+        $this->assertFalse($response['success']);
+        $this->assertStringContainsString('Invalid input for creating page', $response['error']['message']);
+        $this->assertArrayHasKey('name', $response['error']['details']); // Validator specific detail
     }
 
     // --- Test GET /api/pages.php?id={id} ---
@@ -132,7 +132,8 @@ class PagesApiTest extends BaseTestCase
         $pageId = $this->createPageDirectly('Page For ID Test');
         $response = $this->request('GET', 'api/pages.php', ['id' => $pageId]);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
         $this->assertEquals($pageId, $response['data']['id']);
         $this->assertEquals('Page For ID Test', $response['data']['name']);
     }
@@ -146,7 +147,7 @@ class PagesApiTest extends BaseTestCase
 
         $response = $this->request('GET', 'api/pages.php', ['id' => $pageId, 'include_details' => '1']);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertArrayHasKey('page', $response['data']);
         $this->assertEquals($pageId, $response['data']['page']['id']);
         $this->assertArrayHasKey('properties', $response['data']['page']);
@@ -163,13 +164,13 @@ class PagesApiTest extends BaseTestCase
 
         // follow_aliases=true (default)
         $responseFollow = $this->request('GET', 'api/pages.php', ['id' => $pageA_Id]);
-        $this->assertEquals('success', $responseFollow['status']);
+        $this->assertTrue($responseFollow['success']);
         $this->assertEquals($pageB_Id, $responseFollow['data']['id'], "Should return Page B (aliased target) when following aliases.");
         $this->assertEquals('Page B Target', $responseFollow['data']['name']);
         
         // follow_aliases=0
         $responseNoFollow = $this->request('GET', 'api/pages.php', ['id' => $pageA_Id, 'follow_aliases' => '0']);
-        $this->assertEquals('success', $responseNoFollow['status']);
+        $this->assertTrue($responseNoFollow['success']);
         $this->assertEquals($pageA_Id, $responseNoFollow['data']['id'], "Should return Page A (source) when not following aliases.");
         $this->assertEquals('Page A Source', $responseNoFollow['data']['name']);
     }
@@ -178,8 +179,8 @@ class PagesApiTest extends BaseTestCase
     public function testGetPageByIdFailureNotFound()
     {
         $response = $this->request('GET', 'api/pages.php', ['id' => 99999]);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Page not found', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Page not found', $response['error']['message']);
     }
 
     // --- Test GET /api/pages.php?name={name} ---
@@ -189,7 +190,7 @@ class PagesApiTest extends BaseTestCase
         $this->createPageDirectly('Page For Name Test');
         $response = $this->request('GET', 'api/pages.php', ['name' => 'Page For Name Test']);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEquals('Page For Name Test', $response['data']['name']);
     }
 
@@ -198,7 +199,7 @@ class PagesApiTest extends BaseTestCase
         $journalDate = date('Y-m-d', strtotime('+1 day')); // Future date to ensure it doesn't exist
         $response = $this->request('GET', 'api/pages.php', ['name' => $journalDate]);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEquals($journalDate, $response['data']['name']);
         $pageId = $response['data']['id'];
 
@@ -214,20 +215,20 @@ class PagesApiTest extends BaseTestCase
 
         // follow_aliases=true (default)
         $responseFollow = $this->request('GET', 'api/pages.php', ['name' => 'PageX-SourceName']);
-        $this->assertEquals('success', $responseFollow['status']);
+        $this->assertTrue($responseFollow['success']);
         $this->assertEquals('PageY-TargetName', $responseFollow['data']['name']);
         
         // follow_aliases=0
         $responseNoFollow = $this->request('GET', 'api/pages.php', ['name' => 'PageX-SourceName', 'follow_aliases' => '0']);
-        $this->assertEquals('success', $responseNoFollow['status']);
+        $this->assertTrue($responseNoFollow['success']);
         $this->assertEquals('PageX-SourceName', $responseNoFollow['data']['name']);
     }
 
     public function testGetPageByNameFailureNotFoundNonJournal()
     {
         $response = $this->request('GET', 'api/pages.php', ['name' => 'NonExistent Page XYZ']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Page not found', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Page not found', $response['error']['message']);
     }
 
 
@@ -239,7 +240,7 @@ class PagesApiTest extends BaseTestCase
         $this->createPageDirectly('Page All Y');
         
         $response = $this->request('GET', 'api/pages.php');
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertCount(2, $response['data']);
         // Order is by updated_at DESC, name ASC. So Y should be before Z if created closely.
@@ -257,7 +258,7 @@ class PagesApiTest extends BaseTestCase
 
 
         $response = $this->request('GET', 'api/pages.php', ['exclude_journal' => '1']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertCount(1, $response['data']);
         $this->assertEquals('Regular Page 1', $response['data'][0]['name']);
     }
@@ -270,7 +271,7 @@ class PagesApiTest extends BaseTestCase
         $this->addPageProperty($pageId1, 'status', 'draft');
 
         $response = $this->request('GET', 'api/pages.php', ['include_details' => '1']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertCount(1, $response['data']);
         $pageData = $response['data'][0];
         $this->assertArrayHasKey('page', $pageData);
@@ -290,7 +291,7 @@ class PagesApiTest extends BaseTestCase
         $this->createPageDirectly("PageC_AliasingA", "PageA_Unique");
 
         $response = $this->request('GET', 'api/pages.php', ['follow_aliases' => '1']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         
         $pageNames = array_column($response['data'], 'name');
         // Expected: PageA_Unique, PageB_Unique. PageC_AliasingA resolved to PageA_Unique.
@@ -308,7 +309,8 @@ class PagesApiTest extends BaseTestCase
         $pageId = $this->createPageDirectly('Original Name');
         $response = $this->request('POST', "api/pages.php?id={$pageId}", ['name' => 'Updated Name', '_method' => 'PUT']);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
         $this->assertEquals('Updated Name', $response['data']['name']);
         
         $stmt = self::$pdo->prepare("SELECT name FROM Pages WHERE id = :id");
@@ -321,7 +323,8 @@ class PagesApiTest extends BaseTestCase
         $pageId = $this->createPageDirectly('Page For Alias Update', 'old-alias');
         $response = $this->request('POST', "api/pages.php?id={$pageId}", ['alias' => 'new-alias', '_method' => 'PUT']);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
         $this->assertEquals('new-alias', $response['data']['alias']);
     }
     
@@ -330,7 +333,8 @@ class PagesApiTest extends BaseTestCase
         $pageId = $this->createPageDirectly('MyOldPageName');
         $journalName = date('Y-m-d', strtotime('+2 days'));
         $response = $this->request('POST', "api/pages.php?id={$pageId}", ['name' => $journalName, '_method' => 'PUT']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
         $this->assertEquals($journalName, $response['data']['name']);
 
         $stmt = self::$pdo->prepare("SELECT value FROM Properties WHERE page_id = :page_id AND name = 'type'");
@@ -342,8 +346,8 @@ class PagesApiTest extends BaseTestCase
     public function testPutUpdatePageFailureInvalidId()
     {
         $response = $this->request('POST', 'api/pages.php?id=88888', ['name' => 'No Such Page', '_method' => 'PUT']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Page not found', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Page not found', $response['error']['message']);
     }
 
     public function testPutUpdatePageFailureDuplicateName()
@@ -352,16 +356,16 @@ class PagesApiTest extends BaseTestCase
         $pageIdToUpdate = $this->createPageDirectly('Page To Update Name');
         
         $response = $this->request('POST', "api/pages.php?id={$pageIdToUpdate}", ['name' => 'Existing Name For Put', '_method' => 'PUT']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Page name already exists', $response['message']); // 409 Conflict
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Page name already exists', $response['error']['message']); // 409 Conflict
     }
     
     public function testPutUpdatePageFailureNoNameOrAlias()
     {
         $pageId = $this->createPageDirectly('Page For No Field Update');
         $response = $this->request('POST', "api/pages.php?id={$pageId}", ['_method' => 'PUT']); // No fields
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Either name or alias must be provided for update.', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Either name or alias must be provided for update.', $response['error']['message']);
     }
 
 
@@ -374,7 +378,8 @@ class PagesApiTest extends BaseTestCase
 
         $response = $this->request('POST', 'api/pages.php?id=' . $pageId, ['_method' => 'DELETE']);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
         $this->assertEquals($pageId, $response['data']['deleted_page_id']);
 
         // Verify page is removed
@@ -396,8 +401,8 @@ class PagesApiTest extends BaseTestCase
     public function testDeletePageFailureInvalidId()
     {
         $response = $this->request('POST', 'api/pages.php?id=77777', ['_method' => 'DELETE']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Page not found', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Page not found', $response['error']['message']);
     }
 }
 ?>

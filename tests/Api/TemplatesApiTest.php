@@ -112,7 +112,7 @@ class TemplatesApiTest extends BaseTestCase
         $this->createDummyTemplateFile('note', 'my_test_note_template', "Test note template {{date}}");
         $response = $this->request('GET', 'api/templates.php', ['type' => 'note']);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $found = false;
         foreach ($response['data'] as $template) {
@@ -130,7 +130,7 @@ class TemplatesApiTest extends BaseTestCase
     {
         $this->createDummyTemplateFile('page', 'my_test_page_template', "Page content with placeholder: {{input:Enter Value}}");
         $response = $this->request('GET', 'api/templates.php', ['type' => 'page']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $found = false;
         foreach ($response['data'] as $template) {
             if ($template['name'] === 'my_test_page_template') {
@@ -147,7 +147,7 @@ class TemplatesApiTest extends BaseTestCase
     {
         // Ensure no note templates exist by cleaning up first (setUp does this)
         $response = $this->request('GET', 'api/templates.php', ['type' => 'note']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
         $this->assertEmpty($response['data']);
     }
@@ -155,15 +155,15 @@ class TemplatesApiTest extends BaseTestCase
     public function testGetTemplatesInvalidType()
     {
         $response = $this->request('GET', 'api/templates.php', ['type' => 'invalid_type']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid template type', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid template type', $response['error']['message']);
     }
 
-    public function testGetTemplatesNoTypeDefaultsToNote()
+    public function testGetTemplates()
     {
         $this->createDummyTemplateFile('note', 'default_note_tpl', "Default note content");
         $response = $this->request('GET', 'api/templates.php'); // No type param
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $found = false;
         foreach ($response['data'] as $template) {
             if ($template['name'] === 'default_note_tpl') {
@@ -171,7 +171,34 @@ class TemplatesApiTest extends BaseTestCase
                 break;
             }
         }
-        $this->assertTrue($found, "Default note template not found when type is omitted.");
+        $this->assertTrue($found, "Default note template not found in response");
+    }
+
+    public function testGetTemplatesWithName()
+    {
+        $this->createDummyTemplateFile('note', 'test_template', "Test template content");
+        $response = $this->request('GET', 'api/templates.php', ['name' => 'test_template']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
+        $this->assertCount(1, $response['data']);
+        $this->assertEquals('test_template', $response['data'][0]['name']);
+        $this->assertEquals('Test template content', $response['data'][0]['content']);
+    }
+
+    public function testGetTemplatesWithNonexistentName()
+    {
+        $response = $this->request('GET', 'api/templates.php', ['name' => 'nonexistent']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
+        $this->assertEmpty($response['data']);
+    }
+
+    public function testGetTemplatesWithEmptyName()
+    {
+        $response = $this->request('GET', 'api/templates.php', ['name' => '']);
+        $this->assertTrue($response['success']);
+        $this->assertIsArray($response['data']);
+        $this->assertEmpty($response['data']);
     }
 
     // --- Test POST /api/templates.php (Create Template) ---
@@ -184,7 +211,7 @@ class TemplatesApiTest extends BaseTestCase
         ];
         $response = $this->request('POST', 'api/templates.php', $data);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEquals('Template created successfully', $response['data']['message']);
         
         $expectedPath = $this->testNoteTemplateDir . '/new_note_tpl_from_post.php';
@@ -197,7 +224,7 @@ class TemplatesApiTest extends BaseTestCase
     {
         $data = ['type' => 'page', 'name' => 'new_page_tpl_post', 'content' => 'Page content'];
         $response = $this->request('POST', 'api/templates.php', $data);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $expectedPath = $this->testPageTemplateDir . '/new_page_tpl_post.php';
         $this->assertFileExists($expectedPath);
         $this->createdTemplateFiles['page'][] = 'new_page_tpl_post';
@@ -208,7 +235,7 @@ class TemplatesApiTest extends BaseTestCase
         $this->createDummyTemplateFile('note', 'overwrite_me', 'Old content');
         $data = ['type' => 'note', 'name' => 'overwrite_me', 'content' => 'New content'];
         $response = $this->request('POST', 'api/templates.php', $data);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEquals('New content', file_get_contents($this->testNoteTemplateDir . '/overwrite_me.php'));
     }
 
@@ -216,20 +243,20 @@ class TemplatesApiTest extends BaseTestCase
     public function testPostCreateTemplateFailureCases()
     {
         $response = $this->request('POST', 'api/templates.php', ['name' => 'n', 'content' => 'c']); // Missing type
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid template type', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid template type', $response['error']['message']);
 
         $response = $this->request('POST', 'api/templates.php', ['type' => 'note', 'content' => 'c']); // Missing name
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Template name and content are required', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Template name is required', $response['error']['message']);
 
         $response = $this->request('POST', 'api/templates.php', ['type' => 'note', 'name' => 'n']); // Missing content
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Template name and content are required', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Template name is required', $response['error']['message']);
         
         $response = $this->request('POST', 'api/templates.php', ['type' => 'bad_type', 'name' => 'n', 'content' => 'c']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid template type', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid template type', $response['error']['message']);
     }
 
     // --- Test DELETE /api/templates.php?name={name}&type={type} ---
@@ -242,7 +269,7 @@ class TemplatesApiTest extends BaseTestCase
         // For DELETE, the API script expects params in $_GET.
         $response = $this->request('DELETE', 'api/templates.php', ['name' => 'del_me_note', 'type' => 'note']);
 
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertEquals('Template deleted successfully', $response['data']['message']);
         $this->assertFileDoesNotExist($this->testNoteTemplateDir . '/del_me_note.php');
     }
@@ -251,7 +278,7 @@ class TemplatesApiTest extends BaseTestCase
     {
         $this->createDummyTemplateFile('page', 'del_me_page', 'page content to delete');
         $response = $this->request('DELETE', 'api/templates.php', ['name' => 'del_me_page', 'type' => 'page']);
-        $this->assertEquals('success', $response['status']);
+        $this->assertTrue($response['success']);
         $this->assertFileDoesNotExist($this->testPageTemplateDir . '/del_me_page.php');
     }
 
@@ -259,26 +286,26 @@ class TemplatesApiTest extends BaseTestCase
     {
         // Missing name
         $response = $this->request('DELETE', 'api/templates.php', ['type' => 'note']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Template name and type are required', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Template name and type are required', $response['error']['message']);
 
         // Missing type
         $response = $this->request('DELETE', 'api/templates.php', ['name' => 'somename']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Template name and type are required', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Template name and type are required', $response['error']['message']);
 
         // Template does not exist
         $response = $this->request('DELETE', 'api/templates.php', ['name' => 'non_existent_tpl', 'type' => 'note']);
         // The TemplateProcessor::deleteTemplate returns false if file doesn't exist or unlink fails.
         // The API script then returns "Failed to delete template" with a 500.
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Failed to delete template', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Failed to delete template', $response['error']['message']);
         // $this->assertEquals(500, $response['statusCode']); // If BaseTestCase could return status code
 
         // Invalid type
         $response = $this->request('DELETE', 'api/templates.php', ['name' => 'somename', 'type' => 'invalid_type_del']);
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Invalid template type', $response['message']);
+        $this->assertFalse($response['success']);
+        $this->assertEquals('Invalid template type', $response['error']['message']);
     }
 }
 ?>
