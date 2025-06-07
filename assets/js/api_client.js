@@ -390,7 +390,7 @@ const attachmentsAPI = {
     uploadAttachment: (noteId, file) => {
         const formData = new FormData();
         formData.append('note_id', noteId);
-        formData.append('file', file);
+        formData.append('attachmentFile', file); // Changed 'file' to 'attachmentFile'
         return apiRequest('attachments.php', 'POST', formData);
     },
 
