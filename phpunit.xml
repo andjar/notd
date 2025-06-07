@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit bootstrap="tests/bootstrap.php"
          colors="true"
-         verbose="true"
          stopOnFailure="false"
          failOnWarning="true"
          failOnEmptyTestSuite="true"
@@ -25,9 +24,9 @@
         <ini name="memory_limit" value="-1" />
     </php>
     <coverage>
-        <include>
+        <source>
             <directory suffix=".php">src</directory>
-        </include>
+        </source>
         <exclude>
             <directory>vendor</directory>
             <directory>tests</directory>
