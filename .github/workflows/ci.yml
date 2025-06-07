@@ -29,4 +29,4 @@ jobs:
         
     - name: Run PHPUnit Tests
       working-directory: ${{ github.workspace }}
-      run: ./vendor/bin/phpunit 
+      run: ./vendor/bin/phpunit -c phpunit.xml
