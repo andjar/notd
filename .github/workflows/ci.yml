@@ -19,7 +19,14 @@ jobs:
         php-version: '8.1'
         extensions: sqlite3
         coverage: none
+        tools: composer:v2
+        
+    - name: Install Dependencies
+      working-directory: ${{ github.workspace }}
+      run: |
+        composer install --prefer-dist --no-progress
+        composer require --dev phpunit/phpunit
         
     - name: Run PHPUnit Tests
       working-directory: ${{ github.workspace }}
-      run: vendor/bin/phpunit
+      run: ./vendor/bin/phpunit 
