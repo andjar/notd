@@ -2,6 +2,7 @@
     "name": "notd/www",
     "description": "A simple outliner application.",
     "type": "project",
+    "license": "proprietary",
     "require": {
         "php": ">=8.0"
     },
