@@ -386,9 +386,23 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         }
 
         console.log(`Fetching page data using notesAPI.getPageData for: ${pageData.name} (ID: ${pageData.id})`);
-        const pageResponse = await notesAPI.getPageData(pageData.id, { include_internal: false });
+        
+        let pageResponse;
+        try {
+            pageResponse = await notesAPI.getPageData(pageData.id, { include_internal: false });
+        } catch (error) {
+            // If the API call fails (e.g., 404 Not Found from the new logic), handle it gracefully.
+            if (error.message && (error.message.includes('404') || error.message.toLowerCase().includes('not found'))) {
+                console.warn(`Page data for "${pageData.name}" (ID: ${pageData.id}) not found on the server.`);
+                // Set a valid but empty structure to prevent further errors.
+                pageResponse = { page: pageData, notes: [] }; 
+            } else {
+                // For other errors, re-throw to be caught by the outer catch block.
+                throw error;
+            }
+        }
 
-        if (!pageResponse || !pageResponse.page || !pageResponse.notes) {
+        if (!pageResponse || !pageResponse.page) { // Removed !pageResponse.notes check as empty array is valid
             throw new Error('Invalid response structure from getPageData');
         }
 

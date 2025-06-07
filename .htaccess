@@ -2,9 +2,11 @@ RewriteEngine On
 
 # --- PHP Front Controller ---
 # If the request is not for an existing file or directory,
+# and it's not for the API directory,
 # route it to index.php.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
 RewriteRule ^(.*)$ index.php?path=$1 [QSA,L]
 
 # --- OR, if using API endpoints directly (alternative to above for API calls) ---
