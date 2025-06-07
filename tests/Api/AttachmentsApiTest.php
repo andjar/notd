@@ -69,18 +69,20 @@ class AttachmentsApiTest extends BaseTestCase
         $tempPath = sys_get_temp_dir() . '/' . uniqid() . $filename;
         if ($error === UPLOAD_ERR_OK) {
             $handle = fopen($tempPath, 'w');
-            if ($size > 0) { // Write actual content only if size > 0
-                 ftruncate($handle, $size); // Create a file of specified size (sparse)
-                 // fwrite($handle, str_repeat("0", $size)); // Alternative: write actual bytes
+            if ($size > 0) {
+                if (strpos($type, 'image/jpeg') !== false) {
+                    // Write a minimal valid JPEG file
+                    fwrite($handle, "\xFF\xD8\xFF\xE0\x00\x10\x4A\x46\x49\x46\x00\x01\x01\x01\x00\x48\x00\x48\x00\x00\xFF\xDB\x00\x43\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\x09\x09\x08\x0A\x0C\x14\x0D\x0C\x0B\x0B\x0C\x19\x12\x13\x0F\x14\x1D\x1A\x1F\x1E\x1D\x1A\x1C\x1C\x20\x24\x2E\x27\x20\x22\x2C\x23\x1C\x1C\x28\x37\x29\x2C\x30\x31\x34\x34\x34\x1F\x27\x39\x3D\x38\x32\x3C\x2E\x33\x34\x32\xFF\xC0\x00\x0B\x08\x00\x01\x00\x01\x01\x01\x11\x00\xFF\xC4\x00\x14\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\xFF\xDA\x00\x08\x01\x01\x00\x00\x3F\x00\x5C\xFF\xD9");
+                } else {
+                    // For non-image files, just create a sparse file
+                    ftruncate($handle, $size);
+                }
             }
             fclose($handle);
             $this->dummyFiles[] = $tempPath; // Track for cleanup
         } else {
-            // If there's an upload error, tmp_name might be empty or not exist.
-            // For testing, providing a non-existent path or empty string is fine.
-            $tempPath = ''; 
+            $tempPath = '';
         }
-
 
         return [
             'name' => $filename,
