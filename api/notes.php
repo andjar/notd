@@ -67,10 +67,10 @@ if ($method === 'GET') {
             $pageData = $dataManager->getPageWithNotes($pageId, $includeInternal);
 
             if ($pageData) {
-                // The DataManager already returns the correct structure
+                // Return just the notes array as the JavaScript expects
                 sendJsonResponse([
                     'success' => true,
-                    'data' => $pageData  // $pageData is already { page: ..., notes: ... }
+                    'data' => $pageData['notes']  // Extract notes from the pageData structure
                 ]);
             } else {
                 // If the page itself is not found, getPageWithNotes returns null.
@@ -101,13 +101,27 @@ if ($method === 'GET') {
 
     $pageId = (int)$input['page_id'];
     $content = isset($input['content']) ? $input['content'] : '';
+    $parentNoteId = null;
+    
+    // Handle parent_note_id for creating child notes directly
+    if (isset($input['parent_note_id'])) {
+        if ($input['parent_note_id'] === null || $input['parent_note_id'] === '') {
+            $parentNoteId = null;
+        } else {
+            $parentNoteId = (int)$input['parent_note_id'];
+        }
+    }
 
     try {
         $pdo->beginTransaction();
 
-        // 1. Create the note
-        $stmt = $pdo->prepare("INSERT INTO Notes (page_id, content) VALUES (:page_id, :content)");
-        $stmt->execute([':page_id' => $pageId, ':content' => $content]);
+        // 1. Create the note (with optional parent_note_id)
+        $stmt = $pdo->prepare("INSERT INTO Notes (page_id, content, parent_note_id) VALUES (:page_id, :content, :parent_note_id)");
+        $stmt->execute([
+            ':page_id' => $pageId, 
+            ':content' => $content,
+            ':parent_note_id' => $parentNoteId
+        ]);
         $noteId = $pdo->lastInsertId();
 
         // 2. Parse and save properties from the content

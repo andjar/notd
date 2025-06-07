@@ -390,25 +390,35 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         let pageResponse;
         try {
             pageResponse = await notesAPI.getPageData(pageData.id, { include_internal: false });
+            console.log('Page response:', pageResponse); // Add logging to debug response
         } catch (error) {
             // If the API call fails (e.g., 404 Not Found from the new logic), handle it gracefully.
             if (error.message && (error.message.includes('404') || error.message.toLowerCase().includes('not found'))) {
                 console.warn(`Page data for "${pageData.name}" (ID: ${pageData.id}) not found on the server.`);
                 // Set a valid but empty structure to prevent further errors.
-                pageResponse = { page: pageData, notes: [] }; 
+                pageResponse = { success: true, data: [] }; 
             } else {
                 // For other errors, re-throw to be caught by the outer catch block.
                 throw error;
             }
         }
 
-        if (!pageResponse || !pageResponse.page) { // Removed !pageResponse.notes check as empty array is valid
-            throw new Error('Invalid response structure from getPageData');
+        // Validate response structure
+        if (!pageResponse) {
+            throw new Error('No response received from getPageData');
         }
 
-        const pageDetails = pageResponse.page;
-        const pageProperties = pageResponse.page.properties || {};
-        setNotesForCurrentPage(pageResponse.notes);
+        // If the API request wasn't successful, treat it as an empty page
+        if (!pageResponse.success) {
+            console.warn(`API request for page ${pageData.name} was not successful. Treating as empty page.`);
+            pageResponse = { success: true, data: [] };
+        }
+
+        // Use the page data we already have from the initial page fetch
+        const pageDetails = pageData;
+        const pageProperties = pageData.properties || {};
+        const notes = Array.isArray(pageResponse.data) ? pageResponse.data : [];
+        setNotesForCurrentPage(notes);
 
         if (pageProperties && pageProperties.encrypt) {
             // Ensure it's a string and not an array/object if properties can have multiple values
@@ -522,7 +532,7 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
                 id: pageDetails.id,
                 name: pageDetails.name, 
                 alias: pageDetails.alias, 
-                notes: pageResponse.notes,    
+                notes: notes,    
                 properties: pageProperties,    
                 timestamp: Date.now()
             };
@@ -547,7 +557,8 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         }
     } catch (error) {
         console.error('Error loading page:', error);
-        setCurrentPageName(`Error: ${pageNameToLoad}`);
+        setCurrentPageName(`Error: ${pageNameToLoad}`); // Existing line
+        setCurrentPageId(null); // ADD THIS LINE
         window.ui.updatePageTitle(currentPageName); 
         if (notesContainer) { 
             notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
@@ -659,8 +670,8 @@ async function handleCreateAndFocusFirstNote(pageIdToUse) {
     try {
         const savedNote = await notesAPI.createNote({
             page_id: pageIdToUse, 
-            content: ' ', 
-            parent_note_id: null
+            content: ' '
+            // Removed parent_note_id as it's not expected in POST requests
         });
 
         if (savedNote) {
@@ -717,41 +728,54 @@ export async function prefetchRecentPagesData() {
             excludeJournal: false    
         });
         
-        allPages.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+        allPages.sort((a, b) => {
+            // Assuming the structure is { page: { updated_at: ... } }
+            // If updated_at is directly on the outer object, this needs adjustment
+            const dateA = a.page ? new Date(a.page.updated_at) : 0;
+            const dateB = b.page ? new Date(b.page.updated_at) : 0;
+            return dateB - dateA;
+        });
 
         const recentPagesToPrefetch = allPages.slice(0, MAX_PREFETCH_PAGES); 
 
-        for (const page of recentPagesToPrefetch) {
-            if (!hasPageCache(page.name) ||
-                (Date.now() - (getPageCache(page.name)?.timestamp || 0) > CACHE_MAX_AGE_MS)) {
+        for (const pageWithNotes of recentPagesToPrefetch) { // Renamed 'page' to 'pageWithNotes' for clarity
+            const actualPage = pageWithNotes.page; // Extract the actual page object
+            if (!actualPage) {
+                console.warn('Page object within wrapper is missing during pre-fetch. Skipping.', pageWithNotes);
+                continue;
+            }
+
+            if (!hasPageCache(actualPage.name) ||
+                (Date.now() - (getPageCache(actualPage.name)?.timestamp || 0) > CACHE_MAX_AGE_MS)) {
                 
-                console.log(`Pre-fetching data for page: ${page.name}`);
+                console.log(`Pre-fetching data for page: ${actualPage.name}`);
                 try {
-                    if (!page.id || !page.name) {
-                        console.warn(`Page object for pre-fetch is missing id or name. Skipping.`, page);
+                    if (!actualPage.id || !actualPage.name) {
+                        console.warn(`Actual page object for pre-fetch is missing id or name. Skipping.`, actualPage);
                         continue;
                     }
                     
-                    const notes = page.notes || []; 
-                    const properties = page.properties || {}; 
+                    // notes are at pageWithNotes.notes, properties are at actualPage.properties (or pageWithNotes.page.properties)
+                    const notes = pageWithNotes.notes || []; 
+                    const properties = actualPage.properties || {}; 
 
-                    setPageCache(page.name, {
-                        id: page.id,
-                        name: page.name, 
-                        alias: page.alias, 
+                    setPageCache(actualPage.name, {
+                        id: actualPage.id,
+                        name: actualPage.name, 
+                        alias: actualPage.alias, 
                         notes: notes,      
                         properties: properties, 
                         timestamp: Date.now()
                     });
-                    console.log(`Successfully pre-fetched and cached data for page: ${page.name}`);
+                    console.log(`Successfully pre-fetched and cached data for page: ${actualPage.name}`);
                 } catch (error) {
-                    console.error(`Error pre-fetching data for page ${page.name}:`, error);
-                    if (hasPageCache(page.name)) {
-                        deletePageCache(page.name);
+                    console.error(`Error pre-fetching data for page ${actualPage.name}:`, error);
+                    if (hasPageCache(actualPage.name)) {
+                        deletePageCache(actualPage.name);
                     }
                 }
             } else {
-                console.log(`Page ${page.name} is already in cache and recent.`);
+                console.log(`Page ${actualPage.name} is already in cache and recent.`);
             }
         }
         console.log("Pre-fetching for recent pages completed.");

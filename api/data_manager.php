@@ -131,10 +131,18 @@ class DataManager {
         }
         $notesSql .= " ORDER BY order_index ASC";
         
+        error_log("[DEBUG] getNotesByPageId called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
+        error_log("[DEBUG] SQL query: " . $notesSql);
+        
         $stmt = $this->pdo->prepare($notesSql);
         $stmt->bindParam(':pageId', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        error_log("[DEBUG] Found " . count($notes) . " notes for pageId: " . $pageId);
+        if (!empty($notes)) {
+            error_log("[DEBUG] First note: " . json_encode($notes[0]));
+        }
         
         if (empty($notes)) {
             return [];
@@ -194,10 +202,15 @@ class DataManager {
         error_log("[DEBUG] getPageDetailsById result: " . json_encode($pageDetails));
 
         if (!$pageDetails) {
-            error_log("[DEBUG] Page not found for ID: " . $pageId);
-            return null; 
+            error_log("[DEBUG] Page not found by getPageDetailsById for ID: " . $pageId . ". Returning null from getPageWithNotes."); // Updated log
+            return null; // Added this line
         }
         
+        // If $pageDetails was null, the function now exits above.
+        // The original code continued here:
+        // error_log("[DEBUG] Page not found for ID: " . $pageId); // This log might be confusing if pageDetails is null and we proceed.
+        // We should ensure this part is only reached if $pageDetails is valid.
+
         $notes = $this->getNotesByPageId($pageId, $includeInternal);
         error_log("[DEBUG] getNotesByPageId result: " . json_encode($notes));
         

@@ -43,10 +43,10 @@ class NotesApiTest extends BaseTestCase
     }
 
     // Helper to create a note directly for setup purposes
-    private function createNoteDirectly(string $content, int $pageId, array $properties = []): int
+    private function createNoteDirectly(string $content, int $pageId, array $properties = [], ?int $parentNoteId = null): int
     {
-        $stmt = self::$pdo->prepare("INSERT INTO Notes (page_id, content) VALUES (:page_id, :content)");
-        $stmt->execute([':page_id' => $pageId, ':content' => $content]);
+        $stmt = self::$pdo->prepare("INSERT INTO Notes (page_id, content, parent_note_id) VALUES (:page_id, :content, :parent_note_id)");
+        $stmt->execute([':page_id' => $pageId, ':content' => $content, ':parent_note_id' => $parentNoteId]);
         $noteId = self::$pdo->lastInsertId();
 
         foreach ($properties as $name => $value) {
@@ -192,6 +192,111 @@ class NotesApiTest extends BaseTestCase
         $response = $this->request('POST', 'api/notes.php', $data);
         $this->assertTrue($response['success']);
         $this->assertEquals('', $response['data']['content']);
+    }
+
+    // Test creating a note with parent_note_id (child note)
+    public function testPostCreateChildNoteSuccess()
+    {
+        // First create a parent note
+        $parentData = [
+            'page_id' => self::$testPageId,
+            'content' => 'Parent note'
+        ];
+        $parentResponse = $this->request('POST', 'api/notes.php', $parentData);
+        $this->assertTrue($parentResponse['success']);
+        $parentId = $parentResponse['data']['id'];
+
+        // Now create a child note
+        $childData = [
+            'page_id' => self::$testPageId,
+            'content' => 'Child note',
+            'parent_note_id' => $parentId
+        ];
+        $childResponse = $this->request('POST', 'api/notes.php', $childData);
+        
+        $this->assertTrue($childResponse['success']);
+        $childNote = $childResponse['data'];
+        $this->assertEquals($childData['content'], $childNote['content']);
+        $this->assertEquals($parentId, $childNote['parent_note_id']);
+        $this->assertEquals(self::$testPageId, $childNote['page_id']);
+
+        // Verify in DB
+        $stmt = self::$pdo->prepare("SELECT * FROM Notes WHERE id = :id");
+        $stmt->execute([':id' => $childNote['id']]);
+        $dbNote = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertNotEmpty($dbNote);
+        $this->assertEquals($parentId, $dbNote['parent_note_id']);
+    }
+
+    // Test creating a note with null parent_note_id (should be top-level)
+    public function testPostCreateNoteWithNullParentId()
+    {
+        $data = [
+            'page_id' => self::$testPageId,
+            'content' => 'Top-level note',
+            'parent_note_id' => null
+        ];
+        $response = $this->request('POST', 'api/notes.php', $data);
+        
+        $this->assertTrue($response['success']);
+        $noteData = $response['data'];
+        $this->assertNull($noteData['parent_note_id']);
+        $this->assertEquals($data['content'], $noteData['content']);
+
+        // Verify in DB
+        $stmt = self::$pdo->prepare("SELECT * FROM Notes WHERE id = :id");
+        $stmt->execute([':id' => $noteData['id']]);
+        $dbNote = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertNotEmpty($dbNote);
+        $this->assertNull($dbNote['parent_note_id']);
+    }
+
+    // Test creating a note with empty string parent_note_id (should be treated as null)
+    public function testPostCreateNoteWithEmptyStringParentId()
+    {
+        $data = [
+            'page_id' => self::$testPageId,
+            'content' => 'Another top-level note',
+            'parent_note_id' => ''
+        ];
+        $response = $this->request('POST', 'api/notes.php', $data);
+        
+        $this->assertTrue($response['success']);
+        $noteData = $response['data'];
+        $this->assertNull($noteData['parent_note_id']);
+
+        // Verify in DB
+        $stmt = self::$pdo->prepare("SELECT * FROM Notes WHERE id = :id");
+        $stmt->execute([':id' => $noteData['id']]);
+        $dbNote = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertNotEmpty($dbNote);
+        $this->assertNull($dbNote['parent_note_id']);
+    }
+
+    // Test creating a child note with invalid parent_note_id
+    public function testPostCreateChildNoteWithInvalidParentId()
+    {
+        $data = [
+            'page_id' => self::$testPageId,
+            'content' => 'Child with invalid parent',
+            'parent_note_id' => 99999 // Non-existent note
+        ];
+        $response = $this->request('POST', 'api/notes.php', $data);
+        
+        // This should fail if foreign key constraints are enabled
+        // If constraints are not enabled, it might succeed but with an invalid parent reference
+        // The behavior depends on the database configuration
+        if (!$response['success']) {
+            // Foreign key constraint is enforced
+            $this->assertTrue(
+                strpos($response['error']['message'], 'Failed to create note') !== false ||
+                (isset($response['error']['details']) && strpos($response['error']['details'], 'FOREIGN KEY constraint failed') !== false),
+                "Expected foreign key constraint error, got: " . $response['error']['message']
+            );
+        } else {
+            // Foreign key constraint is not enforced, but the parent_note_id should still be set
+            $this->assertEquals(99999, $response['data']['parent_note_id']);
+        }
     }
 
 

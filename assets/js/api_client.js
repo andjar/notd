@@ -236,8 +236,8 @@ const notesAPI = {
 
     /**
      * Create a new note
-     * @param {{page_id: number, content: string}} noteData - Note data
-     * @returns {Promise<{id: number, content: string, page_id: number, created_at: string, updated_at: string}>}
+     * @param {{page_id: number, content: string, parent_note_id?: number|null}} noteData - Note data
+     * @returns {Promise<{id: number, content: string, page_id: number, parent_note_id: number|null, created_at: string, updated_at: string}>}
      */
     createNote: (noteData) => apiRequest('notes.php', 'POST', noteData),
 
