@@ -24,7 +24,7 @@ The Attachments API is responsible for managing file attachments associated with
 ### Supported HTTP Methods & Endpoints
 
 - **POST `api/attachments.php`**: Uploads a new attachment.
-- **GET `api/attachments.php`**: Retrieves an attachment.
+- **GET `api/attachments.php`**: Retrieves an attachment or a list of attachments.
 - **DELETE `api/attachments.php`**: Deletes an attachment.
 
 ### Request Parameters
@@ -35,14 +35,30 @@ The Attachments API is responsible for managing file attachments associated with
     - `Content-Type: multipart/form-data`
 - **Body**:
     - `note_id` (required): The ID of the note to which the attachment should be associated.
-    - `file` (required): The file to be uploaded.
+    - `file` (required): The file to be uploaded. (Sent as `attachmentFile` in the form data).
 
 #### GET `api/attachments.php`
 
-- **URL Parameters**:
-    - `id` (required): The ID of the attachment to retrieve.
-    - `action=download` (optional): If specified, forces the browser to download the file.
-    - `action=view` (optional): If specified, attempts to display the file in the browser (default).
+This endpoint has two modes of operation:
+
+1.  **Retrieve a specific attachment by its ID**:
+    -   **URL Parameters**:
+        -   `id` (required): The ID of the attachment to retrieve.
+        -   `action=download` (optional): If specified, forces the browser to download the file.
+        -   `action=view` (optional): If specified, attempts to display the file in the browser (default).
+    -   *Note: This mode is triggered if an `id` parameter is provided.*
+
+2.  **List all attachments (with filtering and pagination)**:
+    -   **URL Parameters**:
+        -   `note_id` (optional): If provided, lists attachments only for this specific note.
+        -   `page` (optional, integer): The page number for pagination. Defaults to `1`.
+        -   `per_page` (optional, integer): The number of attachments to return per page. Defaults to `10`, max `100`.
+        -   `sort_by` (optional, string): The field to sort attachments by. Allowed values: `id`, `name`, `path`, `type`, `size`, `created_at`. Defaults to `created_at`.
+        -   `sort_order` (optional, string): The order of sorting. Allowed values: `asc`, `desc`. Defaults to `desc`.
+        -   `filter_by_name` (optional, string): Filters attachments by name (case-insensitive, partial match).
+        -   `filter_by_type` (optional, string): Filters attachments by exact MIME type (e.g., `image/jpeg`, `application/pdf`).
+    -   *Note: This mode is triggered if no `id` parameter is provided. If `note_id` is provided without other listing parameters, it will list all attachments for that note.*
+
 
 #### DELETE `api/attachments.php`
 
@@ -69,15 +85,71 @@ The Attachments API is responsible for managing file attachments associated with
         }
     }
     ```
-- **GET `api/attachments.php` (action=view or no action specified)**:
+- **GET `api/attachments.php` (Retrieve specific attachment - action=view or no action specified)**:
     - The raw file content is returned with the appropriate `Content-Type` header.
-- **GET `api/attachments.php` (action=download)**:
+- **GET `api/attachments.php` (Retrieve specific attachment - action=download)**:
     - The raw file content is returned with `Content-Disposition: attachment; filename="example.jpg"` and the appropriate `Content-Type` header.
+- **GET `api/attachments.php` (List all attachments)**:
+    ```json
+    {
+        "status": "success",
+        "data": {
+            "data": [
+                {
+                    "id": 1,
+                    "name": "document.pdf",
+                    "path": "2023/10/uniqueid_document.pdf",
+                    "type": "application/pdf",
+                    "size": 123456, // in bytes
+                    "created_at": "YYYY-MM-DD HH:MM:SS",
+                    "url": "http://example.com/uploads/2023/10/uniqueid_document.pdf"
+                },
+                {
+                    "id": 2,
+                    "name": "image.png",
+                    "path": "2023/11/anotherid_image.png",
+                    "type": "image/png",
+                    "size": 78900, // in bytes
+                    "created_at": "YYYY-MM-DD HH:MM:SS",
+                    "url": "http://example.com/uploads/2023/11/anotherid_image.png"
+                }
+                // ... more attachments
+            ],
+            "pagination": {
+                "total_items": 100,
+                "per_page": 10,
+                "current_page": 1,
+                "total_pages": 10
+            }
+        }
+    }
+    ```
+   *Note: If listing attachments for a specific `note_id` (using the `note_id` parameter without the main `id` parameter), the response structure is an array of attachment objects directly under `data`, without the nested `data` and `pagination` keys, e.g.:*
+    ```json
+    {
+        "status": "success",
+        "data": [
+            {
+                "id": 3,
+                "note_id": 5, // Will be present
+                "name": "note_specific.txt",
+                "path": "2023/12/notespec_text.txt",
+                "type": "text/plain",
+                "size": 1234,
+                "created_at": "YYYY-MM-DD HH:MM:SS",
+                "url": "http://example.com/uploads/2023/12/notespec_text.txt"
+            }
+            // ... other attachments for this note
+        ]
+    }
+    ```
 - **DELETE `api/attachments.php`**:
     ```json
     {
         "status": "success",
-        "message": "Attachment deleted successfully."
+        "data": { // Modified to reflect actual response
+            "deleted_attachment_id": 123
+        }
     }
     ```
 
@@ -88,29 +160,39 @@ The Attachments API is responsible for managing file attachments associated with
     {
         "status": "error",
         "message": "Error message describing the issue."
+        // "details": { ... } // Optional for specific field errors
     }
     ```
-- **Attachment Not Found (GET/DELETE)**:
+- **Attachment Not Found (GET specific attachment / DELETE)**:
     ```json
     {
         "status": "error",
-        "message": "Attachment not found."
+        "message": "Attachment not found" // Corrected message
     }
     ```
 - **Upload Failed (POST)**:
     ```json
     {
         "status": "error",
-        "message": "File upload failed. Details about the failure."
+        "message": "File upload failed. Details about the failure." // Or specific messages like "File type not allowed", "File exceeds maximum size limit"
     }
     ```
 - **Note Not Found (POST)**:
      ```json
     {
         "status": "error",
-        "message": "Note not found."
+        "message": "Note not found" // Corrected message
     }
     ```
+- **Invalid Input (e.g., for pagination parameters)**:
+    ```json
+    {
+        "status": "error",
+        "message": "Invalid input for X.", // X would be the parameter name
+        "details": { /* specific errors */ }
+    }
+    ```
+
 
 ---
 

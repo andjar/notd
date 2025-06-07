@@ -62,22 +62,44 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
             throw new Error('Server error: PHP error in response');
         }
 
-        // Check for API-level errors
-        if (!response.ok) {
-            const errorMessage = data.error || response.statusText;
-            console.error(`API Error (${response.status}):`, errorMessage);
+        // Check for API-level errors or explicit error status
+        let errorMessage = null;
+        if (!response.ok) { // HTTP error status (4xx, 5xx)
+            errorMessage = data?.error || data?.message || response.statusText;
+            console.error(`API Error HTTP (${response.status}):`, errorMessage, data);
+        } else if (data?.success === false) { // Explicit success:false pattern
+            errorMessage = data.error || data.message || 'API request failed (success:false)';
+            console.error('API Error (success:false):', errorMessage, data);
+        } else if (data?.status === 'error') { // Explicit status:'error' pattern (even with HTTP 200 OK)
+            errorMessage = data.message || data.error || 'API request failed (status:error)';
+            console.error('API Error (status:error):', errorMessage, data);
+        }
+
+        if (errorMessage) {
             throw new Error(errorMessage);
         }
-
-        // Check for API success flag
-        if (data.success === false) {
-            console.error('API returned success=false:', data.error);
-            throw new Error(data.error || 'API request failed');
-        }
+        
+        // If we reach here, the request is considered successful by the API's own reporting.
+        // The API spec sometimes has data directly, sometimes under a 'data' field in the response.
+        // The original apiRequest returned `data.data`. We should be careful here.
+        // Most APIs in the spec return { "status": "success", "data": ... } or { "success": true, "data": ... }
+        // For these, `data.data` is correct.
+        // However, the Attachments API on success POST returns:
+        // { "status": "success", "message": "File uploaded successfully.", "data": { ... } }
+        // And on DELETE: { "status": "success", "message": "Attachment deleted successfully." } (NO data.data field)
+        // The Templates API on GET (after client modification) was { success: true, data: [...] }
+        // The original `apiRequest` returned `data.data`. This might be problematic for DELETE Attachments.
+        // Let's assume for now that callers handle cases where `data.data` might be undefined if the primary success indicator is `status:'success'` or `success:true`.
+        // The problem description was about *error handling*.
 
         console.log('[apiRequest] Response successful. Full data object:', JSON.parse(JSON.stringify(data)));
-        console.log('[apiRequest] Returning data.data:', data.data);
-        return data.data;
+        // The problem statement for `templatesAPI.getTemplates` mentioned it re-wrapped `response` if it was an array.
+        // `response` there was `data.data` from `apiRequest`.
+        // This implies `apiRequest` should consistently return the "payload" part.
+        // For responses like `{ "status": "success", "message": "..." }` (e.g., Attachment DELETE), `data.data` is undefined.
+        // This should be acceptable; the promise resolves, and the caller gets `undefined`, signifying success without specific data.
+
+        return data.data; // Keep the original return statement for the data payload
     } catch (error) {
         // Handle network errors or JSON parsing failures
         console.error('[apiRequest] Error details:', { endpoint, method, error: error.message, stack: error.stack });
@@ -119,12 +141,16 @@ const pagesAPI = {
      * Get page by ID
      * @param {number} id - Page ID
      * @param {Object} [options={}] - Query options
-     * @param {boolean} [options.followAliases=true] - Whether to follow page aliases
-     * @returns {Promise<Object>} Page object
+     * @param {boolean} [options.followAliases=true] - Whether to follow page aliases.
+     * @param {boolean} [options.include_details=false] - Whether to include page properties and notes.
+     * @param {boolean} [options.include_internal=false] - Whether to include internal properties (if include_details is true).
+     * @returns {Promise<Object>} Page object (potentially detailed if include_details is true).
      */
     getPageById: (id, options = {}) => {
         const params = new URLSearchParams({ id: id.toString() });
         if (options.followAliases === false) params.append('follow_aliases', '0');
+        if (options.include_details) params.append('include_details', '1');
+        if (options.include_internal) params.append('include_internal', '1'); // Server expects '1' for true
         
         return apiRequest(`pages.php?${params.toString()}`);
     },
@@ -133,13 +159,17 @@ const pagesAPI = {
      * Get page by name
      * @param {string} name - Page name
      * @param {Object} [options={}] - Query options
-     * @param {boolean} [options.followAliases=true] - Whether to follow page aliases
-     * @returns {Promise<Object>} Page object
+     * @param {boolean} [options.followAliases=true] - Whether to follow page aliases.
+     * @param {boolean} [options.include_details=false] - Whether to include page properties and notes.
+     * @param {boolean} [options.include_internal=false] - Whether to include internal properties (if include_details is true).
+     * @returns {Promise<Object>} Page object (potentially detailed if include_details is true).
      */
     getPageByName: (name, options = {}) => {
         const params = new URLSearchParams({ name });
         if (options.followAliases === false) params.append('follow_aliases', '0');
-        
+        if (options.include_details) params.append('include_details', '1');
+        if (options.include_internal) params.append('include_internal', '1'); // Server expects '1' for true
+
         return apiRequest(`pages.php?${params.toString()}`);
     },
 
@@ -214,15 +244,28 @@ const notesAPI = {
     /**
      * Update a note
      * @param {number} noteId - Note ID
-     * @param {{content: string}} noteData - Updated note data
-     * @returns {Promise<{id: number, content: string, page_id: number, created_at: string, updated_at: string}>}
+     * @param {Object} noteUpdateData - Updated note data.
+     * @param {string} [noteUpdateData.content] - The new content for the note.
+     * @param {number|null} [noteUpdateData.parent_note_id] - The ID of the parent note, or null.
+     * @param {number} [noteUpdateData.order_index] - The display order of the note.
+     * @param {number} [noteUpdateData.collapsed] - 0 for expanded, 1 for collapsed.
+     * @param {Object} [noteUpdateData.properties_explicit] - Explicit properties to set.
+     * @returns {Promise<Object>} The updated note object. The structure matches the getNote response.
      */
-    updateNote: (noteId, noteData) => {
+    updateNote: (noteId, noteUpdateData) => {
+        // noteUpdateData can now include:
+        // content, parent_note_id, order_index, collapsed, properties_explicit
         const bodyWithMethodOverride = {
-            ...noteData,
-            id: noteId, // Include ID in body for phpdesktop compatibility
-            _method: 'PUT' // Add _method parameter for tunneling
+            ...noteUpdateData, // Spread all fields from noteUpdateData
+            id: noteId,       // Ensure noteId is in the body as per existing logic
+            _method: 'PUT'    // Method override
         };
+        // Remove any potential undefined fields that might have been explicitly passed
+        Object.keys(bodyWithMethodOverride).forEach(key => {
+            if (bodyWithMethodOverride[key] === undefined) {
+                delete bodyWithMethodOverride[key];
+            }
+        });
         return apiRequest('notes.php', 'POST', bodyWithMethodOverride);
     },
 
@@ -232,16 +275,15 @@ const notesAPI = {
      * @returns {Promise<null>}
      */
     deleteNote: (noteId) => {
-        // Get the current page ID from the global state
-        const pageId = window.currentPageId;
-        if (!pageId) {
-            return Promise.reject(new Error('Page ID is required'));
-        }
+        // const pageId = window.currentPageId; // No longer needed for the request body
+        // if (!pageId) { // This check might be relevant for UI logic, but not for the API call itself if page_id is not part of the API.
+        //     return Promise.reject(new Error('Page ID is required')); // Consider if this check should remain for other reasons or be removed. Assuming removal for pure API alignment.
+        // }
 
         const bodyWithMethodOverride = {
-            id: noteId, // Include ID in body for phpdesktop compatibility
-            _method: 'DELETE',
-            page_id: pageId
+            id: noteId,
+            _method: 'DELETE'
+            // page_id: pageId // REMOVED
         };
         return apiRequest('notes.php', 'POST', bodyWithMethodOverride);
     }
@@ -256,15 +298,30 @@ const propertiesAPI = {
      * Get properties for an entity
      * @param {string} entityType - Entity type ('note' or 'page')
      * @param {number} entityId - Entity ID
-     * @returns {Promise<Object<string, string>>} Properties as key-value pairs
+     * @param {Object} [options={}] - Query options.
+     * @param {boolean} [options.include_internal=false] - Whether to include internal properties.
+     * @returns {Promise<Object>} Properties object. Structure may vary based on include_internal.
      */
-    getProperties: (entityType, entityId) => 
-        apiRequest(`properties.php?entity_type=${entityType}&entity_id=${entityId}`),
+    getProperties: (entityType, entityId, options = {}) => {
+        const params = new URLSearchParams({
+            entity_type: entityType,
+            entity_id: entityId.toString()
+        });
+        if (options.include_internal) {
+            params.append('include_internal', '1');
+        }
+        return apiRequest(`properties.php?${params.toString()}`);
+    },
 
     /**
-     * Set a property
-     * @param {{entity_type: string, entity_id: number, name: string, value: string}} propertyData - Property data
-     * @returns {Promise<{id: number, entity_type: string, entity_id: number, name: string, value: string}>}
+     * Set a property. If the property already exists, its value is updated.
+     * @param {Object} propertyData - Property data.
+     * @param {string} propertyData.entity_type - Entity type ('note' or 'page').
+     * @param {number} propertyData.entity_id - Entity ID.
+     * @param {string} propertyData.name - Property name.
+     * @param {any} propertyData.value - Property value.
+     * @param {0|1} [propertyData.internal] - Optional. Explicitly set internal status (0 or 1). If undefined, backend determines automatically.
+     * @returns {Promise<Object>} The created or updated property object.
      */
     setProperty: (propertyData) => apiRequest('properties.php', 'POST', propertyData),
 
@@ -333,7 +390,7 @@ const attachmentsAPI = {
     uploadAttachment: (noteId, file) => {
         const formData = new FormData();
         formData.append('note_id', noteId);
-        formData.append('attachmentFile', file);
+        formData.append('file', file);
         return apiRequest('attachments.php', 'POST', formData);
     },
 
@@ -383,21 +440,9 @@ const templatesAPI = {
     /**
      * Get available templates
      * @param {string} type - Template type ('note' or 'page')
-     * @returns {Promise<{success: boolean, data: Array<{name: string, content: string}>}>}
+     * @returns {Promise<Array<{name: string, content: string}>>} Array of template objects.
      */
-    getTemplates: async (type) => {
-        const response = await apiRequest(`templates.php?type=${type}`);
-        // Ensure we always return the expected format
-        if (Array.isArray(response)) {
-            // If we got a direct array, wrap it in the expected format
-            return {
-                success: true,
-                data: response
-            };
-        }
-        // Otherwise return the response as is (should already be in correct format)
-        return response;
-    },
+    getTemplates: (type) => apiRequest(`templates.php?type=${type}`),
 
     /**
      * Create a new template
