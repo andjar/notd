@@ -5,6 +5,7 @@ require_once 'property_trigger_service.php';
 require_once 'pattern_processor.php';
 require_once 'property_parser.php';
 require_once 'property_auto_internal.php'; // Added for determinePropertyInternalStatus
+require_once 'properties.php'; // Required for _updateOrAddPropertyAndDispatchTriggers
 
 header('Content-Type: application/json');
 $pdo = get_db_connection();
@@ -366,47 +367,46 @@ if ($method === 'GET') {
         if (isset($input['content']) || (isset($input['properties_explicit']) && !empty($input['properties_explicit']))) {
             $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
             $stmtDeleteOld->execute([':note_id' => $noteId]);
-        }
         
-        $propertiesToSave = [];
+            $propertiesToSave = [];
 
-        // If explicit properties are provided, use them.
-        if (isset($input['properties_explicit']) && is_array($input['properties_explicit']) && !empty($input['properties_explicit'])) {
-            foreach ($input['properties_explicit'] as $name => $values) {
-                if (!is_array($values)) {
-                    $values = [$values];
+            // If explicit properties are provided, use them.
+            if (isset($input['properties_explicit']) && is_array($input['properties_explicit']) && !empty($input['properties_explicit'])) {
+                foreach ($input['properties_explicit'] as $name => $values) {
+                    if (!is_array($values)) {
+                        $values = [$values];
+                    }
+                    foreach ($values as $value) {
+                        $propertiesToSave[] = ['name' => $name, 'value' => (string)$value];
+                    }
                 }
-                foreach ($values as $value) {
-                    $propertiesToSave[] = ['name' => $name, 'value' => (string)$value];
+            } 
+            // Otherwise, if content is updated and the note is not encrypted, parse properties from content.
+            else if (isset($input['content'])) {
+                $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 LIMIT 1");
+                $encryptedStmt->execute([':note_id' => $noteId]);
+                $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$encryptedProp || $encryptedProp['value'] !== 'true') {
+                    $processor = getPatternProcessor();
+                    $processedData = $processor->processContent($input['content'], 'note', $noteId);
+                    if (!empty($processedData['properties'])) {
+                        $propertiesToSave = $processedData['properties'];
+                    }
                 }
             }
-        } 
-        // Otherwise, if content is updated and the note is not encrypted, parse properties from content.
-        else if (isset($input['content'])) {
-            $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 LIMIT 1");
-            $encryptedStmt->execute([':note_id' => $noteId]);
-            $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$encryptedProp || $encryptedProp['value'] !== 'true') {
-                $processor = getPatternProcessor();
-                $processedData = $processor->processContent($input['content'], 'note', $noteId);
-                if (!empty($processedData['properties'])) {
-                    $propertiesToSave = $processedData['properties'];
+            // Save the collected properties to the database using the centralized function.
+            if (!empty($propertiesToSave)) {
+                foreach ($propertiesToSave as $prop) {
+                     _updateOrAddPropertyAndDispatchTriggers(
+                        $pdo,
+                        'note',
+                        $noteId,
+                        $prop['name'],
+                        $prop['value']
+                    );
                 }
-            }
-        }
-
-        // Save the collected properties to the database.
-        if (!empty($propertiesToSave)) {
-            $stmtInsertProp = $pdo->prepare("INSERT INTO Properties (note_id, name, value, internal) VALUES (:note_id, :name, :value, :internal)");
-            foreach ($propertiesToSave as $prop) {
-                $internalStatus = determinePropertyInternalStatus($pdo, $prop['name']);
-                $stmtInsertProp->execute([
-                    ':note_id' => $noteId,
-                    ':name' => $prop['name'],
-                    ':value' => $prop['value'],
-                    ':internal' => $internalStatus
-                ]);
             }
         }
         // --- END properties LOGIC ---

@@ -89,11 +89,11 @@ BEGIN
     UPDATE Pages SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
 END;
 
--- CREATE TRIGGER IF NOT EXISTS update_properties_updated_at
--- AFTER UPDATE ON Properties FOR EACH ROW
--- BEGIN
---     UPDATE Properties SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
--- END;
+CREATE TRIGGER IF NOT EXISTS update_properties_updated_at
+AFTER UPDATE ON Properties FOR EACH ROW
+BEGIN
+    UPDATE Properties SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
 
 CREATE TRIGGER IF NOT EXISTS update_property_definitions_updated_at
 AFTER UPDATE ON PropertyDefinitions FOR EACH ROW
@@ -108,3 +108,33 @@ INSERT OR IGNORE INTO PropertyDefinitions (name, internal, description, auto_app
 ('system', 1, 'System-generated properties', 1),
 ('_private', 1, 'Private properties (underscore prefix)', 1),
 ('metadata', 1, 'Metadata properties for internal use', 1);
+
+-- Webhooks Table
+CREATE TABLE IF NOT EXISTS Webhooks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    secret TEXT NOT NULL,
+    entity_type TEXT NOT NULL, -- 'note' or 'page'
+    property_name TEXT NOT NULL, -- The property that triggers the webhook
+    active INTEGER NOT NULL DEFAULT 1,
+    verified INTEGER NOT NULL DEFAULT 0,
+    last_verified DATETIME,
+    last_triggered DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_webhooks_lookup ON Webhooks(entity_type, property_name, active);
+
+-- Webhook Events Log Table
+CREATE TABLE IF NOT EXISTS WebhookEvents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    webhook_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL, -- 'property_change', 'test', 'verification'
+    payload TEXT,
+    response_code INTEGER,
+    response_body TEXT,
+    success INTEGER NOT NULL, -- 1 for success (2xx), 0 for failure
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (webhook_id) REFERENCES Webhooks(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_webhook_id ON WebhookEvents(webhook_id);

@@ -1,7 +1,11 @@
 <?php
+require_once __DIR__ . '/db_connect.php';
+require_once __DIR__ . '/response_utils.php';
+require_once __DIR__ . '/webhooks.php'; // Include the new WebhooksManager
 
 class PropertyTriggerService {
     private $pdo;
+    private $webhooksManager; // Add WebhooksManager instance
 
     // Trigger handler functions will be defined as private methods here
     // e.g., private function handleInternalPropertyForNote(...) { ... }
@@ -9,48 +13,28 @@ class PropertyTriggerService {
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->webhooksManager = new WebhooksManager($pdo); // Instantiate WebhooksManager
     }
 
     private function handleInternalPropertyForNote($entityId, $propertyName, $propertyValue) {
-        if ($propertyName === 'internal' && $entityId) {
-            $internalValue = filter_var($propertyValue, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-            if ($internalValue !== null) {
-                try {
-                    $stmt = $this->pdo->prepare("UPDATE Notes SET internal = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                    $stmt->execute([$internalValue ? 1 : 0, $entityId]);
-                    error_log("Updated internal status for note {$entityId} to " . ($internalValue ? 1 : 0));
-                } catch (PDOException $e) {
-                    error_log("Error updating internal status for note {$entityId}: " . $e->getMessage());
-                }
-            }
+        if ($propertyName === 'internal') {
+            $stmt = $this->pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
+            $stmt->execute([(int)$propertyValue, $entityId]);
         }
     }
 
     private function handleAliasPropertyForPage($entityId, $propertyName, $propertyValue) {
-        if ($propertyName === 'alias' && $entityId) {
-            // Ensure alias is not self-referential to the page's own name
-            try {
-                $stmtCheckName = $this->pdo->prepare("SELECT name FROM Pages WHERE id = ?");
-                $stmtCheckName->execute([$entityId]);
-                $page = $stmtCheckName->fetch(PDO::FETCH_ASSOC);
+        if ($propertyName === 'alias') {
+            // Check if the alias points to a valid page
+            $stmt = $this->pdo->prepare("SELECT id FROM Pages WHERE LOWER(name) = LOWER(?)");
+            $stmt->execute([$propertyValue]);
+            $targetPage = $stmt->fetch();
 
-                if ($page && strtolower($page['name']) === strtolower($propertyValue)) {
-                    error_log("Cannot set alias for page {$entityId} to its own name '{$propertyValue}'. Clearing alias.");
-                    // Set alias to NULL or empty string to prevent self-reference
-                    $stmt = $this->pdo->prepare("UPDATE Pages SET alias = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                    $stmt->execute([$entityId]);
-                } else {
-                    // Standard alias update (or it's already handled by the main property save if 'alias' is a direct column)
-                    // This trigger might be more about validation or side effects than direct update if 'alias' is a main column.
-                    // If 'alias' is a property in Properties table, then this trigger would update Pages.alias
-                    // For now, assuming 'alias' is a main column on Pages table, this trigger is for validation.
-                    // If it were a property to sync, it would look like:
-                    // $stmt = $this->pdo->prepare("UPDATE Pages SET alias = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                    // $stmt->execute([$propertyValue, $entityId]);
-                    error_log("Alias property '{$propertyValue}' for page {$entityId} processed (validation executed).");
-                }
-            } catch (PDOException $e) {
-                error_log("Error processing alias for page {$entityId}: " . $e->getMessage());
+            if (!$targetPage) {
+                // If the target page doesn't exist, remove the alias
+                $stmt = $this->pdo->prepare("UPDATE Properties SET value = NULL WHERE page_id = ? AND name = 'alias'");
+                $stmt->execute([$entityId]);
+                error_log("Alias target page '{$propertyValue}' not found. Alias removed.");
             }
         }
     }
@@ -65,55 +49,75 @@ class PropertyTriggerService {
      * @param mixed $propertyValue Property value
      */
     public function dispatch($entityType, $entityId, $propertyName, $propertyValue) {
-        error_log("[PROPERTY_TRIGGER_DEBUG] Dispatching trigger for {$entityType} {$entityId}, property: {$propertyName}");
-        error_log("[PROPERTY_TRIGGER_DEBUG] Property value: " . json_encode($propertyValue));
-        
-        // Get available triggers for this entity type
+        // Handle hardcoded triggers
         $triggers = $this->getTriggersForEntityType($entityType);
-        error_log("[PROPERTY_TRIGGER_DEBUG] Available triggers: " . json_encode(array_keys($triggers)));
-        
-        // Check if we have a handler for this property
         if (isset($triggers[$propertyName])) {
             $handler = $triggers[$propertyName];
-            error_log("[PROPERTY_TRIGGER_DEBUG] Found handler for {$propertyName}");
-            
-            try {
-                if (is_callable($handler)) {
-                    error_log("[PROPERTY_TRIGGER_DEBUG] Executing handler for {$propertyName}");
-                    $handler($entityId, $propertyName, $propertyValue);
-                    error_log("[PROPERTY_TRIGGER_DEBUG] Handler executed successfully");
-                } else {
-                    error_log("[PROPERTY_TRIGGER_ERROR] Handler for {$propertyName} is not callable");
-                }
-            } catch (Exception $e) {
-                error_log("[PROPERTY_TRIGGER_ERROR] Error executing handler for {$propertyName}: " . $e->getMessage());
-                error_log("[PROPERTY_TRIGGER_ERROR] Stack trace: " . $e->getTraceAsString());
-                throw $e; // Re-throw to be caught by caller
-            }
-        } else {
-            error_log("[PROPERTY_TRIGGER_DEBUG] No trigger found for {$propertyName}");
+            $this->$handler($entityId, $propertyName, $propertyValue);
         }
+
+        // Handle dynamic webhook triggers
+        $this->handleWebhookTrigger($entityType, $entityId, $propertyName, $propertyValue);
     }
     
+    /**
+     * Finds and dispatches webhooks for a given property change.
+     */
+    private function handleWebhookTrigger($entityType, $entityId, $propertyName, $propertyValue) {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT * FROM Webhooks WHERE entity_type = ? AND property_name = ? AND active = 1 AND verified = 1"
+            );
+            $stmt->execute([$entityType, $propertyName]);
+            $webhooks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($webhooks)) {
+                return; // No webhooks to trigger
+            }
+
+            // In a real-world scenario with many webhooks, this should be offloaded to a queue.
+            // For this application, direct dispatch is acceptable.
+            foreach ($webhooks as $webhook) {
+                $payload = [
+                    'event' => 'property_change',
+                    'webhook_id' => $webhook['id'],
+                    'timestamp' => time(),
+                    'data' => [
+                        'entity_type' => $entityType,
+                        'entity_id' => $entityId,
+                        'property_name' => $propertyName,
+                        'value' => $propertyValue
+                    ]
+                ];
+                // Use the new WebhooksManager to dispatch the event
+                $this->webhooksManager->dispatchEvent($webhook, 'property_change', $payload);
+            }
+        } catch (Exception $e) {
+            error_log("Error during webhook dispatch: " . $e->getMessage());
+        }
+    }
+
     /**
      * Get available triggers for an entity type
      * @param string $entityType Entity type ('note' or 'page')
      * @return array Map of property names to handler functions
      */
     private function getTriggersForEntityType($entityType) {
-        $triggers = [];
-        
-        if ($entityType === 'note') {
-            $triggers = [
-                'internal' => [$this, 'handleInternalPropertyForNote']
-            ];
-        } elseif ($entityType === 'page') {
-            $triggers = [
-                'alias' => [$this, 'handleAliasPropertyForPage']
-            ];
-        }
-        
-        return $triggers;
+        $triggers = [
+            'note' => [
+                'internal' => 'handleInternalPropertyForNote'
+            ],
+            'page' => [
+                'alias' => 'handleAliasPropertyForPage'
+            ]
+        ];
+
+        return $triggers[$entityType] ?? [];
     }
 }
+
+// Initialize and handle the request
+$pdo = get_db_connection();
+$propertyTriggerService = new PropertyTriggerService($pdo);
+// No direct output from this service file. It's a library.
 ?>

@@ -1,73 +1,99 @@
 <?php
-require_once __DIR__ . '/property_auto_internal.php';
+require_once 'db_connect.php';
+require_once 'response_utils.php';
 
-/**
- * Parses content for properties in the format key::value.
- *
- * @param string $content The text content to parse.
- * @return array An associative array of properties found, with keys as property names and values as arrays of property values.
- */
-function parsePropertiesFromContent($content) {
-    $properties = [];
-    // Regex to find 'key::value' pairs, ignoring code blocks.
-    // It looks for a key (word chars, -, _) followed by :: and captures the rest of the line as the value.
-    $pattern = '/(?<=\s|^)([a-zA-Z0-9_-]+)::([^\n\r]+)/';
-    preg_match_all($pattern, $content, $matches, PREG_SET_ORDER);
-    
-    foreach ($matches as $match) {
-        $key = trim($match[1]);
-        $value = trim($match[2]);
+class PropertyParser {
+    private $pdo;
+
+    public function __construct($pdo) {
+        $this->pdo = $pdo;
+    }
+
+    public function parsePropertiesFromContent($content) {
+        $properties = [];
+        $lines = explode("\n", $content);
         
-        // Don't add if key or value is empty
-        if (!empty($key) && !empty($value)) {
-            // Allow multiple values for the same key (e.g., tags)
-            if (!isset($properties[$key])) {
-                $properties[$key] = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            
+            // Match property pattern: key: value
+            if (preg_match('/^([^:]+):\s*(.+)$/', $line, $matches)) {
+                $key = trim($matches[1]);
+                $value = trim($matches[2]);
+                
+                // Skip empty keys
+                if (empty($key)) continue;
+                
+                $properties[$key] = $value;
             }
-            $properties[$key][] = $value;
+        }
+        
+        return $properties;
+    }
+
+    public function syncNotePropertiesFromContent($noteId, $content) {
+        try {
+            $this->pdo->beginTransaction();
+            
+            // Get existing properties
+            $stmt = $this->pdo->prepare("SELECT name, value FROM Properties WHERE note_id = ?");
+            $stmt->execute([$noteId]);
+            $existingProperties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Convert to associative array for easier lookup
+            $existingProps = [];
+            foreach ($existingProperties as $prop) {
+                $existingProps[$prop['name']] = $prop['value'];
+            }
+            
+            // Parse properties from content
+            $contentProperties = $this->parsePropertiesFromContent($content);
+            
+            // Find properties to add or update
+            $propertiesToAdd = [];
+            $propertiesToUpdate = [];
+            
+            foreach ($contentProperties as $name => $value) {
+                if (!isset($existingProps[$name])) {
+                    $propertiesToAdd[] = ['name' => $name, 'value' => $value];
+                } elseif ($existingProps[$name] !== $value) {
+                    $propertiesToUpdate[] = ['name' => $name, 'value' => $value];
+                }
+            }
+            
+            // Add new properties
+            if (!empty($propertiesToAdd)) {
+                $insertStmt = $this->pdo->prepare(
+                    "INSERT INTO Properties (note_id, name, value) VALUES (?, ?, ?)"
+                );
+                foreach ($propertiesToAdd as $prop) {
+                    $insertStmt->execute([$noteId, $prop['name'], $prop['value']]);
+                }
+            }
+            
+            // Update existing properties
+            if (!empty($propertiesToUpdate)) {
+                $updateStmt = $this->pdo->prepare(
+                    "UPDATE Properties SET value = ? WHERE note_id = ? AND name = ?"
+                );
+                foreach ($propertiesToUpdate as $prop) {
+                    $updateStmt->execute([$prop['value'], $noteId, $prop['name']]);
+                }
+            }
+            
+            $this->pdo->commit();
+            return true;
+        } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            error_log("Error syncing note properties: " . $e->getMessage());
+            return false;
         }
     }
-    
-    return $properties;
 }
 
-/**
- * Syncs properties found in note content with the Properties table in the database.
- * This function is designed to be the single source of truth for note properties derived from its content.
- * It will add, update, and delete properties as necessary to match what is in the text.
- *
- * @param PDO $pdo The PDO database connection object.
- * @param int $noteId The ID of the note to sync properties for.
- * @param string $content The new content of the note.
- * @return void
- */
-function syncNotePropertiesFromContent($pdo, $noteId, $content) {
-    $propertiesFromContent = parsePropertiesFromContent($content);
-    
-    // Flatten the array for easier processing.
-    // from ['tags' => ['a', 'b']] to [['name' => 'tags', 'value' => 'a'], ['name' => 'tags', 'value' => 'b']]
-    $newProperties = [];
-    foreach ($propertiesFromContent as $name => $values) {
-        foreach ($values as $value) {
-            $newProperties[] = ['name' => $name, 'value' => $value];
-        }
-    }
-    
-    // The transaction is now handled by the calling function (e.g., the POST/PUT handler in notes.php)
-    // 1. Delete all existing, non-internal properties for this note, EXCEPT for 'status' properties.
-    $stmtDelete = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND internal = 0 AND name != 'status'");
-    $stmtDelete->execute([$noteId]);
-    
-    // 2. Insert the new properties found in the content.
-    $stmtInsert = $pdo->prepare(
-        "INSERT INTO Properties (note_id, name, value, internal) VALUES (?, ?, ?, ?)"
-    );
-    
-    foreach ($newProperties as $prop) {
-        // Determine the internal status for the property before inserting.
-        $internalStatus = determinePropertyInternalStatus($pdo, $prop['name']);
-        $stmtInsert->execute([$noteId, $prop['name'], $prop['value'], $internalStatus]);
-    }
-
-    return $propertiesFromContent;
-} 
+// Initialize and handle the request
+$pdo = get_db_connection();
+$propertyParser = new PropertyParser($pdo); 

@@ -2,6 +2,73 @@
 // Helper functions for automatic property internal status based on definitions
 
 require_once 'db_connect.php';
+require_once 'response_utils.php';
+
+class PropertyAutoInternalManager {
+    private $pdo;
+
+    public function __construct($pdo) {
+        $this->pdo = $pdo;
+    }
+
+    public function getPropertyInternalStatusFromDefinition($propertyName) {
+        try {
+            $stmt = $this->pdo->prepare("SELECT internal FROM PropertyDefinitions WHERE name = ?");
+            $stmt->execute([$propertyName]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($result) {
+                return (int)$result['internal'];
+            }
+            
+            return null;
+        } catch (PDOException $e) {
+            error_log("Error getting property internal status from definition: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function determinePropertyInternalStatus($propertyName, $explicitInternal = null) {
+        // If explicit internal status is provided, use it
+        if ($explicitInternal !== null) {
+            return (int)$explicitInternal;
+        }
+
+        // Try to get from property definition
+        $definitionInternal = $this->getPropertyInternalStatusFromDefinition($propertyName);
+        if ($definitionInternal !== null) {
+            return $definitionInternal;
+        }
+
+        // Default internal properties
+        $defaultInternalProperties = [
+            'internal',
+            'created_at',
+            'updated_at',
+            'order_index',
+            'type',
+            'alias',
+            'welcome_notes_added'
+        ];
+
+        // Check if property name starts with underscore
+        if (strpos($propertyName, '_') === 0) {
+            return 1;
+        }
+
+        // Check if property is in default internal list
+        if (in_array($propertyName, $defaultInternalProperties)) {
+            return 1;
+        }
+
+        // Default to non-internal
+        return 0;
+    }
+}
+
+// Initialize and handle the request
+$pdo = get_db_connection();
+$propertyAutoInternalManager = new PropertyAutoInternalManager($pdo);
 
 /**
  * Check if a property should be internal based on PropertyDefinitions
