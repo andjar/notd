@@ -20,10 +20,6 @@ jobs:
         extensions: sqlite3
         coverage: none
         
-    - name: Install Dependencies
-      working-directory: ${{ github.workspace }}
-      run: composer install --prefer-dist --no-progress
-        
     - name: Run PHPUnit Tests
       working-directory: ${{ github.workspace }}
       run: vendor/bin/phpunit
