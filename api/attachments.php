@@ -4,6 +4,8 @@ error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
 error_log("POST data: " . print_r($_POST, true));
 error_log("FILES data: " . print_r($_FILES, true));
 
+ob_start(); // Start output buffering
+
 try {
     require_once __DIR__ . '/db_connect.php';
     require_once __DIR__ . '/../config.php';
@@ -143,6 +145,7 @@ try {
         $validationRulesPOST = ['note_id' => 'required|isPositiveInteger'];
         $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
         if (!empty($errorsPOST)) {
+            ob_end_clean();
             ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
             exit;
         }
@@ -150,6 +153,7 @@ try {
 
         // File presence check
         if (!isset($_FILES['attachmentFile'])) {
+            ob_end_clean();
             ApiResponse::error('attachmentFile is required.', 400);
             exit;
         }
@@ -173,6 +177,7 @@ try {
             if (!$note) {
                 error_log("Note not found for ID: $note_id");
                 $pdo->rollBack();
+                ob_end_clean();
                 ApiResponse::error('Note not found', 404);
                 exit;
             }
@@ -226,6 +231,8 @@ try {
 
             $pdo->commit();
             ApiResponse::success($attachment);
+            ob_end_flush();
+            exit;
 
         } catch (RuntimeException $e) {
             if (isset($full_path) && file_exists($full_path)) {
@@ -234,7 +241,9 @@ try {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            ob_end_clean();
             ApiResponse::error($e->getMessage(), 400);
+            exit;
         } catch (PDOException $e) {
             if (isset($full_path) && file_exists($full_path)) {
                 unlink($full_path);
@@ -242,7 +251,9 @@ try {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            ob_end_clean();
             ApiResponse::error('Failed to save attachment: ' . $e->getMessage(), 500);
+            exit;
         }
     } elseif ($method === 'GET') {
         if (isset($_GET['note_id'])) {
@@ -256,8 +267,12 @@ try {
                     $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path']; 
                 }
                 ApiResponse::success($attachments);
+                ob_end_flush();
+                exit;
             } catch (PDOException $e) {
+                ob_end_clean();
                 ApiResponse::error('Failed to fetch attachments for note_id: ' . $e->getMessage(), 500);
+                exit;
             }
         } else {
             // New logic for all attachments
@@ -341,8 +356,12 @@ try {
                         'total_pages' => (int)ceil($totalItems / $perPage)
                     ]
                 ]);
+                ob_end_flush();
+                exit;
             } catch (PDOException $e) {
+                ob_end_clean();
                 ApiResponse::error('Failed to fetch all attachments: ' . $e->getMessage(), 500);
+                exit;
             }
         }
     } elseif ($method === 'DELETE') {
@@ -353,6 +372,7 @@ try {
         // Use a temporary array for validation as $_GET or $input might be the source
         $errors = Validator::validate(['id' => $id_to_validate], $validationRules); 
         if (!empty($errors)) {
+            ob_end_clean();
             ApiResponse::error('Invalid attachment ID.', 400, $errors);
             exit;
         }
@@ -368,6 +388,7 @@ try {
 
             if (!$attachment) {
                 $pdo->rollBack();
+                ob_end_clean();
                 ApiResponse::error('Attachment not found', 404);
                 exit;
             }
@@ -393,22 +414,32 @@ try {
 
             $pdo->commit();
             ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
+            ob_end_flush();
+            exit;
 
         } catch (RuntimeException $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            ob_end_clean();
             ApiResponse::error($e->getMessage(), 500);
+            exit;
         } catch (PDOException $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            ob_end_clean();
             ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
+            exit;
         }
     } else {
+        ob_end_clean();
         ApiResponse::error('Method Not Allowed', 405);
+        exit;
     }
 } catch (Exception $e) {
     // Ensure ApiResponse is used for the final catch-all
+    ob_end_clean();
     ApiResponse::error('An unexpected error occurred: ' . $e->getMessage(), 500);
+    exit;
 }
