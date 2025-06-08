@@ -30,14 +30,6 @@ class BaseTestCase extends TestCase
         }
         if (!defined('UPLOADS_DIR')) {
             define('UPLOADS_DIR', self::$tempUploadsDir);
-        } else {
-            // If UPLOADS_DIR is already defined, we might be in trouble or need to adapt.
-            // For now, assume we can define it or it matches.
-            // This could happen if config.php is included before BaseTestCase::setUp runs.
-            // To be safe, let's try to ensure our test-specific UPLOADS_DIR is used.
-            // This is tricky because constants can't be redefined.
-            // A better approach would be for config.php to use getenv() or a variable that can be overridden.
-            // For now, we'll proceed hoping this definition takes precedence or is handled.
         }
         
         // Define other potentially missing constants from config.php

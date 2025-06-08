@@ -25,41 +25,49 @@ if ($method === 'POST' && isset($input['_method'])) {
 }
 
 // Helper function to send JSON response
-function sendJsonResponse($data, $statusCode = 200) {
-    http_response_code($statusCode);
-    echo json_encode($data);
-    exit;
+if (!function_exists('sendJsonResponse')) {
+    function sendJsonResponse($data, $statusCode = 200) {
+        http_response_code($statusCode);
+        echo json_encode($data);
+        exit;
+    }
 }
 
 // Helper function to validate note data
-function validateNoteData($data) {
-    if (!isset($data['content'])) {
-        sendJsonResponse(['success' => false, 'error' => 'Note content is required'], 400);
+if (!function_exists('validateNoteData')) {
+    function validateNoteData($data) {
+        if (!isset($data['content'])) {
+            sendJsonResponse(['success' => false, 'error' => 'Note content is required'], 400);
+        }
+        return true;
     }
-    return true;
 }
 
 // Helper function to check for 'internal' property and update Notes.internal
-function _checkAndSetNoteInternalFlag($pdo, $noteId) {
-    $stmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = ? AND name = 'internal' AND active = 1");
-    $stmt->execute([$noteId]);
-    $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if (!function_exists('_checkAndSetNoteInternalFlag')) {
+    function _checkAndSetNoteInternalFlag($pdo, $noteId) {
+        $stmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = ? AND name = 'internal' AND active = 1");
+        $stmt->execute([$noteId]);
+        $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    foreach ($properties as $prop) {
-        if (strtolower($prop['value']) === 'true') {
-            $updateStmt = $pdo->prepare("UPDATE Notes SET internal = 1 WHERE id = ?");
-            $updateStmt->execute([$noteId]);
-            return true; // Flag set
+        foreach ($properties as $prop) {
+            if (strtolower($prop['value']) === 'true') {
+                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = 1 WHERE id = ?");
+                $updateStmt->execute([$noteId]);
+                return true; // Flag set
+            }
         }
+        return false; // Flag not set or property not found/not true
     }
-    return false; // Flag not set or property not found/not true
 }
 
 // Helper function to process note content and extract properties
-function processNoteContent($pdo, $content, $entityType, $entityId) {
-    // This now correctly syncs properties with the database and returns the parsed properties.
-    // The entityType parameter is not used by syncNotePropertiesFromContent but is kept for compatibility.
-    return syncNotePropertiesFromContent($pdo, $entityId, $content);
+if (!function_exists('processNoteContent')) {
+    function processNoteContent($pdo, $content, $entityType, $entityId) {
+        // This now correctly syncs properties with the database and returns the parsed properties.
+        // The entityType parameter is not used by syncNotePropertiesFromContent but is kept for compatibility.
+        return syncNotePropertiesFromContent($pdo, $entityId, $content);
+    }
 }
 
 if ($method === 'GET') {
