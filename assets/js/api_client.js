@@ -40,6 +40,12 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     try {
         const response = await fetch(API_BASE_URL + endpoint, options);
         
+        // Debug logging
+        console.log(`[apiRequest] Making ${method} request to: ${API_BASE_URL + endpoint}`);
+        if (body) {
+            console.log('[apiRequest] Request body:', body);
+        }
+        
         // Handle empty responses (e.g., 204 No Content)
         if (response.status === 204) {
             return { success: true, data: null };
@@ -65,14 +71,29 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         // Check for API-level errors or explicit error status
         let errorMessage = null;
         if (!response.ok) { // HTTP error status (4xx, 5xx)
-            errorMessage = data?.error || data?.message || response.statusText;
-            console.error(`API Error HTTP (${response.status}):`, errorMessage, data);
+            errorMessage = data?.error?.message || data?.message || data?.error || response.statusText;
+            // Fallback if error is still an object
+            if (typeof errorMessage === 'object') {
+                errorMessage = JSON.stringify(errorMessage);
+            }
+            console.error(`API Error HTTP (${response.status}):`, errorMessage);
+            console.error('Full error response data:', JSON.stringify(data, null, 2));
         } else if (data?.success === false) { // Explicit success:false pattern
-            errorMessage = data.error || data.message || 'API request failed (success:false)';
-            console.error('API Error (success:false):', errorMessage, data);
+            errorMessage = data?.error?.message || data?.message || data?.error || 'API request failed (success:false)';
+            // Fallback if error is still an object
+            if (typeof errorMessage === 'object') {
+                errorMessage = JSON.stringify(errorMessage);
+            }
+            console.error('API Error (success:false):', errorMessage);
+            console.error('Full error response data:', JSON.stringify(data, null, 2));
         } else if (data?.status === 'error') { // Explicit status:'error' pattern (even with HTTP 200 OK)
             errorMessage = data.message || data.error || 'API request failed (status:error)';
-            console.error('API Error (status:error):', errorMessage, data);
+            // Fallback if error is still an object
+            if (typeof errorMessage === 'object') {
+                errorMessage = JSON.stringify(errorMessage);
+            }
+            console.error('API Error (status:error):', errorMessage);
+            console.error('Full error response data:', JSON.stringify(data, null, 2));
         }
 
         if (errorMessage) {

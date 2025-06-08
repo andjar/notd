@@ -8,7 +8,8 @@ require_once 'validator_utils.php'; // Include the new Validator
 $pdo = get_db_connection();
 $dataManager = new DataManager($pdo); // Instantiate DataManager
 $method = $_SERVER['REQUEST_METHOD'];
-$input = json_decode(file_get_contents('php://input'), true);
+$rawInput = file_get_contents('php://input');
+$input = json_decode($rawInput, true);
 
 class PageManager {
     private $pdo;
@@ -53,7 +54,13 @@ class PageManager {
 
     public function handleRequest() {
         $method = $_SERVER['REQUEST_METHOD'];
-        $input = json_decode(file_get_contents('php://input'), true);
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+
+        // Debug logging
+        error_log("[PageManager] Raw input: " . $rawInput);
+        error_log("[PageManager] Parsed input: " . json_encode($input));
+        error_log("[PageManager] JSON decode error: " . json_last_error_msg());
 
         switch ($method) {
             case 'GET':
@@ -201,13 +208,21 @@ class PageManager {
     }
 
     private function handlePostRequest($input) {
+        // Debug logging
+        error_log("[PageManager] POST request input: " . json_encode($input));
+        
         $validationRules = [
             'name' => 'required|isNotEmpty',
             'alias' => 'optional'
         ];
         $errors = Validator::validate($input, $validationRules);
         if (!empty($errors)) {
-            ApiResponse::error('Invalid input for creating page.', 400, $errors);
+            error_log("[PageManager] Validation errors: " . json_encode($errors));
+            ApiResponse::error('Invalid input for creating page.', 400, [
+                'validation_errors' => $errors,
+                'received_input' => $input,
+                'input_type' => gettype($input)
+            ]);
             return;
         }
 

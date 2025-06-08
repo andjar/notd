@@ -55,15 +55,20 @@ class Validator {
                         $validationRule = $parts[1];
                     } elseif ($parts[0] === 'optional') {
                         $isOptional = true;
-                        $validationRule = $parts[1];
+                        $validationRule = $parts[1] ?? null; // Allow optional without a rule
                     } else { // Assumes rule implies required if not 'optional'
                         $validationRule = $ruleEntry;
                     }
                 } else {
-                    $validationRule = $ruleEntry; // Default to required
+                    if ($ruleEntry === 'optional') {
+                        $isOptional = true;
+                        $validationRule = null;
+                    } else {
+                        $validationRule = $ruleEntry; // Default to required
+                    }
                 }
             } elseif (is_array($ruleEntry)) {
-                $validationRule = $ruleEntry['rule'];
+                $validationRule = $ruleEntry['rule'] ?? null;
                 if (isset($ruleEntry['message'])) {
                     $customMessage = $ruleEntry['message'];
                 }
@@ -86,6 +91,11 @@ class Validator {
             
             // Skip validation for optional fields if they are not present
             if ($isOptional && !isset($data[$field])) {
+                continue;
+            }
+            
+            // Skip validation if no validation rule is specified
+            if ($validationRule === null) {
                 continue;
             }
             
