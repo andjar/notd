@@ -13,22 +13,24 @@ require_once 'validator_utils.php'; // Include the new Validator
 // This specific validation can be replaced by Validator class or kept if it has special logic (like tag normalization)
 // For now, let's assume Validator can handle 'name' and 'value' presence, but tag normalization is specific.
 // We might call Validator first, then this if basic checks pass.
-function validate_property_data($data) {
-    if (!isset($data['name']) || !isset($data['value'])) {
-        return false;
-    }
-    
-    // Handle tag::tag format
-    if (strpos($data['name'], 'tag::') === 0) {
-        $tagName = substr($data['name'], 5);
-        if (empty($tagName)) {
+if (!function_exists('validate_property_data')) {
+    function validate_property_data($data) {
+        if (!isset($data['name']) || !isset($data['value'])) {
             return false;
         }
-        // Normalize tag value to match the tag name
-        $data['value'] = $tagName;
+        
+        // Handle tag::tag format
+        if (strpos($data['name'], 'tag::') === 0) {
+            $tagName = substr($data['name'], 5);
+            if (empty($tagName)) {
+                return false;
+            }
+            // Normalize tag value to match the tag name
+            $data['value'] = $tagName;
+        }
+        
+        return $data;
     }
-    
-    return $data;
 }
 
 /**
@@ -45,9 +47,10 @@ function validate_property_data($data) {
  * @return array Associative array with 'name', 'value', 'internal' of the saved property.
  * @throws Exception If validation fails or DB operation fails.
  */
-function _updateOrAddPropertyAndDispatchTriggers($pdo, $entityType, $entityId, $name, $value, $explicitInternal = null) {
-    // Validate and normalize property data
-    $propertyData = validate_property_data(['name' => $name, 'value' => $value]);
+if (!function_exists('_updateOrAddPropertyAndDispatchTriggers')) {
+    function _updateOrAddPropertyAndDispatchTriggers($pdo, $entityType, $entityId, $name, $value, $explicitInternal = null) {
+        // Validate and normalize property data
+        $propertyData = validate_property_data(['name' => $name, 'value' => $value]);
     if (!$propertyData) {
         throw new Exception('Invalid property data');
     }
@@ -97,6 +100,7 @@ function _updateOrAddPropertyAndDispatchTriggers($pdo, $entityType, $entityId, $
     $triggerService->dispatch($entityType, $entityId, $validatedName, $validatedValue);
     
     return ['name' => $validatedName, 'value' => $validatedValue, 'internal' => $finalInternal];
+    }
 }
 
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {

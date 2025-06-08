@@ -2,12 +2,14 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/setup_db.php'; // Make the setup function available globally
 
-function log_db_error($message, $context = []) {
-    $logMessage = date('Y-m-d H:i:s') . " [DB] " . $message;
-    if (!empty($context)) {
-        $logMessage .= " Context: " . json_encode($context);
+if (!function_exists('log_db_error')) {
+    function log_db_error($message, $context = []) {
+        $logMessage = date('Y-m-d H:i:s') . " [DB] " . $message;
+        if (!empty($context)) {
+            $logMessage .= " Context: " . json_encode($context);
+        }
+        error_log($logMessage);
     }
-    error_log($logMessage);
 }
 
 function get_db_connection() {

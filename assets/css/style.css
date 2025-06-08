@@ -3308,3 +3308,8 @@ a[href^="https://"]:visited {
 .generic-modal-input-field::placeholder {
     color: var(--ls-tertiary-text-color);
 }
+
+#page-modal-encryption-button {
+    margin-right: 2.3em;
+    margin-top: .8em;
+}

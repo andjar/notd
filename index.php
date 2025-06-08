@@ -146,11 +146,15 @@ require_once 'config.php';
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
                 <!-- modal-header-icons div might be redundant if close button is absolute, or can be kept for other icons -->
-                <div class="modal-header-icons"> 
-                    <i data-feather="key" class="page-encryption-icon" id="page-encryption-icon" title="Set page encryption"></i>
-                    <button class="modal-close-x" aria-label="Close modal" id="page-properties-modal-close" data-target-modal="page-properties-modal">
-                        <i data-feather="x"></i>
-                    </button>
+                <div class="modal-header-icons">
+                    <div id="page-modal-encryption-button">
+                        <i data-feather="key" class="page-encryption-icon" id="page-encryption-icon" title="Set page encryption"></i>
+                    </div>
+                    <div id="page-modal-close-button">
+                        <button class="modal-close-x" aria-label="Close modal" id="page-properties-modal-close" data-target-modal="page-properties-modal">
+                            <i data-feather="x"></i>
+                        </button>
+                    </div>
                </div>
             </div>
             <div id="page-properties-list" class="page-properties-list"></div>
