@@ -154,4 +154,63 @@ class WebhooksApiTest extends TestCase {
         $getResponse = self::$client->get("/api/webhooks.php?id={$id}");
         $this->assertEquals(404, $getResponse->getStatusCode());
     }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function testWebhookDispatchDisabledByConfig() {
+        // Define WEBHOOKS_ENABLED as false for this test process
+        define('WEBHOOKS_ENABLED', false);
+
+        // Re-include dependent files that use this constant if necessary,
+        // or ensure the app's entry points re-read config.
+        // The WebhooksManager will read config.php when instantiated or when dispatchEvent is called.
+        // Since api/webhooks.php includes config.php, this should be fine.
+
+        // Create a webhook
+        $createResponse = self::$client->post('/api/webhooks.php', [
+            'json' => [
+                'url' => 'https://example.com/webhook-listener-disabled-test',
+                'entity_type' => 'note',
+                'property_name' => 'status_disabled_test'
+            ]
+        ]);
+        $this->assertEquals(200, $createResponse->getStatusCode(), "Failed to create webhook for disabled test.");
+        $createData = json_decode($createResponse->getBody(), true);
+        $this->assertTrue($createData['success']);
+        $webhookId = $createData['data']['id'];
+
+        // Manually activate and verify the webhook in the DB for the test
+        // This is important because dispatchEvent won't run if not active/verified
+        // Need to get DB connection within this process
+        require_once __DIR__ . '/../../api/db_connect.php'; // Ensures get_db_connection is available
+        $pdo = get_db_connection(); 
+        $stmt = $pdo->prepare("UPDATE Webhooks SET active = 1, verified = 1 WHERE id = ?");
+        $stmt->execute([$webhookId]);
+        $this->assertEquals(1, $stmt->rowCount(), "Failed to activate/verify webhook for disabled test.");
+        
+        // Trigger the property change that would normally dispatch a webhook
+        $propResponse = self::$client->post('/api/properties.php', [
+            'json' => [
+                'entity_type' => 'note',
+                'entity_id' => self::$testNoteId, // Ensure this ID is valid
+                'name' => 'status_disabled_test', // Match property_name
+                'value' => 'TRIGGER_DISABLED'
+            ]
+        ]);
+        $this->assertEquals(200, $propResponse->getStatusCode(), "Property change failed for disabled test.");
+
+        // Add a small delay to allow any async processing (if any, though current dispatch is synchronous)
+        sleep(1);
+
+        // Check the webhook event history - it should be empty or not contain the new event
+        $historyResponse = self::$client->get("/api/webhooks.php?action=history&id={$webhookId}");
+        $this->assertEquals(200, $historyResponse->getStatusCode(), "Failed to get history for disabled test.");
+        
+        $historyData = json_decode($historyResponse->getBody(), true);
+        $this->assertTrue($historyData['success']);
+        // Assert that no event was logged because webhooks are disabled.
+        $this->assertEquals(0, $historyData['pagination']['total'], "Webhook event was logged even when WEBHOOKS_ENABLED=false.");
+    }
 } 

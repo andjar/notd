@@ -139,13 +139,24 @@ if ($method === 'GET') {
     try {
         $pdo->beginTransaction();
 
-        // 1. Create the note (with optional parent_note_id)
-        $stmt = $pdo->prepare("INSERT INTO Notes (page_id, content, parent_note_id) VALUES (:page_id, :content, :parent_note_id)");
-        $stmt->execute([
-            ':page_id' => $pageId, 
+        // 1. Create the note (with optional parent_note_id and order_index)
+        $sql = "INSERT INTO Notes (page_id, content, parent_note_id";
+        $params = [
+            ':page_id' => $pageId,
             ':content' => $content,
             ':parent_note_id' => $parentNoteId
-        ]);
+        ];
+
+        if (isset($input['order_index']) && is_numeric($input['order_index'])) {
+            $sql .= ", order_index";
+            $params[':order_index'] = (int)$input['order_index'];
+            $sql .= ") VALUES (:page_id, :content, :parent_note_id, :order_index)";
+        } else {
+            $sql .= ") VALUES (:page_id, :content, :parent_note_id)";
+        }
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $noteId = $pdo->lastInsertId();
 
         // 2. Parse and save properties from the content

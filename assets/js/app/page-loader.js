@@ -188,47 +188,67 @@ function displayBacklinks(backlinksData) {
  * @param {string} pageNameParam - Name of the page to load
  * @param {boolean} [focusFirstNote=false] - Whether to focus the first note
  * @param {boolean} [updateHistory=true] - Whether to update browser history
+ * @param {Object} [providedPageData=null] - Optional pre-fetched page data
  */
-export async function loadPage(pageNameParam, focusFirstNote = false, updateHistory = true) {
+export async function loadPage(pageNameParam, focusFirstNote = false, updateHistory = true, providedPageData = null) {
     currentPageEncryptionKey = null;
     decryptionPassword = null;
     let pageNameToLoad = pageNameParam;
-    console.log(`Loading page: ${pageNameToLoad}, focusFirstNote: ${focusFirstNote}, updateHistory: ${updateHistory}`);
+    console.log(`Loading page: ${pageNameToLoad}, focusFirstNote: ${focusFirstNote}, updateHistory: ${updateHistory}, providedPageData: ${providedPageData ? providedPageData.name : null}`);
     if (window.blockPageLoad) {
         console.warn('Page load blocked, possibly due to unsaved changes or ongoing operation.');
         return;
     }
     window.blockPageLoad = true;
 
-    if (hasPageCache(pageNameToLoad) && (Date.now() - getPageCache(pageNameToLoad).timestamp < CACHE_MAX_AGE_MS)) {
+    let pageDataFromSource = null; // Will hold page data from provided, cache, or API
+
+    // 1. Check for providedPageData
+    if (providedPageData && providedPageData.name === pageNameToLoad) {
+        console.log(`Using provided page data for: ${pageNameToLoad}`);
+        pageDataFromSource = providedPageData;
+        // Ensure this provided data is cached for subsequent loads
+        // Notes and properties should be part of providedPageData if it's complete
+        const cacheEntry = {
+            id: providedPageData.id,
+            name: providedPageData.name,
+            alias: providedPageData.alias,
+            notes: providedPageData.notes || [], // Ensure notes array exists
+            properties: providedPageData.properties || {}, // Ensure properties object exists
+            timestamp: Date.now() // Update timestamp as it's being "loaded" now
+        };
+        setPageCache(pageNameToLoad, cacheEntry);
+        console.log(`Provided page data for ${pageNameToLoad} has been cached/updated in cache.`);
+    } 
+    // 2. Check cache if not using providedPageData
+    else if (hasPageCache(pageNameToLoad) && (Date.now() - getPageCache(pageNameToLoad).timestamp < CACHE_MAX_AGE_MS)) {
         const cachedData = getPageCache(pageNameToLoad);
         console.log(`Using cached data for page: ${pageNameToLoad}`);
-        
+        pageDataFromSource = cachedData;
+    }
+
+    // If we have data from provided source or cache
+    if (pageDataFromSource) {
         try {
-            setCurrentPageName(cachedData.name);
-            setCurrentPageId(cachedData.id);
+            setCurrentPageName(pageDataFromSource.name);
+            setCurrentPageId(pageDataFromSource.id);
 
             if (updateHistory) {
                 const newUrl = new URL(window.location);
-                newUrl.searchParams.set('page', cachedData.name);
-                history.pushState({ pageName: cachedData.name }, '', newUrl.toString());
+                newUrl.searchParams.set('page', pageDataFromSource.name);
+                history.pushState({ pageName: pageDataFromSource.name }, '', newUrl.toString());
             }
 
-            window.ui.updatePageTitle(cachedData.name);
+            window.ui.updatePageTitle(pageDataFromSource.name);
             if (window.ui.calendarWidget && typeof window.ui.calendarWidget.setCurrentPage === 'function') {
-                window.ui.calendarWidget.setCurrentPage(cachedData.name);
+                window.ui.calendarWidget.setCurrentPage(pageDataFromSource.name);
             }
 
-            const pageDetails = { 
-                id: cachedData.id,
-                name: cachedData.name,
-                alias: cachedData.alias 
-            };
-            const pageProperties = cachedData.properties;
-            setNotesForCurrentPage(cachedData.notes);
+            // pageDetails are directly from pageDataFromSource
+            const pageProperties = pageDataFromSource.properties || {};
+            setNotesForCurrentPage(pageDataFromSource.notes || []);
 
             if (pageProperties && pageProperties.encrypt) {
-                // Ensure it's a string and not an array/object if properties can have multiple values
                 const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt;
                 currentPageEncryptionKey = encryptionPropValue;
 
@@ -285,13 +305,8 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
                             }
                             
                             // Display notes (these are the original notes, decryption happens in note-renderer)
-                            // The notes are already in `notesForCurrentPage` (set by `setNotesForCurrentPage`)
-                            // or `cachedData.notes` if using cache.
-                            let notesToDisplay = notesForCurrentPage; // Default to notes from state
-                            if (hasPageCache(pageNameToLoad) && getPageCache(pageNameToLoad).notes) { // Check if we were in cache path
-                                notesToDisplay = getPageCache(pageNameToLoad).notes;
-                            }
-                            
+                            // The notes are already in `notesForCurrentPage` (set by `setNotesForCurrentPage` from pageDataFromSource.notes)
+                            let notesToDisplay = notesForCurrentPage;
                             window.ui.displayNotes(notesToDisplay, currentPageId); // currentPageId is set
 
                             // Handle transclusions and SQL queries as usual after notes are displayed
@@ -330,92 +345,108 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
                 decryptionPassword = null;
             }
 
-            console.log('Page details for (cached)', cachedData.name, ':', pageDetails);
-            console.log('Page properties for (cached)', cachedData.name, ':', pageProperties);
-            console.log('Notes for (cached)', cachedData.name, ':', notesForCurrentPage.length);
+            console.log(`Page details for (${pageDataFromSource === providedPageData ? 'provided' : 'cached'})`, pageDataFromSource.name, ':', pageDataFromSource);
+            console.log(`Page properties for (${pageDataFromSource === providedPageData ? 'provided' : 'cached'})`, pageDataFromSource.name, ':', pageProperties);
+            console.log(`Notes for (${pageDataFromSource === providedPageData ? 'provided' : 'cached'})`, pageDataFromSource.name, ':', notesForCurrentPage.length);
             
             if (window.ui.domRefs.pagePropertiesContainer && typeof window.ui.renderPageInlineProperties === 'function') {
                 window.ui.renderPageInlineProperties(pageProperties, window.ui.domRefs.pagePropertiesContainer);
             }
-            window.ui.displayNotes(notesForCurrentPage, cachedData.id);
-            window.ui.updateActivePageLink(cachedData.name);
+            window.ui.displayNotes(notesForCurrentPage, pageDataFromSource.id);
+            window.ui.updateActivePageLink(pageDataFromSource.name);
 
-            const backlinks = await searchAPI.getBacklinks(cachedData.name);
+            const backlinks = await searchAPI.getBacklinks(pageDataFromSource.name);
             displayBacklinks(backlinks);
-            await handleTransclusions(); 
-            await handleSqlQueries(); // Call the new SQL query handler
+            await handleTransclusions();
+            await handleSqlQueries();
 
             if (focusFirstNote && notesContainer) {
                 const firstNoteEl = notesContainer.querySelector('.note-content');
                 if (firstNoteEl) firstNoteEl.focus();
             }
             window.blockPageLoad = false;
-            return; 
+            return;
         } catch (error) {
-            console.error('Error loading page from cache, falling back to network:', error);
-            deletePageCache(pageNameToLoad);
+            console.error('Error loading page from provided data or cache, falling back to network if appropriate:', error);
+            // If the error was with providedPageData, we might not want to delete cache yet,
+            // but if it was a cache integrity issue, then deleting is good.
+            // For now, let's assume if pageDataFromSource was set and failed, it's safer to try fetching.
+            // If providedPageData was the source, pageNameToLoad might still be in cache correctly.
+            if (pageDataFromSource !== providedPageData) { // Only delete cache if it was the source of the error
+                 deletePageCache(pageNameToLoad);
+            }
+            pageDataFromSource = null; // Ensure we fetch from network
         }
     }
 
-    try {
-        if (!pageNameToLoad || pageNameToLoad.trim() === '') {
-            console.warn('loadPage called with empty pageName, defaulting to initial page.');
-            pageNameToLoad = getInitialPage();
-        }
-
-        if (notesContainer) notesContainer.innerHTML = '<p>Loading page...</p>';
-        if (window.ui.domRefs.pagePropertiesContainer) window.ui.domRefs.pagePropertiesContainer.innerHTML = ''; 
-
-        const pageData = await pagesAPI.getPageByName(pageNameToLoad);
-        if (!pageData) {
-            throw new Error(`Page "${pageNameToLoad}" not found and could not be created.`);
-        }
-
-        setCurrentPageName(pageData.name);
-        setCurrentPageId(pageData.id);
-
-        if (updateHistory) {
-            const newUrl = new URL(window.location);
-            newUrl.searchParams.set('page', pageData.name);
-            history.pushState({ pageName: pageData.name }, '', newUrl.toString());
-        }
-
-        window.ui.updatePageTitle(pageData.name);
-        if (window.ui.calendarWidget && typeof window.ui.calendarWidget.setCurrentPage === 'function') {
-            window.ui.calendarWidget.setCurrentPage(pageData.name);
-        }
-
-        console.log(`Fetching page data using notesAPI.getPageData for: ${pageData.name} (ID: ${pageData.id})`);
-        
-        let notesArrayFromAPI; // Renamed for clarity
+    // 3. Fetch from network if not loaded from providedPageData or cache
+    // This block executes if pageDataFromSource is still null
+    if (!pageDataFromSource) {
         try {
-            // notesAPI.getPageData returns the array of notes directly due to how apiRequest is structured
-            notesArrayFromAPI = await notesAPI.getPageData(pageData.id, { include_internal: false });
-            console.log('Notes array received from notesAPI.getPageData:', notesArrayFromAPI);
-
-            // Ensure notesArrayFromAPI is actually an array.
-            // If apiRequest threw an error that was caught and returned something else, or if API legitimately returned non-array
-            if (!Array.isArray(notesArrayFromAPI)) {
-                console.warn(`Expected an array from notesAPI.getPageData for page ${pageData.name}, but received:`, notesArrayFromAPI, '. Treating as empty notes list.');
-                notesArrayFromAPI = []; // Default to empty array in case of unexpected non-array response
+            if (!pageNameToLoad || pageNameToLoad.trim() === '') {
+                console.warn('loadPage called with empty pageName, defaulting to initial page.');
+                pageNameToLoad = getInitialPage();
             }
-        } catch (error) {
-            // This catch block handles errors from the notesAPI.getPageData call itself (e.g., network error, 500, or 404 that wasn't caught inside apiRequest)
-            console.error(`Error fetching notes for page ${pageData.name} (ID: ${pageData.id}):`, error.message);
-             // If page_id was valid but no notes exist, backend returns {success:true, data:[]}, so notesArrayFromAPI would be [].
-             // A 404 here might mean pageData.id itself is problematic or API endpoint for notes has an issue for this page_id.
-            notesArrayFromAPI = []; // Default to empty notes on error
-            // Optionally, you could display a more specific error to the user here or re-throw
-        }
 
-        const pageDetails = pageData; // We already have page details
-        const pageProperties = pageData.properties || {};
-        setNotesForCurrentPage(notesArrayFromAPI); // Use the fetched notes array
+            if (notesContainer) notesContainer.innerHTML = '<p>Loading page...</p>';
+            if (window.ui.domRefs.pagePropertiesContainer) window.ui.domRefs.pagePropertiesContainer.innerHTML = '';
 
-        if (pageProperties && pageProperties.encrypt) {
-            // Ensure it's a string and not an array/object if properties can have multiple values
-            const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt;
-            currentPageEncryptionKey = encryptionPropValue;
+            const fetchedPageData = await pagesAPI.getPageByName(pageNameToLoad);
+            if (!fetchedPageData) {
+                throw new Error(`Page "${pageNameToLoad}" not found and could not be created.`);
+            }
+            pageDataFromSource = fetchedPageData; // Assign to pageDataFromSource for consistency
+
+            setCurrentPageName(pageDataFromSource.name);
+            setCurrentPageId(pageDataFromSource.id);
+
+            if (updateHistory) {
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('page', pageDataFromSource.name);
+                history.pushState({ pageName: pageDataFromSource.name }, '', newUrl.toString());
+            }
+
+            window.ui.updatePageTitle(pageDataFromSource.name);
+            if (window.ui.calendarWidget && typeof window.ui.calendarWidget.setCurrentPage === 'function') {
+                window.ui.calendarWidget.setCurrentPage(pageDataFromSource.name);
+            }
+
+            console.log(`Fetching full page data (including notes) for page: ${pageDataFromSource.name} (ID: ${pageDataFromSource.id})`);
+            // notesAPI.getPageData is expected to return the 'data' part of the API response.
+            // For notes.php?page_id=X, the backend's 'data' field (which apiRequest returns) 
+            // should be an object like { page: {...}, notes: [...] } or just the notes array
+            // depending on the exact backend implementation of notes.php for this GET request.
+            // Given the previous working version and the structure of notesAPI.getPageData in api_client.js,
+            // it's most likely that notesAPI.getPageData already returns the notes array directly
+            // if the backend's 'data' field was just the array.
+            // Let's re-verify based on original working code:
+            // Original: notesArrayFromAPI = await notesAPI.getPageData(pageData.id, { include_internal: false });
+            // This implies notesAPI.getPageData returns the array directly.
+
+            let notesArrayFromAPI;
+            try {
+                // Assuming notesAPI.getPageData directly returns the array of notes
+                // as suggested by the original working code and the comment in api_client.js
+                // for notesAPI.getPageData when it was just notes.php?page_id=X
+                // Let's stick to the original successful pattern for fetching notes:
+                notesArrayFromAPI = await notesAPI.getPageData(pageDataFromSource.id, { include_internal: false });
+                
+                if (!Array.isArray(notesArrayFromAPI)) {
+                    console.warn(`Expected an array from notesAPI.getPageData for page ${pageDataFromSource.name}, but received:`, notesArrayFromAPI, '. Treating as empty notes list.');
+                    notesArrayFromAPI = [];
+                }
+            } catch (error) {
+                console.error(`Error fetching notes for page ${pageDataFromSource.name} (ID: ${pageDataFromSource.id}):`, error.message);
+                notesArrayFromAPI = []; // Default to empty notes on error
+            }
+            pageDataFromSource.notes = notesArrayFromAPI; // Attach notes to pageDataFromSource
+
+            const pageProperties = pageDataFromSource.properties || {};
+            setNotesForCurrentPage(notesArrayFromAPI);
+
+            if (pageProperties && pageProperties.encrypt) {
+                const encryptionPropValue = Array.isArray(pageProperties.encrypt) ? pageProperties.encrypt[0].value : pageProperties.encrypt;
+                currentPageEncryptionKey = encryptionPropValue;
 
             // Clear existing notes and show password prompt
             if (notesContainer) notesContainer.innerHTML = ''; // Clear "Loading page..." or old notes
@@ -470,11 +501,8 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
                         }
                         
                         // Display notes (these are the original notes, decryption happens in note-renderer)
-                        // The notes are already in `notesForCurrentPage` (set by `setNotesForCurrentPage`)
-                        // or `cachedData.notes` if using cache.
-                        let notesToDisplay = notesForCurrentPage; // Default to notes from state
-                        // No need to check cache here as this is the network path
-                        
+                        // The notes are already in `notesForCurrentPage` (set by `setNotesForCurrentPage` from pageDataFromSource.notes)
+                        let notesToDisplay = notesForCurrentPage;
                         window.ui.displayNotes(notesToDisplay, currentPageId); // currentPageId is set
 
                         // Handle transclusions and SQL queries as usual after notes are displayed
@@ -508,59 +536,62 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
             window.blockPageLoad = false; // Release the block we set at the start
             return; // Exit loadPage early, decryption handler will continue
         } else {
-            // This is the non-encrypted path, ensure keys are null
-            currentPageEncryptionKey = null;
-            decryptionPassword = null;
+                // This is the non-encrypted path, ensure keys are null
+                currentPageEncryptionKey = null;
+                decryptionPassword = null;
+            }
+
+            // Cache the newly fetched pageDataFromSource (which now includes notes)
+            if (pageDataFromSource.id && pageDataFromSource.name) {
+                const cacheEntry = {
+                    id: pageDataFromSource.id,
+                    name: pageDataFromSource.name,
+                    alias: pageDataFromSource.alias,
+                    notes: pageDataFromSource.notes, // notes are now part of pageDataFromSource
+                    properties: pageDataFromSource.properties || {},
+                    timestamp: Date.now()
+                };
+                setPageCache(pageDataFromSource.name, cacheEntry);
+                console.log(`Page data for ${pageDataFromSource.name} fetched from network and cached.`);
+            }
+            
+            console.log('Page properties for (network)', pageDataFromSource.name, ':', pageDataFromSource.properties);
+            if (window.ui.domRefs.pagePropertiesContainer && typeof window.ui.renderPageInlineProperties === 'function') {
+                window.ui.renderPageInlineProperties(pageDataFromSource.properties || {}, window.ui.domRefs.pagePropertiesContainer);
+            }
+            
+            window.ui.displayNotes(notesForCurrentPage, pageDataFromSource.id);
+            window.ui.updateActivePageLink(pageDataFromSource.name);
+            
+            const backlinks = await searchAPI.getBacklinks(pageDataFromSource.name);
+            displayBacklinks(backlinks);
+            await handleTransclusions();
+            await handleSqlQueries();
+
+            if (focusFirstNote && notesContainer) {
+                const firstNoteEl = notesContainer.querySelector('.note-content');
+                if (firstNoteEl) firstNoteEl.focus();
+            }
+
+        } catch (error) {
+            console.error('Error loading page from network:', error);
+            setCurrentPageName(`Error: ${pageNameToLoad}`);
+            setCurrentPageId(null);
+            window.ui.updatePageTitle(currentPageName);
+            if (notesContainer) {
+                notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
+            }
         }
+    } // End of network fetch block
 
-        setCurrentPageId(pageDetails.id); 
-        setCurrentPageName(pageDetails.name); 
-        
-        const backlinks = await searchAPI.getBacklinks(pageDetails.name); 
-        console.log(`Fetched backlinks for page: ${pageDetails.name}`);
+    // Common finalization logic (runs if page was loaded from any source or if an error occurred in network fetch)
+    window.blockPageLoad = false;
 
-        if (pageDetails.id && pageDetails.name) { 
-            const cacheEntry = {
-                id: pageDetails.id,
-                name: pageDetails.name, 
-                alias: pageDetails.alias, 
-                notes: notesArrayFromAPI,    
-                properties: pageProperties,    
-                timestamp: Date.now()
-            };
-            setPageCache(pageDetails.name, cacheEntry);
-            console.log(`Page data for ${pageDetails.name} fetched from network and cached.`);
-        }
-
-        console.log('Page properties for ', pageDetails.name, ':', pageProperties);
-        if (window.ui.domRefs.pagePropertiesContainer && typeof window.ui.renderPageInlineProperties === 'function') {
-            window.ui.renderPageInlineProperties(pageProperties, window.ui.domRefs.pagePropertiesContainer);
-        }
-
-        window.ui.displayNotes(notesForCurrentPage, pageDetails.id); 
-        window.ui.updateActivePageLink(pageDetails.name);
-        displayBacklinks(backlinks);
-        await handleTransclusions(); 
-        await handleSqlQueries(); // Call the new SQL query handler
-
-        if (focusFirstNote && notesContainer) {
-            const firstNoteEl = notesContainer.querySelector('.note-content');
-            if (firstNoteEl) firstNoteEl.focus();
-        }
-    } catch (error) {
-        console.error('Error loading page:', error);
-        setCurrentPageName(`Error: ${pageNameToLoad}`); // Existing line
-        setCurrentPageId(null); // ADD THIS LINE
-        window.ui.updatePageTitle(currentPageName); 
-        if (notesContainer) { 
-            notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
-        }
-    } finally {
-        window.blockPageLoad = false; 
-    }
-
-    if (notesForCurrentPage.length === 0 && currentPageId) { 
-        await handleCreateAndFocusFirstNote(currentPageId); 
+    // This check should only run if pageDataFromSource was successfully populated and not an error page
+    if (pageDataFromSource && pageDataFromSource.id && notesForCurrentPage.length === 0 && currentPageId) {
+        console.log('[PAGE LOAD] No notes found, creating first note');
+        await handleCreateAndFocusFirstNote(currentPageId);
+        return; // Exit after creating first note to prevent further processing
     }
 }
 
@@ -660,46 +691,54 @@ async function handleCreateAndFocusFirstNote(pageIdToUse) {
         return;
     }
     try {
+        console.log(`[NOTE CREATION] Creating first note for page ${pageIdToUse}`);
         const savedNote = await notesAPI.createNote({
             page_id: pageIdToUse, 
-            content: ' '
-            // Removed parent_note_id as it's not expected in POST requests
+            content: '',
+            order_index: 0 // Explicitly set order_index to 0 for first note
         });
 
         if (savedNote) {
-            addNoteToCurrentPage(savedNote);
-
-            if (notesContainer) { // Ensure notesContainer
-                if(notesContainer.innerHTML.includes("empty-page-hint") || notesContainer.children.length === 0) {
-                    notesContainer.innerHTML = ''; 
-                }
-                const noteEl = window.ui.renderNote(savedNote, 0); // Assuming ui.renderNote exists
-                notesContainer.appendChild(noteEl);
-                
-                const contentDiv = noteEl.querySelector('.note-content');
-                if (contentDiv) {
-                    contentDiv.dataset.rawContent = savedNote.content;
-                    contentDiv.textContent = '';
-                    window.ui.switchToEditMode(contentDiv);
-                    
-                    const initialInputHandler = async (e) => {
-                        const currentContent = contentDiv.textContent.trim();
-                        if (currentContent !== '') {
-                            contentDiv.dataset.rawContent = currentContent;
-                            await saveNoteImmediately(noteEl); // saveNoteImmediately needs to be imported
-                            contentDiv.removeEventListener('input', initialInputHandler);
-                        }
-                    };
-                    contentDiv.addEventListener('input', initialInputHandler);
-                }
+            console.log(`[NOTE CREATION] Received from server: id=${savedNote.id}, server_assigned_order_index=${savedNote.order_index}, content="${savedNote.content}"`);
+            
+            // Clear any existing notes in the container
+            if (notesContainer) {
+                notesContainer.innerHTML = '';
             }
+            
+            // Update the global state with just this one note
+            setNotesForCurrentPage([savedNote]);
+            
+            // Render the note
+            const noteEl = window.ui.renderNote(savedNote, 0);
+            if (notesContainer) {
+                notesContainer.appendChild(noteEl);
+            }
+            
+            // Focus the new note
+            const contentDiv = noteEl.querySelector('.note-content');
+            if (contentDiv) {
+                contentDiv.dataset.rawContent = '';
+                window.ui.switchToEditMode(contentDiv);
+                
+                const initialInputHandler = async (e) => {
+                    const currentContent = contentDiv.textContent.trim();
+                    if (currentContent !== '') {
+                        contentDiv.dataset.rawContent = currentContent;
+                        await saveNoteImmediately(noteEl);
+                        contentDiv.removeEventListener('input', initialInputHandler);
+                    }
+                };
+                contentDiv.addEventListener('input', initialInputHandler);
+            }
+            
             if (typeof feather !== 'undefined' && feather.replace) {
                 feather.replace();
             }
         }
     } catch (error) {
         console.error('Error creating the first note for the page:', error);
-        if (notesContainer) { // Ensure notesContainer
+        if (notesContainer) {
             notesContainer.innerHTML = '<p>Error creating the first note. Please try reloading.</p>';
         }
     }

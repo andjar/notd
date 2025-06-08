@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once '../../config.php';
 // Basic setup, similar to index.php if any common elements are needed,
 // but largely independent.
 ?>

@@ -50,9 +50,8 @@ export function setNotesForCurrentPage(newNotes) {
 // Helper to add a single note - ensures notesForCurrentPage array is mutated directly
 // and window object is kept in sync.
 export function addNoteToCurrentPage(note) {
-    notesForCurrentPage.push(note);
-    // window.notesForCurrentPage should automatically reflect this change
-    // as it holds a reference to the notesForCurrentPage array.
+  notesForCurrentPage.push(note);
+  notesForCurrentPage.sort((a, b) => a.order_index - b.order_index); // Add sort here
 }
 
 // Helper to remove a note by ID - ensures notesForCurrentPage array is mutated directly
