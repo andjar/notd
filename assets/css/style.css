@@ -2175,12 +2175,18 @@ h6 { font-size: var(--ls-font-size-xs); font-weight: var(--ls-font-weight-semibo
     background-color: var(--ls-secondary-background-color);
     border-radius: var(--ls-border-radius-medium);
     border: 1px solid var(--ls-secondary-border-color); /* Softened border */
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.note-attachment-item:hover {
+    background-color: var(--ls-tertiary-background-color);
+    box-shadow: var(--ls-shadow-sm);
 }
 
 .attachment-preview {
     flex-shrink: 0;
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2196,8 +2202,8 @@ h6 { font-size: var(--ls-font-size-xs); font-weight: var(--ls-font-weight-semibo
 }
 
 .attachment-preview-icon {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     color: var(--ls-secondary-text-color);
 }
 

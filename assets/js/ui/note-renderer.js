@@ -996,6 +996,12 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
             }
         });
 
+        if (attachmentsContainer.children.length > 0) {
+            attachmentsContainer.style.display = 'flex';
+        } else {
+            attachmentsContainer.style.display = 'none'; // Explicitly hide if no attachments rendered
+        }
+
         if (typeof feather !== 'undefined' && feather.replace) {
             feather.replace();
         }

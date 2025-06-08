@@ -51,33 +51,68 @@ if (!$page_id && !$page_name) {
             $http_status = isset($match[1]) ? intval($match[1]) : 0;
 
             if ($http_status >= 200 && $http_status < 300) {
-                if (isset($responseData['error'])) {
-                    $error_message = "API Error: " . htmlspecialchars($responseData['error']);
-                } elseif (is_array($responseData)) {
-                    if (count($responseData) === 1 && isset($responseData[0])) {
-                        $pageData = $responseData[0];
-                    } elseif (count($responseData) > 1) {
-                        $pageData = $responseData[0]; 
-                    } elseif (empty($responseData) && $http_status === 200) {
-                        $error_message = "Page not found.";
+                if (isset($responseData['error'])) { // API might use 'error' key even with 2xx
+                    $error_message = "API Error (within 2xx response): " . htmlspecialchars($responseData['error']);
+                } elseif (isset($responseData['status']) && $responseData['status'] === 'success' && isset($responseData['data'])) {
+                    $api_data_content = $responseData['data']; // Use a shorthand
+
+                    if (isset($api_data_content['page'])) {
+                        // Handles API response: "data": { "page": {...}, "notes": [...] }
+                        $pageData = $api_data_content['page'];
+                        if (isset($api_data_content['notes'])) {
+                            $pageData['notes'] = $api_data_content['notes'];
+                        }
+                    } elseif (is_array($api_data_content) && !empty($api_data_content) && isset($api_data_content[0])) {
+                        // Handles API response: "data": [ ITEM, ... ]
+                        // We are interested in the first item for a single page view.
+                        $first_item = $api_data_content[0];
+                        if (isset($first_item['page'])) {
+                            // Specifically handles: "data": [ { "page": {...}, "notes": [...] } ]
+                            $pageData = $first_item['page'];
+                            if (isset($first_item['notes'])) {
+                                $pageData['notes'] = $first_item['notes'];
+                            }
+                        } else {
+                            // Handles "data": [ { "id": ..., "name": ... } ] (list of simple page objects)
+                            // This is unexpected if 'include_details=1' was meant to provide the 'page'/'notes' wrapper.
+                            $error_message = "API returned a list of simple page objects. Expected a detailed page structure (with 'page' and 'notes' keys) due to 'include_details=1'.";
+                            // Optionally, to still display the simple page data from the first item:
+                            // $pageData = $first_item; // Note: 'notes' and detailed 'properties' would be missing.
+                        }
+                    } elseif (empty($api_data_content)) {
+                        // Handles "data": [] (empty array) or "data": {} (empty object, json_decode makes it an empty array)
+                        $error_message = "Page not found or API returned no data.";
                     } else {
-                        // This handles empty array or non-standard successful response.
-                        // If $responseData is an empty array, $pageData remains null, leading to "Page not found" or "No data" message.
-                        // If it's some other structure, it might lead to errors if not handled by JS, but JS is being simplified.
-                        // For PHP templating, $pageData being null or not having expected keys is handled by `??` or `isset`.
-                         $error_message = "API returned successfully but with unexpected data structure or no specific page data found.";
+                        // $api_data_content is not an array, not empty, and has no 'page' key.
+                        // Could be "data": { "id": ..., "name": ... } (API ignored include_details=1 wrapper part)
+                        if (isset($api_data_content['id']) || isset($api_data_content['name'])) {
+                            $error_message = "API returned a simple page object directly, without the expected 'page'/'notes' wrapper structure required for a detailed view (despite 'include_details=1').";
+                            // Optionally, to still display this simple page data:
+                            // $pageData = $api_data_content; // Note: 'notes' and detailed 'properties' would be missing.
+                        } else {
+                            $error_message = "API returned successfully but with an unexpected data structure.";
+                        }
                     }
+
+                    // If after all checks, pageData is not set and there's no error, something is still unexpected.
+                    if (!$error_message && !$pageData) {
+                         $error_message = "Failed to parse page data from API response despite a successful API call status.";
+                    }
+
                 } else {
-                     $error_message = "API returned unexpected data format. Expected an array of page data.";
+                    $error_message = "API returned unexpected response format (missing 'status' or 'data' fields).";
                 }
-            } else { 
+            } else {
+                // HTTP status is not 2xx
                 $error_message = "API request failed with HTTP status: " . $http_status . ". ";
                 if (isset($responseData['error'])) {
                     $error_message .= "API Error: " . htmlspecialchars($responseData['error']);
                 } elseif (isset($responseData['message'])) {
                     $error_message .= "API Message: " . htmlspecialchars($responseData['message']);
+                } elseif ($response !== false && !empty($response)) {
+                    $error_message .= "Response: " . htmlspecialchars(substr($response, 0, 200)); // Show a snippet
                 } else {
-                    $error_message .= "No specific error message from API.";
+                    $error_message .= "No specific error message from API or empty response.";
                 }
             }
         }
