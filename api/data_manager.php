@@ -99,7 +99,7 @@ class DataManager {
     }
 
     public function getNoteById($noteId, $includeInternal = false) {
-        $sql = "SELECT * FROM Notes WHERE id = :id";
+        $sql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes WHERE Notes.id = :id";
         if (!$includeInternal) {
             // This condition needs to be carefully considered.
             // If a note itself is marked internal, should it be excluded here?
@@ -125,11 +125,11 @@ class DataManager {
     }
 
     public function getNotesByPageId($pageId, $includeInternal = false) {
-        $notesSql = "SELECT * FROM Notes WHERE page_id = :pageId";
+        $notesSql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes WHERE Notes.page_id = :pageId";
         if (!$includeInternal) {
-            $notesSql .= " AND internal = 0";
+            $notesSql .= " AND Notes.internal = 0"; // Added Notes. prefix for clarity
         }
-        $notesSql .= " ORDER BY order_index ASC";
+        $notesSql .= " ORDER BY Notes.order_index ASC"; // Added Notes. prefix for clarity
         
         error_log("[DEBUG] getNotesByPageId called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
         error_log("[DEBUG] SQL query: " . $notesSql);

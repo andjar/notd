@@ -63,6 +63,19 @@ class NotesApiTest extends BaseTestCase
         }
         return $noteId;
     }
+
+    private function createAttachmentDirectly(int $noteId, string $name = 'test_attachment.txt', string $path = 'test/path/test_attachment.txt', string $type = 'text/plain', int $size = 123): int
+    {
+        $stmt = self::$pdo->prepare("INSERT INTO Attachments (note_id, name, path, type, size) VALUES (:note_id, :name, :path, :type, :size)");
+        $stmt->execute([
+            ':note_id' => $noteId,
+            ':name' => $name,
+            ':path' => $path,
+            ':type' => $type,
+            ':size' => $size
+        ]);
+        return self::$pdo->lastInsertId();
+    }
     
     // Helper to set a property as internal directly in DB for testing include_internal
     private function setPropertyInternalStatus(int $noteId, string $propName, int $status = 1)
@@ -117,6 +130,8 @@ class NotesApiTest extends BaseTestCase
         $this->assertEquals($data['content'], $noteData['content']);
         $this->assertEquals(self::$testPageId, $noteData['page_id']);
         $this->assertIsArray($noteData['properties']); // Should be empty or contain parsed from content
+        $this->assertArrayHasKey('has_attachments', $noteData, "Response should have 'has_attachments' key.");
+        $this->assertEquals(0, $noteData['has_attachments'], "'has_attachments' should be 0 for a new note without attachments.");
 
         // Verify in DB
         $stmt = self::$pdo->prepare("SELECT * FROM Notes WHERE id = :id");
@@ -307,9 +322,26 @@ class NotesApiTest extends BaseTestCase
         $response = $this->request('GET', 'api/notes.php', ['id' => $noteId]);
 
         $this->assertTrue($response['success']);
-        $this->assertEquals($noteId, $response['data']['id']);
-        $this->assertEquals('Test note for GET', $response['data']['content']);
-        $this->assertEquals('blue', $response['data']['properties']['color']);
+        $this->assertArrayHasKey('data', $response, 'Response should contain data key');
+        $noteData = $response['data'];
+
+        $this->assertEquals($noteId, $noteData['id']);
+        $this->assertEquals('Test note for GET', $noteData['content']);
+        $this->assertEquals('blue', $noteData['properties']['color']);
+        $this->assertArrayHasKey('has_attachments', $noteData, "Response should have 'has_attachments' key.");
+        $this->assertEquals(0, $noteData['has_attachments'], "'has_attachments' should be 0 for note without attachments.");
+
+        // Scenario 2: With attachments
+        $this->createAttachmentDirectly($noteId, 'attachment1.pdf');
+        
+        $responseWithAttachment = $this->request('GET', 'api/notes.php', ['id' => $noteId]);
+        $this->assertTrue($responseWithAttachment['success']);
+        $this->assertArrayHasKey('data', $responseWithAttachment, 'Response with attachment should contain data key');
+        $noteDataWithAttachment = $responseWithAttachment['data'];
+
+        $this->assertEquals($noteId, $noteDataWithAttachment['id']);
+        $this->assertArrayHasKey('has_attachments', $noteDataWithAttachment, "Response should have 'has_attachments' key.");
+        $this->assertEquals(1, $noteDataWithAttachment['has_attachments'], "'has_attachments' should be 1 for note with an attachment.");
     }
     
     public function testGetSingleNoteIncludeInternal()
@@ -347,8 +379,9 @@ class NotesApiTest extends BaseTestCase
     // --- Test GET /api/notes.php?page_id={id} (Get Notes by Page) ---
     public function testGetNotesByPageSuccess()
     {
-        $this->createNoteDirectly('Note 1 on page', self::$testPageId);
-        $this->createNoteDirectly('Note 2 on page', self::$testPageId);
+        $noteId1 = $this->createNoteDirectly('Note 1 on page (no attachment)', self::$testPageId);
+        $noteId2 = $this->createNoteDirectly('Note 2 on page (with attachment)', self::$testPageId);
+        $this->createAttachmentDirectly($noteId2, 'page_attachment.doc');
 
         $response = $this->request('GET', 'api/notes.php', ['page_id' => self::$testPageId]);
         $this->assertTrue($response['success']);
@@ -356,7 +389,24 @@ class NotesApiTest extends BaseTestCase
         $this->assertEquals(self::$testPageId, $response['data']['page']['id']);
         $this->assertArrayHasKey('notes', $response['data']);
         $this->assertCount(2, $response['data']['notes']);
-        $this->assertEquals('Note 1 on page', $response['data']['notes'][0]['content']);
+
+        $foundNote1 = false;
+        $foundNote2 = false;
+
+        foreach ($response['data']['notes'] as $note) {
+            $this->assertArrayHasKey('has_attachments', $note, "Each note should have 'has_attachments' key.");
+            if ($note['id'] == $noteId1) {
+                $this->assertEquals(0, $note['has_attachments'], "Note 1 should have has_attachments = 0.");
+                $this->assertEquals('Note 1 on page (no attachment)', $note['content']);
+                $foundNote1 = true;
+            } elseif ($note['id'] == $noteId2) {
+                $this->assertEquals(1, $note['has_attachments'], "Note 2 should have has_attachments = 1.");
+                $this->assertEquals('Note 2 on page (with attachment)', $note['content']);
+                $foundNote2 = true;
+            }
+        }
+        $this->assertTrue($foundNote1, "Note 1 was not found in the response.");
+        $this->assertTrue($foundNote2, "Note 2 was not found in the response.");
     }
     
     public function testGetNotesByPageIncludeInternal()
@@ -582,46 +632,132 @@ class NotesApiTest extends BaseTestCase
     // --- Test GET /api/notes.php (Get All Notes) ---
     public function testGetAllNotes()
     {
-        // notes.php currently returns all notes if no id or page_id is specified.
-        $this->createNoteDirectly('Note A for Get All', self::$testPageId);
-        $this->createNoteDirectly('Note B for Get All', self::$testPageId);
+        // Ensure a clean slate for this specific test regarding note counts if possible,
+        // or be mindful of notes created in other tests if DB is not fully reset per test method.
+        // For this test, we'll create specific notes and look for them.
         
-        $response = $this->request('GET', 'api/notes.php');
+        // Delete all notes from self::$testPageId to ensure clean state for this test
+        self::$pdo->exec("DELETE FROM Properties WHERE note_id IN (SELECT id FROM Notes WHERE page_id = " . (int)self::$testPageId . ")");
+        self::$pdo->exec("DELETE FROM Notes WHERE page_id = " . (int)self::$testPageId . ")");
+        self::$pdo->exec("DELETE FROM Attachments WHERE note_id NOT IN (SELECT id FROM Notes)"); // Clean up orphaned attachments if any
+
+        $noteIdWithAttachment = $this->createNoteDirectly('Note A for Get All (with attachment)', self::$testPageId);
+        $this->createAttachmentDirectly($noteIdWithAttachment, 'all_notes_attachment.zip');
+        
+        $noteIdWithoutAttachment = $this->createNoteDirectly('Note B for Get All (no attachment)', self::$testPageId);
+
+        // Potentially create another note on another page to ensure "all" means all, not just for one page
+        $otherPageStmt = self::$pdo->prepare("INSERT INTO Pages (name) VALUES (:name)");
+        $otherPageStmt->execute([':name' => 'Other Page for All Notes Test']);
+        $otherPageId = self::$pdo->lastInsertId();
+        $noteIdOnOtherPage = $this->createNoteDirectly('Note C on Other Page', $otherPageId);
+
+
+        $response = $this->request('GET', 'api/notes.php'); // Get all notes (default is include_internal=false)
         $this->assertTrue($response['success']);
         $this->assertIsArray($response['data']);
-        $this->assertGreaterThanOrEqual(2, count($response['data']), "Should fetch at least the two notes created.");
-        // Further checks could verify structure of each note object in the array.
+        
+        // We expect at least 3 notes (2 on testPageId, 1 on otherPageId, assuming they are not internal)
+        $this->assertGreaterThanOrEqual(3, count($response['data']), "Should fetch at least the three notes created for this test.");
+
+        $foundNoteA = false;
+        $foundNoteB = false;
+        $foundNoteC = false;
+
+        foreach ($response['data'] as $note) {
+            $this->assertArrayHasKey('has_attachments', $note, "Each note in getAllNotes should have 'has_attachments'.");
+            if ($note['id'] == $noteIdWithAttachment) {
+                $this->assertEquals(1, $note['has_attachments'], "Note A should have has_attachments = 1.");
+                $foundNoteA = true;
+            } elseif ($note['id'] == $noteIdWithoutAttachment) {
+                $this->assertEquals(0, $note['has_attachments'], "Note B should have has_attachments = 0.");
+                $foundNoteB = true;
+            } elseif ($note['id'] == $noteIdOnOtherPage) {
+                 $this->assertEquals(0, $note['has_attachments'], "Note C on other page should have has_attachments = 0.");
+                 $foundNoteC = true;
+            }
+        }
+
+        $this->assertTrue($foundNoteA, "Note A (with attachment) was not found or correctly identified.");
+        $this->assertTrue($foundNoteB, "Note B (without attachment) was not found or correctly identified.");
+        $this->assertTrue($foundNoteC, "Note C (on other page) was not found or correctly identified.");
+        
+        // Cleanup the other page
+        self::$pdo->exec("DELETE FROM Notes WHERE page_id = " . (int)$otherPageId);
+        self::$pdo->exec("DELETE FROM Pages WHERE id = " . (int)$otherPageId);
     }
     
     public function testGetAllNotesIncludeInternal()
     {
-        $publicNoteId = $this->createNoteDirectly('Public note for All', self::$testPageId);
-        $internalNoteId = $this->createNoteDirectly('Internal note for All', self::$testPageId);
-        $this->setNoteInternalStatus($internalNoteId, true);
+        // Clean up notes on the test page for focused testing
+        self::$pdo->exec("DELETE FROM Properties WHERE note_id IN (SELECT id FROM Notes WHERE page_id = " . (int)self::$testPageId . ")");
+        self::$pdo->exec("DELETE FROM Notes WHERE page_id = " . (int)self::$testPageId . ")");
+        self::$pdo->exec("DELETE FROM Attachments WHERE note_id NOT IN (SELECT id FROM Notes)");
 
-        // include_internal=false (default)
+
+        $publicNoteId = $this->createNoteDirectly('Public note for All (with attachment)', self::$testPageId);
+        $this->createAttachmentDirectly($publicNoteId, 'public_attach.txt');
+
+        $internalNoteId = $this->createNoteDirectly('Internal note for All (no attachment)', self::$testPageId);
+        $this->setNoteInternalStatus($internalNoteId, true);
+        
+        // Another internal note, this one with an attachment
+        $internalNoteWithAttachmentId = $this->createNoteDirectly('Internal note for All (with attachment)', self::$testPageId);
+        $this->setNoteInternalStatus($internalNoteWithAttachmentId, true);
+        $this->createAttachmentDirectly($internalNoteWithAttachmentId, 'internal_attach.doc');
+
+
+        // Case 1: include_internal=false (default)
         $responseFalse = $this->request('GET', 'api/notes.php');
         $this->assertTrue($responseFalse['success']);
-        $foundPublic = false;
-        $foundInternal = false;
-        foreach($responseFalse['data'] as $note) {
-            if ($note['id'] == $publicNoteId) $foundPublic = true;
-            if ($note['id'] == $internalNoteId) $foundInternal = true;
-        }
-        $this->assertTrue($foundPublic, "Public note should be present.");
-        $this->assertFalse($foundInternal, "Internal note should NOT be present when include_internal=false.");
+        $foundPublic = null;
+        $foundInternal = null;
+        $foundInternalWithAttachment = null;
 
-        // include_internal=true
+        foreach($responseFalse['data'] as $note) {
+            $this->assertArrayHasKey('has_attachments', $note, "Each note in getAllNotes (include_internal=false) should have 'has_attachments'.");
+            if ($note['id'] == $publicNoteId) {
+                $foundPublic = $note;
+            }
+            if ($note['id'] == $internalNoteId) {
+                $foundInternal = $note; // Should not be found
+            }
+            if ($note['id'] == $internalNoteWithAttachmentId) {
+                $foundInternalWithAttachment = $note; // Should not be found
+            }
+        }
+        $this->assertNotNull($foundPublic, "Public note should be present.");
+        $this->assertEquals(1, $foundPublic['has_attachments'], "Public note with attachment should have has_attachments = 1.");
+        $this->assertNull($foundInternal, "Internal note (no attachment) should NOT be present when include_internal=false.");
+        $this->assertNull($foundInternalWithAttachment, "Internal note (with attachment) should NOT be present when include_internal=false.");
+
+        // Case 2: include_internal=true
         $responseTrue = $this->request('GET', 'api/notes.php', ['include_internal' => 'true']);
         $this->assertTrue($responseTrue['success']);
-        $foundPublic = false;
-        $foundInternal = false;
+        $foundPublic = null;
+        $foundInternal = null;
+        $foundInternalWithAttachment = null;
+
         foreach($responseTrue['data'] as $note) {
-            if ($note['id'] == $publicNoteId) $foundPublic = true;
-            if ($note['id'] == $internalNoteId) $foundInternal = true;
+            $this->assertArrayHasKey('has_attachments', $note, "Each note in getAllNotes (include_internal=true) should have 'has_attachments'.");
+            if ($note['id'] == $publicNoteId) {
+                $foundPublic = $note;
+            }
+            if ($note['id'] == $internalNoteId) {
+                $foundInternal = $note;
+            }
+            if ($note['id'] == $internalNoteWithAttachmentId) {
+                $foundInternalWithAttachment = $note;
+            }
         }
-        $this->assertTrue($foundPublic, "Public note should be present when include_internal=true.");
-        $this->assertTrue($foundInternal, "Internal note should be present when include_internal=true.");
+        $this->assertNotNull($foundPublic, "Public note should be present when include_internal=true.");
+        $this->assertEquals(1, $foundPublic['has_attachments'], "Public note with attachment should have has_attachments = 1 (include_internal=true).");
+        
+        $this->assertNotNull($foundInternal, "Internal note (no attachment) should be present when include_internal=true.");
+        $this->assertEquals(0, $foundInternal['has_attachments'], "Internal note without attachment should have has_attachments = 0 (include_internal=true).");
+        
+        $this->assertNotNull($foundInternalWithAttachment, "Internal note (with attachment) should be present when include_internal=true.");
+        $this->assertEquals(1, $foundInternalWithAttachment['has_attachments'], "Internal note with attachment should have has_attachments = 1 (include_internal=true).");
     }
 }
 ?>

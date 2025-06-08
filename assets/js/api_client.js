@@ -404,14 +404,10 @@ const attachmentsAPI = {
 
     /**
      * Upload a new attachment
-     * @param {number} noteId - Note ID
-     * @param {File} file - File to upload
+     * @param {FormData} formData - FormData object containing note_id and attachmentFile
      * @returns {Promise<Object>} Created attachment object
      */
-    uploadAttachment: (noteId, file) => {
-        const formData = new FormData();
-        formData.append('note_id', noteId);
-        formData.append('attachmentFile', file); // Changed 'file' to 'attachmentFile'
+    uploadAttachment: (formData) => {
         return apiRequest('attachments.php', 'POST', formData);
     },
 

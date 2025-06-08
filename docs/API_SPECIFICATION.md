@@ -270,6 +270,7 @@ The Notes API is responsible for managing notes, including their content and ass
             "parent_note_id": null,
             "order_index": 0,
             "collapsed": 0,
+            "has_attachments": 0,
             "created_at": "YYYY-MM-DD HH:MM:SS",
             "updated_at": "YYYY-MM-DD HH:MM:SS",
             "internal": 0,
@@ -307,6 +308,7 @@ The Notes API is responsible for managing notes, including their content and ass
                     "id": 1,
                     "page_id": 10,
                     "content": "This is note 1.",
+                    "has_attachments": 1,
                     // ... other note fields ...
                     "properties": {
                         // ... note 1 properties ...
@@ -316,6 +318,7 @@ The Notes API is responsible for managing notes, including their content and ass
                     "id": 2,
                     "page_id": 10,
                     "content": "This is note 2.",
+                    "has_attachments": 0,
                     // ... other note fields ...
                     "properties": {
                         // ... note 2 properties ...
@@ -344,6 +347,7 @@ The Notes API is responsible for managing notes, including their content and ass
             "id": 2,
             "page_id": 10,
             "content": "Newly created note.\nstatus:: new",
+            "has_attachments": 0,
             // ... other fields (parent_note_id, order_index default to null/0 or as set) ...
             "properties": {
                 "status": "new"
@@ -361,6 +365,7 @@ The Notes API is responsible for managing notes, including their content and ass
             "id": 1,
             "page_id": 10,
             "content": "Updated note content.\nstatus:: updated",
+            "has_attachments": 0,
             // ... other updated fields ...
             "properties": {
                 "status": "updated"
