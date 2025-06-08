@@ -253,5 +253,3 @@ class DataManager {
         return $formattedPropertiesByNoteId;
     }
 }
-
-?>

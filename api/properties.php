@@ -80,145 +80,147 @@ function _updateOrAddPropertyAndDispatchTriggers($pdo, $entityType, $entityId, $
     return ['name' => $validatedName, 'value' => $validatedValue, 'internal' => $finalInternal];
 }
 
-// GET /api/properties.php?entity_type=note&entity_id=123
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $validationRules = [
-        'entity_type' => 'required|isValidEntityType',
-        'entity_id' => 'required|isPositiveInteger'
-        // include_internal is boolean, filter_input is fine
-    ];
-    $errors = Validator::validate($_GET, $validationRules);
-    if (!empty($errors)) {
-        ApiResponse::error('Invalid input parameters.', 400, $errors);
-        exit;
-    }
-
-    $entityType = $_GET['entity_type']; // Validated
-    $entityId = (int)$_GET['entity_id']; // Validated
-    $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
-
-    try {
-        $pdo = get_db_connection(); // DataManager needs PDO
-        $dataManager = new DataManager($pdo);
-        $properties = null;
-
-        if ($entityType === 'note') {
-            $properties = $dataManager->getNoteProperties($entityId, $includeInternal);
-        } elseif ($entityType === 'page') {
-            $properties = $dataManager->getPageProperties($entityId, $includeInternal);
-        }
-        // $properties will be an array, empty if no properties found or entity_id is invalid.
-        ApiResponse::success($properties);
-        
-    } catch (Exception $e) {
-        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
-    }
-}
-
-// POST /api/properties.php
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input = json_decode(file_get_contents('php://input'), true);
-    if (!$input) {
-        ApiResponse::error('Invalid JSON', 400);
-        exit; // Ensure script termination
-    }
-    
-    // Check if this is a delete action
-    if (isset($input['action']) && $input['action'] === 'delete') {
+if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
+    // GET /api/properties.php?entity_type=note&entity_id=123
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $validationRules = [
             'entity_type' => 'required|isValidEntityType',
-            'entity_id' => 'required|isPositiveInteger',
-            'name' => 'required|isNotEmpty'
+            'entity_id' => 'required|isPositiveInteger'
+            // include_internal is boolean, filter_input is fine
         ];
-        $errors = Validator::validate($input, $validationRules);
+        $errors = Validator::validate($_GET, $validationRules);
         if (!empty($errors)) {
-            ApiResponse::error('Invalid input for deleting property.', 400, $errors);
+            ApiResponse::error('Invalid input parameters.', 400, $errors);
             exit;
         }
-        
-        $entityType = $input['entity_type']; // Validated
-        $entityId = (int)$input['entity_id']; // Validated
-        $name = $input['name']; // Validated
-        
+
+        $entityType = $_GET['entity_type']; // Validated
+        $entityId = (int)$_GET['entity_id']; // Validated
+        $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
+
         try {
-            $pdo = get_db_connection();
-            // Transaction for delete? Usually not necessary for single deletes unless triggers do complex things.
-            // For now, assuming delete itself is atomic and triggers handle their own logic.
-            if ($entityType === 'page') {
-                $stmt = $pdo->prepare("DELETE FROM Properties WHERE page_id = ? AND note_id IS NULL AND name = ?");
-            } else { // 'note'
-                $stmt = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND page_id IS NULL AND name = ?");
+            $pdo = get_db_connection(); // DataManager needs PDO
+            $dataManager = new DataManager($pdo);
+            $properties = null;
+
+            if ($entityType === 'note') {
+                $properties = $dataManager->getNoteProperties($entityId, $includeInternal);
+            } elseif ($entityType === 'page') {
+                $properties = $dataManager->getPageProperties($entityId, $includeInternal);
             }
-            $stmt->execute([$entityId, $name]);
-            
-            // FUTURE: Consider if delete operations should also have a "before_delete" or "after_delete" trigger mechanism.
-            // For now, keeping it simple.
-            
-            ApiResponse::success(null, 200); // Or perhaps a more descriptive success message if needed.
+            // $properties will be an array, empty if no properties found or entity_id is invalid.
+            ApiResponse::success($properties);
             
         } catch (Exception $e) {
             ApiResponse::error('Server error: ' . $e->getMessage(), 500);
         }
-        // Important: exit after handling delete action
-        exit; 
-    }
-    
-    // Handle regular property creation/update
-    $validationRules = [
-        'entity_type' => 'required|isValidEntityType',
-        'entity_id' => 'required|isPositiveInteger',
-        'name' => 'required|isNotEmpty', // Name is required
-        'value' => 'required',          // Value is required (can be empty string, so not isNotEmpty)
-        'internal' => 'optional|isBooleanLike'
-    ];
-    $errors = Validator::validate($input, $validationRules);
-    if (!empty($errors)) {
-        ApiResponse::error('Invalid input for creating/updating property.', 400, $errors);
-        exit;
     }
 
-    $entityType = $input['entity_type']; // Validated
-    $entityId = (int)$input['entity_id']; // Validated
-    $name = $input['name']; // Validated
-    $value = $input['value']; // Validated (presence)
-    // 'internal' is optional, Validator ensures it's 0/1 if present
-    $explicitInternal = isset($input['internal']) ? (int)$input['internal'] : null;
-
-    // The specific validate_property_data function can still be used for its tag normalization logic
-    // after basic validation passes.
-    $normalizedPropertyData = validate_property_data(['name' => $name, 'value' => $value]);
-    if (!$normalizedPropertyData) {
-        // This indicates an issue with tag format specifically, as basic presence was validated.
-        ApiResponse::error('Invalid property format (e.g., tag:: without tag name).', 400);
-        exit;
-    }
-    $name = $normalizedPropertyData['name']; // Potentially normalized name (though current logic doesn't change it)
-    $value = $normalizedPropertyData['value']; // Potentially normalized value (for tags)
-
-    try {
-        $pdo = get_db_connection();
-        $pdo->beginTransaction();
-        
-        $savedProperty = _updateOrAddPropertyAndDispatchTriggers(
-            $pdo,
-            $entityType,
-            $entityId,
-            $name,
-            $value,
-            $explicitInternal 
-        );
-        
-        $pdo->commit();
-        ApiResponse::success(['property' => $savedProperty]);
-        
-    } catch (Exception $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
+    // POST /api/properties.php
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input) {
+            ApiResponse::error('Invalid JSON', 400);
+            exit; // Ensure script termination
         }
-        ApiResponse::error('Server error: ' . $e->getMessage(), 500);
-    }
-    exit; // Ensure script termination after POST
-}
+        
+        // Check if this is a delete action
+        if (isset($input['action']) && $input['action'] === 'delete') {
+            $validationRules = [
+                'entity_type' => 'required|isValidEntityType',
+                'entity_id' => 'required|isPositiveInteger',
+                'name' => 'required|isNotEmpty'
+            ];
+            $errors = Validator::validate($input, $validationRules);
+            if (!empty($errors)) {
+                ApiResponse::error('Invalid input for deleting property.', 400, $errors);
+                exit;
+            }
+            
+            $entityType = $input['entity_type']; // Validated
+            $entityId = (int)$input['entity_id']; // Validated
+            $name = $input['name']; // Validated
+            
+            try {
+                $pdo = get_db_connection();
+                // Transaction for delete? Usually not necessary for single deletes unless triggers do complex things.
+                // For now, assuming delete itself is atomic and triggers handle their own logic.
+                if ($entityType === 'page') {
+                    $stmt = $pdo->prepare("DELETE FROM Properties WHERE page_id = ? AND note_id IS NULL AND name = ?");
+                } else { // 'note'
+                    $stmt = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND page_id IS NULL AND name = ?");
+                }
+                $stmt->execute([$entityId, $name]);
+                
+                // FUTURE: Consider if delete operations should also have a "before_delete" or "after_delete" trigger mechanism.
+                // For now, keeping it simple.
+                
+                ApiResponse::success(null, 200); // Or perhaps a more descriptive success message if needed.
+                
+            } catch (Exception $e) {
+                ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+            }
+            // Important: exit after handling delete action
+            exit; 
+        }
+        
+        // Handle regular property creation/update
+        $validationRules = [
+            'entity_type' => 'required|isValidEntityType',
+            'entity_id' => 'required|isPositiveInteger',
+            'name' => 'required|isNotEmpty', // Name is required
+            'value' => 'required',          // Value is required (can be empty string, so not isNotEmpty)
+            'internal' => 'optional|isBooleanLike'
+        ];
+        $errors = Validator::validate($input, $validationRules);
+        if (!empty($errors)) {
+            ApiResponse::error('Invalid input for creating/updating property.', 400, $errors);
+            exit;
+        }
 
-// Method not allowed (if not GET or POST)
-ApiResponse::error('Method not allowed', 405);
+        $entityType = $input['entity_type']; // Validated
+        $entityId = (int)$input['entity_id']; // Validated
+        $name = $input['name']; // Validated
+        $value = $input['value']; // Validated (presence)
+        // 'internal' is optional, Validator ensures it's 0/1 if present
+        $explicitInternal = isset($input['internal']) ? (int)$input['internal'] : null;
+
+        // The specific validate_property_data function can still be used for its tag normalization logic
+        // after basic validation passes.
+        $normalizedPropertyData = validate_property_data(['name' => $name, 'value' => $value]);
+        if (!$normalizedPropertyData) {
+            // This indicates an issue with tag format specifically, as basic presence was validated.
+            ApiResponse::error('Invalid property format (e.g., tag:: without tag name).', 400);
+            exit;
+        }
+        $name = $normalizedPropertyData['name']; // Potentially normalized name (though current logic doesn't change it)
+        $value = $normalizedPropertyData['value']; // Potentially normalized value (for tags)
+
+        try {
+            $pdo = get_db_connection();
+            $pdo->beginTransaction();
+            
+            $savedProperty = _updateOrAddPropertyAndDispatchTriggers(
+                $pdo,
+                $entityType,
+                $entityId,
+                $name,
+                $value,
+                $explicitInternal 
+            );
+            
+            $pdo->commit();
+            ApiResponse::success(['property' => $savedProperty]);
+            
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+        }
+        exit; // Ensure script termination after POST
+    }
+
+    // Method not allowed (if not GET or POST)
+    ApiResponse::error('Method not allowed', 405);
+}

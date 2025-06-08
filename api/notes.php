@@ -125,7 +125,10 @@ if ($method === 'GET') {
         $noteId = $pdo->lastInsertId();
 
         // 2. Parse and save properties from the content
-        $properties = processNoteContent($pdo, $content, 'note', $noteId);
+        $properties = []; // Initialize properties
+        if (trim($content) !== '') {
+            $properties = processNoteContent($pdo, $content, 'note', $noteId);
+        }
 
         $pdo->commit();
 

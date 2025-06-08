@@ -387,38 +387,30 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
 
         console.log(`Fetching page data using notesAPI.getPageData for: ${pageData.name} (ID: ${pageData.id})`);
         
-        let pageResponse;
+        let notesArrayFromAPI; // Renamed for clarity
         try {
-            pageResponse = await notesAPI.getPageData(pageData.id, { include_internal: false });
-            console.log('Page response:', pageResponse); // Add logging to debug response
-        } catch (error) {
-            // If the API call fails (e.g., 404 Not Found from the new logic), handle it gracefully.
-            if (error.message && (error.message.includes('404') || error.message.toLowerCase().includes('not found'))) {
-                console.warn(`Page data for "${pageData.name}" (ID: ${pageData.id}) not found on the server.`);
-                // Set a valid but empty structure to prevent further errors.
-                pageResponse = { success: true, data: [] }; 
-            } else {
-                // For other errors, re-throw to be caught by the outer catch block.
-                throw error;
+            // notesAPI.getPageData returns the array of notes directly due to how apiRequest is structured
+            notesArrayFromAPI = await notesAPI.getPageData(pageData.id, { include_internal: false });
+            console.log('Notes array received from notesAPI.getPageData:', notesArrayFromAPI);
+
+            // Ensure notesArrayFromAPI is actually an array.
+            // If apiRequest threw an error that was caught and returned something else, or if API legitimately returned non-array
+            if (!Array.isArray(notesArrayFromAPI)) {
+                console.warn(`Expected an array from notesAPI.getPageData for page ${pageData.name}, but received:`, notesArrayFromAPI, '. Treating as empty notes list.');
+                notesArrayFromAPI = []; // Default to empty array in case of unexpected non-array response
             }
+        } catch (error) {
+            // This catch block handles errors from the notesAPI.getPageData call itself (e.g., network error, 500, or 404 that wasn't caught inside apiRequest)
+            console.error(`Error fetching notes for page ${pageData.name} (ID: ${pageData.id}):`, error.message);
+             // If page_id was valid but no notes exist, backend returns {success:true, data:[]}, so notesArrayFromAPI would be [].
+             // A 404 here might mean pageData.id itself is problematic or API endpoint for notes has an issue for this page_id.
+            notesArrayFromAPI = []; // Default to empty notes on error
+            // Optionally, you could display a more specific error to the user here or re-throw
         }
 
-        // Validate response structure
-        if (!pageResponse) {
-            throw new Error('No response received from getPageData');
-        }
-
-        // If the API request wasn't successful, treat it as an empty page
-        if (!pageResponse.success) {
-            console.warn(`API request for page ${pageData.name} was not successful. Treating as empty page.`);
-            pageResponse = { success: true, data: [] };
-        }
-
-        // Use the page data we already have from the initial page fetch
-        const pageDetails = pageData;
+        const pageDetails = pageData; // We already have page details
         const pageProperties = pageData.properties || {};
-        const notes = Array.isArray(pageResponse.data) ? pageResponse.data : [];
-        setNotesForCurrentPage(notes);
+        setNotesForCurrentPage(notesArrayFromAPI); // Use the fetched notes array
 
         if (pageProperties && pageProperties.encrypt) {
             // Ensure it's a string and not an array/object if properties can have multiple values
@@ -532,7 +524,7 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
                 id: pageDetails.id,
                 name: pageDetails.name, 
                 alias: pageDetails.alias, 
-                notes: notes,    
+                notes: notesArrayFromAPI,    
                 properties: pageProperties,    
                 timestamp: Date.now()
             };
