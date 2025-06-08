@@ -238,14 +238,16 @@ export async function handleAddRootNote() {
             newRootOrderIndex = maxRootOrderIndex + 1;
         }
 
-        console.log(`[NOTE CREATION] Sending to server for new note: page_id=${newNotePayload.page_id}, parent_id=${newNotePayload.parent_note_id}, client_calculated_order_index=${newNotePayload.order_index}`);
-
-        const savedNote = await notesAPI.createNote({
+        const newNotePayload = {
             page_id: pageIdToUse,
             content: '',
             parent_note_id: null,
             order_index: newRootOrderIndex // Send calculated order_index
-        });
+        };
+        
+        console.log(`[NOTE CREATION] Sending to server for new note: page_id=${newNotePayload.page_id}, parent_id=${newNotePayload.parent_note_id}, client_calculated_order_index=${newNotePayload.order_index}`);
+
+        const savedNote = await notesAPI.createNote(newNotePayload);
 
         if (savedNote) {
             console.log(`[NOTE CREATION] Received from server: id=${savedNote.id}, server_assigned_order_index=${savedNote.order_index}, content="${savedNote.content}"`);
