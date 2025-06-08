@@ -365,14 +365,45 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     const pageIdToUse = currentPageId;
     if (!pageIdToUse) { console.error("Cannot create new note with Enter: currentPageId from state is missing."); return; }
 
-    const newNoteData = { page_id: pageIdToUse, content: '', parent_note_id: noteData.parent_note_id, order_index: noteData.order_index + 1 };
+    // Calculate order_index for the new note
+    const parentIdForNewNote = noteData.parent_note_id; // This can be null for root notes
+    const siblings = notesForCurrentPage.filter(n => {
+        // Robust comparison for parent_note_id
+        const nParentId = n.parent_note_id;
+        if (parentIdForNewNote === null || typeof parentIdForNewNote === 'undefined') {
+            return nParentId === null || typeof nParentId === 'undefined';
+        }
+        // Ensure comparison is consistent if IDs are numbers or strings
+        return String(nParentId) === String(parentIdForNewNote);
+    });
+
+    let maxOrderIndex = -1;
+    if (siblings.length > 0) {
+        // Ensure order_index is treated as a number, default to 0 if missing/invalid
+        maxOrderIndex = Math.max(...siblings.map(s => Number(s.order_index) || 0));
+    }
+    const newOrderIndex = maxOrderIndex + 1;
+
+    const newNoteData = { 
+        page_id: pageIdToUse, 
+        content: '', 
+        parent_note_id: parentIdForNewNote, 
+        order_index: newOrderIndex // Use the newly calculated order_index
+    };
+
     try {
         const savedNote = await notesAPI.createNote(newNoteData); // Assumes notesAPI is global
-        const currentNoteIndex = notesForCurrentPage.findIndex(n => n.id === noteData.id);
-        notesForCurrentPage.splice(currentNoteIndex + 1, 0, savedNote); 
-        // This direct splice should be okay since notesForCurrentPage is a reference from state,
-        // but ideally state.js would provide an insertNoteAt(note, index) function.
-        // For now, this relies on the window.notesForCurrentPage also reflecting this.
+        
+        // Add the new note to the local state. 
+        // Instead of splicing directly, use addNoteToCurrentPage if it handles order,
+        // or ensure notesForCurrentPage is sorted after adding if not.
+        // For now, we'll add and then rely on the DOM insertion logic to place it correctly based on savedNote.order_index.
+        // A more robust approach might involve a state function that inserts based on order_index.
+        addNoteToCurrentPage(savedNote); // Add to state; rendering logic will use order_index from savedNote
+
+        // The existing logic for DOM manipulation below should largely work, 
+        // as it determines `beforeElement` based on `savedNote.order_index`.
+        // We need to ensure notesForCurrentPage is up-to-date for getNoteDataById calls.
 
         let newNoteNestingLevel = 0;
         let parentChildrenContainer = notesContainer;

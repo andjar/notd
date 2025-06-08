@@ -176,7 +176,7 @@ body {
     bottom: 0;
     width: var(--ls-left-sidebar-width);
     background: var(--ls-secondary-background-color);
-    border-right: 1px solid var(--ls-border-color);
+    border-right: 1px solid var(--ls-secondary-border-color); /* Softened border */
     transition: transform 0.3s ease, width 0.3s ease;
     z-index: var(--ls-z-index-sticky);
     overflow-y: auto;
@@ -188,14 +188,14 @@ body {
 .right-sidebar {
     right: 0;
     border-right: none;
-    border-left: 1px solid var(--ls-border-color);
+    border-left: 1px solid var(--ls-secondary-border-color); /* Softened border */
 }
 
 .left-sidebar.collapsed { transform: translateX(-100%); }
 .right-sidebar.collapsed { transform: translateX(100%); }
 
 .sidebar-content {
-    padding: var(--ls-space-4);
+    padding: var(--ls-space-3); /* Reduced padding */
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -204,8 +204,8 @@ body {
 
 .sidebar-footer {
     margin-top: auto;
-    padding: var(--ls-space-4);
-    border-top: 1px solid var(--ls-border-color);
+    padding: var(--ls-space-3); /* Reduced padding */
+    border-top: 1px solid var(--ls-secondary-border-color); /* Softened border */
     background: var(--ls-secondary-background-color);
     flex-shrink: 0;
 }
@@ -215,7 +215,7 @@ body {
     grid-area: main-content;
     max-width: var(--ls-main-content-max-width);
     margin: 0 auto;
-    padding: var(--ls-space-6);
+    padding: var(--ls-space-4); /* Reduced padding */
     width: 100%;
     transition: margin 0.3s ease;
     min-height: 100vh;
@@ -227,9 +227,9 @@ body {
 
 /* App Header */
 .app-header {
-    padding-top: var(--ls-space-6);
-    padding-bottom: var(--ls-space-4);
-    margin-bottom: var(--ls-space-4);
+    padding-top: var(--ls-space-4); /* Reduced padding */
+    padding-bottom: var(--ls-space-3); /* Reduced padding */
+    margin-bottom: var(--ls-space-3); /* Reduced margin */
 }
 
 .app-header-main {
@@ -261,8 +261,8 @@ body {
 .calendar-widget {
     background-color: var(--ls-tertiary-background-color);
     border-radius: var(--ls-border-radius-medium);
-    padding: var(--ls-space-4);
-    margin-bottom: var(--ls-space-6);
+    padding: var(--ls-space-3); /* Reduced padding */
+    margin-bottom: var(--ls-space-4); /* Reduced margin */
 }
 .calendar-header {
     display: flex;
@@ -319,9 +319,9 @@ body {
 
 /* Search Section */
 .search-section {
-    margin-bottom: var(--ls-space-6);
+    margin-bottom: var(--ls-space-4); /* Reduced margin */
     border-bottom: 1px solid var(--ls-border-color);
-    padding-bottom: var(--ls-space-4);
+    padding-bottom: var(--ls-space-3); /* Reduced padding */
 }
 .search-input {
     width: 100%;
@@ -345,7 +345,7 @@ body {
     max-height: 300px;
     overflow-y: auto;
     background: var(--ls-primary-background-color);
-    border: 1px solid var(--ls-border-color);
+    border: 1px solid var(--ls-secondary-border-color); /* Softened border */
     border-radius: var(--ls-border-radius-medium);
     display: none;
 }
@@ -374,7 +374,7 @@ body {
 .new-page-form {
     display: flex;
     gap: var(--ls-space-2);
-    margin-bottom: var(--ls-space-6);
+    margin-bottom: var(--ls-space-4); /* Reduced margin */
 }
 .new-page-form input {
     flex: 1;
@@ -413,14 +413,15 @@ body {
 
 /* Outliner / Notes Container */
 .outliner {
-    margin-top: var(--ls-space-3);
-    padding: var(--ls-space-2) 0;
+    margin-top: var(--ls-space-2); /* Reduced margin */
+    padding: var(--ls-space-1) 0; /* Reduced padding */
 }
 
 .note-item {
     position: relative;
-    --controls-top-offset: calc( (2 * var(--ls-space-1)) + (var(--ls-font-size-base) * 0.8) - (var(--control-icon-size) / 2) ); /* Base for text notes */
-    /* Reduced margin-bottom, if any, or rely on children padding */
+    --controls-top-offset: calc( (var(--ls-space-1) * 1.5) + (var(--ls-font-size-base) * 0.8) - (var(--control-icon-size) / 2) ); /* Adjusted for slightly less top padding */
+    margin: 0; /* Rely on parent gap for inter-item spacing */
+    padding: 0; /* No internal padding for note-item itself */
 }
 
 .note-header-row {
@@ -428,7 +429,7 @@ body {
     align-items: flex-start;
     position: relative;
     padding-left: calc(var(--nesting-level, 0) * var(--ls-indentation-unit));
-    min-height: calc(var(--ls-font-size-base) * 1.4 + var(--ls-space-1)); /* Reduced min-height */
+    min-height: calc(var(--ls-font-size-base) * 1.3); /* Reduced min-height */
 }
 
 .note-controls {
@@ -441,8 +442,8 @@ body {
     flex: 1;
     min-width: 0;
     padding-left: var(--content-left-padding);
-    padding-top: calc(var(--ls-space-1) * 0.8); /* Reduced padding-top */
-    padding-bottom: calc(var(--ls-space-1) * 0.8); /* Reduced padding-bottom */
+    padding-top: 2px; /* Reduced padding-top significantly */
+    padding-bottom: 2px; /* Reduced padding-bottom significantly */
     display: flex;
     flex-direction: column;
 }
@@ -872,15 +873,15 @@ body {
 .page-properties-list {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--ls-space-2);
-    margin-bottom: var(--ls-space-3);
+    gap: var(--ls-space-1); /* Reduced gap */
+    margin-bottom: var(--ls-space-2); /* Reduced margin */
 }
 .page-property-item {
     background-color: var(--ls-tertiary-background-color);
     display: flex;
     align-items: center;
-    gap: var(--ls-space-2);
-    padding: var(--ls-space-2) var(--ls-space-3);
+    gap: var(--ls-space-1); /* Reduced gap */
+    padding: var(--ls-space-1) var(--ls-space-2); /* Reduced padding */
     border-radius: var(--ls-border-radius-low);
 }
 .page-property-key {
@@ -917,13 +918,13 @@ body {
 /* Transclusion and SQL Query Placeholder Styles - Minimalistic */
 .transclusion-placeholder,
 .sql-query-placeholder {
-    padding: var(--ls-space-2);
+    padding: var(--ls-space-1); /* Reduced padding */
     color: var(--ls-secondary-text-color);
     font-style: italic;
-    border: 1px dashed var(--ls-border-color);
+    border: 1px dashed var(--ls-secondary-border-color); /* Softened border */
     background-color: transparent;
     border-radius: var(--ls-border-radius-low);
-    margin-bottom: var(--ls-space-2); /* Add some space below placeholders */
+    margin-bottom: var(--ls-space-1); /* Reduced margin */
 }
 
 .transclusion-placeholder.error {
@@ -944,7 +945,7 @@ body {
 }
 
 .transcluded-content {
-    background-color: var(--ls-tertiary-background-color);
+    background-color: var(--ls-secondary-background-color); /* Softened background */
     border: 1px solid var(--ls-secondary-border-color); /* Subtle border for the content box */
     border-radius: var(--ls-border-radius-low);
     margin-top: 0; /* Placeholder margin-bottom handles spacing */
@@ -969,7 +970,7 @@ body {
 }
 
 .transclusion-body {
-    padding: var(--ls-space-2);
+    padding: var(--ls-space-1); /* Reduced padding */
 }
 
 /* .sql-query-results is a .note-children div, so it should inherit default note-children styling. */
@@ -1127,6 +1128,10 @@ textarea:focus {
 }
 
 @media (max-width: 768px) {
+    :root {
+        --ls-indentation-unit: var(--ls-space-4); /* Reduce indentation for mobile */
+    }
+
     .sidebar {
         width: 220px;
     }
@@ -1152,7 +1157,12 @@ textarea:focus {
         font-size: var(--ls-font-size-3xl);
     }
     .main-content {
-        padding: var(--ls-space-4);
+        padding: var(--ls-space-3); /* Further reduce padding for mobile */
+    }
+
+    .note-content-wrapper {
+        padding-top: var(--ls-space-1); /* Restore some padding for note content on mobile */
+        padding-bottom: var(--ls-space-1); /* Restore some padding for note content on mobile */
     }
 }
 
@@ -1199,7 +1209,7 @@ textarea:focus {
     font-weight: var(--ls-font-weight-semibold);
     color: var(--ls-primary-text-color);
     line-height: 1.2;
-    border-bottom: 1px solid var(--ls-border-color);
+    border-bottom: 1px solid var(--ls-secondary-border-color); /* Softened border */
     padding-bottom: var(--ls-space-2);
 }
 
@@ -1228,7 +1238,7 @@ textarea:focus {
     align-items: center;
     margin-bottom: var(--ls-space-4);
     padding-bottom: var(--ls-space-4);
-    border-bottom: 1px solid var(--ls-border-color);
+    border-bottom: 1px solid var(--ls-secondary-border-color); /* Softened border */
 }
 
 .generic-modal-title { /* Was .page-properties-modal-title */
@@ -1429,7 +1439,7 @@ textarea:focus {
 .generic-modal-content {
     background-color: var(--ls-primary-background-color);
     border-radius: var(--ls-border-radius-medium);
-    padding: var(--ls-space-4);
+    padding: var(--ls-space-3); /* Reduced padding */
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
@@ -1452,9 +1462,9 @@ textarea:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--ls-space-4);
-    padding-bottom: var(--ls-space-4);
-    border-bottom: 1px solid var(--ls-border-color);
+    margin-bottom: var(--ls-space-3); /* Reduced margin */
+    padding-bottom: var(--ls-space-3); /* Reduced padding */
+    border-bottom: 1px solid var(--ls-secondary-border-color); /* Softened border */
 }
 
 #page-properties-modal .generic-modal-title {
@@ -1546,9 +1556,9 @@ textarea:focus {
     display: flex;
     justify-content: flex-end;
     gap: var(--ls-space-2);
-    margin-top: var(--ls-space-4);
-    padding-top: var(--ls-space-4);
-    border-top: 1px solid var(--ls-border-color);
+    margin-top: var(--ls-space-3); /* Reduced margin */
+    padding-top: var(--ls-space-3); /* Reduced padding */
+    border-top: 1px solid var(--ls-secondary-border-color); /* Softened border */
 }
 
 .add-property-btn {
@@ -1591,7 +1601,7 @@ textarea:focus {
     padding: 0;
     max-height: 400px;
     overflow-y: auto;
-    border: 2px solid var(--ls-border-color);
+    border: 1px solid var(--ls-secondary-border-color); /* Softened and thinned border */
     border-radius: var(--ls-border-radius-lg);
     background: var(--ls-primary-background-color);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -1629,7 +1639,7 @@ textarea:focus {
 /* Bullet Context Menu */
 .bullet-context-menu {
     background: var(--ls-primary-background-color);
-    border: 1px solid var(--ls-border-color);
+    border: 1px solid var(--ls-secondary-border-color); /* Softened border */
     border-radius: var(--ls-border-radius-medium);
     box-shadow: var(--ls-shadow-lg);
     padding: var(--ls-space-1);
@@ -1691,14 +1701,14 @@ textarea:focus {
     margin-top: var(--ls-space-1);
     display: flex;
     flex-wrap: wrap;
-    gap: var(--ls-space-2);
+    gap: var(--ls-space-1); /* Reduced gap */
 }
 
 .note-properties .property-item {
     display: inline-flex;
     align-items: center;
     background-color: var(--ls-tertiary-background-color);
-    padding: var(--ls-space-1) var(--ls-space-2);
+    padding: var(--ls-space-1); /* Reduced padding */
     border-radius: var(--ls-border-radius-low);
 }
 
@@ -1751,7 +1761,7 @@ textarea:focus {
 #notes-container {
     display: flex;
     flex-direction: column;
-    gap: var(--ls-space-1);
+    gap: var(--ls-space-1); /* This provides inter-item spacing */
 }
 
 /* Breadcrumbs Container */
@@ -2113,24 +2123,29 @@ h5 { font-size: var(--ls-font-size-sm); font-weight: var(--ls-font-weight-semibo
 h6 { font-size: var(--ls-font-size-xs); font-weight: var(--ls-font-weight-semibold); }
 
 .note-content.rendered-mode {
-    cursor: pointer; /* Will be overridden by hover style */
+    cursor: pointer;
+    background-color: transparent; /* Ensure view mode is subtle */
+    padding: 6px 8px; /* Ensure padding is consistent if overridden elsewhere */
+    border-radius: var(--ls-border-radius-low); /* Ensure consistent border-radius */
     /* No specific background, rely on hover */
 }
 
 .note-content.rendered-mode:hover {
     cursor: text;
-    background: transparent; /* Removed background var(--ls-gray-2) */
+    background-color: var(--ls-tertiary-background-color); /* Subtle hover feedback */
 }
 
 .note-content.edit-mode {
-    background: transparent; /* Make it feel like part of the page, consistent with rendered-mode:hover */
-    /* border: 2px solid var(--ls-accent-10); Removed border */
-    outline: none; /* Remove default outline if using custom subtle indicator */
+    border: none !important; /* Ensure no border overrides */
+    background-color: transparent !important; /* Ensure transparent background */
+    padding: 6px 8px; /* Match view mode padding */
+    border-radius: var(--ls-border-radius-low); /* Match view mode radius */
+    outline: none; /* Remove default outline */
 }
 
 .note-content.edit-mode:focus {
-    /* Subtle focus indicator, browser default might be enough or: */
-    outline: none;
+    outline: none; /* Keep it minimal, rely on caret or subtle page-level focus */
+    box-shadow: 0 0 0 1px var(--ls-accent-8); /* Subtle focus shadow, less prominent than view mode focus */
 }
 
 /* Empty state placeholder */
@@ -2159,7 +2174,7 @@ h6 { font-size: var(--ls-font-size-xs); font-weight: var(--ls-font-weight-semibo
     padding: var(--ls-space-2);
     background-color: var(--ls-secondary-background-color);
     border-radius: var(--ls-border-radius-medium);
-    border: 1px solid var(--ls-border-color);
+    border: 1px solid var(--ls-secondary-border-color); /* Softened border */
 }
 
 .attachment-preview {
@@ -2607,10 +2622,10 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 .backlinks-section {
     margin-top: var(--ls-space-8);
     padding-top: var(--ls-space-6);
-    border-top: 2px solid var(--ls-secondary-border-color);
+    border-top: 1px solid var(--ls-secondary-border-color); /* Thinned border */
     background-color: var(--ls-secondary-background-color);
     border-radius: var(--ls-border-radius-medium);
-    padding: var(--ls-space-6);
+    padding: var(--ls-space-4); /* Reduced padding */
 }
 
 .backlinks-section h4 {
@@ -2632,7 +2647,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 
 .backlink-item {
     background-color: var(--ls-primary-background-color);
-    border: 1px solid var(--ls-border-color);
+    border: 1px solid var(--ls-secondary-border-color); /* Softened border */
     border-radius: var(--ls-border-radius-medium);
     padding: var(--ls-space-4);
     transition: all var(--ls-transition-fast);

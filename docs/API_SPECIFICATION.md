@@ -14,6 +14,7 @@ This document provides a detailed specification for the API endpoints.
 - [Templates API (`api/templates.php`)](#templates-api)
 - [Query Notes API (`api/query_notes.php`)](#query-notes-api)
 - [Utility Scripts](#utility-scripts)
+- [Webhooks API (`api/webhooks.php`)](#webhooks-api)
 
 ## Attachments API
 
@@ -557,6 +558,747 @@ This section briefly describes various utility scripts found in the `api/` direc
 -   **`api/validator_utils.php`**:
     -   **Role**: Provides the `Validator` class with static methods for validating input data (e.g., `validate()`, `sanitizeString()`, type checks like `isPositiveInteger`, `isValidEntityType`). It helps ensure that data received by API endpoints is clean and meets expected formats before processing.
     -   **Used By**: `pages.php`, `properties.php`.
+
+---
+
+## Webhooks API (`api/webhooks.php`)
+
+Webhooks are automated messages sent from this application to external services when something happens. They provide a way to notify other systems or applications in real-time about events occurring within this application, enabling seamless integration and automation.
+
+### Main Objective
+
+The primary purpose of the Webhooks API is to allow users to subscribe to specific events and have relevant data sent to a configured URL (the webhook endpoint) as an HTTP POST request. Currently, the supported events primarily revolve around property changes on entities such as notes. For example, a webhook can be triggered when a specific property (e.g., `status`, `priority`) on a note is created, updated, or deleted.
+
+### Key Benefits
+
+-   **Real-time Updates**: External services receive immediate notifications when specific events occur, eliminating the need for frequent polling.
+-   **Integration**: Facilitates a loosely coupled way to integrate this application with other third-party services (e.g., notification systems, custom dashboards, data analysis tools).
+-   **Automation**: Enables the creation of automated workflows. For instance, a change in a note's property could trigger an action in another system, like sending an email, updating a project management tool, or logging data to a spreadsheet.
+
+### Supported HTTP Methods & Endpoints
+
+-   **`POST /api/webhooks.php`**: Create a new webhook.
+-   **`GET /api/webhooks.php`**: List all webhooks.
+-   **`GET /api/webhooks.php?id={webhook_id}`**: Get details of a specific webhook.
+-   **`PUT /api/webhooks.php?id={webhook_id}`**: Update an existing webhook.
+-   **`DELETE /api/webhooks.php?id={webhook_id}`**: Delete a webhook.
+-   **`POST /api/webhooks.php?action=test&id={webhook_id}`**: Send a test event to the specified webhook endpoint.
+-   **`POST /api/webhooks.php?action=verify&id={webhook_id}`**: Initiate verification of a webhook endpoint.
+-   **`GET /api/webhooks.php?action=history&id={webhook_id}`**: Retrieve the event delivery history for a webhook.
+
+### Request Parameters
+
+#### `POST /api/webhooks.php` (Create Webhook)
+
+-   **Headers**:
+    -   `Content-Type: application/json`
+-   **JSON Payload**:
+    -   `url` (string, required): The URL to which webhook events will be sent. Must be a valid URL.
+    -   `entity_type` (string, required): The type of entity to monitor (e.g., "note", "page").
+    -   `property_name` (string, required): The specific property name to monitor for changes (e.g., "status", "content").
+    -   `active` (boolean, optional): Set to `true` to activate the webhook immediately, `false` to create it inactive. Defaults to `true`.
+
+#### `GET /api/webhooks.php` (List Webhooks)
+
+-   No specific request parameters. Returns a list of all configured webhooks.
+
+#### `GET /api/webhooks.php?id={webhook_id}` (Get Specific Webhook)
+
+-   **URL Parameters**:
+    -   `id` (integer, required): The ID of the webhook to retrieve.
+
+#### `PUT /api/webhooks.php?id={webhook_id}` (Update Webhook)
+
+-   **Headers**:
+    -   `Content-Type: application/json`
+-   **URL Parameters**:
+    -   `id` (integer, required): The ID of the webhook to update.
+-   **JSON Payload (provide at least one)**:
+    -   `url` (string, optional): The new URL for the webhook.
+    -   `entity_type` (string, optional): The new entity type to monitor.
+    -   `property_name` (string, optional): The new property name to monitor.
+    -   `active` (boolean, optional): Set to `true` or `false` to change the webhook's active status.
+
+#### `DELETE /api/webhooks.php?id={webhook_id}` (Delete Webhook)
+
+-   **URL Parameters**:
+    -   `id` (integer, required): The ID of the webhook to delete.
+
+#### `POST /api/webhooks.php?action=test&id={webhook_id}` (Send Test Event)
+
+-   **URL Parameters**:
+    -   `action` (string, required): Must be "test".
+    -   `id` (integer, required): The ID of the webhook to test.
+-   No JSON payload required.
+
+#### `POST /api/webhooks.php?action=verify&id={webhook_id}` (Verify Webhook Endpoint)
+
+-   **URL Parameters**:
+    -   `action` (string, required): Must be "verify".
+    -   `id` (integer, required): The ID of the webhook whose endpoint is to be verified.
+-   No JSON payload required. The system will send a special 'verification' event to the webhook URL.
+
+#### `GET /api/webhooks.php?action=history&id={webhook_id}` (Get Webhook History)
+
+-   **URL Parameters**:
+    -   `action` (string, required): Must be "history".
+    -   `id` (integer, required): The ID of the webhook.
+    -   `page` (integer, optional): For pagination, the page number. Defaults to 1.
+    -   `limit` (integer, optional): For pagination, the number of events per page. Defaults to 20.
+
+### Response Structure (Success)
+
+#### `POST /api/webhooks.php` (Create Webhook)
+```json
+{
+    "success": true,
+    "data": {
+        "id": 123,
+        "url": "https://example.com/webhook-listener",
+        "entity_type": "note",
+        "property_name": "status",
+        "secret": "whsec_exampleSecretToken12345",
+        "active": 1,
+        "verified": 0,
+        "last_verified": null,
+        "last_triggered": null,
+        "created_at": "YYYY-MM-DD HH:MM:SS",
+        "updated_at": "YYYY-MM-DD HH:MM:SS"
+    }
+}
+```
+*Note: The `secret` is only returned upon creation and should be stored securely by the client.*
+
+#### `GET /api/webhooks.php?id={webhook_id}` (Get Specific Webhook)
+```json
+{
+    "success": true,
+    "data": {
+        "id": 123,
+        "url": "https://example.com/webhook-listener",
+        "entity_type": "note",
+        "property_name": "status",
+        "active": 1,
+        "verified": 1,
+        "last_verified": "YYYY-MM-DD HH:MM:SS",
+        "last_triggered": "YYYY-MM-DD HH:MM:SS",
+        "created_at": "YYYY-MM-DD HH:MM:SS",
+        "updated_at": "YYYY-MM-DD HH:MM:SS"
+    }
+}
+```
+
+#### `GET /api/webhooks.php` (List Webhooks)
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "id": 123,
+            "url": "https://example.com/webhook-listener-1",
+            "entity_type": "note",
+            "property_name": "status",
+            "active": 1,
+            "verified": 1,
+            "last_verified": "YYYY-MM-DD HH:MM:SS",
+            "last_triggered": "YYYY-MM-DD HH:MM:SS",
+            "created_at": "YYYY-MM-DD HH:MM:SS",
+            "updated_at": "YYYY-MM-DD HH:MM:SS"
+        },
+        {
+            "id": 124,
+            "url": "https://example.com/webhook-listener-2",
+            "entity_type": "page",
+            "property_name": "title",
+            "active": 0,
+            "verified": 0,
+            "last_verified": null,
+            "last_triggered": null,
+            "created_at": "YYYY-MM-DD HH:MM:SS",
+            "updated_at": "YYYY-MM-DD HH:MM:SS"
+        }
+    ]
+}
+```
+
+#### `PUT /api/webhooks.php?id={webhook_id}` (Update Webhook)
+```json
+{
+    "success": true,
+    "data": {
+        "id": 123,
+        "url": "https://example.com/new-webhook-listener",
+        "entity_type": "note",
+        "property_name": "priority",
+        "active": 1,
+        "verified": 1,
+        "last_verified": "YYYY-MM-DD HH:MM:SS",
+        "last_triggered": "YYYY-MM-DD HH:MM:SS",
+        "created_at": "YYYY-MM-DD HH:MM:SS",
+        "updated_at": "YYYY-MM-DD HH:MM:SS"
+    }
+}
+```
+
+#### `DELETE /api/webhooks.php?id={webhook_id}` (Delete Webhook)
+```json
+{
+    "success": true,
+    "data": {
+        "message": "Webhook 123 and its events deleted successfully."
+    }
+}
+```
+
+#### `POST /api/webhooks.php?action=test&id={webhook_id}` (Send Test Event)
+```json
+{
+    "success": true,
+    "data": {
+        "message": "Test event sent. Check history for result."
+    }
+}
+```
+
+#### `POST /api/webhooks.php?action=verify&id={webhook_id}` (Verify Webhook Endpoint)
+```json
+{
+    "success": true,
+    "data": {
+        "message": "Webhook verified successfully with status 200."
+    }
+}
+```
+
+#### `GET /api/webhooks.php?action=history&id={webhook_id}` (Get Webhook History)
+```json
+{
+    "success": true,
+    "data": {
+        "pagination": {
+            "total": 5,
+            "page": 1,
+            "limit": 20
+        },
+        "history": [
+            {
+                "id": 1,
+                "webhook_id": 123,
+                "event_type": "property_change",
+                "payload": "{\"event\":\"property_change\",\"data\":{...}}",
+                "response_code": 200,
+                "response_body": "Received OK",
+                "success": 1,
+                "created_at": "YYYY-MM-DD HH:MM:SS"
+            },
+            {
+                "id": 2,
+                "webhook_id": 123,
+                "event_type": "test",
+                "payload": "{\"event\":\"test\",\"data\":{...}}",
+                "response_code": 404,
+                "response_body": "Not Found",
+                "success": 0,
+                "created_at": "YYYY-MM-DD HH:MM:SS"
+            }
+        ]
+    }
+}
+```
+
+### Event Triggers and Payload Structure
+
+#### 1. Event Triggers
+
+Webhooks are primarily triggered under the following conditions:
+
+-   **Property Change**: When a monitored property of a specified `entity_type` changes. For example, if a webhook is configured for `entity_type: 'note'` and `property_name: 'status'`, any creation, update, or deletion of the 'status' property on any note will trigger the webhook. The webhook fires for changes made via the API or through direct content modification (e.g., `status:: new_value` in note content).
+-   **Test Event**: Manually triggered via the `POST /api/webhooks.php?action=test&id={webhook_id}` endpoint. This allows developers to check if their endpoint is receiving requests correctly.
+-   **Verification Event**: Sent when a webhook endpoint is being verified via `POST /api/webhooks.php?action=verify&id={webhook_id}`. The receiving endpoint needs to respond appropriately (e.g., with an HTTP 2xx status) to confirm its validity.
+
+#### 2. Payload Structure
+
+All webhook events are sent from the application to the configured URL as an **HTTP POST** request with a JSON payload. The receiving server is responsible for parsing this JSON.
+
+The general structure of the payload is as follows:
+
+-   `event` (string): The type of event that occurred. Examples: "property_change", "test", "verification".
+-   `webhook_id` (integer): The ID of the webhook configuration that generated this event. This helps the receiving service identify the source and context of the event if it handles multiple webhooks.
+-   `timestamp` (integer): A UNIX timestamp representing when the event was generated on the server.
+-   `data` (object, optional): An object containing event-specific data. The structure of this object varies depending on the `event` type. For some events like "verification", this field might be omitted.
+
+All payloads are signed for security. See the "Webhook Security" section for details on how to verify the signature.
+
+#### 3. Example Event: `property_change`
+
+This is the most common event type, triggered when a monitored property changes.
+
+**Payload:**
+```json
+{
+    "event": "property_change",
+    "webhook_id": 123,
+    "timestamp": 1678886400,
+    "data": {
+        "entity_type": "note",
+        "entity_id": 789,
+        "property_name": "status",
+        "old_value": "TODO",
+        "new_value": "DONE",
+        "changed_by": "user_xyz"
+    }
+}
+```
+**Fields within `data` for `property_change`:**
+-   `entity_type` (string): The type of entity that was modified (e.g., "note", "page").
+-   `entity_id` (integer): The unique identifier of the specific entity that was changed.
+-   `property_name` (string): The name of the property that triggered the event.
+-   `old_value` (any, optional): The value of the property before the change. This field might be `null` or omitted if the property was newly created.
+-   `new_value` (any): The new value of the property after the change. This field might be `null` or omitted if the property was deleted.
+-   `changed_by` (string, optional): An identifier for the user or process that initiated the change, if this information is available.
+
+#### 4. Example Event: `test`
+
+Triggered by the "Send Test Event" action.
+
+**Payload:**
+```json
+{
+    "event": "test",
+    "webhook_id": 123,
+    "timestamp": 1678886500,
+    "data": {
+        "message": "This is a test event from Notd."
+    }
+}
+```
+
+#### 5. Example Event: `verification`
+
+Sent when initiating endpoint verification. The receiving endpoint should typically respond with a 2xx HTTP status code to confirm receipt and validity.
+
+**Payload:**
+```json
+{
+    "event": "verification",
+    "webhook_id": 123,
+    "timestamp": 1678886600
+}
+```
+*Note: As per the implementation, the `verification` event payload is minimal and does not contain a `data` object.*
+
+### Verifying Webhook Signatures (Security)
+
+#### 1. Introduction to Signature Verification
+
+To ensure that webhook requests genuinely originate from this application (Notd) and not from a malicious third party, each outgoing webhook request is digitally signed. The signature is included in the `X-Notd-Signature` HTTP header.
+
+The signature is a **HMAC-SHA256** hash. By verifying this signature, your receiving server can confirm the authenticity and integrity of the payload.
+
+#### 2. How it Works
+
+The signature is generated by Notd using:
+-   The webhook's unique `secret`. This secret is provided to you when you create the webhook and is known only to you and Notd.
+-   The raw JSON payload of the HTTP POST request.
+
+Your server, upon receiving a webhook request, must compute its own signature using the same method (HMAC-SHA256, the shared secret, and the raw payload). If your computed signature matches the one received in the `X-Notd-Signature` header, the request is considered authentic.
+
+#### 3. Steps to Verify
+
+1.  **Retrieve the Webhook Secret**:
+    *   Access the unique `secret` associated with the webhook configuration. You should have stored this securely when you initially set up the webhook in Notd. **Never expose this secret in client-side code or unsecured storage.**
+
+2.  **Get the Raw Request Body**:
+    *   Obtain the exact raw body of the incoming HTTP POST request. It is crucial to use the raw, unmodified byte string of the payload. Do not parse and then re-serialize the JSON, as even minor differences (like whitespace changes or key order) will result in a different signature.
+
+3.  **Get the Received Signature**:
+    *   Extract the signature value from the `X-Notd-Signature` HTTP header of the incoming request.
+
+4.  **Compute Your Signature**:
+    *   Calculate an HMAC-SHA256 hash of the raw request body (from step 2) using the webhook's `secret` (from step 1) as the cryptographic key. The output of the hash function should be in hexadecimal format.
+
+5.  **Compare Signatures**:
+    *   Compare the signature you computed (from step 4) with the signature you received in the header (from step 3). Use a constant-time string comparison method to prevent timing attacks. If they are identical, the webhook request is genuine and its payload can be trusted.
+
+#### 4. Code Examples for Verification
+
+##### PHP Example
+```php
+<?php
+// Ensure this is the raw POST body
+$requestBody = file_get_contents('php://input');
+
+// Retrieve your stored webhook secret for this specific webhook
+// Example: $webhookSecret = get_secret_for_webhook($_GET['webhook_id']);
+$webhookSecret = 'whsec_exampleSecretToken12345'; // Replace with actual secret retrieval
+
+// Get the signature from the request header
+$receivedSignature = isset($_SERVER['HTTP_X_NOTD_SIGNATURE']) ? $_SERVER['HTTP_X_NOTD_SIGNATURE'] : '';
+
+if (empty($receivedSignature)) {
+    http_response_code(400);
+    echo "Missing X-Notd-Signature header.";
+    exit;
+}
+
+$computedSignature = hash_hmac('sha256', $requestBody, $webhookSecret);
+
+if (hash_equals($computedSignature, $receivedSignature)) {
+    // Signature is valid
+    // Now it's safe to process the $requestBody (e.g., json_decode($requestBody, true))
+    echo "Signature valid. Processing webhook...";
+    // $payload = json_decode($requestBody, true);
+    // ... process $payload ...
+} else {
+    // Signature is invalid
+    http_response_code(403); // Forbidden
+    echo "Signature invalid.";
+    // Log the attempt or take other security measures
+}
+?>
+```
+
+##### Python (Flask) Example
+```python
+import hashlib
+import hmac
+import os
+from flask import Flask, request, abort, jsonify
+
+app = Flask(__name__)
+
+# --- Secure Secret Management ---
+# Best Practice: Store secrets in environment variables or a secure vault.
+# This example demonstrates fetching a secret based on a webhook identifier.
+# The identifier might be part of the URL or a query parameter.
+# For instance, if your endpoint is /webhook-receiver/<webhook_identifier>
+#
+# DO NOT hardcode secrets directly in your application code for production.
+
+# Example: Load secrets from environment variables
+# WEBHOOK_SECRET_ID123='whsec_secretForWebhook123'
+# WEBHOOK_SECRET_ID456='whsec_secretForWebhook456'
+
+def get_webhook_secret(webhook_identifier):
+    """
+    Retrieves the webhook secret for a given identifier.
+    Replace this with your actual secret management logic.
+    """
+    return os.environ.get(f'WEBHOOK_SECRET_{webhook_identifier}')
+
+@app.route('/webhook-receiver/<string:webhook_identifier>', methods=['POST'])
+def webhook_receiver(webhook_identifier):
+    # 1. Retrieve the Webhook Secret
+    webhook_secret = get_webhook_secret(webhook_identifier)
+    if not webhook_secret:
+        app.logger.error(f"No secret configured for webhook identifier: {webhook_identifier}")
+        abort(400, 'Webhook configuration error: Secret not found.')
+
+    # 2. Get the Raw Request Body
+    request_body_bytes = request.get_data() # Get raw bytes
+
+    # 3. Get the Received Signature
+    received_signature = request.headers.get('X-Notd-Signature')
+    if not received_signature:
+        app.logger.warning("Request missing X-Notd-Signature header.")
+        abort(400, 'Missing X-Notd-Signature header.')
+
+    # 4. Compute Your Signature
+    computed_hasher = hmac.new(
+        webhook_secret.encode('utf-8'),
+        request_body_bytes, # Use raw bytes directly
+        hashlib.sha256
+    )
+    computed_signature = computed_hasher.hexdigest()
+
+    # 5. Compare Signatures
+    if hmac.compare_digest(computed_signature, received_signature):
+        app.logger.info(f"Signature valid for webhook: {webhook_identifier}")
+        # Now it's safe to process the payload
+        payload = request.get_json()
+        # Example: Log the event type from the X-Notd-Event header
+        event_type = request.headers.get('X-Notd-Event')
+        app.logger.info(f"Received event: {event_type}, Payload: {payload}")
+        
+        # ... process the payload based on event_type and content ...
+        
+        return jsonify({"status": "success", "message": "Webhook processed"}), 200
+    else:
+        app.logger.warning(f"Invalid signature for webhook: {webhook_identifier}")
+        abort(403, 'Invalid signature.')
+
+if __name__ == '__main__':
+    # Example: Define a secret for testing if running directly
+    # In a real app, use environment variables or a proper config system.
+    os.environ['WEBHOOK_SECRET_test123'] = 'whsec_exampleSecretToken12345'
+    # Run Flask app on port 5000
+    # Ensure DEBUG is False in production.
+    app.run(port=5000, debug=True) # For debug=True, Flask logger will show INFO messages.
+```
+
+#### 5. Important Considerations
+
+-   **Constant-Time Comparison**: Always use a constant-time string comparison function like `hash_equals()` in PHP or `hmac.compare_digest()` in Python. Standard equality operators (e.g., `==` or `===`) can be vulnerable to timing attacks, where an attacker could potentially guess the signature by measuring the time it takes for a comparison to fail.
+-   **Secret Confidentiality**: Your webhook `secret` is like a password. Keep it confidential. Do not embed it directly in client-side code or commit it to your version control system. Use environment variables or a secure secret management system.
+-   **`X-Notd-Event` Header**: While not part of the signature verification itself, Notd also sends an `X-Notd-Event` header (e.g., `X-Notd-Event: property_change`). You can use this header to quickly identify the type of event in the payload before parsing the JSON, which can be useful for routing or initial processing.
+-   **Payload Replay**: Signature verification confirms the authenticity of the payload but does not protect against replay attacks (where an attacker intercepts a valid payload and resends it). Consider using the `timestamp` in the payload to discard events that are too old, though this requires clock synchronization. For stronger replay protection, you might implement a system of nonces, but this is often more complex than necessary for many webhook use cases.
+
+### End-to-End Example: Creating a Webhook and Receiving an Event
+
+This example walks through setting up a webhook to monitor note status changes and processing the event on a receiving server.
+
+#### 1. Scenario
+
+We want to receive a notification at our service endpoint `https://my-service.com/notd-webhook-handler` whenever the `status` property of any `note` entity changes within our Notd application.
+
+#### 2. Step 1: Creating the Webhook (cURL Example)
+
+First, we create the webhook subscription using the Notd API. We'll use `http://localhost/notd/api` as the base URL for the Notd API.
+
+```bash
+curl -X POST http://localhost/notd/api/webhooks.php \
+-H "Content-Type: application/json" \
+-d '{
+  "url": "https://my-service.com/notd-webhook-handler",
+  "entity_type": "note",
+  "property_name": "status"
+}'
+```
+
+Notd will respond with the details of the created webhook, including a crucial `secret`:
+
+```json
+{
+    "success": true,
+    "data": {
+        "id": 124,
+        "url": "https://my-service.com/notd-webhook-handler",
+        "entity_type": "note",
+        "property_name": "status",
+        "secret": "whsec_GeneratedSecretForThisWebhook",
+        "active": 1,
+        "verified": 0,
+        "last_verified": null,
+        "last_triggered": null,
+        "created_at": "YYYY-MM-DD HH:MM:SS",
+        "updated_at": "YYYY-MM-DD HH:MM:SS"
+    }
+}
+```
+
+**Action**: Securely store the `secret` (`whsec_GeneratedSecretForThisWebhook` in this example) on your receiving server. This secret is vital for verifying incoming webhook requests.
+
+#### 3. Step 2: Building the Receiving Endpoint (Python Flask Example)
+
+Now, let's set up a simple Python Flask application at `https://my-service.com/notd-webhook-handler` to listen for these webhooks.
+
+```python
+from flask import Flask, request, abort, jsonify
+import hashlib
+import hmac
+import json # For pretty printing the payload
+import os
+
+app = Flask(__name__)
+
+# IMPORTANT: Store this secret securely! This is for demonstration.
+# This secret corresponds to the webhook created in Step 1.
+# In a production app, use environment variables or a secure vault.
+NOTD_WEBHOOK_SECRET = os.environ.get('NOTD_WEBHOOK_SECRET', 'whsec_GeneratedSecretForThisWebhook')
+
+@app.route('/notd-webhook-handler', methods=['POST'])
+def handle_webhook():
+    # 1. Verify Signature
+    received_signature = request.headers.get('X-Notd-Signature')
+    if not received_signature:
+        print("Request is missing X-Notd-Signature header.")
+        abort(400, "Missing X-Notd-Signature header.")
+
+    request_body_bytes = request.get_data() # Get raw bytes for signature computation
+    
+    computed_signature_hasher = hmac.new(
+        NOTD_WEBHOOK_SECRET.encode('utf-8'),
+        request_body_bytes, # Use raw bytes directly
+        hashlib.sha256
+    )
+    computed_signature = computed_signature_hasher.hexdigest()
+
+    if not hmac.compare_digest(computed_signature, received_signature):
+        print(f"Invalid signature. Received: {received_signature}, Computed: {computed_signature}")
+        abort(403, "Invalid signature.") # Forbidden
+    
+    print("Signature verified successfully!")
+
+    # 2. Process the event (now that signature is verified)
+    event_type = request.headers.get('X-Notd-Event')
+    payload = request.json # Safely parse JSON after verification
+
+    print(f"Received event type: {event_type}")
+    print(f"Payload: {json.dumps(payload, indent=2)}")
+
+    if event_type == 'property_change':
+        # Example: Extracting data from a property_change event
+        entity = payload.get('data', {}).get('entity_type')
+        entity_id = payload.get('data', {}).get('entity_id')
+        prop_name = payload.get('data', {}).get('property_name')
+        new_val = payload.get('data', {}).get('new_value')
+        print(f"Property '{prop_name}' on {entity} {entity_id} changed to '{new_val}'")
+        # Add your custom application logic here based on the event
+    elif event_type == 'test':
+        print("Received a test event!")
+        # You might log this or perform a simple check
+    elif event_type == 'verification':
+        print("Received a verification event. Responding 200 OK.")
+        # The main purpose is to confirm the endpoint is reachable and responds.
+        # Signature verification handles authenticity.
+    
+    return jsonify({"status": "success", "message": "Webhook received"}), 200
+
+if __name__ == '__main__':
+    # For local testing, ensure Notd can reach this endpoint (e.g., using ngrok if Notd is not local).
+    # If Notd is also local, ensure this runs on a different port than Notd.
+    # Set the NOTD_WEBHOOK_SECRET environment variable if you want to override the default.
+    # Example: export NOTD_WEBHOOK_SECRET="whsec_AnotherSecretIfTesting"
+    app.run(port=5001, debug=True)
+```
+
+#### 4. Step 3: Triggering an Event
+
+With the webhook created in Notd and the receiving endpoint running, any change to the `status` property of any note within the Notd application will trigger an HTTP POST request to `https://my-service.com/notd-webhook-handler`.
+
+For example, a user updates a note, and its `status` property changes from "Open" to "Closed".
+
+#### 5. Step 4: Observing the Output
+
+If the event is triggered, your Python Flask application's console will show output similar to this:
+
+```
+Signature verified successfully!
+Received event type: property_change
+Payload: {
+  "event": "property_change",
+  "webhook_id": 124,
+  "timestamp": 1678886400,
+  "data": {
+    "entity_type": "note",
+    "entity_id": 789,
+    "property_name": "status",
+    "old_value": "Open",
+    "new_value": "Closed",
+    "changed_by": "user_abc"
+  }
+}
+Property 'status' on note 789 changed to 'Closed'
+```
+
+The Notd application will also log this delivery attempt (and its success or failure) in the webhook's event history, which can be retrieved via the API (`GET /api/webhooks.php?action=history&id=124`).
+
+This end-to-end example demonstrates the basic workflow for creating, receiving, verifying, and processing webhooks from Notd.
+
+### Error Responses
+
+This section describes common error responses for the Webhooks API. The general error structure usually includes `"success": false` and an `"error"` message. A `"details"` object may provide field-specific issues.
+
+#### `400 Bad Request`
+
+-   **Reason**: Typically due to invalid input from the client. This can include:
+    -   Malformed JSON in the request body.
+    -   Missing required parameters for an operation (e.g., `url`, `entity_type`, `property_name` during webhook creation).
+    -   Parameters of an incorrect type or format (e.g., an invalid URL for the `url` field, non-boolean for `active`).
+    -   Invalid `action` parameter for POST requests.
+-   **Example (Missing required fields)**:
+    ```json
+    {
+        "success": false,
+        "error": "Invalid input.",
+        "details": {
+            "url": "URL is required and must be a valid URL.",
+            "entity_type": "Entity type is required."
+        }
+    }
+    ```
+-   **Example (Invalid URL format)**:
+    ```json
+    {
+        "success": false,
+        "error": "Invalid input.",
+        "details": {
+            "url": "Must be a valid URL."
+        }
+    }
+    ```
+
+#### `404 Not Found`
+
+-   **Reason**: The requested resource (specifically a webhook by its ID) could not be found. This occurs when trying to:
+    -   GET details for a specific webhook ID that doesn't exist.
+    -   PUT (update) a webhook ID that doesn't exist.
+    -   DELETE a webhook ID that doesn't exist.
+    -   POST an action (like `test`, `verify`, `history`) for a webhook ID that doesn't exist.
+-   **Example**:
+    ```json
+    {
+        "success": false,
+        "error": "Webhook not found."
+    }
+    ```
+
+#### `405 Method Not Allowed`
+
+-   **Reason**: The HTTP method used for the request is not supported by the target endpoint. For example, sending a `GET` request to an endpoint that only accepts `POST` for a specific action.
+-   **Example**:
+    ```json
+    {
+        "success": false,
+        "error": "Method Not Allowed"
+    }
+    ```
+    *(Note: The server's default response for 405 might be less structured if not explicitly formatted by the API.)*
+
+#### `500 Internal Server Error`
+
+-   **Reason**: An unexpected error occurred on the server side while attempting to process the request. This could be due to:
+    -   Database connection problems.
+    -   Unhandled exceptions or bugs in the API's business logic.
+    -   Failures in underlying services the API depends on.
+-   **Example**:
+    ```json
+    {
+        "success": false,
+        "error": "An unexpected error occurred: Database query failed."
+        // "details": "SQLSTATE[HY000] [2002] Connection refused" // Optional, more specific detail
+    }
+    ```
+    *A more generic message might be: `{"success": false, "error": "An internal server error occurred."}`*
+
+#### `502 Bad Gateway` (or similar, for webhook dispatch/verification issues)
+
+-   **Reason**: This error (or a custom error message with a similar meaning) can occur specifically during webhook operations that involve Notd making an outbound request to the user-configured webhook URL:
+    -   **Verification Failure**: When using `POST /api/webhooks.php?action=verify&id={webhook_id}`, if the target webhook URL returns an HTTP error (e.g., 5xx, 4xx), is unreachable (DNS failure, connection timeout), or does not respond appropriately.
+    -   **Event Dispatch Failure**: While not a direct API response to the user, the webhook history might log similar issues if an event dispatch fails due to problems with the receiving endpoint.
+-   **Example (For Verification Failure, if target URL returns 500)**:
+    ```json
+    {
+        "success": false,
+        "error": "Webhook verification failed. The endpoint responded with status 500.",
+        "details": {
+            "response_code": 500,
+            "response_body": "Internal Server Error on your-service.com" 
+            // response_body might be truncated or a summary
+        }
+    }
+    ```
+-   **Example (For Verification Failure, if target URL is unreachable)**:
+    ```json
+    {
+        "success": false,
+        "error": "Webhook verification failed. Could not connect to the endpoint.",
+        "details": {
+            "response_code": 0, // Or a cURL error code
+            "response_body": "cURL error 6: Could not resolve host: your-invalid-service-url.com"
+        }
+    }
+    ```
 
 ---
 
