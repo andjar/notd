@@ -559,8 +559,10 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         window.blockPageLoad = false; 
     }
 
-    if (notesForCurrentPage.length === 0 && currentPageId) { 
-        await handleCreateAndFocusFirstNote(currentPageId); 
+    if (notesForCurrentPage.length === 0 && currentPageId) {
+        console.log('[PAGE LOAD] No notes found, creating first note');
+        await handleCreateAndFocusFirstNote(currentPageId);
+        return; // Exit after creating first note to prevent further processing
     }
 }
 
@@ -660,46 +662,54 @@ async function handleCreateAndFocusFirstNote(pageIdToUse) {
         return;
     }
     try {
+        console.log(`[NOTE CREATION] Creating first note for page ${pageIdToUse}`);
         const savedNote = await notesAPI.createNote({
             page_id: pageIdToUse, 
-            content: ' '
-            // Removed parent_note_id as it's not expected in POST requests
+            content: '',
+            order_index: 0 // Explicitly set order_index to 0 for first note
         });
 
         if (savedNote) {
-            addNoteToCurrentPage(savedNote);
-
-            if (notesContainer) { // Ensure notesContainer
-                if(notesContainer.innerHTML.includes("empty-page-hint") || notesContainer.children.length === 0) {
-                    notesContainer.innerHTML = ''; 
-                }
-                const noteEl = window.ui.renderNote(savedNote, 0); // Assuming ui.renderNote exists
-                notesContainer.appendChild(noteEl);
-                
-                const contentDiv = noteEl.querySelector('.note-content');
-                if (contentDiv) {
-                    contentDiv.dataset.rawContent = savedNote.content;
-                    contentDiv.textContent = '';
-                    window.ui.switchToEditMode(contentDiv);
-                    
-                    const initialInputHandler = async (e) => {
-                        const currentContent = contentDiv.textContent.trim();
-                        if (currentContent !== '') {
-                            contentDiv.dataset.rawContent = currentContent;
-                            await saveNoteImmediately(noteEl); // saveNoteImmediately needs to be imported
-                            contentDiv.removeEventListener('input', initialInputHandler);
-                        }
-                    };
-                    contentDiv.addEventListener('input', initialInputHandler);
-                }
+            console.log(`[NOTE CREATION] Received from server: id=${savedNote.id}, server_assigned_order_index=${savedNote.order_index}, content="${savedNote.content}"`);
+            
+            // Clear any existing notes in the container
+            if (notesContainer) {
+                notesContainer.innerHTML = '';
             }
+            
+            // Update the global state with just this one note
+            setNotesForCurrentPage([savedNote]);
+            
+            // Render the note
+            const noteEl = window.ui.renderNote(savedNote, 0);
+            if (notesContainer) {
+                notesContainer.appendChild(noteEl);
+            }
+            
+            // Focus the new note
+            const contentDiv = noteEl.querySelector('.note-content');
+            if (contentDiv) {
+                contentDiv.dataset.rawContent = '';
+                window.ui.switchToEditMode(contentDiv);
+                
+                const initialInputHandler = async (e) => {
+                    const currentContent = contentDiv.textContent.trim();
+                    if (currentContent !== '') {
+                        contentDiv.dataset.rawContent = currentContent;
+                        await saveNoteImmediately(noteEl);
+                        contentDiv.removeEventListener('input', initialInputHandler);
+                    }
+                };
+                contentDiv.addEventListener('input', initialInputHandler);
+            }
+            
             if (typeof feather !== 'undefined' && feather.replace) {
                 feather.replace();
             }
         }
     } catch (error) {
         console.error('Error creating the first note for the page:', error);
-        if (notesContainer) { // Ensure notesContainer
+        if (notesContainer) {
             notesContainer.innerHTML = '<p>Error creating the first note. Please try reloading.</p>';
         }
     }

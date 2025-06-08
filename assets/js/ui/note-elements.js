@@ -27,8 +27,11 @@ function displayNotes(notesData, pageId) {
         return;
     }
 
+    // Sort notes by order_index before building the tree
+    const sortedNotes = [...notesData].sort((a, b) => a.order_index - b.order_index);
+    
     // Build and display note tree
-    const noteTree = buildNoteTree(notesData);
+    const noteTree = buildNoteTree(sortedNotes);
     noteTree.forEach(note => {
         domRefs.notesContainer.appendChild(renderNote(note, 0));
     });
@@ -123,9 +126,31 @@ function addNoteElement(noteData, targetDomContainer, nestingLevel, beforeElemen
 
     const newNoteEl = renderNote(noteData, nestingLevel);
 
+    // Find the correct position to insert based on order_index
+    if (!beforeElement) {
+        const siblings = Array.from(targetDomContainer.children)
+            .filter(child => child.classList.contains('note-item'))
+            .map(childEl => ({
+                element: childEl,
+                order_index: window.notesForCurrentPage.find(n => String(n.id) === String(childEl.dataset.noteId))?.order_index || Infinity
+            }))
+            .sort((a, b) => a.order_index - b.order_index);
+
+        // Find the first sibling with a higher order_index
+        const nextSibling = siblings.find(s => s.order_index > noteData.order_index);
+        if (nextSibling) {
+            beforeElement = nextSibling.element;
+        } else if (siblings.length > 0 && noteData.order_index < siblings[0].order_index) {
+            // If this note should be first, insert before the first sibling
+            beforeElement = siblings[0].element;
+        }
+    }
+
+    // Insert the new note at the correct position
     if (beforeElement && beforeElement.parentElement === targetDomContainer) {
         targetDomContainer.insertBefore(newNoteEl, beforeElement);
     } else {
+        // If no beforeElement or it's not in the target container, append to the end
         targetDomContainer.appendChild(newNoteEl);
     }
 
@@ -139,9 +164,17 @@ function addNoteElement(noteData, targetDomContainer, nestingLevel, beforeElemen
     
     // Initialize Sortable on its children container if it has one and it's newly created by renderNote
     const newChildrenContainer = newNoteEl.querySelector('.note-children');
-    if (newChildrenContainer && !newChildrenContainer.classList.contains('ui-sortable')) { // Check if not already sortable
+    if (newChildrenContainer && !newChildrenContainer.classList.contains('ui-sortable')) {
         if (typeof Sortable !== 'undefined' && Sortable.create) {
-            Sortable.create(newChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', ghostClass: 'note-ghost', chosenClass: 'note-chosen', dragClass: 'note-drag', onEnd: handleNoteDrop });
+            Sortable.create(newChildrenContainer, { 
+                group: 'notes', 
+                animation: 150, 
+                handle: '.note-bullet', 
+                ghostClass: 'note-ghost', 
+                chosenClass: 'note-chosen', 
+                dragClass: 'note-drag', 
+                onEnd: handleNoteDrop 
+            });
         }
     }
     
@@ -332,24 +365,25 @@ async function handleNoteDrop(evt) {
         String(note.id) !== String(noteId) // Exclude the note being moved
     ).sort((a, b) => a.order_index - b.order_index);
 
-    if (newIndex >= siblingsInNewParent.length) {
-        targetOrderIndex = siblingsInNewParent.length > 0 ? siblingsInNewParent[siblingsInNewParent.length - 1].order_index + 1 : 0;
+    if (siblingsInNewParent.length === 0) {
+        targetOrderIndex = 0;
+    } else if (newIndex >= siblingsInNewParent.length) {
+        // If dropped at the end, use the highest order_index + 1
+        targetOrderIndex = Math.max(...siblingsInNewParent.map(n => n.order_index)) + 1;
     } else {
-        // If dropped at the beginning or in the middle
-        // We need to adjust order_index based on the visual position relative to actual data items
-        const elementAtIndex = newContainer.children[newIndex];
-        if(elementAtIndex && elementAtIndex !== evt.item) {
-            const siblingNoteId = elementAtIndex.dataset.noteId;
-            const siblingNoteData = window.notesForCurrentPage.find(n => String(n.id) === String(siblingNoteId));
-            if (siblingNoteData) {
-                 targetOrderIndex = siblingNoteData.order_index;
-                 // Shift subsequent items if necessary (API should handle this, or we do it client-side before API call)
-            } else {
-                // Fallback if sibling data not found, less accurate
-                targetOrderIndex = newIndex;
-            }
+        // If dropped between items, calculate the average of surrounding order indices
+        const prevSibling = siblingsInNewParent[newIndex - 1];
+        const nextSibling = siblingsInNewParent[newIndex];
+        
+        if (!prevSibling) {
+            // Dropped at the beginning
+            targetOrderIndex = nextSibling.order_index - 1;
+        } else if (!nextSibling) {
+            // Dropped at the end
+            targetOrderIndex = prevSibling.order_index + 1;
         } else {
-             targetOrderIndex = newIndex; // Fallback or if dropped at the end relative to its own position
+            // Dropped between two items
+            targetOrderIndex = Math.floor((prevSibling.order_index + nextSibling.order_index) / 2);
         }
     }
     

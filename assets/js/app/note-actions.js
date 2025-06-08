@@ -231,13 +231,24 @@ export async function handleAddRootNote() {
     }
 
     try {
-        const savedNote = await notesAPI.createNote({ // Assumes notesAPI is global
+        const rootNotes = notesForCurrentPage.filter(n => n.parent_note_id === null || typeof n.parent_note_id === 'undefined');
+        let newRootOrderIndex = 0;
+        if (rootNotes.length > 0) {
+            const maxRootOrderIndex = Math.max(...rootNotes.map(s => Number(s.order_index) || 0));
+            newRootOrderIndex = maxRootOrderIndex + 1;
+        }
+
+        console.log(`[NOTE CREATION] Sending to server for new note: page_id=${newNotePayload.page_id}, parent_id=${newNotePayload.parent_note_id}, client_calculated_order_index=${newNotePayload.order_index}`);
+
+        const savedNote = await notesAPI.createNote({
             page_id: pageIdToUse,
-            content: '', 
-            parent_note_id: null
+            content: '',
+            parent_note_id: null,
+            order_index: newRootOrderIndex // Send calculated order_index
         });
 
         if (savedNote) {
+            console.log(`[NOTE CREATION] Received from server: id=${savedNote.id}, server_assigned_order_index=${savedNote.order_index}, content="${savedNote.content}"`);
             addNoteToCurrentPage(savedNote);
             const noteEl = window.ui.addNoteElement(savedNote, notesContainer, 0); // Assumes ui is global
 
@@ -351,12 +362,12 @@ function handleAutocloseBrackets(e) { // e.target is the contentEditable div
 async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     if (contentDiv.classList.contains('rendered-mode')) {
         e.preventDefault();
-        window.ui.switchToEditMode(contentDiv); // Assumes ui is global
+        window.ui.switchToEditMode(contentDiv);
         return;
     }
     if (e.shiftKey) {
-        const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv); // Assumes ui is global
-        contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue); // Assumes ui is global
+        const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
+        contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue);
         debouncedSaveNote(noteItem);
         return;
     }
@@ -366,79 +377,120 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     if (!pageIdToUse) { console.error("Cannot create new note with Enter: currentPageId from state is missing."); return; }
 
     // Calculate order_index for the new note
-    const parentIdForNewNote = noteData.parent_note_id; // This can be null for root notes
+    const parentIdForNewNote = noteData.parent_note_id;
     const siblings = notesForCurrentPage.filter(n => {
-        // Robust comparison for parent_note_id
         const nParentId = n.parent_note_id;
         if (parentIdForNewNote === null || typeof parentIdForNewNote === 'undefined') {
             return nParentId === null || typeof nParentId === 'undefined';
         }
-        // Ensure comparison is consistent if IDs are numbers or strings
         return String(nParentId) === String(parentIdForNewNote);
-    });
+    }).sort((a, b) => a.order_index - b.order_index);
 
-    let maxOrderIndex = -1;
-    if (siblings.length > 0) {
-        // Ensure order_index is treated as a number, default to 0 if missing/invalid
-        maxOrderIndex = Math.max(...siblings.map(s => Number(s.order_index) || 0));
+    // Find the current note's index in the siblings array
+    const currentNoteIndex = siblings.findIndex(n => String(n.id) === String(noteData.id));
+    if (currentNoteIndex === -1) {
+        console.error("Current note not found in siblings array");
+        return;
     }
-    const newOrderIndex = maxOrderIndex + 1;
 
-    const newNoteData = { 
-        page_id: pageIdToUse, 
-        content: '', 
-        parent_note_id: parentIdForNewNote, 
-        order_index: newOrderIndex // Use the newly calculated order_index
+    // Calculate new order_index based on the current note's position
+    let newOrderIndex;
+    if (currentNoteIndex === siblings.length - 1) {
+        // If this is the last note, add after it
+        newOrderIndex = noteData.order_index + 1;
+    } else {
+        // If there are notes after this one, insert between current and next
+        const nextNote = siblings[currentNoteIndex + 1];
+        newOrderIndex = (noteData.order_index + nextNote.order_index) / 2;
+    }
+
+    console.log(`[NOTE CREATION] Sending to server for new note: page_id=${pageIdToUse}, parent_id=${parentIdForNewNote}, client_calculated_order_index=${newOrderIndex}`);
+
+    const newNotePayload = {
+        page_id: pageIdToUse,
+        content: '',
+        parent_note_id: parentIdForNewNote,
+        order_index: newOrderIndex
     };
 
     try {
-        const savedNote = await notesAPI.createNote(newNoteData); // Assumes notesAPI is global
-        
-        // Add the new note to the local state. 
-        // Instead of splicing directly, use addNoteToCurrentPage if it handles order,
-        // or ensure notesForCurrentPage is sorted after adding if not.
-        // For now, we'll add and then rely on the DOM insertion logic to place it correctly based on savedNote.order_index.
-        // A more robust approach might involve a state function that inserts based on order_index.
-        addNoteToCurrentPage(savedNote); // Add to state; rendering logic will use order_index from savedNote
+        const savedNewNote = await notesAPI.createNote(newNotePayload);
 
-        // The existing logic for DOM manipulation below should largely work, 
-        // as it determines `beforeElement` based on `savedNote.order_index`.
-        // We need to ensure notesForCurrentPage is up-to-date for getNoteDataById calls.
+        if (savedNewNote) {
+            console.log(`[NOTE CREATION] Received from server: id=${savedNewNote.id}, server_assigned_order_index=${savedNewNote.order_index}, content="${savedNewNote.content}"`);
+            
+            // Add the new note to the local state
+            addNoteToCurrentPage(savedNewNote);
+            
+            // Sort notesForCurrentPage by order_index
+            notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
 
-        let newNoteNestingLevel = 0;
-        let parentChildrenContainer = notesContainer;
-        if (savedNote.parent_note_id) {
-            const parentNoteEl = getNoteElementById(savedNote.parent_note_id);
-            if (parentNoteEl) {
-                parentChildrenContainer = parentNoteEl.querySelector('.note-children');
-                if (!parentChildrenContainer) { 
-                    parentChildrenContainer = document.createElement('div');
-                    parentChildrenContainer.className = 'note-children';
-                    parentNoteEl.appendChild(parentChildrenContainer);
-                    if (typeof Sortable !== 'undefined') { // Assumes Sortable is global
-                        Sortable.create(parentChildrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', ghostClass: 'note-ghost', chosenClass: 'note-chosen', dragClass: 'note-drag', onEnd: handleNoteDrop }); // handleNoteDrop would need to be imported or defined
+            // Determine target container and nesting level correctly
+            let targetDomContainer;
+            let nestingLevel;
+            const currentNestingLevel = window.ui.getNestingLevel(noteItem);
+
+            if (parentIdForNewNote) {
+                const parentNoteElement = getNoteElementById(parentIdForNewNote);
+                if (parentNoteElement) {
+                    targetDomContainer = parentNoteElement.querySelector('.note-children');
+                    if (!targetDomContainer) {
+                        targetDomContainer = document.createElement('div');
+                        targetDomContainer.className = 'note-children';
+                        parentNoteElement.appendChild(targetDomContainer);
+                        if (typeof Sortable !== 'undefined' && Sortable.create) {
+                            Sortable.create(targetDomContainer, { 
+                                group: 'notes', 
+                                animation: 150, 
+                                handle: '.note-bullet', 
+                                ghostClass: 'note-ghost', 
+                                chosenClass: 'note-chosen', 
+                                dragClass: 'note-drag', 
+                                onEnd: handleNoteDrop 
+                            });
+                        }
                     }
+                    nestingLevel = window.ui.getNestingLevel(parentNoteElement) + 1;
+                } else {
+                    console.warn(`Parent element for ID ${parentIdForNewNote} not found. Adding new note to root.`);
+                    targetDomContainer = notesContainer;
+                    nestingLevel = 0;
                 }
-                newNoteNestingLevel = window.ui.getNestingLevel(parentNoteEl) + 1; // Assumes ui is global
+            } else {
+                targetDomContainer = notesContainer;
+                nestingLevel = 0;
             }
-        } else {
-             const rootNotes = Array.from(notesContainer.children).filter(child => child.classList.contains('note-item'));
-             if(rootNotes.length > 0) newNoteNestingLevel = parseInt(rootNotes[0].style.getPropertyValue('--nesting-level') || '0');
+            
+            // Create the new note element
+            const newNoteEl = window.ui.renderNote(savedNewNote, nestingLevel);
+            
+            // Insert the new note after the current note in the DOM
+            if (noteItem.nextSibling) {
+                targetDomContainer.insertBefore(newNoteEl, noteItem.nextSibling);
+            } else {
+                targetDomContainer.appendChild(newNoteEl);
+            }
+
+            const newContentDiv = newNoteEl ? newNoteEl.querySelector('.note-content') : null;
+            if (newContentDiv) {
+                newContentDiv.dataset.rawContent = '';
+                window.ui.switchToEditMode(newContentDiv);
+                
+                const initialInputHandler = async (evt) => {
+                    const currentContent = newContentDiv.textContent;
+                    if (currentContent !== '') {
+                        newContentDiv.dataset.rawContent = currentContent;
+                        await saveNoteImmediately(newNoteEl);
+                        newContentDiv.removeEventListener('input', initialInputHandler);
+                    }
+                };
+                newContentDiv.addEventListener('input', initialInputHandler);
+            }
         }
-        
-        let beforeElement = null;
-        const siblingsInDom = Array.from(parentChildrenContainer.children)
-            .filter(child => child.classList.contains('note-item'))
-            .map(childEl => ({ element: childEl, order_index: getNoteDataById(childEl.dataset.noteId)?.order_index || Infinity }))
-            .sort((a, b) => a.order_index - b.order_index);
-        for (const sibling of siblingsInDom) {
-            if (savedNote.order_index <= sibling.order_index) { beforeElement = sibling.element; break; }
-        }
-        
-        const newNoteEl = window.ui.addNoteElement(savedNote, parentChildrenContainer, newNoteNestingLevel, beforeElement); // Assumes ui is global
-        const newContentDiv = newNoteEl ? newNoteEl.querySelector('.note-content') : null;
-        if (newContentDiv) window.ui.switchToEditMode(newContentDiv); // Assumes ui is global
-    } catch (error) { console.error('Error creating sibling note:', error); }
+    } catch (error) {
+        console.error('Error creating note on Enter:', error);
+        alert('Failed to save new note. Please try again.');
+    }
 }
 
 async function handleTabKey(e, noteItem, noteData, contentDiv) {
@@ -450,33 +502,29 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
     const originalNoteData = JSON.parse(JSON.stringify(noteData));
     const originalParentDomElement = noteItem.parentElement.closest('.note-item') || notesContainer;
     const originalNextSibling = noteItem.nextElementSibling;
-    const originalNestingLevel = window.ui.getNestingLevel(noteItem); // Assumes ui is global
+    const originalNestingLevel = window.ui.getNestingLevel(noteItem);
 
-    let newParentNoteIdToSet = null; // For API call
+    let newParentNoteIdToSet = null;
     let newOrderIndex = noteData.order_index;
 
     if (e.shiftKey) { // Outdent
         if (!noteData.parent_note_id) return;
         const parentNoteData = getNoteDataById(noteData.parent_note_id);
         if (!parentNoteData) return;
-        newParentNoteIdToSet = parentNoteData.parent_note_id; // This could be null for root
+        newParentNoteIdToSet = parentNoteData.parent_note_id;
         const oldParentId = noteData.parent_note_id;
         
         // Update local data structure first
         noteData.parent_note_id = newParentNoteIdToSet;
-        newOrderIndex = parentNoteData.order_index + 1; 
+        newOrderIndex = parentNoteData.order_index + 1;
         noteData.order_index = newOrderIndex;
-        // Adjust order_index of subsequent siblings of the original parent
-        notesForCurrentPage.filter(n => n.parent_note_id === oldParentId && n.order_index > parentNoteData.order_index)
-            .forEach(n => n.order_index--);
-        updateNoteInCurrentPage(noteData); // Update the note in state
+        updateNoteInCurrentPage(noteData);
 
         // Update DOM
         const newParentDomElement = newParentNoteIdToSet ? getNoteElementById(newParentNoteIdToSet) : notesContainer;
         if (!newParentDomElement && newParentNoteIdToSet) { console.error("Could not find new parent in DOM for outdent"); return; }
         const newNestingLevel = newParentNoteIdToSet ? window.ui.getNestingLevel(newParentDomElement) + 1 : 0;
-        const parentNoteElement = getNoteElementById(oldParentId);
-        window.ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, parentNoteElement ? parentNoteElement.nextElementSibling : null); // Assumes ui is global
+        window.ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, parentNoteData ? getNoteElementById(parentNoteData.id)?.nextElementSibling : null);
     } else { // Indent
         const siblings = notesForCurrentPage.filter(n => n.parent_note_id === noteData.parent_note_id && n.order_index < noteData.order_index).sort((a, b) => b.order_index - a.order_index);
         if (siblings.length === 0) return;
@@ -485,29 +533,56 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
 
         // Update local data structure first
         noteData.parent_note_id = newParentNoteIdToSet;
-        newOrderIndex = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(newParentNoteIdToSet)).length -1; // -1 because current note is already in list
+        
+        // Calculate new order index for the indented note
+        const childrenOfNewParent = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(newParentNoteIdToSet));
+        if (childrenOfNewParent.length === 0) {
+            newOrderIndex = 0;
+        } else {
+            newOrderIndex = Math.max(...childrenOfNewParent.map(n => n.order_index)) + 1;
+        }
         noteData.order_index = newOrderIndex;
-        updateNoteInCurrentPage(noteData); // Update the note in state
+        updateNoteInCurrentPage(noteData);
 
         // Update DOM
         const newParentDomElement = getNoteElementById(newParentNoteData.id);
         if (!newParentDomElement) { console.error("Could not find new parent in DOM for indent"); return; }
-        const newNestingLevel = window.ui.getNestingLevel(newParentDomElement) + 1; // Assumes ui is global
-        window.ui.moveNoteElement(noteItem, newParentDomElement, newNestingLevel); // Assumes ui is global
+        const newNestingLevel = window.ui.getNestingLevel(newParentDomElement) + 1;
+        
+        // Ensure the parent has a children container
+        let childrenContainer = newParentDomElement.querySelector('.note-children');
+        if (!childrenContainer) {
+            childrenContainer = document.createElement('div');
+            childrenContainer.className = 'note-children';
+            newParentDomElement.appendChild(childrenContainer);
+            if (typeof Sortable !== 'undefined') {
+                Sortable.create(childrenContainer, { 
+                    group: 'notes', 
+                    animation: 150, 
+                    handle: '.note-bullet', 
+                    ghostClass: 'note-ghost', 
+                    chosenClass: 'note-chosen', 
+                    dragClass: 'note-drag', 
+                    onEnd: handleNoteDrop 
+                });
+            }
+        }
+        
+        window.ui.moveNoteElement(noteItem, childrenContainer, newNestingLevel);
     }
-    window.ui.switchToEditMode(contentDiv); // Assumes ui is global
+    window.ui.switchToEditMode(contentDiv);
 
     try {
-        await notesAPI.updateNote(noteData.id, { content: noteData.content, parent_note_id: newParentNoteIdToSet, order_index: newOrderIndex }); // Assumes notesAPI is global
+        await notesAPI.updateNote(noteData.id, { 
+            content: noteData.content, 
+            parent_note_id: newParentNoteIdToSet, 
+            order_index: newOrderIndex 
+        });
     } catch (error) {
         console.error('Error updating note parent/order (API):', error);
         alert('Error updating note structure. Reverting changes.');
-        // Revert: This is complex, involves restoring notesForCurrentPage and DOM.
-        // For simplicity in this step, full revert is omitted but would be needed in production.
-        // notesForCurrentPage[notesForCurrentPage.findIndex(n => n.id === noteData.id)] = originalNoteData;
-        // ui.moveNoteElement(noteItem, originalParentDomElement, originalNestingLevel, originalNextSibling);
-        window.ui.setNotesForCurrentPage(JSON.parse(sessionStorage.getItem('backupNotesBeforeTab')) || notesForCurrentPage); //簡易的なバックアップ・リストア
-        window.ui.displayNotes(notesForCurrentPage, currentPageId); // Re-render all
+        window.ui.setNotesForCurrentPage(JSON.parse(sessionStorage.getItem('backupNotesBeforeTab')) || notesForCurrentPage);
+        window.ui.displayNotes(notesForCurrentPage, currentPageId);
         window.ui.switchToEditMode(contentDiv);
     }
 }
