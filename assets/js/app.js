@@ -612,8 +612,34 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
         try {
             const newPage = await pagesAPI.createPage({ name: pageName });
             if (newPage && newPage.id) {
-                await fetchAndDisplayPages(newPage.name); // Refresh page list
-                await loadPage(newPage.name, true); // Load the new page
+                // Optimistically update the page list
+                if (window.ui && window.ui.domRefs && window.ui.domRefs.pageListContainer) {
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.dataset.pageName = newPage.name;
+                    link.textContent = newPage.name;
+                    
+                    // Remove 'active' class from other links and make new one active
+                    const existingLinks = window.ui.domRefs.pageListContainer.querySelectorAll('a');
+                    existingLinks.forEach(existingLink => existingLink.classList.remove('active'));
+                    link.classList.add('active');
+
+                    window.ui.domRefs.pageListContainer.prepend(link); // Prepend to show it at the top
+
+                    // Keep allPagesForSearch in sync
+                    if (window.allPagesForSearch && Array.isArray(window.allPagesForSearch)) {
+                        // Add if not already present (it shouldn't be, as it's a new page)
+                        if (!window.allPagesForSearch.find(p => p.id === newPage.id)) {
+                            window.allPagesForSearch.push(newPage);
+                        }
+                        // Sort allPagesForSearch if necessary, or just add. For simplicity, just adding.
+                    }
+                } else {
+                    // Fallback if optimistic update isn't possible (should not happen ideally)
+                    await fetchAndDisplayPages(newPage.name);
+                }
+                
+                await loadPage(newPage.name, true, true, newPage); // Load the new page (force reload, switch to it, pass newPage object)
             } else {
                 alert(`Failed to create page: ${pageName}`);
             }
