@@ -1,9 +1,10 @@
 <?php
-define('DB_PATH', __DIR__ . '/db/database.sqlite');
-define('UPLOADS_DIR', __DIR__ . '/uploads');
+if (!defined('DB_PATH')) { define('DB_PATH', __DIR__ . '/db/database.sqlite'); }
+if (!defined('UPLOADS_DIR')) { define('UPLOADS_DIR', __DIR__ . '/uploads'); }
 if (!defined('APP_BASE_URL')) {
     define('APP_BASE_URL', ''); // Set this if your app is in a subdirectory, e.g., /notetaker
 }
+
 define('ACTIVE_THEME', 'flatly'); // Defines the active theme file (e.g., 'default' for 'default.css')
 define('WEBHOOKS_ENABLED', true); // Option to disable webhooks
 

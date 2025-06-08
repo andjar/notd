@@ -1,8 +1,9 @@
 <?php
 
-class Validator {
+if (!class_exists('Validator')) {
+    class Validator {
 
-    public static function sanitizeString($str) {
+        public static function sanitizeString($str) {
         return trim((string)$str);
     }
 
@@ -140,6 +141,7 @@ class Validator {
             }
         }
         return $errors;
+        }
     }
 }
 ?>

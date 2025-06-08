@@ -2,10 +2,11 @@
 require_once 'db_connect.php';
 require_once 'response_utils.php';
 
-class PropertyUtils {
-    private $pdo;
+if (!class_exists('PropertyUtils')) {
+    class PropertyUtils {
+        private $pdo;
 
-    public function __construct(PDO $pdo) {
+        public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
     }
 
@@ -84,6 +85,7 @@ class PropertyUtils {
         ];
         
         return $columns[$entityType] ?? null;
+        }
     }
 }
 
