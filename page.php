@@ -138,12 +138,16 @@ try {
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
                 <div class="modal-header-icons">
-                    <button class="modal-icon-button" id="page-encryption-icon" title="Set page encryption">
-                        <i data-feather="key"></i>
-                    </button>
-                    <button class="modal-icon-button" id="page-properties-modal-close" aria-label="Close modal">
-                        <i data-feather="x"></i>
-                    </button>
+                    <div id="page-modal-encryption-button">
+                        <button class="modal-icon-button" id="page-encryption-icon" title="Set page encryption">
+                            <i data-feather="key"></i>
+                        </button>
+                    </div>
+                    <div id="page-modal-close-button">
+                        <button class="modal-icon-button" id="page-properties-modal-close" aria-label="Close modal">
+                            <i data-feather="x"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div id="page-properties-list" class="page-properties-list"></div>
