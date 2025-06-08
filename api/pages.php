@@ -11,9 +11,10 @@ $method = $_SERVER['REQUEST_METHOD'];
 $rawInput = file_get_contents('php://input');
 $input = json_decode($rawInput, true);
 
-class PageManager {
-    private $pdo;
-    private $dataManager;
+if (!class_exists('PageManager')) {
+    class PageManager {
+        private $pdo;
+        private $dataManager;
 
     public function __construct($pdo) {
         $this->pdo = $pdo;
@@ -436,7 +437,7 @@ class PageManager {
         }
     }
 }
-
+}
 // Initialize and handle the request
 $pdo = get_db_connection();
 $pageManager = new PageManager($pdo);

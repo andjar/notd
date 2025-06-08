@@ -5,8 +5,8 @@
  */
 
 import { domRefs } from './dom-refs.js';
-// Assuming note-renderer.js will export renderNote and parseAndRenderContent
-import { renderNote, parseAndRenderContent } from './note-renderer.js'; 
+// Assuming note-renderer.js will export renderNote, parseAndRenderContent, and renderAttachments
+import { renderNote, parseAndRenderContent, renderAttachments } from './note-renderer.js'; 
 // Assuming note-interactions.js will export updateParentVisuals and handleNoteDrop
 // import { updateParentVisuals } from './note-interactions.js';  // Remove this import as the function is in ui.js
 
@@ -95,6 +95,13 @@ function updateNoteElement(noteId, updatedNoteData) {
     // This relies on updatedNoteData.children being part of the data if it's available
     // or checking the DOM if not. For now, let updateParentVisuals handle it based on DOM.
     ui.updateParentVisuals(noteElement); // Call on itself to update its own arrow if children status changed
+
+    // Update attachments section if has_attachments info is available
+    const attachmentsContainer = noteElement.querySelector('.note-attachments');
+    if (attachmentsContainer && typeof updatedNoteData.has_attachments !== 'undefined') {
+        // renderAttachments is now idempotent and handles showing/hiding/fetching based on the flag
+        renderAttachments(attachmentsContainer, noteId, updatedNoteData.has_attachments);
+    }
 
     if (typeof feather !== 'undefined' && feather.replace) {
         feather.replace();

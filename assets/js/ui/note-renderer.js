@@ -348,7 +348,8 @@ function renderNote(note, nestingLevel = 0) {
     contentWrapperEl.appendChild(attachmentsEl);
 
     if (note.id && (typeof note.id === 'number' || (typeof note.id === 'string' && !note.id.startsWith('temp-')))) {
-        renderAttachments(attachmentsEl, note.attachments, note.id);
+        // Pass note.id and note.has_attachments flag
+        renderAttachments(attachmentsEl, note.id, note.has_attachments);
     }
 
     contentWrapperEl.addEventListener('dragover', (e) => {
@@ -879,17 +880,30 @@ function parseAndRenderContent(rawContent) {
 /**
  * Renders attachments for a note
  * @param {HTMLElement} container - The container element to render attachments into
- * @param {Array<Object>} attachments - Array of attachment objects
  * @param {string} noteId - The ID of the note these attachments belong to
+ * @param {boolean|number|undefined} has_attachments_flag - Flag indicating if attachments exist
  */
-async function renderAttachments(container, attachments, noteId) {
+async function renderAttachments(container, noteId, has_attachments_flag) {
+    // If the flag is explicitly false or 0, clear and return.
+    // If undefined or null or true or 1, proceed to fetch.
+    if (has_attachments_flag === false || has_attachments_flag === 0) {
+        container.innerHTML = ''; // Clear any existing content
+        // container.style.display = 'none'; // Optional: hide if needed
+        return;
+    }
+    // container.style.display = ''; // Optional: ensure visible
+
     try {
-        // Fetch attachments for this note
+        // Fetch attachments for this note if flag suggests they might exist or is undefined
         const noteAttachments = await attachmentsAPI.getNoteAttachments(noteId);
         
+        container.innerHTML = ''; // Clear previous content before rendering new, or if no attachments found
+
         if (!noteAttachments || noteAttachments.length === 0) {
+            // container.style.display = 'none'; // Optional: hide if no attachments
             return;
         }
+        // container.style.display = ''; // Optional: ensure visible if attachments are found
 
         const attachmentsContainer = document.createElement('div');
         attachmentsContainer.className = 'note-attachments';

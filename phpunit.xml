@@ -25,7 +25,9 @@
     </php>
     <coverage>
         <source>
-            <directory suffix=".php">src</directory>
+            <directory suffix=".php">api</directory>
+            <directory suffix=".php">.</directory>
+            <directory suffix=".php">extensions</directory>
         </source>
         <exclude>
             <directory>vendor</directory>
