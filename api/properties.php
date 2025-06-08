@@ -54,24 +54,43 @@ function _updateOrAddPropertyAndDispatchTriggers($pdo, $entityType, $entityId, $
     
     $validatedName = $propertyData['name'];
     $validatedValue = $propertyData['value'];
+
+    // Deactivate existing properties
+    if ($entityType === 'page') {
+        $deactivateStmt = $pdo->prepare("UPDATE Properties SET active = 0 WHERE page_id = ? AND name = ?");
+    } else { // 'note'
+        $deactivateStmt = $pdo->prepare("UPDATE Properties SET active = 0 WHERE note_id = ? AND name = ?");
+    }
+    $deactivateStmt->execute([$entityId, $validatedName]);
     
     // Check property definitions to determine internal status
     // $explicitInternal will typically come from property definition applications
     $finalInternal = determinePropertyInternalStatus($pdo, $validatedName, $explicitInternal);
     
-    // For single values, use REPLACE to handle both insert and update
     if ($entityType === 'page') {
         $stmt = $pdo->prepare("
-            REPLACE INTO Properties (page_id, note_id, name, value, internal)
-            VALUES (?, NULL, ?, ?, ?)
+            REPLACE INTO Properties (page_id, note_id, name, value, internal, active)
+            VALUES (?, NULL, ?, ?, ?, 1)
         ");
+        $stmt->execute([$entityId, $validatedName, $validatedValue, $finalInternal]);
     } else { // 'note'
-        $stmt = $pdo->prepare("
-            REPLACE INTO Properties (note_id, page_id, name, value, internal)
-            VALUES (?, NULL, ?, ?, ?)
+        // Try to update existing property first
+        $updateStmt = $pdo->prepare("
+            UPDATE Properties 
+            SET value = ?, internal = ?, active = 1, updated_at = CURRENT_TIMESTAMP 
+            WHERE note_id = ? AND name = ?
         ");
+        $updateStmt->execute([$validatedValue, $finalInternal, $entityId, $validatedName]);
+        
+        // If no rows were affected, insert a new one
+        if ($updateStmt->rowCount() === 0) {
+            $insertStmt = $pdo->prepare("
+                INSERT INTO Properties (note_id, page_id, name, value, internal, active)
+                VALUES (?, NULL, ?, ?, ?, 1)
+            ");
+            $insertStmt->execute([$entityId, $validatedName, $validatedValue, $finalInternal]);
+        }
     }
-    $stmt->execute([$entityId, $validatedName, $validatedValue, $finalInternal]);
     
     // Dispatch triggers using the service
     $triggerService = new PropertyTriggerService($pdo);

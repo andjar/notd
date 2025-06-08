@@ -39,6 +39,22 @@ function validateNoteData($data) {
     return true;
 }
 
+// Helper function to check for 'internal' property and update Notes.internal
+function _checkAndSetNoteInternalFlag($pdo, $noteId) {
+    $stmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = ? AND name = 'internal' AND active = 1");
+    $stmt->execute([$noteId]);
+    $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($properties as $prop) {
+        if (strtolower($prop['value']) === 'true') {
+            $updateStmt = $pdo->prepare("UPDATE Notes SET internal = 1 WHERE id = ?");
+            $updateStmt->execute([$noteId]);
+            return true; // Flag set
+        }
+    }
+    return false; // Flag not set or property not found/not true
+}
+
 // Helper function to process note content and extract properties
 function processNoteContent($pdo, $content, $entityType, $entityId) {
     // This now correctly syncs properties with the database and returns the parsed properties.
@@ -129,6 +145,9 @@ if ($method === 'GET') {
         if (trim($content) !== '') {
             $properties = processNoteContent($pdo, $content, 'note', $noteId);
         }
+
+        // Check and set internal flag for the note
+        _checkAndSetNoteInternalFlag($pdo, $noteId);
 
         $pdo->commit();
 
@@ -280,6 +299,9 @@ if ($method === 'GET') {
             }
         }
         // --- END properties LOGIC ---
+
+        // Check and set internal flag for the note
+        _checkAndSetNoteInternalFlag($pdo, $noteId);
         
         // Fetch updated note
         $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");

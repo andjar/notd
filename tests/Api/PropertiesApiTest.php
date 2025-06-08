@@ -355,5 +355,55 @@ class PropertiesApiTest extends BaseTestCase
         $response = $this->request('POST', 'api/properties.php', $deleteData);
         $this->assertTrue($response['success']); 
     }
+
+    public function testPropertyUpdateDeactivatesOldInstance()
+    {
+        // Test for entity_type = 'note'
+        $this->runPropertyUpdateDeactivationTest('note', self::$testNoteId);
+
+        // Test for entity_type = 'page'
+        $this->runPropertyUpdateDeactivationTest('page', self::$testPageId);
+    }
+
+    private function runPropertyUpdateDeactivationTest(string $entityType, int $entityId)
+    {
+        $propertyName = 'test_deactivation_prop';
+        $initialValue = 'initial_value';
+        $updatedValue = 'updated_value';
+
+        // Add initial property
+        $createData = [
+            'entity_type' => $entityType,
+            'entity_id' => $entityId,
+            'name' => $propertyName,
+            'value' => $initialValue
+        ];
+        $responseCreate = $this->request('POST', 'api/properties.php', $createData);
+        $this->assertTrue($responseCreate['success'], "Failed to create initial property for {$entityType}");
+
+        // Update the same property
+        $updateData = [
+            'entity_type' => $entityType,
+            'entity_id' => $entityId,
+            'name' => $propertyName,
+            'value' => $updatedValue
+        ];
+        $responseUpdate = $this->request('POST', 'api/properties.php', $updateData);
+        $this->assertTrue($responseUpdate['success'], "Failed to update property for {$entityType}");
+
+        // Assertions directly from DB
+        $idColumn = ($entityType === 'page') ? 'page_id' : 'note_id';
+        $stmt = self::$pdo->prepare("SELECT value, active FROM Properties WHERE {$idColumn} = :entityId AND name = :name ORDER BY id ASC");
+        $stmt->execute([':entityId' => $entityId, ':name' => $propertyName]);
+        $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->assertCount(2, $properties, "Should be two instances of the property for {$entityType}");
+
+        $this->assertEquals($initialValue, $properties[0]['value'], "Initial value mismatch for {$entityType}");
+        $this->assertEquals(0, $properties[0]['active'], "Old property instance should be inactive for {$entityType}");
+
+        $this->assertEquals($updatedValue, $properties[1]['value'], "Updated value mismatch for {$entityType}");
+        $this->assertEquals(1, $properties[1]['active'], "New property instance should be active for {$entityType}");
+    }
 }
 ?>
