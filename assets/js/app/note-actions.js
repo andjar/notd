@@ -526,19 +526,37 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
         const newNestingLevel = newParentNoteIdToSet ? window.ui.getNestingLevel(newParentDomElement) + 1 : 0;
         window.ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, parentNoteData ? getNoteElementById(parentNoteData.id)?.nextElementSibling : null);
     } else { // Indent
-        const siblings = notesForCurrentPage.filter(n => n.parent_note_id === noteData.parent_note_id && n.order_index < noteData.order_index).sort((a, b) => b.order_index - a.order_index);
-        if (siblings.length === 0) return;
-        const newParentNoteData = siblings[0];
+        let newParentNoteData;
+        if (noteData.parent_note_id === null || typeof noteData.parent_note_id === 'undefined') {
+            // Handle indenting a root note
+            const rootNotes = notesForCurrentPage.filter(n => n.parent_note_id === null || typeof n.parent_note_id === 'undefined').sort((a, b) => a.order_index - b.order_index);
+            const currentIndex = rootNotes.findIndex(n => String(n.id) === String(noteData.id));
+            if (currentIndex === 0) return; // Cannot indent the first root note
+            if (currentIndex === -1) { console.error("Current root note not found for indent"); return; }
+            newParentNoteData = rootNotes[currentIndex - 1];
+        } else {
+            // Handle indenting a non-root note (existing logic)
+            const siblings = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteData.parent_note_id) && n.order_index < noteData.order_index).sort((a, b) => b.order_index - a.order_index);
+            if (siblings.length === 0) return;
+            newParentNoteData = siblings[0];
+        }
+
+        if (!newParentNoteData) { console.error("Could not determine new parent for indent"); return; }
         newParentNoteIdToSet = newParentNoteData.id;
 
         // Update local data structure first
         noteData.parent_note_id = newParentNoteIdToSet;
         
         // Calculate new order index for the indented note
-        const childrenOfNewParent = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(newParentNoteIdToSet));
+        // Ensure notesForCurrentPage is sorted or filter children correctly
+        const childrenOfNewParent = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(newParentNoteIdToSet)).sort((a,b) => a.order_index - b.order_index);
         if (childrenOfNewParent.length === 0) {
             newOrderIndex = 0;
         } else {
+            // If the note being moved was already a child of the new parent (e.g. due to a quick succession of tab/shift-tab)
+            // and is now the last child, its order index might not need to change relative to others,
+            // but it should be greater than the current max.
+            // However, standard indent behavior is to become the last child.
             newOrderIndex = Math.max(...childrenOfNewParent.map(n => n.order_index)) + 1;
         }
         noteData.order_index = newOrderIndex;
@@ -555,7 +573,7 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
             childrenContainer = document.createElement('div');
             childrenContainer.className = 'note-children';
             newParentDomElement.appendChild(childrenContainer);
-            if (typeof Sortable !== 'undefined') {
+            if (typeof Sortable !== 'undefined' && Sortable.create) { // Check Sortable.create
                 Sortable.create(childrenContainer, { 
                     group: 'notes', 
                     animation: 150, 
