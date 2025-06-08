@@ -1,6 +1,12 @@
 <?php
 require_once __DIR__ . '/../config.php';
 
+if (!function_exists('log_setup_local')) {
+    function log_setup_local($message) {
+        error_log("[Database Setup] " . $message);
+    }
+}
+
 /**
  * Runs the entire database schema and initial data setup.
  * This function requires a valid PDO connection to be passed to it.
@@ -9,11 +15,6 @@ require_once __DIR__ . '/../config.php';
  * @throws Exception if any part of the setup fails.
  */
 function run_database_setup(PDO $pdo) {
-    
-    function log_setup_local($message) {
-        error_log("[Database Setup] " . $message);
-    }
-
     try {
         $schemaSql = file_get_contents(__DIR__ . '/schema.sql');
         if ($schemaSql === false) {
