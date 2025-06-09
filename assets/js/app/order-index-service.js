@@ -23,7 +23,7 @@ export function calculateOrderIndex(notesArray, parentId, previousSiblingId, nex
 
     // Filter children of the same parent and parse order_index as integer
     const parentChildren = notesArray
-        .filter(note => String(note.parentId) === String(parentId))
+        .filter(note => String(note.parent_note_id) === String(parentId))
         .map(note => ({
             ...note,
             order_index: parseInt(note.order_index, 10)
