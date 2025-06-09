@@ -120,13 +120,18 @@ class NotesApiTest extends BaseTestCase
             'page_id' => self::$testPageId,
             'content' => 'This is a new test note.'
         ];
-        $response = $this->request('POST', 'api/notes.php', $data);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
 
         $this->assertIsArray($response, "Response is not an array: " . print_r($response, true));
-        $this->assertTrue($response['success']); // Assuming response_utils wraps it
+        $this->assertEquals('success', $response['status']);
         $this->assertArrayHasKey('data', $response);
         $noteData = $response['data'];
         $this->assertArrayHasKey('id', $noteData);
+        // Location header check
+        $this->assertArrayHasKey('headers', $response, "Response should have headers array");
+        $this->assertArrayHasKey('Location', $response['headers'], "Response should have Location header");
+        $this->assertStringContainsString('/v1/api/notes.php?id=' . $noteData['id'], $response['headers']['Location']);
         $this->assertEquals($data['content'], $noteData['content']);
         $this->assertEquals(self::$testPageId, $noteData['page_id']);
         $this->assertIsArray($noteData['properties']); // Should be empty or contain parsed from content
@@ -148,32 +153,52 @@ class NotesApiTest extends BaseTestCase
             'page_id' => self::$testPageId,
             'content' => $content
         ];
-        $response = $this->request('POST', 'api/notes.php', $data);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
         
-        $this->assertTrue($response['success']);
+        $this->assertEquals('success', $response['status']);
         $noteData = $response['data'];
         $this->assertArrayHasKey('id', $noteData);
         $newNoteId = $noteData['id'];
 
         $this->assertArrayHasKey('properties', $noteData);
-        $this->assertEquals('TODO', $noteData['properties']['status']);
-        $this->assertEquals('High', $noteData['properties']['priority']);
+        // Updated property structure check
+        $this->assertArrayHasKey('status', $noteData['properties']);
+        $this->assertIsArray($noteData['properties']['status']);
+        $this->assertCount(1, $noteData['properties']['status']);
+        $this->assertEquals('TODO', $noteData['properties']['status'][0]['value']);
+        $this->assertEquals(0, $noteData['properties']['status'][0]['internal']);
 
-        // Verify properties in DB
-        $stmt = self::$pdo->prepare("SELECT name, value FROM Properties WHERE note_id = :note_id");
+        $this->assertArrayHasKey('priority', $noteData['properties']);
+        $this->assertIsArray($noteData['properties']['priority']);
+        $this->assertCount(1, $noteData['properties']['priority']);
+        $this->assertEquals('High', $noteData['properties']['priority'][0]['value']);
+        $this->assertEquals(0, $noteData['properties']['priority'][0]['internal']);
+
+
+        // Verify properties in DB (DB structure remains name, value, internal per row)
+        $stmt = self::$pdo->prepare("SELECT name, value, internal FROM Properties WHERE note_id = :note_id");
         $stmt->execute([':note_id' => $newNoteId]);
-        $dbProps = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-        $this->assertEquals('TODO', $dbProps['status']);
-        $this->assertEquals('High', $dbProps['priority']);
+        $dbPropsRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $dbProps = [];
+        foreach ($dbPropsRaw as $p) {
+            $dbProps[$p['name']] = ['value' => $p['value'], 'internal' => $p['internal']];
+        }
+        $this->assertEquals('TODO', $dbProps['status']['value']);
+        $this->assertEquals('TODO', $dbProps['status']['value']); // This was correct
+        $this->assertEquals(0, $dbProps['status']['internal']);
+        $this->assertEquals('High', $dbProps['priority']['value']); // This was correct
+        $this->assertEquals(0, $dbProps['priority']['internal']);
     }
 
     public function testPostCreateNoteFailureMissingPageId()
     {
         $data = ['content' => 'Note without page_id'];
-        $response = $this->request('POST', 'api/notes.php', $data);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
         
-        $this->assertFalse($response['success']);
-        $this->assertEquals('A valid page_id is required.', $response['error']['message']);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('A valid page_id is required.', $response['message']);
     }
 
     public function testPostCreateNoteFailureInvalidPageId()
@@ -182,30 +207,25 @@ class NotesApiTest extends BaseTestCase
             'page_id' => 99999, // Non-existent page
             'content' => 'Note for invalid page'
         ];
-        $response = $this->request('POST', 'api/notes.php', $data);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
         
-        // The API currently attempts an insert, which might fail at DB level if FK constraints are on.
-        // If they are not (like in default SQLite), it might create the note with an invalid page_id.
-        // The current notes.php doesn't check if page_id exists before insert.
-        // Let's assume the API's response_utils or DB error handler catches this.
-        // The actual error message might be "Failed to create note." due to PDOException.
-        $this->assertFalse($response['success']);
-        // A more specific check could be $this->assertStringContainsString('Failed to create note', $response['message']);
-        // Or if FKs are enforced: $this->assertStringContainsString('FOREIGN KEY constraint failed', $response['details']);
-        // For now, a general "Failed to create note" is expected from the catch block in notes.php
-        $this->assertTrue(
-            strpos($response['error']['message'], 'Failed to create note') !== false ||
-            (isset($response['error']['details']) && strpos($response['error']['details'], 'FOREIGN KEY constraint failed') !== false),
-            "Error message mismatch: " . $response['error']['message'] . (isset($response['error']['details']) ? " Details: " . $response['error']['details'] : "")
-        );
+        $this->assertEquals('error', $response['status']);
+        // The error message might vary depending on DB constraints and error handling in API.
+        // It could be "Page not found" if validated before insert, or "Failed to create note" if DB fails.
+        // Let's assume a generic "Failed to create note" or a more specific one if the API implements it.
+        // For now, I'll check for "Failed to create note" as it was the previous expectation.
+        // A better API might return "Page not found with ID 99999".
+        $this->assertStringContainsString('Failed to create note', $response['message']);
     }
     
     // Test for missing content (optional, as notes.php allows empty content for notes)
     public function testPostCreateNoteWithEmptyContent()
     {
         $data = ['page_id' => self::$testPageId, 'content' => ''];
-        $response = $this->request('POST', 'api/notes.php', $data);
-        $this->assertTrue($response['success']);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
+        $this->assertEquals('success', $response['status']);
         $this->assertEquals('', $response['data']['content']);
     }
 
@@ -217,8 +237,9 @@ class NotesApiTest extends BaseTestCase
             'page_id' => self::$testPageId,
             'content' => 'Parent note'
         ];
-        $parentResponse = $this->request('POST', 'api/notes.php', $parentData);
-        $this->assertTrue($parentResponse['success']);
+        $parentPayload = ['action' => 'create', 'data' => $parentData];
+        $parentResponse = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($parentPayload));
+        $this->assertEquals('success', $parentResponse['status']);
         $parentId = $parentResponse['data']['id'];
 
         // Now create a child note
@@ -227,9 +248,10 @@ class NotesApiTest extends BaseTestCase
             'content' => 'Child note',
             'parent_note_id' => $parentId
         ];
-        $childResponse = $this->request('POST', 'api/notes.php', $childData);
+        $childPayload = ['action' => 'create', 'data' => $childData];
+        $childResponse = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($childPayload));
         
-        $this->assertTrue($childResponse['success']);
+        $this->assertEquals('success', $childResponse['status']);
         $childNote = $childResponse['data'];
         $this->assertEquals($childData['content'], $childNote['content']);
         $this->assertEquals($parentId, $childNote['parent_note_id']);
@@ -251,9 +273,10 @@ class NotesApiTest extends BaseTestCase
             'content' => 'Top-level note',
             'parent_note_id' => null
         ];
-        $response = $this->request('POST', 'api/notes.php', $data);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
         
-        $this->assertTrue($response['success']);
+        $this->assertEquals('success', $response['status']);
         $noteData = $response['data'];
         $this->assertNull($noteData['parent_note_id']);
         $this->assertEquals($data['content'], $noteData['content']);
@@ -274,9 +297,10 @@ class NotesApiTest extends BaseTestCase
             'content' => 'Another top-level note',
             'parent_note_id' => ''
         ];
-        $response = $this->request('POST', 'api/notes.php', $data);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
         
-        $this->assertTrue($response['success']);
+        $this->assertEquals('success', $response['status']);
         $noteData = $response['data'];
         $this->assertNull($noteData['parent_note_id']);
 
@@ -296,22 +320,17 @@ class NotesApiTest extends BaseTestCase
             'content' => 'Child with invalid parent',
             'parent_note_id' => 99999 // Non-existent note
         ];
-        $response = $this->request('POST', 'api/notes.php', $data);
+        $payload = ['action' => 'create', 'data' => $data];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
         
-        // This should fail if foreign key constraints are enabled
-        // If constraints are not enabled, it might succeed but with an invalid parent reference
-        // The behavior depends on the database configuration
-        if (!$response['success']) {
-            // Foreign key constraint is enforced
-            $this->assertTrue(
-                strpos($response['error']['message'], 'Failed to create note') !== false ||
-                (isset($response['error']['details']) && strpos($response['error']['details'], 'FOREIGN KEY constraint failed') !== false),
-                "Expected foreign key constraint error, got: " . $response['error']['message']
-            );
-        } else {
-            // Foreign key constraint is not enforced, but the parent_note_id should still be set
-            $this->assertEquals(99999, $response['data']['parent_note_id']);
-        }
+        // This should ideally be validated by the API before attempting to insert.
+        // If validated, expect an error like "Parent note not found".
+        // If not validated and DB has FK constraints, expect "Failed to create note".
+        $this->assertEquals('error', $response['status']);
+        // Assuming the API now validates this:
+        // $this->assertEquals('Parent note not found.', $response['message']);
+        // Or, if it relies on DB constraint:
+        $this->assertStringContainsString('Failed to create note', $response['message']);
     }
 
 
@@ -319,23 +338,30 @@ class NotesApiTest extends BaseTestCase
     public function testGetSingleNoteSuccess()
     {
         $noteId = $this->createNoteDirectly('Test note for GET', self::$testPageId, ['color' => 'blue']);
-        $response = $this->request('GET', 'api/notes.php', ['id' => $noteId]);
+        $response = $this->request('GET', '/v1/api/notes.php', ['id' => $noteId]);
 
-        $this->assertTrue($response['success']);
+        $this->assertEquals('success', $response['status']);
         $this->assertArrayHasKey('data', $response, 'Response should contain data key');
         $noteData = $response['data'];
 
         $this->assertEquals($noteId, $noteData['id']);
         $this->assertEquals('Test note for GET', $noteData['content']);
-        $this->assertEquals('blue', $noteData['properties']['color']);
+        
+        // Updated property structure check
+        $this->assertArrayHasKey('color', $noteData['properties']);
+        $this->assertIsArray($noteData['properties']['color']);
+        $this->assertCount(1, $noteData['properties']['color']);
+        $this->assertEquals('blue', $noteData['properties']['color'][0]['value']);
+        $this->assertEquals(0, $noteData['properties']['color'][0]['internal']);
+
         $this->assertArrayHasKey('has_attachments', $noteData, "Response should have 'has_attachments' key.");
-        $this->assertEquals(0, $noteData['has_attachments'], "'has_attachments' should be 0 for note without attachments.");
+        $this->assertEquals(0, $noteData['has_attachments'], "'has_attachments' should be 0 for note without attachments."); // This was correct
 
         // Scenario 2: With attachments
         $this->createAttachmentDirectly($noteId, 'attachment1.pdf');
         
-        $responseWithAttachment = $this->request('GET', 'api/notes.php', ['id' => $noteId]);
-        $this->assertTrue($responseWithAttachment['success']);
+        $responseWithAttachment = $this->request('GET', '/v1/api/notes.php', ['id' => $noteId]);
+        $this->assertEquals('success', $responseWithAttachment['status']);
         $this->assertArrayHasKey('data', $responseWithAttachment, 'Response with attachment should contain data key');
         $noteDataWithAttachment = $responseWithAttachment['data'];
 
@@ -351,29 +377,32 @@ class NotesApiTest extends BaseTestCase
         $this->setNoteInternalStatus($noteId, true); // Mark the note itself as internal
 
         // Case 1: include_internal=false (or not provided)
-        $responseFalse = $this->request('GET', 'api/notes.php', ['id' => $noteId]);
-        // notes.php behavior: if note is internal and include_internal=false, it returns "Note not found or is internal"
-        $this->assertFalse($responseFalse['success']);
-        $this->assertEquals('Note not found or is internal', $responseFalse['error']['message']);
+        $responseFalse = $this->request('GET', '/v1/api/notes.php', ['id' => $noteId]);
+        $this->assertEquals('error', $responseFalse['status']);
+        $this->assertEquals('Note not found or is internal', $responseFalse['message']);
 
         // Case 2: include_internal=true
-        $responseTrue = $this->request('GET', 'api/notes.php', ['id' => $noteId, 'include_internal' => 'true']);
-        $this->assertTrue($responseTrue['success']);
+        $responseTrue = $this->request('GET', '/v1/api/notes.php', ['id' => $noteId, 'include_internal' => '1']); // Use '1' for true
+        $this->assertEquals('success', $responseTrue['status']);
         $this->assertEquals($noteId, $responseTrue['data']['id']);
+        
         $this->assertArrayHasKey('internal_prop', $responseTrue['data']['properties']);
-        $this->assertEquals('secret_val', $responseTrue['data']['properties']['internal_prop']['value']);
-        $this->assertEquals(1, $responseTrue['data']['properties']['internal_prop']['internal']);
-        $this->assertEquals(1, $responseTrue['data']['internal']); // Note's own internal flag
+        $this->assertEquals('secret_val', $responseTrue['data']['properties']['internal_prop'][0]['value']); // This was correct
+        $this->assertEquals(1, $responseTrue['data']['properties']['internal_prop'][0]['internal']); // This was correct
+        
+        $this->assertEquals(1, $responseTrue['data']['internal']); // Note's own internal flag - This was correct
+        
         $this->assertArrayHasKey('internal', $responseTrue['data']['properties']); // The 'internal::true' property itself
-        $this->assertEquals('true', $responseTrue['data']['properties']['internal']['value']);
+        $this->assertEquals('true', $responseTrue['data']['properties']['internal'][0]['value']); // This was correct
+        $this->assertEquals(1, $responseTrue['data']['properties']['internal'][0]['internal']); // This was correct
     }
 
 
     public function testGetSingleNoteFailureNotFound()
     {
-        $response = $this->request('GET', 'api/notes.php', ['id' => 99999]);
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Note not found or is internal', $response['error']['message']); // notes.php combines these
+        $response = $this->request('GET', '/v1/api/notes.php', ['id' => 99999]);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Note not found or is internal', $response['message']); // notes.php combines these
     }
 
     // --- Test GET /api/notes.php?page_id={id} (Get Notes by Page) ---
@@ -383,17 +412,31 @@ class NotesApiTest extends BaseTestCase
         $noteId2 = $this->createNoteDirectly('Note 2 on page (with attachment)', self::$testPageId);
         $this->createAttachmentDirectly($noteId2, 'page_attachment.doc');
 
-        $response = $this->request('GET', 'api/notes.php', ['page_id' => self::$testPageId]);
-        $this->assertTrue($response['success']);
-        $this->assertArrayHasKey('page', $response['data']);
-        $this->assertEquals(self::$testPageId, $response['data']['page']['id']);
-        $this->assertArrayHasKey('notes', $response['data']);
-        $this->assertCount(2, $response['data']['notes']);
+        // Add pagination parameters
+        $response = $this->request('GET', '/v1/api/notes.php', ['page_id' => self::$testPageId, 'page' => 1, 'per_page' => 10]);
+        $this->assertEquals('success', $response['status']);
+        
+        // Response structure for notes by page might be:
+        // { status: "success", data: { page_info: {...}, data: [notes...], pagination: {...} } }
+        // Or if page_info is not primary: { status: "success", data: [notes...], pagination: {...}, page_id: ... }
+        // Based on previous structure, it had $response['data']['page'] and $response['data']['notes']
+        // Let's assume it becomes: $response['data']['page_info'] and $response['data']['data'] for notes list,
+        // and $response['data']['pagination']
+        
+        $this->assertArrayHasKey('page_info', $response['data'], "Response data should have 'page_info'");
+        $this->assertEquals(self::$testPageId, $response['data']['page_info']['id']);
+        
+        $this->assertArrayHasKey('data', $response['data'], "Response data should have 'data' for notes list");
+        $this->assertArrayHasKey('pagination', $response['data'], "Response data should have 'pagination'");
+        $this->assertCount(2, $response['data']['data']);
+        $this->assertEquals(1, $response['data']['pagination']['current_page']);
+        $this->assertEquals(2, $response['data']['pagination']['total_items']);
+
 
         $foundNote1 = false;
         $foundNote2 = false;
 
-        foreach ($response['data']['notes'] as $note) {
+        foreach ($response['data']['data'] as $note) { // Notes are in 'data' array
             $this->assertArrayHasKey('has_attachments', $note, "Each note should have 'has_attachments' key.");
             if ($note['id'] == $noteId1) {
                 $this->assertEquals(0, $note['has_attachments'], "Note 1 should have has_attachments = 0.");
@@ -418,39 +461,49 @@ class NotesApiTest extends BaseTestCase
         $this->setPropertyInternalStatus($internalNoteId, 'internal_prop_on_internal_note', 1);
         $this->setNoteInternalStatus($internalNoteId, true);
 
-        // Case 1: include_internal=false
-        $responseFalse = $this->request('GET', 'api/notes.php', ['page_id' => self::$testPageId, 'include_internal' => 'false']);
-        $this->assertTrue($responseFalse['success']);
-        $this->assertCount(1, $responseFalse['data']['notes'], "Should only return public notes.");
-        $publicNoteResp = $responseFalse['data']['notes'][0];
+        // Case 1: include_internal=false (or '0')
+        $responseFalse = $this->request('GET', '/v1/api/notes.php', ['page_id' => self::$testPageId, 'include_internal' => '0', 'page' => 1, 'per_page' => 10]);
+        $this->assertEquals('success', $responseFalse['status']); // Corrected from 'error'
+        $this->assertCount(1, $responseFalse['data']['data'], "Should only return public notes.");
+        $publicNoteResp = $responseFalse['data']['data'][0];
         $this->assertEquals($publicNoteId, $publicNoteResp['id']);
-        $this->assertEquals('visible', $publicNoteResp['properties']['public_prop']);
+        $this->assertArrayHasKey('public_prop', $publicNoteResp['properties']);
+        $this->assertEquals('visible', $publicNoteResp['properties']['public_prop'][0]['value']);
+        $this->assertEquals(0, $publicNoteResp['properties']['public_prop'][0]['internal']);
         $this->assertArrayNotHasKey('internal_prop_on_public_note', $publicNoteResp['properties']);
-        $this->assertArrayNotHasKey('internal', $publicNoteResp['properties']); // No 'internal::true' property for public note
+        $this->assertArrayNotHasKey('internal', $publicNoteResp['properties']);
 
-        // Case 2: include_internal=true
-        $responseTrue = $this->request('GET', 'api/notes.php', ['page_id' => self::$testPageId, 'include_internal' => 'true']);
-        $this->assertTrue($responseTrue['success']);
-        $this->assertCount(2, $responseTrue['data']['notes'], "Should return all notes.");
-        // Find the public note
+        // Case 2: include_internal=true (or '1')
+        $responseTrue = $this->request('GET', '/v1/api/notes.php', ['page_id' => self::$testPageId, 'include_internal' => '1', 'page' => 1, 'per_page' => 10]);
+        $this->assertEquals('success', $responseTrue['status']);
+        $this->assertCount(2, $responseTrue['data']['data'], "Should return all notes.");
+        
         $publicNoteRespTrue = null;
         $internalNoteRespTrue = null;
-        foreach($responseTrue['data']['notes'] as $n) {
+        foreach($responseTrue['data']['data'] as $n) {
             if ($n['id'] == $publicNoteId) $publicNoteRespTrue = $n;
             if ($n['id'] == $internalNoteId) $internalNoteRespTrue = $n;
         }
         $this->assertNotNull($publicNoteRespTrue);
         $this->assertNotNull($internalNoteRespTrue);
 
-        $this->assertEquals('visible', $publicNoteRespTrue['properties']['public_prop']['value']);
-        $this->assertEquals(1, $publicNoteRespTrue['properties']['internal_prop_on_public_note']['internal']);
-        $this->assertEquals('secret1', $publicNoteRespTrue['properties']['internal_prop_on_public_note']['value']);
+        $this->assertArrayHasKey('public_prop', $publicNoteRespTrue['properties']);
+        $this->assertEquals('visible', $publicNoteRespTrue['properties']['public_prop'][0]['value']);
+        $this->assertEquals(0, $publicNoteRespTrue['properties']['public_prop'][0]['internal']);
+        $this->assertArrayHasKey('internal_prop_on_public_note', $publicNoteRespTrue['properties']);
+        $this->assertEquals(1, $publicNoteRespTrue['properties']['internal_prop_on_public_note'][0]['internal']);
+        $this->assertEquals('secret1', $publicNoteRespTrue['properties']['internal_prop_on_public_note'][0]['value']);
         
-        $this->assertEquals(1, $internalNoteRespTrue['internal']); // Note itself is internal
-        $this->assertEquals('val', $internalNoteRespTrue['properties']['prop_on_internal_note']['value']);
-        $this->assertEquals(1, $internalNoteRespTrue['properties']['internal_prop_on_internal_note']['internal']);
-        $this->assertEquals('secret2', $internalNoteRespTrue['properties']['internal_prop_on_internal_note']['value']);
-        $this->assertEquals('true', $internalNoteRespTrue['properties']['internal']['value']); // 'internal::true' property
+        $this->assertEquals(1, $internalNoteRespTrue['internal']); 
+        $this->assertArrayHasKey('prop_on_internal_note', $internalNoteRespTrue['properties']);
+        $this->assertEquals('val', $internalNoteRespTrue['properties']['prop_on_internal_note'][0]['value']);
+        $this->assertEquals(0, $internalNoteRespTrue['properties']['prop_on_internal_note'][0]['internal']);
+        $this->assertArrayHasKey('internal_prop_on_internal_note', $internalNoteRespTrue['properties']);
+        $this->assertEquals(1, $internalNoteRespTrue['properties']['internal_prop_on_internal_note'][0]['internal']);
+        $this->assertEquals('secret2', $internalNoteRespTrue['properties']['internal_prop_on_internal_note'][0]['value']);
+        $this->assertArrayHasKey('internal', $internalNoteRespTrue['properties']);
+        $this->assertEquals('true', $internalNoteRespTrue['properties']['internal'][0]['value']); 
+        $this->assertEquals(1, $internalNoteRespTrue['properties']['internal'][0]['internal']);
     }
 
 
@@ -460,36 +513,36 @@ class NotesApiTest extends BaseTestCase
         $stmt->execute([':name' => 'Empty Page']);
         $emptyPageId = self::$pdo->lastInsertId();
 
-        $response = $this->request('GET', 'api/notes.php', ['page_id' => $emptyPageId]);
-        $this->assertTrue($response['success']);
-        $this->assertArrayHasKey('notes', $response['data']);
-        $this->assertEmpty($response['data']['notes']);
+        $response = $this->request('GET', '/v1/api/notes.php', ['page_id' => $emptyPageId, 'page' => 1, 'per_page' => 10]);
+        $this->assertEquals('success', $response['status']);
+        $this->assertArrayHasKey('data', $response['data'], "Notes list should be in data.data");
+        $this->assertEmpty($response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(0, $response['data']['pagination']['total_items']);
         
         self::$pdo->exec("DELETE FROM Pages WHERE id = " . (int)$emptyPageId);
     }
 
     public function testGetNotesByPageFailurePageNotFound()
     {
-        $response = $this->request('GET', 'api/notes.php', ['page_id' => 88888]);
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Page not found', $response['error']['message']);
+        $response = $this->request('GET', '/v1/api/notes.php', ['page_id' => 88888, 'page' => 1, 'per_page' => 10]);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Page not found', $response['message']);
     }
 
     // --- Test PUT /api/notes.php?id={id} (Update Note) ---
     public function testPutUpdateNoteContent()
     {
         $noteId = $this->createNoteDirectly('Original content', self::$testPageId);
-        $updateData = [
-            'id' => $noteId, // For phpdesktop compatibility, notes.php also checks $input['id']
-            'content' => 'Updated content',
-            '_method' => 'PUT'
-        ];
-        // notes.php expects ID in GET param for PUT, or in body if _method is used.
-        // Our request helper puts all data into POST for _method override.
-        // Let's also test with ID in GET param.
-        $response = $this->request('POST', "api/notes.php?id={$noteId}", $updateData);
+        $updateData = ['content' => 'Updated content'];
+        $payload = ['action' => 'update', 'id' => $noteId, 'data' => $updateData];
         
-        $this->assertTrue($response['success']);
+        // ID might be in URL or payload. Spec says action in payload. Assume ID also in payload.
+        // $response = $this->request('POST', "/v1/api/notes.php?id={$noteId}", [], [], json_encode($payload));
+        // OR if ID is only in payload:
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
+        
+        $this->assertEquals('success', $response['status']);
         $this->assertEquals('Updated content', $response['data']['content']);
 
         $stmt = self::$pdo->prepare("SELECT content, updated_at FROM Notes WHERE id = :id");
@@ -502,26 +555,33 @@ class NotesApiTest extends BaseTestCase
     public function testPutUpdateNoteContentAndParseProperties()
     {
         $noteId = $this->createNoteDirectly("old_prop::old_val", self::$testPageId, ['old_prop' => 'old_val']);
-        $updateData = [
-            'content' => "new_prop::new_val\nstatus::Done",
-            '_method' => 'PUT'
-        ];
-        $response = $this->request('POST', "api/notes.php?id={$noteId}", $updateData);
+        $updateData = ['content' => "new_prop::new_val\nstatus::Done"];
+        $payload = ['action' => 'update', 'id' => $noteId, 'data' => $updateData];
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
 
-        $this->assertTrue($response['success']);
-        $this->assertArrayHasKey('new_prop', $response['data']['properties']);
-        $this->assertEquals('new_val', $response['data']['properties']['new_prop'][0]['value']); // Properties are now array of objects
-        $this->assertArrayHasKey('status', $response['data']['properties']);
-        $this->assertEquals('Done', $response['data']['properties']['status'][0]['value']);
-        $this->assertArrayNotHasKey('old_prop', $response['data']['properties']); // Old, non-internal prop should be gone
+        $this->assertEquals('success', $response['status']);
+        $props = $response['data']['properties'];
+        $this->assertArrayHasKey('new_prop', $props);
+        $this->assertEquals('new_val', $props['new_prop'][0]['value']);
+        $this->assertEquals(0, $props['new_prop'][0]['internal']); // This was correct
+        $this->assertArrayHasKey('status', $props); // This was correct
+        $this->assertEquals('Done', $props['status'][0]['value']); // This was correct
+        $this->assertEquals(0, $props['status'][0]['internal']); // This was correct
+        $this->assertArrayNotHasKey('old_prop', $props); 
 
         // Verify in DB
-        $stmt = self::$pdo->prepare("SELECT name, value FROM Properties WHERE note_id = :note_id");
+        $stmt = self::$pdo->prepare("SELECT name, value, internal FROM Properties WHERE note_id = :note_id"); // This was correct
         $stmt->execute([':note_id' => $noteId]);
-        $dbProps = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-        $this->assertEquals('new_val', $dbProps['new_prop']);
-        $this->assertEquals('Done', $dbProps['status']);
-        $this->assertArrayNotHasKey('old_prop', $dbProps);
+        $dbPropsRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $dbProps = [];
+        foreach ($dbPropsRaw as $p) {
+            $dbProps[$p['name']] = ['value' => $p['value'], 'internal' => $p['internal']];
+        }
+        $this->assertEquals('new_val', $dbProps['new_prop']['value']); // This was correct
+        $this->assertEquals(0, $dbProps['new_prop']['internal']); // Added internal check for DB
+        $this->assertEquals('Done', $dbProps['status']['value']); // This was correct
+        $this->assertEquals(0, $dbProps['status']['internal']); // Added internal check for DB
+        $this->assertArrayNotHasKey('old_prop', $dbProps); // This was correct
     }
     
     public function testPutUpdateNoteSpecialFields()
@@ -533,11 +593,11 @@ class NotesApiTest extends BaseTestCase
         $updateData = [
             'parent_note_id' => $parentNoteId,
             'order_index' => 5,
-            'collapsed' => 1,
-            '_method' => 'PUT'
+            'collapsed' => 1
         ];
-        $response = $this->request('POST', "api/notes.php?id={$noteId}", $updateData);
-        $this->assertTrue($response['success']);
+        $payload = ['action' => 'update', 'id' => $noteId, 'data' => $updateData];
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
+        $this->assertEquals('success', $response['status']);
         $this->assertEquals($parentNoteId, $response['data']['parent_note_id']);
         $this->assertEquals(5, $response['data']['order_index']);
         $this->assertEquals(1, $response['data']['collapsed']);
@@ -547,69 +607,78 @@ class NotesApiTest extends BaseTestCase
     {
         $noteId = $this->createNoteDirectly("content_prop::val1", self::$testPageId, ['content_prop' => 'val1']);
         $updateData = [
-            'properties_explicit' => [
-                'explicit_prop1' => 'exp_val1',
-                'explicit_prop2' => ['exp_val2a', 'exp_val2b'] // Multi-value
-            ],
-            '_method' => 'PUT'
+            'properties' => [ // Changed from properties_explicit to just 'properties' as per typical API design
+                'explicit_prop1' => [['value' => 'exp_val1', 'internal' => 0]],
+                'explicit_prop2' => [['value' => 'exp_val2a', 'internal' => 0], ['value' => 'exp_val2b', 'internal' => 0]] // Multi-value
+            ]
         ];
-        // When properties_explicit is used, content properties are NOT re-parsed if content isn't also sent.
-        // If content IS sent, notes.php currently still parses it.
-        // The prompt implies properties_explicit should take precedence.
-        // The current notes.php clears non-internal properties if content or properties_explicit is sent.
-        // Then it saves properties_explicit if present.
-        // If only properties_explicit is sent (no content change), content_prop should be removed.
+        $payload = ['action' => 'update', 'id' => $noteId, 'data' => $updateData];
 
-        $response = $this->request('POST', "api/notes.php?id={$noteId}", $updateData);
-        $this->assertTrue($response['success']);
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
+        $this->assertEquals('success', $response['status']);
         $responseDataProps = $response['data']['properties'];
 
         $this->assertArrayHasKey('explicit_prop1', $responseDataProps);
+        $this->assertCount(1, $responseDataProps['explicit_prop1']);
         $this->assertEquals('exp_val1', $responseDataProps['explicit_prop1'][0]['value']);
+        $this->assertEquals(0, $responseDataProps['explicit_prop1'][0]['internal']);
+
         $this->assertArrayHasKey('explicit_prop2', $responseDataProps);
         $this->assertCount(2, $responseDataProps['explicit_prop2']);
         $this->assertEquals('exp_val2a', $responseDataProps['explicit_prop2'][0]['value']);
+        $this->assertEquals(0, $responseDataProps['explicit_prop2'][0]['internal']);
         $this->assertEquals('exp_val2b', $responseDataProps['explicit_prop2'][1]['value']);
+        $this->assertEquals(0, $responseDataProps['explicit_prop2'][1]['internal']);
         
-        $this->assertArrayNotHasKey('content_prop', $responseDataProps, "Content-derived property should be removed when properties_explicit is used.");
+        $this->assertArrayNotHasKey('content_prop', $responseDataProps, "Content-derived property should be removed when explicit properties are used.");
 
         // Verify in DB
-        $stmt = self::$pdo->prepare("SELECT name, value FROM Properties WHERE note_id = :note_id ORDER BY name, value");
+        $stmt = self::$pdo->prepare("SELECT name, value, internal FROM Properties WHERE note_id = :note_id ORDER BY name, value");
         $stmt->execute([':note_id' => $noteId]);
+        $dbPropsRaw = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $dbProps = [];
-        while($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            if (!isset($dbProps[$row['name']])) $dbProps[$row['name']] = [];
-            $dbProps[$row['name']][] = $row['value'];
+        foreach ($dbPropsRaw as $p) {
+            if (!isset($dbProps[$p['name']])) $dbProps[$p['name']] = [];
+            $dbProps[$p['name']][] = ['value' => $p['value'], 'internal' => $p['internal']];
         }
         
-        $this->assertEquals(['exp_val1'], $dbProps['explicit_prop1']);
-        $this->assertEquals(['exp_val2a', 'exp_val2b'], $dbProps['explicit_prop2']);
-        $this->assertArrayNotHasKey('content_prop', $dbProps);
+        $this->assertCount(1, $dbProps['explicit_prop1']);
+        $this->assertEquals('exp_val1', $dbProps['explicit_prop1'][0]['value']);
+        $this->assertEquals(0, $dbProps['explicit_prop1'][0]['internal']); // This was correct
+        $this->assertCount(2, $dbProps['explicit_prop2']); // This was correct
+        $this->assertEquals('exp_val2a', $dbProps['explicit_prop2'][0]['value']); // This was correct
+        $this->assertEquals(0, $dbProps['explicit_prop2'][0]['internal']); // Added internal check
+        $this->assertEquals('exp_val2b', $dbProps['explicit_prop2'][1]['value']); // This was correct
+        $this->assertEquals(0, $dbProps['explicit_prop2'][1]['internal']); // Added internal check
+        $this->assertArrayNotHasKey('content_prop', $dbProps); // This was correct
     }
 
 
     public function testPutUpdateNoteFailureInvalidId()
     {
-        $response = $this->request('POST', "api/notes.php?id=77777", ['content' => 'update non-existent', '_method' => 'PUT']);
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Note not found', $response['error']['message']);
+        $payload = ['action' => 'update', 'id' => 77777, 'data' => ['content' => 'update non-existent']];
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Note not found', $response['message']);
     }
 
     public function testPutUpdateNoteFailureNoUpdatableFields()
     {
         $noteId = $this->createNoteDirectly('No fields to update', self::$testPageId);
-        $response = $this->request('POST', "api/notes.php?id={$noteId}", ['_method' => 'PUT']); // No actual fields
-        $this->assertFalse($response['success']);
-        $this->assertEquals('No updateable fields provided', $response['error']['message']);
+        $payload = ['action' => 'update', 'id' => $noteId, 'data' => []]; // No actual fields in data
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('No updateable fields provided', $response['message']);
     }
 
     // --- Test DELETE /api/notes.php?id={id} (Delete Note) ---
     public function testDeleteNoteSuccess()
     {
         $noteId = $this->createNoteDirectly('Note to delete', self::$testPageId, ['temp_prop' => 'del_val']);
-        $response = $this->request('POST', "api/notes.php?id={$noteId}", ['_method' => 'DELETE']);
+        $payload = ['action' => 'delete', 'id' => $noteId];
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
 
-        $this->assertTrue($response['success']);
+        $this->assertEquals('success', $response['status']);
         $this->assertEquals($noteId, $response['data']['deleted_note_id']);
 
         // Verify removed from DB
@@ -624,9 +693,10 @@ class NotesApiTest extends BaseTestCase
 
     public function testDeleteNoteFailureInvalidId()
     {
-        $response = $this->request('POST', "api/notes.php?id=66666", ['_method' => 'DELETE']);
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Note not found', $response['error']['message']);
+        $payload = ['action' => 'delete', 'id' => 66666];
+        $response = $this->request('POST', "/v1/api/notes.php", [], [], json_encode($payload));
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Note not found', $response['message']);
     }
     
     // --- Test GET /api/notes.php (Get All Notes) ---
@@ -653,18 +723,21 @@ class NotesApiTest extends BaseTestCase
         $noteIdOnOtherPage = $this->createNoteDirectly('Note C on Other Page', $otherPageId);
 
 
-        $response = $this->request('GET', 'api/notes.php'); // Get all notes (default is include_internal=false)
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
+        $response = $this->request('GET', '/v1/api/notes.php', ['page' => 1, 'per_page' => 10]); // Added pagination
+        $this->assertEquals('success', $response['status']);
+        $this->assertArrayHasKey('data', $response['data'], "Notes list should be in data.data");
+        $this->assertArrayHasKey('pagination', $response['data']);
         
         // We expect at least 3 notes (2 on testPageId, 1 on otherPageId, assuming they are not internal)
-        $this->assertGreaterThanOrEqual(3, count($response['data']), "Should fetch at least the three notes created for this test.");
+        $this->assertGreaterThanOrEqual(3, $response['data']['pagination']['total_items'], "Should fetch at least the three notes created for this test.");
+        $this->assertGreaterThanOrEqual(3, count($response['data']['data']));
+
 
         $foundNoteA = false;
         $foundNoteB = false;
         $foundNoteC = false;
 
-        foreach ($response['data'] as $note) {
+        foreach ($response['data']['data'] as $note) { // Notes are in data.data
             $this->assertArrayHasKey('has_attachments', $note, "Each note in getAllNotes should have 'has_attachments'.");
             if ($note['id'] == $noteIdWithAttachment) {
                 $this->assertEquals(1, $note['has_attachments'], "Note A should have has_attachments = 1.");
@@ -707,38 +780,45 @@ class NotesApiTest extends BaseTestCase
         $this->createAttachmentDirectly($internalNoteWithAttachmentId, 'internal_attach.doc');
 
 
-        // Case 1: include_internal=false (default)
-        $responseFalse = $this->request('GET', 'api/notes.php');
-        $this->assertTrue($responseFalse['success']);
+        // Case 1: include_internal=false (default or '0')
+        $responseFalse = $this->request('GET', '/v1/api/notes.php', ['include_internal' => '0', 'page' => 1, 'per_page' => 10]);
+        $this->assertEquals('success', $responseFalse['status']);
+        $this->assertArrayHasKey('data', $responseFalse['data']['data']); // notes are in data.data
+        
         $foundPublic = null;
-        $foundInternal = null;
-        $foundInternalWithAttachment = null;
+        $foundInternal = false; // Initialize to false to check they are NOT found
+        $foundInternalWithAttachment = false;
 
-        foreach($responseFalse['data'] as $note) {
+        foreach($responseFalse['data']['data'] as $note) {
             $this->assertArrayHasKey('has_attachments', $note, "Each note in getAllNotes (include_internal=false) should have 'has_attachments'.");
             if ($note['id'] == $publicNoteId) {
                 $foundPublic = $note;
             }
             if ($note['id'] == $internalNoteId) {
-                $foundInternal = $note; // Should not be found
+                $foundInternal = true; 
             }
             if ($note['id'] == $internalNoteWithAttachmentId) {
-                $foundInternalWithAttachment = $note; // Should not be found
+                $foundInternalWithAttachment = true;
             }
         }
         $this->assertNotNull($foundPublic, "Public note should be present.");
         $this->assertEquals(1, $foundPublic['has_attachments'], "Public note with attachment should have has_attachments = 1.");
-        $this->assertNull($foundInternal, "Internal note (no attachment) should NOT be present when include_internal=false.");
-        $this->assertNull($foundInternalWithAttachment, "Internal note (with attachment) should NOT be present when include_internal=false.");
+        $this->assertFalse($foundInternal, "Internal note (no attachment) should NOT be present when include_internal=false.");
+        $this->assertFalse($foundInternalWithAttachment, "Internal note (with attachment) should NOT be present when include_internal=false.");
+        $this->assertEquals(1, $responseFalse['data']['pagination']['total_items']); // Only one public note
 
-        // Case 2: include_internal=true
-        $responseTrue = $this->request('GET', 'api/notes.php', ['include_internal' => 'true']);
-        $this->assertTrue($responseTrue['success']);
+
+        // Case 2: include_internal=true ('1')
+        $responseTrue = $this->request('GET', '/v1/api/notes.php', ['include_internal' => '1', 'page' => 1, 'per_page' => 10]);
+        $this->assertEquals('success', $responseTrue['status']);
+        $this->assertArrayHasKey('data', $responseTrue['data']['data']); // notes are in data.data
+        $this->assertEquals(3, $responseTrue['data']['pagination']['total_items']); // All three notes
+
         $foundPublic = null;
         $foundInternal = null;
         $foundInternalWithAttachment = null;
 
-        foreach($responseTrue['data'] as $note) {
+        foreach($responseTrue['data']['data'] as $note) {
             $this->assertArrayHasKey('has_attachments', $note, "Each note in getAllNotes (include_internal=true) should have 'has_attachments'.");
             if ($note['id'] == $publicNoteId) {
                 $foundPublic = $note;

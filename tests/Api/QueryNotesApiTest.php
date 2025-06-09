@@ -94,59 +94,132 @@ class QueryNotesApiTest extends BaseTestCase
 
     public function testQueryDirectNotesTable()
     {
-        $query = "SELECT id FROM Notes WHERE content LIKE '%Beta%'";
-        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $query = "SELECT id, content FROM Notes WHERE content LIKE '%Beta%'"; // Ensure content is selected for assertion
+        $payload = [
+            'sql_query' => $query,
+            'include_properties' => false,
+            'page' => 1,
+            'per_page' => 10
+        ];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
 
         $this->assertEquals('success', $response['status']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(1, $response['data']);
-        $this->assertEquals(self::$note2Id, $response['data'][0]['id']);
-        $this->assertEquals('Note Beta for review', $response['data'][0]['content']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(1, $response['data']['data']);
+        $this->assertEquals(self::$note2Id, $response['data']['data'][0]['id']);
+        $this->assertEquals('Note Beta for review', $response['data']['data'][0]['content']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(1, $response['data']['pagination']['current_page']);
+        $this->assertEquals(1, $response['data']['pagination']['total_items']);
     }
 
     public function testQueryJoinWithProperties()
     {
-        $query = "SELECT DISTINCT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'status' AND P.value = 'TODO'";
-        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $query = "SELECT DISTINCT N.id, N.content FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'status' AND P.value = 'TODO' ORDER BY N.id";
+        $payload = [
+            'sql_query' => $query,
+            'include_properties' => true, // Test property inclusion
+            'page' => 1,
+            'per_page' => 10
+        ];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
         
         $this->assertEquals('success', $response['status']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(2, $response['data']);
-        $noteIds = array_column($response['data'], 'id');
-        $this->assertContains(self::$note1Id, $noteIds);
-        $this->assertContains(self::$note3Id, $noteIds);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(2, $response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(2, $response['data']['pagination']['total_items']);
+
+        $note1Data = null;
+        $note3Data = null;
+
+        foreach($response['data']['data'] as $note) {
+            if ($note['id'] == self::$note1Id) $note1Data = $note;
+            if ($note['id'] == self::$note3Id) $note3Data = $note;
+        }
+
+        $this->assertNotNull($note1Data);
+        $this->assertNotNull($note3Data);
+
+        // Check properties for Note1 (status:TODO, tag:Urgent)
+        $this->assertArrayHasKey('properties', $note1Data);
+        $this->assertArrayHasKey('status', $note1Data['properties']);
+        $this->assertEquals('TODO', $note1Data['properties']['status'][0]['value']);
+        $this->assertEquals(0, $note1Data['properties']['status'][0]['internal']);
+        $this->assertArrayHasKey('tag', $note1Data['properties']);
+        $this->assertEquals('Urgent', $note1Data['properties']['tag'][0]['value']);
+        
+        // Check properties for Note3 (status:TODO, tag:Later)
+        $this->assertArrayHasKey('properties', $note3Data);
+        $this->assertArrayHasKey('status', $note3Data['properties']);
+        $this->assertEquals('TODO', $note3Data['properties']['status'][0]['value']);
+        $this->assertArrayHasKey('tag', $note3Data['properties']);
+        $this->assertEquals('Later', $note3Data['properties']['tag'][0]['value']);
     }
 
     public function testQueryJoinWithPropertiesSpecificPage()
     {
-        $query = "SELECT DISTINCT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE N.page_id = " . self::$page1Id . " AND P.name = 'tag' AND P.value = 'Urgent'";
-        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $query = "SELECT DISTINCT N.id, N.content FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE N.page_id = " . self::$page1Id . " AND P.name = 'tag' AND P.value = 'Urgent'";
+        $payload = [
+            'sql_query' => $query,
+            'include_properties' => true,
+            'page' => 1,
+            'per_page' => 10
+        ];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
 
         $this->assertEquals('success', $response['status']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(1, $response['data']);
-        $this->assertEquals(self::$note1Id, $response['data'][0]['id']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(1, $response['data']['data']);
+        $this->assertEquals(self::$note1Id, $response['data']['data'][0]['id']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(1, $response['data']['pagination']['total_items']);
+
+        // Verify property structure for the returned note
+        $noteData = $response['data']['data'][0];
+        $this->assertArrayHasKey('properties', $noteData);
+        $this->assertArrayHasKey('tag', $noteData['properties']);
+        $this->assertEquals('Urgent', $noteData['properties']['tag'][0]['value']);
+        $this->assertEquals(0, $noteData['properties']['tag'][0]['internal']);
+        // Also check for 'status' property
+        $this->assertArrayHasKey('status', $noteData['properties']);
+        $this->assertEquals('TODO', $noteData['properties']['status'][0]['value']);
     }
 
     public function testQuerySubqueryWithProperties()
     {
-        $query = "SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE name = 'tag' AND value = 'Review')";
-        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $query = "SELECT id, content FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE name = 'tag' AND value = 'Review')";
+        $payload = [
+            'sql_query' => $query,
+            'include_properties' => false, // Properties not directly selected, so this primarily affects default fields
+            'page' => 1,
+            'per_page' => 10
+        ];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
 
         $this->assertEquals('success', $response['status']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(1, $response['data']);
-        $this->assertEquals(self::$note2Id, $response['data'][0]['id']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(1, $response['data']['data']);
+        $this->assertEquals(self::$note2Id, $response['data']['data'][0]['id']);
+        $this->assertArrayHasKey('pagination', $response['data']);
     }
 
     public function testQueryReturningNoResults()
     {
         $query = "SELECT id FROM Notes WHERE content LIKE '%NonExistentUniqueContentString%'";
-        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $payload = [
+            'sql_query' => $query,
+            'include_properties' => false,
+            'page' => 1,
+            'per_page' => 10
+        ];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
 
         $this->assertEquals('success', $response['status']);
-        $this->assertIsArray($response['data']);
-        $this->assertEmpty($response['data']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertEmpty($response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(0, $response['data']['pagination']['total_items']);
     }
 
     // --- Test POST /api/query_notes.php (Reject Invalid/Forbidden Queries) ---
@@ -162,7 +235,8 @@ class QueryNotesApiTest extends BaseTestCase
         ];
 
         foreach ($forbiddenQueries as $query) {
-            $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+            $payload = ['sql_query' => $query, 'page' => 1, 'per_page' => 10];
+            $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
             $this->assertEquals('error', $response['status'], "Query should have failed: $query");
             // The exact message can vary based on which validation rule it hits first.
             $this->assertMatchesRegularExpression('/(Query must be one of the allowed patterns|Query contains forbidden SQL keywords|Semicolons are only allowed)/', $response['message'], "Message for query: $query");
@@ -177,7 +251,8 @@ class QueryNotesApiTest extends BaseTestCase
         ];
 
         foreach ($invalidQueries as $query) {
-            $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+            $payload = ['sql_query' => $query, 'page' => 1, 'per_page' => 10];
+            $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
             $this->assertEquals('error', $response['status'], "Query structure should be invalid: $query");
             $this->assertStringContainsString('Query must be one of the allowed patterns', $response['message']);
         }
@@ -199,7 +274,8 @@ class QueryNotesApiTest extends BaseTestCase
         // The overall pattern match is stricter.
         
         // This query will fail the overall pattern match first.
-        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $payload = ['sql_query' => $query, 'page' => 1, 'per_page' => 10];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
         $this->assertEquals('error', $response['status']);
         $this->assertStringContainsString('Query must be one of the allowed patterns', $response['message']);
 
@@ -220,19 +296,21 @@ class QueryNotesApiTest extends BaseTestCase
         ];
         
         // Test the one without semicolon first, as it's a direct comment violation
-        $responseComment = $this->request('POST', 'api/query_notes.php', ['sql_query' => $queriesWithComments[0]]);
+        $payloadComment = ['sql_query' => $queriesWithComments[0], 'page' => 1, 'per_page' => 10];
+        $responseComment = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payloadComment));
         $this->assertEquals('error', $responseComment['status']);
         $this->assertStringContainsString('Query contains forbidden SQL keywords/characters or comments', $responseComment['message']);
         $this->assertStringContainsString('--', $responseComment['message']);
 
-
-        $responseBlockComment = $this->request('POST', 'api/query_notes.php', ['sql_query' => $queriesWithComments[1]]);
+        $payloadBlockComment = ['sql_query' => $queriesWithComments[1], 'page' => 1, 'per_page' => 10];
+        $responseBlockComment = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payloadBlockComment));
         $this->assertEquals('error', $responseBlockComment['status']);
         $this->assertStringContainsString('Query contains forbidden SQL keywords/characters or comments', $responseBlockComment['message']);
         $this->assertStringContainsString('/*', $responseBlockComment['message']);
         
         // Test semicolon not at very end (which also implies a comment or second statement)
-        $responseSemicolonComment = $this->request('POST', 'api/query_notes.php', ['sql_query' => "SELECT id FROM Notes WHERE id = 1; -- comment"]);
+        $payloadSemicolonComment = ['sql_query' => "SELECT id FROM Notes WHERE id = 1; -- comment", 'page' => 1, 'per_page' => 10];
+        $responseSemicolonComment = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payloadSemicolonComment));
         $this->assertEquals('error', $responseSemicolonComment['status']);
         $this->assertEquals('Semicolons are only allowed at the very end of the query.', $responseSemicolonComment['message']);
 
@@ -241,7 +319,8 @@ class QueryNotesApiTest extends BaseTestCase
     public function testQueryMultipleStatements()
     {
         $query = "SELECT id FROM Notes WHERE id = 1; SELECT id FROM Notes WHERE id = 2";
-        $response = $this->request('POST', 'api/query_notes.php', ['sql_query' => $query]);
+        $payload = ['sql_query' => $query, 'page' => 1, 'per_page' => 10];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload));
         $this->assertEquals('error', $response['status']);
         $this->assertEquals('Semicolons are only allowed at the very end of the query.', $response['message']);
     }
@@ -249,13 +328,46 @@ class QueryNotesApiTest extends BaseTestCase
     // --- Failure Case (Missing sql_query parameter) ---
     public function testQueryMissingSqlParameter()
     {
-        $response = $this->request('POST', 'api/query_notes.php', []); // Empty payload
+        // Payload missing sql_query key
+        $payloadMissing = ['include_properties' => false, 'page' => 1, 'per_page' => 10];
+        $response = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payloadMissing));
         $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing sql_query parameter.', $response['message']);
+        $this->assertEquals('Missing or empty sql_query parameter in JSON payload.', $response['message']);
 
-        $response = $this->request('POST', 'api/query_notes.php', ['other_param' => 'value']); // No sql_query
-        $this->assertEquals('error', $response['status']);
-        $this->assertEquals('Missing sql_query parameter.', $response['message']);
+        // Empty sql_query value
+        $payloadEmpty = ['sql_query' => '', 'include_properties' => false, 'page' => 1, 'per_page' => 10];
+        $responseEmpty = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payloadEmpty));
+        $this->assertEquals('error', $responseEmpty['status']);
+        $this->assertEquals('Missing or empty sql_query parameter in JSON payload.', $responseEmpty['message']);
+    }
+
+    public function testQueryPagination()
+    {
+        // We have 4 notes. Let's query all of them and test pagination.
+        // Note: ORDER BY is important for pagination consistency.
+        $query = "SELECT id, content FROM Notes ORDER BY id ASC"; 
+        
+        // Page 1, 2 per page
+        $payload1 = ['sql_query' => $query, 'include_properties' => false, 'page' => 1, 'per_page' => 2];
+        $response1 = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload1));
+        $this->assertEquals('success', $response1['status']);
+        $this->assertCount(2, $response1['data']['data']);
+        $this->assertEquals(self::$note1Id, $response1['data']['data'][0]['id']);
+        $this->assertEquals(self::$note2Id, $response1['data']['data'][1]['id']);
+        $this->assertEquals(1, $response1['data']['pagination']['current_page']);
+        $this->assertEquals(2, $response1['data']['pagination']['per_page']);
+        $this->assertEquals(4, $response1['data']['pagination']['total_items']);
+        $this->assertEquals(2, $response1['data']['pagination']['total_pages']);
+
+        // Page 2, 2 per page
+        $payload2 = ['sql_query' => $query, 'include_properties' => false, 'page' => 2, 'per_page' => 2];
+        $response2 = $this->request('POST', '/v1/api/query_notes.php', [], [], json_encode($payload2));
+        $this->assertEquals('success', $response2['status']);
+        $this->assertCount(2, $response2['data']['data']);
+        $this->assertEquals(self::$note3Id, $response2['data']['data'][0]['id']);
+        $this->assertEquals(self::$note4Id, $response2['data']['data'][1]['id']);
+        $this->assertEquals(2, $response2['data']['pagination']['current_page']);
+        $this->assertEquals(4, $response2['data']['pagination']['total_items']);
     }
 }
 ?>

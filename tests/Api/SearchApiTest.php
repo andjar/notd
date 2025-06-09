@@ -114,14 +114,18 @@ class SearchApiTest extends BaseTestCase
     // --- Test GET /api/search.php?q={term} (Full-Text Search) ---
     public function testSearchFullTextTermFound()
     {
-        $response = $this->request('GET', 'api/search.php', ['q' => 'apples']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(1, $response['data']);
+        $params = ['q' => 'apples', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        // The setup creates two notes with "apples" (Note1 and Note4)
+        $this->assertCount(2, $response['data']['data'], "Expected 2 notes for 'apples'"); 
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(2, $response['data']['pagination']['total_items']);
 
         $foundNote1 = false;
         $foundNote4 = false;
-        foreach ($response['data'] as $result) {
+        foreach ($response['data']['data'] as $result) {
             $this->assertArrayHasKey('note_id', $result);
             $this->assertArrayHasKey('content_snippet', $result);
             $this->assertStringContainsString('<mark>apples</mark>', $result['content_snippet']);
@@ -129,22 +133,22 @@ class SearchApiTest extends BaseTestCase
             if ($result['note_id'] == self::$note4Id) $foundNote4 = true;
         }
         $this->assertTrue($foundNote1, "Note 1 (apples) not found in search results.");
-        // Note 4 content is "DONE: Research apples. status::DONE"
-        // The FTS snippet might be just "apples" if the content is short.
-        // The important part is that it's found.
         $this->assertTrue($foundNote4, "Note 4 (apples) not found in search results.");
     }
 
     public function testSearchFullTextTermFoundMultiple()
     {
-        $response = $this->request('GET', 'api/search.php', ['q' => 'oranges']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(2, $response['data']);
+        $params = ['q' => 'oranges', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(2, $response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(2, $response['data']['pagination']['total_items']);
 
         $foundNote1 = false;
         $foundNote3 = false;
-        foreach ($response['data'] as $result) {
+        foreach ($response['data']['data'] as $result) {
             if ($result['note_id'] == self::$note1Id) $foundNote1 = true;
             if ($result['note_id'] == self::$note3Id) $foundNote3 = true;
         }
@@ -154,29 +158,39 @@ class SearchApiTest extends BaseTestCase
 
     public function testSearchFullTextTermNotFound()
     {
-        $response = $this->request('GET', 'api/search.php', ['q' => 'zyxwvu']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertEmpty($response['data']);
+        $params = ['q' => 'zyxwvu', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertEmpty($response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(0, $response['data']['pagination']['total_items']);
     }
     
     public function testSearchFullTextEmptyQuery()
     {
-        $response = $this->request('GET', 'api/search.php', ['q' => '']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertEmpty($response['data']);
+        $params = ['q' => '', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertEmpty($response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(0, $response['data']['pagination']['total_items']);
     }
 
 
     // --- Test GET /api/search.php?backlinks_for_page_name={name} ---
     public function testSearchBacklinksPageHasBacklinks()
     {
-        $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => 'Fruit Details']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(1, $response['data']);
-        $backlink = $response['data'][0];
+        $params = ['backlinks_for_page_name' => 'Fruit Details', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(1, $response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(1, $response['data']['pagination']['total_items']);
+
+        $backlink = $response['data']['data'][0];
         $this->assertEquals(self::$note1Id, $backlink['note_id']);
         $this->assertEquals(self::$page1Id, $backlink['page_id']);
         $this->assertEquals('Landing Page', $backlink['source_page_name']);
@@ -185,89 +199,113 @@ class SearchApiTest extends BaseTestCase
 
     public function testSearchBacklinksPageHasNoBacklinks()
     {
-        $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => 'Landing Page']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertEmpty($response['data']);
+        $params = ['backlinks_for_page_name' => 'Landing Page', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertEmpty($response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(0, $response['data']['pagination']['total_items']);
     }
     
     public function testSearchBacklinksTargetPageNonExistent()
     {
-        $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => 'NonExistentPageForBacklinks']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertEmpty($response['data']);
+        $params = ['backlinks_for_page_name' => 'NonExistentPageForBacklinks', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertEmpty($response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(0, $response['data']['pagination']['total_items']);
     }
 
     public function testSearchBacklinksEmptyPageName()
     {
-        $response = $this->request('GET', 'api/search.php', ['backlinks_for_page_name' => '']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertEmpty($response['data']);
+        $params = ['backlinks_for_page_name' => '', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertEmpty($response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(0, $response['data']['pagination']['total_items']);
     }
 
 
     // --- Test GET /api/search.php?tasks={status} ---
     public function testSearchTasksTodo()
     {
-        $response = $this->request('GET', 'api/search.php', ['tasks' => 'todo']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(1, $response['data']);
-        $task = $response['data'][0];
+        $params = ['tasks' => 'todo', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(1, $response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(1, $response['data']['pagination']['total_items']);
+
+        $task = $response['data']['data'][0];
         $this->assertEquals(self::$note2Id, $task['note_id']);
         $this->assertEquals('Landing Page', $task['page_name']);
         $this->assertArrayHasKey('properties', $task);
-        $this->assertEquals('TODO', $task['properties']['status']); // Properties are simplified here
-        $this->assertStringContainsString('TODO', $task['content_snippet']); // Snippet might show the property value
+        $this->assertArrayHasKey('status', $task['properties']);
+        $this->assertEquals('TODO', $task['properties']['status'][0]['value']);
+        $this->assertEquals(0, $task['properties']['status'][0]['internal']);
+        $this->assertStringContainsString('TODO', $task['content_snippet']);
     }
 
     public function testSearchTasksDone()
     {
-        $response = $this->request('GET', 'api/search.php', ['tasks' => 'done']);
-        $this->assertTrue($response['success']);
-        $this->assertIsArray($response['data']);
-        $this->assertCount(1, $response['data']);
-        $task = $response['data'][0];
+        $params = ['tasks' => 'done', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('success', $response['status']);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertCount(1, $response['data']['data']);
+        $this->assertArrayHasKey('pagination', $response['data']);
+        $this->assertEquals(1, $response['data']['pagination']['total_items']);
+
+        $task = $response['data']['data'][0];
         $this->assertEquals(self::$note4Id, $task['note_id']);
         $this->assertEquals('Fruit Details', $task['page_name']);
-        $this->assertEquals('DONE', $task['properties']['status']);
+        $this->assertArrayHasKey('properties', $task);
+        $this->assertArrayHasKey('status', $task['properties']);
+        $this->assertEquals('DONE', $task['properties']['status'][0]['value']);
+        $this->assertEquals(0, $task['properties']['status'][0]['internal']);
         $this->assertStringContainsString('DONE', $task['content_snippet']);
     }
     
     public function testSearchTasksNoTasksOfStatus()
     {
-        // Assuming no 'DOING' status tasks exist
         // The API only supports 'todo' and 'done'. Any other value is an invalid status.
-        $response = $this->request('GET', 'api/search.php', ['tasks' => 'doing']);
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['error']['message']);
+        $params = ['tasks' => 'doing', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['message']);
     }
 
     public function testSearchTasksInvalidStatus()
     {
-        $response = $this->request('GET', 'api/search.php', ['tasks' => 'invalidstatus']);
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['error']['message']);
+        $params = ['tasks' => 'invalidstatus', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['message']);
     }
     
     public function testSearchTasksEmptyStatus()
     {
-        // search.php: if (empty($_GET['tasks'])) and not in_array -> error.
-        // if tasks="", it's not in_array, so it will be an error.
-        $response = $this->request('GET', 'api/search.php', ['tasks' => '']);
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['error']['message']);
+        $params = ['tasks' => '', 'page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Invalid task status. Must be "todo" or "done".', $response['message']);
     }
 
 
     // --- Test Failure Case (No search parameter) ---
     public function testSearchNoParameter()
     {
-        $response = $this->request('GET', 'api/search.php');
-        $this->assertFalse($response['success']);
-        $this->assertEquals('Missing required parameter: q, backlinks, or tasks', $response['error']['message']);
+        // Also need to include pagination params even if no search param, or API might reject based on that first
+        $params = ['page' => 1, 'per_page' => 10];
+        $response = $this->request('GET', '/v1/api/search.php', $params);
+        $this->assertEquals('error', $response['status']);
+        $this->assertEquals('Missing required search parameter: q, backlinks_for_page_name, or tasks', $response['message']);
     }
 }
 ?>
