@@ -318,33 +318,49 @@ function switchToEditMode(contentEl) {
         // Helper function to map a character offset within contentEl.textContent to a DOM Node and offset pair
         function findDomPosition(parentElement, charOffset) {
             let accumulatedOffset = 0;
+            let found = false;
+            let result = null;
+            // Walk all text nodes, including whitespace-only
             const walker = document.createTreeWalker(
                 parentElement,
                 NodeFilter.SHOW_TEXT,
-                {
-                    acceptNode: (node) => {
-                        // Skip empty text nodes
-                        return node.textContent.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-                    }
-                },
+                null, // Accept all text nodes
                 false
             );
-
             let currentNode;
-            while (currentNode = walker.nextNode()) {
+            while ((currentNode = walker.nextNode())) {
                 const nodeLength = currentNode.textContent.length;
                 if (accumulatedOffset + nodeLength >= charOffset) {
-                    return { node: currentNode, offset: charOffset - accumulatedOffset };
+                    result = { node: currentNode, offset: charOffset - accumulatedOffset };
+                    found = true;
+                    break;
                 }
                 accumulatedOffset += nodeLength;
             }
-
-            // Fallback: if charOffset is beyond content length, point to end of last text node or parent
-            const lastTextNode = parentElement.lastChild?.nodeType === Node.TEXT_NODE 
-                ? parentElement.lastChild 
-                : parentElement;
-            const lastNodeOffset = lastTextNode.textContent?.length || 0;
-            return { node: lastTextNode, offset: lastNodeOffset };
+            if (found) return result;
+            // Fallback: if charOffset is beyond content length
+            // Find the last text node
+            let lastTextNode = null;
+            const fallbackWalker = document.createTreeWalker(
+                parentElement,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            let n;
+            while ((n = fallbackWalker.nextNode())) {
+                lastTextNode = n;
+            }
+            if (lastTextNode) {
+                return { node: lastTextNode, offset: lastTextNode.textContent.length };
+            } else {
+                // No text nodes at all: return parent with offset 0 (start) or offset = childNodes.length (end)
+                if (charOffset <= 0) {
+                    return { node: parentElement, offset: 0 };
+                } else {
+                    return { node: parentElement, offset: parentElement.childNodes.length };
+                }
+            }
         }
 
         try {
