@@ -1,0 +1,19 @@
+/* Styles for the Excalidraw extension */
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* To prevent scrollbars if Excalidraw handles its own scrolling */
+}
+
+#excalidraw-container {
+  width: 100vw; /* vw = viewport width */
+  height: 100vh; /* vh = viewport height */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* If further specific styling for the Excalidraw component or its integration is needed,
+   it can be added here. For example, to ensure it fits well within the application's UI theme if applicable. */

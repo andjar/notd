@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Excalidraw Editor</title>
+  <meta charset="UTF-8" />
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column; /* Allow items to stack vertically */
+    }
+    .controls {
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .controls button {
+      padding: 8px 15px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .controls span {
+      font-size: 12px;
+      color: #333;
+    }
+    #excalidraw-container {
+      flex-grow: 1; /* Excalidraw container takes remaining space */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 0; /* Important for flex children that might overflow */
+    }
+  </style>
+  <!-- Ensure api_client.js is loaded BEFORE the main logic script -->
+  <script src="../../assets/js/api_client.js" type="module"></script> 
+</head>
+<body>
+  <div class="controls">
+    <button id="save-to-note-btn">Save as Attachment</button>
+    <span id="note-id-display">Note ID: (loading...)</span>
+  </div>
+  <div id="excalidraw-container"></div>
+
+  <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@excalidraw/excalidraw/dist/excalidraw.production.min.js"></script>
+  
+  <!-- Main logic for the extension, including save functionality -->
+  <script src="main.js" type="module"></script> 
+</body>
+</html>
