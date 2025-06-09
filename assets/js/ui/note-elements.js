@@ -334,12 +334,12 @@ async function handleNoteDrop(evt) {
         console.error('Note data not found for ID:', noteId, 'in window.notesForCurrentPage. Aborting drop.');
         // Revert the DOM change on error
         if (oldContainer !== newContainer) {
-            oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
+            oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]);
         } else {
-            if (oldIndex < newIndex) {
-                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
+            if (oldSortableIndex < newSortableIndex) {
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]);
             } else {
-                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex + 1]);
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex + 1]);
             }
         }
         return;
@@ -353,7 +353,7 @@ async function handleNoteDrop(evt) {
             if (!newParentId || newParentId.startsWith('temp-')) {
                 console.error('Cannot drop note onto a temporary or invalid parent note.');
                 // Revert logic as above
-                 if (oldContainer !== newContainer) { oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]); } else { if (oldIndex < newIndex) { oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]); } else { oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex + 1]); } }
+                 if (oldContainer !== newContainer) { oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]); } else { if (oldSortableIndex < newSortableIndex) { oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]); } else { oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex + 1]); } }
                 return;
             }
         }

@@ -12,6 +12,8 @@ import {
     // setCurrentFocusedNoteId, // Not directly used by functions moved here yet, but might be needed by future note actions
 } from './state.js';
 
+import { calculateOrderIndex } from './order-index-service.js';
+
 // Use window.ui instead of direct import
 // const { notesContainer } = ui.domRefs;
 const notesContainer = document.querySelector('#notes-container');
@@ -102,40 +104,6 @@ export function getNoteElementById(noteId) {
         return null;
     }
     return notesContainer.querySelector(`.note-item[data-note-id="${noteId}"]`);
-}
-
-
-/**
- * Calculates a new order_index for a note being inserted between two siblings.
- * This uses a fractional indexing strategy to avoid re-ordering all subsequent notes.
- * @param {Array<Object>} allNotes - All notes for the current page.
- * @param {string|null} _parentId - The parent ID of the note. (Not directly used, but good for context).
- * @param {string|null} previousSiblingId - The ID of the note before the new position.
- * @param {string|null} nextSiblingId - The ID of the note after the new position.
- * @returns {number} The calculated order_index.
- */
-function calculateOrderIndex(allNotes, _parentId, previousSiblingId, nextSiblingId) {
-    const getNoteOrderById = (id) => {
-        const note = allNotes.find(n => String(n.id) === String(id));
-        return note ? Number(note.order_index) : null;
-    };
-
-    const prevOrder = previousSiblingId ? getNoteOrderById(previousSiblingId) : null;
-    const nextOrder = nextSiblingId ? getNoteOrderById(nextSiblingId) : null;
-
-    if (prevOrder !== null && nextOrder !== null) {
-        // Case 1: Insert between two notes.
-        return (prevOrder + nextOrder) / 2.0;
-    } else if (prevOrder !== null) {
-        // Case 2: Insert after a note (at the end of a list).
-        return prevOrder + 1.0;
-    } else if (nextOrder !== null) {
-        // Case 3: Insert before a note (at the beginning of a list).
-        return nextOrder > 0 ? nextOrder / 2.0 : nextOrder - 1.0;
-    } else {
-        // Case 4: Only note in the list.
-        return 1.0;
-    }
 }
 
 
