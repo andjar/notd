@@ -188,8 +188,13 @@ const debouncedSearch = debounce(async (query) => {
     }
     
     try {
-        const results = await searchAPI.search(query);
-        displaySearchResults(results);
+        const response = await searchAPI.search(query);
+        if (response && Array.isArray(response.results)) {
+            displaySearchResults(response.results);
+        } else {
+            console.warn('Search API returned unexpected format:', response);
+            displaySearchResults([]);
+        }
     } catch (error) {
         console.error('Search error:', error);
         searchResults.innerHTML = '<div class="search-result-item">Error performing search</div>';

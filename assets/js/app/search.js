@@ -79,8 +79,13 @@ const debouncedSearch = debounce(async (query) => {
     }
     
     try {
-        const results = await searchAPI.search(query); // Assumes searchAPI is global
-        displaySearchResults(results);
+        const response = await searchAPI.search(query); // Assumes searchAPI is global
+        if (response && Array.isArray(response.results)) {
+            displaySearchResults(response.results);
+        } else {
+            console.warn('Search API returned unexpected format:', response);
+            displaySearchResults([]);
+        }
     } catch (error) {
         console.error('Search error:', error);
         searchResultsEl.innerHTML = '<div class="search-result-item">Error performing search</div>';
