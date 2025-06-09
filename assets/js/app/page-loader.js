@@ -429,7 +429,25 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
             if (notesContainer) notesContainer.innerHTML = '<p>Loading page...</p>';
             if (window.ui.domRefs.pagePropertiesContainer) window.ui.domRefs.pagePropertiesContainer.innerHTML = '';
 
-            const fetchedPageData = await pagesAPI.getPageByName(pageNameToLoad);
+            let fetchedPageData;
+            try {
+                fetchedPageData = await pagesAPI.getPageByName(pageNameToLoad);
+            } catch (error) {
+                // If page not found and it's a journal page (matches YYYY-MM-DD format), try to create it
+                if (error.message === 'Page not found' && /^\d{4}-\d{2}-\d{2}$/.test(pageNameToLoad)) {
+                    console.log(`Journal page ${pageNameToLoad} not found, attempting to create it...`);
+                    try {
+                        fetchedPageData = await pagesAPI.createPage(pageNameToLoad);
+                        console.log(`Successfully created journal page ${pageNameToLoad}`);
+                    } catch (createError) {
+                        console.error(`Failed to create journal page ${pageNameToLoad}:`, createError);
+                        throw new Error(`Failed to create journal page: ${createError.message}`);
+                    }
+                } else {
+                    throw error; // Re-throw if not a journal page or other error
+                }
+            }
+
             if (!fetchedPageData) {
                 throw new Error(`Page "${pageNameToLoad}" not found and could not be created.`);
             }
