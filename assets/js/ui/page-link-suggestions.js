@@ -1,9 +1,11 @@
-// This module manages the UI for page link auto-suggestions.
+// assets_js_ui_page-link-suggestions.js
+
 import { pagesAPI } from '../api_client.js';
 
 let suggestionBox;
 let suggestionList;
 let allPagesForSuggestions = []; // Cached page names
+let suggestionStyleSheet = null; // To hold our dedicated stylesheet object
 
 /**
  * Fetches all page names and caches them.
@@ -26,16 +28,20 @@ async function fetchAllPages() {
 }
 
 /**
- * Initializes the suggestion UI elements.
+ * Initializes the suggestion UI elements and their dedicated styles.
  */
 function initSuggestionUI() {
   suggestionBox = document.createElement('div');
   suggestionBox.id = 'page-link-suggestion-box';
-  suggestionBox.style.display = 'none'; // Initially hidden
-  suggestionBox.style.position = 'absolute'; // For positioning near the query
-  suggestionBox.style.border = '1px solid #ccc';
-  suggestionBox.style.backgroundColor = 'white';
-  suggestionBox.style.zIndex = '1000'; // Ensure it's on top
+  suggestionBox.style.display = 'none'; 
+  suggestionBox.style.position = 'absolute'; 
+  suggestionBox.style.border = '1px solid var(--color-border, #ccc)';
+  suggestionBox.style.backgroundColor = 'var(--color-background, white)'; 
+  suggestionBox.style.color = 'var(--color-text, black)'; 
+  suggestionBox.style.zIndex = '1000'; 
+  suggestionBox.style.maxHeight = '200px'; 
+  suggestionBox.style.overflowY = 'auto';  
+  suggestionBox.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'; // Enhanced shadow
 
   suggestionList = document.createElement('ul');
   suggestionList.style.listStyleType = 'none';
@@ -44,6 +50,43 @@ function initSuggestionUI() {
 
   suggestionBox.appendChild(suggestionList);
   document.body.appendChild(suggestionBox);
+
+  // Create and append a dedicated <style> element for suggestion box rules
+  const styleEl = document.createElement('style');
+  styleEl.id = 'page-link-suggestion-dynamic-styles'; // Give it an ID for clarity
+  document.head.appendChild(styleEl);
+  suggestionStyleSheet = styleEl.sheet; // Get the CSSStyleSheet object
+
+  // Add CSS rules to our dedicated stylesheet
+  try {
+    if (suggestionStyleSheet) {
+      // Rule for selected items
+      const selectedRule = '#page-link-suggestion-box li.selected { background-color: var(--color-accent, #007bff) !important; color: var(--color-accent-contrast, white) !important; }';
+      // Rule for hover effect (non-selected items)
+      const hoverRule = '#page-link-suggestion-box li:not(.selected):hover { background-color: var(--color-background-hover, #f0f0f0); color: var(--color-text, black); }'; // Ensure text color on hover
+
+      // Helper to check if a rule exists to prevent duplicates if init is called multiple times
+      const ruleExists = (selector) => {
+        if (!suggestionStyleSheet.cssRules) return false; // Should not happen with our own sheet
+        for (let i = 0; i < suggestionStyleSheet.cssRules.length; i++) {
+          if (suggestionStyleSheet.cssRules[i].selectorText === selector) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      if (!ruleExists('#page-link-suggestion-box li.selected')) {
+        suggestionStyleSheet.insertRule(selectedRule, suggestionStyleSheet.cssRules.length);
+      }
+      if (!ruleExists('#page-link-suggestion-box li:not(.selected):hover')) {
+        suggestionStyleSheet.insertRule(hoverRule, suggestionStyleSheet.cssRules.length);
+      }
+    }
+  } catch (e) {
+    console.error("Error inserting CSS rule into dedicated stylesheet for suggestion box:", e);
+    // If this fails, highlighting might rely solely on inline styles or main CSS.
+  }
 }
 
 /**
@@ -52,7 +95,7 @@ function initSuggestionUI() {
  * @param {{top: number, left: number}} position The position to display the box.
  */
 function showSuggestions(query, position) {
-  suggestionList.innerHTML = ''; // Clear existing items
+  suggestionList.innerHTML = ''; 
 
   if (!query) {
     hideSuggestions();
@@ -62,29 +105,48 @@ function showSuggestions(query, position) {
   const lowerCaseQuery = query.toLowerCase();
   const matchedPages = allPagesForSuggestions.filter(page =>
     page.toLowerCase().includes(lowerCaseQuery)
-  );
+  ).slice(0, 10); 
 
   if (matchedPages.length > 0) {
-    matchedPages.forEach(pageName => {
+    matchedPages.forEach((pageName, index) => {
       const listItem = document.createElement('li');
       listItem.textContent = pageName;
       listItem.dataset.pageName = pageName;
-      listItem.style.padding = '5px';
+      listItem.style.padding = '8px 12px'; 
       listItem.style.cursor = 'pointer';
+      listItem.style.borderBottom = '1px solid var(--color-border-subtle, #eee)'; 
+      // Remove last item's border bottom for cleaner look
+      if (index === matchedPages.length - 1) {
+        listItem.style.borderBottom = 'none';
+      }
+
       listItem.addEventListener('mouseover', () => {
-        // Remove 'selected' from other items
         Array.from(suggestionList.children).forEach(child => child.classList.remove('selected'));
-        // Add 'selected' to the current item
         listItem.classList.add('selected');
       });
+      // No mouseout needed to remove .selected, as hover and selection are distinct.
+      // The :hover CSS rule handles visual hover state.
+
+      listItem.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const selectedPageName = listItem.dataset.pageName;
+        const selectEvent = new CustomEvent('suggestion-select', { 
+            detail: { pageName: selectedPageName },
+            bubbles: true, 
+            cancelable: true 
+        });
+        // Dispatch from the list item itself or the suggestionBox
+        suggestionBox.dispatchEvent(selectEvent); // Dispatch from suggestionBox for easier listening
+      });
+
       suggestionList.appendChild(listItem);
     });
-
+    
     suggestionBox.style.left = `${position.left}px`;
     suggestionBox.style.top = `${position.top}px`;
     suggestionBox.style.display = 'block';
 
-    // Select the first suggestion by default
     if (suggestionList.children.length > 0) {
       suggestionList.children[0].classList.add('selected');
     }
@@ -97,8 +159,12 @@ function showSuggestions(query, position) {
  * Hides the suggestion box and clears its content.
  */
 function hideSuggestions() {
-  suggestionBox.style.display = 'none';
-  suggestionList.innerHTML = '';
+  if (suggestionBox) {
+    suggestionBox.style.display = 'none';
+  }
+  if (suggestionList) {
+    suggestionList.innerHTML = '';
+  }
 }
 
 /**
@@ -121,7 +187,7 @@ function navigateSuggestions(direction) {
 
   if (currentIndex >= 0 && currentIndex < items.length) {
     items[currentIndex].classList.add('selected');
-    // Ensure the selected item is visible
+    // The .selected class is now styled by the rule in our dedicated stylesheet
     items[currentIndex].scrollIntoView({ block: 'nearest' });
   }
 }
@@ -135,15 +201,11 @@ function getSelectedSuggestion() {
   return selectedItem ? selectedItem.dataset.pageName : null;
 }
 
-// Export functions to be used by other modules
 export {
   initSuggestionUI,
   showSuggestions,
   hideSuggestions,
   navigateSuggestions,
   getSelectedSuggestion,
-  fetchAllPages // Export fetchAllPages
+  fetchAllPages
 };
-
-// The setAllPagesForSuggestions function is now removed as per requirements.
-// fetchAllPages directly populates the module-level allPagesForSuggestions.
