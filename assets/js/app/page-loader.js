@@ -18,7 +18,7 @@ window.currentPageEncryptionKey = null;
 window.decryptionPassword = null;
 
 // Import API clients
-import { notesAPI, pagesAPI, searchAPI } from '../api_client.js';
+import { notesAPI, pagesAPI, searchAPI, queryAPI } from '../api_client.js';
 
 // Import note actions
 import { saveNoteImmediately } from './note-actions.js';
@@ -646,43 +646,31 @@ export async function handleSqlQueries() {
         }
 
         try {
-            // Make an API call to 'api/query_notes.php'
-            const response = await fetch('api/query_notes.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sql_query: sqlQuery })
-            });
+            // NEW: Call using queryAPI.queryNotes
+            // Assuming queryNotes takes the query and options (like include_properties, page, per_page)
+            // For this specific use case, we're only passing sql_query.
+            // The API client will use defaults for include_properties, page, per_page.
+            const notesArray = await queryAPI.queryNotes(sqlQuery); // NEW
 
-            if (!response.ok) {
-                // Try to get error message from response body
-                let errorMsg = `HTTP error! status: ${response.status}`;
-                try {
-                    const errorResult = await response.json();
-                    if (errorResult && errorResult.error) {
-                        errorMsg = errorResult.error;
-                    }
-                } catch (e) { /* Ignore if response is not json */ }
-                throw new Error(errorMsg);
-            }
+            // apiRequest throws on error, so no need for !response.ok or result.success check here.
+            // notesArray is the equivalent of the old result.data
             
-            const result = await response.json();
-
-            if (result.success && result.data) {
-                placeholder.innerHTML = ''; // Clear "Loading..."
-                if (result.data.length === 0) {
+            // if (result.success && result.data) { // OLD
+            if (notesArray) { // NEW - check if notesArray is not null/undefined (though apiRequest should return array or throw)
+                placeholder.innerHTML = ''; 
+                if (notesArray.length === 0) {
                     placeholder.textContent = 'Query returned no results.';
                 } else {
                     const childrenContainer = document.createElement('div');
-                    childrenContainer.className = 'note-children sql-query-results'; // Added specific class
+                    childrenContainer.className = 'note-children sql-query-results';
 
-                    result.data.forEach(noteData => {
+                    notesArray.forEach(noteData => { // OLD: result.data.forEach
                         const parentNoteItem = placeholder.closest('.note-item');
                         let nestingLevel = 0;
                         if (parentNoteItem) {
                             const currentNesting = parseInt(parentNoteItem.style.getPropertyValue('--nesting-level') || '0');
                             nestingLevel = currentNesting + 1;
                         }
-                        // Assuming window.ui.renderNote is available, as seen in other parts of page-loader.js
                         if (window.ui && typeof window.ui.renderNote === 'function') {
                             const noteElement = window.ui.renderNote(noteData, nestingLevel);
                             childrenContainer.appendChild(noteElement);
@@ -690,24 +678,24 @@ export async function handleSqlQueries() {
                             console.error('window.ui.renderNote is not available to render SQL query results.');
                             placeholder.textContent = 'Error: UI function to render notes is missing.';
                             placeholder.classList.add('error');
-                            return; // Stop processing this placeholder
+                            return; 
                         }
                     });
                     placeholder.appendChild(childrenContainer);
                     if (typeof feather !== 'undefined' && feather.replace) {
-                         feather.replace(); // Refresh icons if any were added
+                         feather.replace(); 
                     }
                 }
-            } else {
-                placeholder.textContent = `Error: ${result.error || 'Failed to execute SQL query.'}`;
+            } else { // Should not be reached if apiRequest works as expected (throws or returns data)
+                placeholder.textContent = 'Error: Failed to execute SQL query (no data returned).'; // OLD: result.error
                 placeholder.classList.add('error');
             }
-            placeholder.classList.add('loaded'); // Add loaded class after processing
-        } catch (error) {
+            placeholder.classList.add('loaded'); 
+        } catch (error) { // Error from apiRequest or other issues
             console.error('Error fetching SQL query results for query:', sqlQuery, error);
             placeholder.textContent = `Error loading query results: ${error.message}`;
             placeholder.classList.add('error');
-            placeholder.classList.add('loaded'); // Add loaded class even on error
+            placeholder.classList.add('loaded'); 
         }
     }
 }

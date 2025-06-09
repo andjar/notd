@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/response_utils.php';
-require_once __DIR__ . '/webhooks.php'; // Include the new WebhooksManager
+require_once __DIR__ . '/v1/webhooks.php'; // Include the new WebhooksManager
 
 class PropertyTriggerService {
     private $pdo;
