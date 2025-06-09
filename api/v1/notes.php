@@ -74,6 +74,526 @@ if (!function_exists('processNoteContent')) {
     }
 }
 
+// Batch operation helper functions
+if (!function_exists('_createNoteInBatch')) {
+    function _createNoteInBatch($pdo, $payload, &$tempIdMap) {
+        if (!isset($payload['page_id']) || !is_numeric($payload['page_id'])) {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing or invalid page_id for create operation', 'client_temp_id' => $payload['client_temp_id'] ?? null];
+        }
+
+        $pageId = (int)$payload['page_id'];
+        $content = $payload['content'] ?? '';
+        $parentNoteId = null;
+        if (isset($payload['parent_note_id'])) {
+            $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : (int)$payload['parent_note_id'];
+        }
+        $orderIndex = $payload['order_index'] ?? null;
+        $collapsed = $payload['collapsed'] ?? 0; // Default to not collapsed
+        $clientTempId = $payload['client_temp_id'] ?? null;
+        $propertiesExplicit = $payload['properties_explicit'] ?? null;
+
+        try {
+            // 1. Create the note
+            $sqlFields = ['page_id', 'content', 'parent_note_id', 'collapsed'];
+            $sqlParams = [
+                ':page_id' => $pageId,
+                ':content' => $content,
+                ':parent_note_id' => $parentNoteId,
+                ':collapsed' => (int)$collapsed
+            ];
+
+            if ($orderIndex !== null && is_numeric($orderIndex)) {
+                $sqlFields[] = 'order_index';
+                $sqlParams[':order_index'] = (int)$orderIndex;
+            }
+            
+            $sqlFieldPlaceholders = implode(', ', $sqlFields);
+            $sqlValuePlaceholders = ':' . implode(', :', $sqlFields);
+            
+            $sql = "INSERT INTO Notes ($sqlFieldPlaceholders) VALUES ($sqlValuePlaceholders)";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($sqlParams);
+            $noteId = $pdo->lastInsertId();
+
+            if (!$noteId) {
+                 return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note record in database.', 'client_temp_id' => $clientTempId];
+            }
+
+            // 2. Handle properties
+            $finalProperties = [];
+
+            if (is_array($propertiesExplicit)) {
+                 // Clear existing non-internal properties (though for a new note, there shouldn't be any)
+                $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
+                $stmtDeleteOld->execute([':note_id' => $noteId]);
+
+                foreach ($propertiesExplicit as $name => $values) {
+                    if (!is_array($values)) $values = [$values]; // Ensure values are in an array
+                    foreach ($values as $value) {
+                        $isInternal = determinePropertyInternalStatus($name, $value);
+                         _updateOrAddPropertyAndDispatchTriggers($pdo, 'note', $noteId, $name, (string)$value, $isInternal, false); // No individual commit
+                        // Collect for response, mimicking structure from single GET/POST
+                        if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
+                        $finalProperties[$name][] = ['value' => (string)$value, 'internal' => (int)$isInternal];
+                    }
+                }
+            } elseif (trim($content) !== '') {
+                // Parse and save properties from content if no explicit properties given
+                // processNoteContent already calls _updateOrAddPropertyAndDispatchTriggers
+                // which in turn calls determinePropertyInternalStatus.
+                // We need to ensure processNoteContent can run without individual commits or adapt it.
+                // For now, let's assume processNoteContent works within a transaction.
+                $parsedProps = processNoteContent($pdo, $content, 'note', $noteId); // This function needs to be transaction-aware or not commit itself.
+                                                                                     // It internally calls _updateOrAddPropertyAndDispatchTriggers.
+                // Structure $parsedProps for $finalProperties
+                foreach($parsedProps as $name => $value) { // processNoteContent returns a simple key/value map
+                    if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
+                     // Assuming processNoteContent gives single values, adjust if it can give arrays
+                    $isInternal = determinePropertyInternalStatus($name, $value); // Re-check internal status as processNoteContent might not return it structured
+                    $finalProperties[$name][] = ['value' => $value, 'internal' => (int)$isInternal];
+                }
+            }
+            
+            _checkAndSetNoteInternalFlag($pdo, $noteId);
+
+            // 3. Fetch the newly created note to return it
+            $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = :id");
+            $stmt->execute([':id' => $noteId]);
+            $newNote = $stmt->fetch(PDO::FETCH_ASSOC);
+            $newNote['properties'] = $finalProperties; // Attach the collected properties
+
+            if ($clientTempId !== null) {
+                $tempIdMap[$clientTempId] = $noteId;
+            }
+            
+            // Ensure $newNote contains the 'id'
+            $newNote['id'] = $noteId; 
+
+            $result = [
+                'type' => 'create',
+                'status' => 'success',
+                'note' => $newNote 
+            ];
+            if ($clientTempId !== null) {
+                $result['client_temp_id'] = $clientTempId;
+            }
+            return $result;
+
+        } catch (Exception $e) {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note: ' . $e->getMessage(), 'client_temp_id' => $clientTempId, 'details_trace' => $e->getTraceAsString()]; // Renamed 'details' to 'details_trace' to avoid clash
+        }
+    }
+}
+
+if (!function_exists('_updateNoteInBatch')) {
+    function _updateNoteInBatch($pdo, $payload, $tempIdMap) {
+        $originalId = $payload['id'] ?? null; // Keep original ID for error reporting if resolution fails
+        $noteId = $originalId;
+
+        if ($noteId === null) {
+            return ['type' => 'update', 'status' => 'error', 'message' => 'Missing id for update operation', 'id' => $originalId];
+        }
+
+        // Resolve ID if it's a temporary one (e.g., "temp:client-generated-uuid")
+        // Assuming temp IDs are strings and might have a prefix like "temp:"
+        if (is_string($noteId) && strpos($noteId, "temp:") === 0) { 
+            if (isset($tempIdMap[$noteId])) {
+                $noteId = $tempIdMap[$noteId];
+            } else {
+                return ['type' => 'update', 'status' => 'error', 'message' => "Update failed: Temporary ID {$originalId} not resolved.", 'id' => $originalId];
+            }
+        } elseif (!is_numeric($noteId)) {
+             return ['type' => 'update', 'status' => 'error', 'message' => "Invalid ID format for update: {$originalId}", 'id' => $originalId];
+        }
+        $noteId = (int)$noteId; // Ensure it's an integer after resolution
+
+        try {
+            // Check if note exists
+            $stmtCheck = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
+            $stmtCheck->execute([$noteId]);
+            $existingNote = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$existingNote) {
+                return ['type' => 'update', 'status' => 'error', 'message' => 'Note not found for update.', 'id' => $noteId];
+            }
+
+            $setClauses = [];
+            $executeParams = [];
+            $updateContent = false;
+
+            // Dynamically build SET clauses
+            if (isset($payload['content'])) {
+                $setClauses[] = "content = ?";
+                $executeParams[] = $payload['content'];
+                $updateContent = true; // Flag that content is being updated for property parsing logic
+            }
+            if (array_key_exists('parent_note_id', $payload)) {
+                $newParentNoteId = $payload['parent_note_id'];
+                if (is_string($newParentNoteId) && strpos($newParentNoteId, "temp:") === 0) {
+                    if (isset($tempIdMap[$newParentNoteId])) {
+                        $newParentNoteId = $tempIdMap[$newParentNoteId];
+                    } else {
+                        return ['type' => 'update', 'status' => 'error', 'message' => "Update failed: Temporary parent_note_id {$payload['parent_note_id']} not resolved.", 'id' => $noteId];
+                    }
+                }
+                $setClauses[] = "parent_note_id = ?";
+                $executeParams[] = $newParentNoteId === null ? null : (int)$newParentNoteId;
+            }
+            if (isset($payload['order_index'])) {
+                $setClauses[] = "order_index = ?";
+                $executeParams[] = (int)$payload['order_index'];
+            }
+            if (isset($payload['collapsed'])) {
+                $setClauses[] = "collapsed = ?";
+                $executeParams[] = (int)$payload['collapsed'];
+            }
+            if (isset($payload['page_id']) && is_numeric($payload['page_id'])) { // Allow page_id update if provided
+                 $setClauses[] = "page_id = ?";
+                 $executeParams[] = (int)$payload['page_id'];
+            }
+
+
+            if (empty($setClauses) && !isset($payload['properties_explicit'])) {
+                return ['type' => 'update', 'status' => 'warning', 'message' => 'No updatable fields provided for note.', 'id' => $noteId];
+            }
+
+            if (!empty($setClauses)) {
+                $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
+                $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
+                $executeParams[] = $noteId;
+                
+                $stmt = $pdo->prepare($sql);
+                if (!$stmt->execute($executeParams)) {
+                    return ['type' => 'update', 'status' => 'error', 'message' => 'Failed to update note record.', 'id' => $noteId, 'details' => $stmt->errorInfo()];
+                }
+            }
+            
+            // Properties Handling
+            $finalProperties = []; // To collect properties for the response
+
+            if (isset($payload['properties_explicit']) && is_array($payload['properties_explicit'])) {
+                // Delete existing non-internal properties
+                $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
+                $stmtDeleteOld->execute([':note_id' => $noteId]);
+            
+                foreach ($payload['properties_explicit'] as $name => $values) {
+                    if (!is_array($values)) $values = [$values];
+                    foreach ($values as $value) {
+                        $isInternal = determinePropertyInternalStatus($name, $value);
+                        _updateOrAddPropertyAndDispatchTriggers($pdo, 'note', $noteId, $name, (string)$value, $isInternal, false); // No individual commit
+                        if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
+                        $finalProperties[$name][] = ['value' => (string)$value, 'internal' => (int)$isInternal];
+                    }
+                }
+            } elseif ($updateContent) { // Only process content for properties if content was actually updated
+                // And if note is not encrypted (assuming similar logic to existing PUT)
+                $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 LIMIT 1");
+                $encryptedStmt->execute([':note_id' => $noteId]);
+                $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$encryptedProp || $encryptedProp['value'] !== 'true') {
+                    $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
+                    $stmtDeleteOld->execute([':note_id' => $noteId]);
+                    
+                    $parsedProps = processNoteContent($pdo, $payload['content'], 'note', $noteId);
+                    foreach($parsedProps as $name => $value) {
+                        if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
+                        $isInternal = determinePropertyInternalStatus($name, $value); 
+                        $finalProperties[$name][] = ['value' => $value, 'internal' => (int)$isInternal];
+                    }
+                }
+            }
+
+            _checkAndSetNoteInternalFlag($pdo, $noteId);
+
+            // Fetch updated note and its properties
+            $stmtFetch = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
+            $stmtFetch->execute([$noteId]);
+            $updatedNote = $stmtFetch->fetch(PDO::FETCH_ASSOC);
+
+            // Fetch all properties for the response, including those not touched by this update
+            $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id ORDER BY name";
+            $stmtProps = $pdo->prepare($propSql);
+            $stmtProps->bindParam(':note_id', $noteId, PDO::PARAM_INT);
+            $stmtProps->execute();
+            $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
+
+            $updatedNote['properties'] = [];
+            foreach ($propertiesResult as $prop) {
+                if (!isset($updatedNote['properties'][$prop['name']])) {
+                    $updatedNote['properties'][$prop['name']] = [];
+                }
+                $updatedNote['properties'][$prop['name']][] = [
+                    'value' => $prop['value'],
+                    'internal' => (int)$prop['internal']
+                ];
+            }
+            
+            // Ensure $updatedNote contains the 'id'
+            $updatedNote['id'] = $noteId;
+
+            return ['type' => 'update', 'status' => 'success', 'note' => $updatedNote];
+
+        } catch (Exception $e) {
+            return ['type' => 'update', 'status' => 'error', 'message' => 'Failed to update note: ' . $e->getMessage(), 'id' => $noteId, 'details_trace' => $e->getTraceAsString()]; // Renamed 'details' to 'details_trace'
+        }
+    }
+}
+
+if (!function_exists('_deleteNoteInBatch')) {
+    function _deleteNoteInBatch($pdo, $payload, $tempIdMap) {
+        $originalId = $payload['id'] ?? null;
+        $noteId = $originalId;
+
+        if ($noteId === null) {
+            return ['type' => 'delete', 'status' => 'error', 'message' => 'Missing id for delete operation', 'id' => $originalId];
+        }
+
+        // Resolve ID if it's a temporary one
+        if (is_string($noteId) && strpos($noteId, "temp:") === 0) {
+            if (isset($tempIdMap[$noteId])) {
+                $noteId = $tempIdMap[$noteId];
+            } else {
+                return ['type' => 'delete', 'status' => 'error', 'message' => "Delete failed: Temporary ID {$originalId} not resolved.", 'id' => $originalId];
+            }
+        } elseif (!is_numeric($noteId)) {
+            return ['type' => 'delete', 'status' => 'error', 'message' => "Invalid ID format for delete: {$originalId}", 'id' => $originalId];
+        }
+        $noteId = (int)$noteId;
+
+        try {
+            // Check if note exists
+            $stmtCheck = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
+            $stmtCheck->execute([$noteId]);
+            if (!$stmtCheck->fetch()) {
+                return ['type' => 'delete', 'status' => 'error', 'message' => 'Note not found for delete.', 'id' => $noteId];
+            }
+
+            // Check for child notes (Option A: Stricter)
+            $stmtCheckChildren = $pdo->prepare("SELECT COUNT(*) FROM Notes WHERE parent_note_id = ?");
+            $stmtCheckChildren->execute([$noteId]);
+            if ($stmtCheckChildren->fetchColumn() > 0) {
+                return ['type' => 'delete', 'status' => 'error', 'message' => 'Note has child notes. Cannot delete directly. Delete children first.', 'id' => $noteId];
+            }
+
+            // Delete associated properties
+            $stmtDeleteProps = $pdo->prepare("DELETE FROM Properties WHERE note_id = ?");
+            $stmtDeleteProps->execute([$noteId]); // No need to check rowCount, as note might not have properties
+
+            // Delete the note
+            $stmtDeleteNote = $pdo->prepare("DELETE FROM Notes WHERE id = ?");
+            if ($stmtDeleteNote->execute([$noteId])) {
+                if ($stmtDeleteNote->rowCount() > 0) {
+                    return ['type' => 'delete', 'status' => 'success', 'deleted_note_id' => $noteId];
+                } else {
+                    // Should have been caught by the existence check, but as a safeguard:
+                    return ['type' => 'delete', 'status' => 'error', 'message' => 'Note not found during delete execution (unexpected).', 'id' => $noteId];
+                }
+            } else {
+                return ['type' => 'delete', 'status' => 'error', 'message' => 'Failed to execute note deletion.', 'id' => $noteId, 'details_db' => $stmtDeleteNote->errorInfo()]; // Renamed 'details'
+            }
+
+        } catch (Exception $e) {
+            return ['type' => 'delete', 'status' => 'error', 'message' => 'Failed to delete note: ' . $e->getMessage(), 'id' => $noteId, 'details_trace' => $e->getTraceAsString()]; // Renamed 'details'
+        }
+    }
+}
+
+
+if (!function_exists('_handleBatchOperations')) {
+    function _handleBatchOperations($pdo, $operations) { // Note: $operations is already $input['operations'] from the calling context
+        
+        // Early validation of the overall batch structure and individual operation structures
+        $validationErrors = [];
+        foreach ($operations as $index => $operation) {
+            $operationHasError = false;
+            if (!isset($operation['type']) || !is_string($operation['type'])) {
+                $validationErrors[] = ['index' => $index, 'error' => 'Missing or invalid type field.'];
+                $operationHasError = true;
+            }
+            if (!isset($operation['payload']) || !is_array($operation['payload'])) {
+                $validationErrors[] = ['index' => $index, 'error' => 'Missing or invalid payload field.'];
+                $operationHasError = true;
+            }
+
+            // If the basic structure of the operation is invalid, skip to the next one.
+            if ($operationHasError) {
+                continue;
+            }
+
+
+            $type = $operation['type'];
+            $payload = $operation['payload'];
+
+            if (!in_array($type, ['create', 'update', 'delete'])) {
+                $validationErrors[] = ['index' => $index, 'type' => $type, 'error' => 'Invalid operation type.'];
+            }
+
+            // Validate presence of essential fields in payload based on type
+            switch ($type) {
+                case 'create':
+                    if (!isset($payload['page_id'])) {
+                        $validationErrors[] = ['index' => $index, 'type' => 'create', 'error' => 'Missing page_id in payload.'];
+                    }
+                    // More detailed validation for page_id (e.g., is_numeric) is handled in _createNoteInBatch
+                    break;
+                case 'update':
+                    if (!isset($payload['id'])) {
+                        $validationErrors[] = ['index' => $index, 'type' => 'update', 'error' => 'Missing id in payload.'];
+                    }
+                    break;
+                case 'delete':
+                    if (!isset($payload['id'])) {
+                        $validationErrors[] = ['index' => $index, 'type' => 'delete', 'error' => 'Missing id in payload.'];
+                    }
+                    break;
+            }
+        }
+
+        if (!empty($validationErrors)) {
+            ApiResponse::error('Batch request validation failed.', 400, ['details' => ['validation_errors' => $validationErrors]]);
+            exit; // Use exit as ApiResponse::error should handle script termination.
+        }
+
+        // Proceed with processing if validation passes
+        $deleteOps = [];
+        $createOps = [];
+        $updateOps = [];
+        $orderedResults = array_fill(0, count($operations), null);
+        
+        $tempIdMap = []; 
+        $anyOperationFailed = false;
+        $failedOperationsDetails = [];
+
+        // Categorize operations while preserving original index
+        foreach ($operations as $index => $operation) {
+            // Type has been validated by the initial loop, but check again for safety or if logic changes
+            $type = $operation['type'] ?? 'unknown'; 
+            
+            $opItem = ['original_index' => $index, 'data' => $operation];
+
+            switch ($type) {
+                case 'delete':
+                    $deleteOps[] = $opItem;
+                    break;
+                case 'create':
+                    $createOps[] = $opItem;
+                    break;
+                case 'update':
+                    $updateOps[] = $opItem;
+                    break;
+                default:
+                    // This case should ideally not be reached if initial validation is comprehensive
+                    $anyOperationFailed = true;
+                    $opResult = ['type' => $type, 'status' => 'error', 'message' => 'Invalid operation type during categorization.'];
+                    $orderedResults[$index] = $opResult;
+                    $failedOperationsDetails[] = [
+                        'index' => $index,
+                        'type' => $type,
+                        'payload_identifier' => $operation['payload']['id'] ?? $operation['payload']['client_temp_id'] ?? null,
+                        'error_message' => $opResult['message']
+                    ];
+                    break;
+            }
+        }
+        
+        try {
+            $pdo->beginTransaction();
+
+            // 1. Process Deletions
+            foreach ($deleteOps as $opItem) {
+                $originalIndex = $opItem['original_index'];
+                $payload = $opItem['data']['payload']; // Payload was validated to exist
+                $operationType = $opItem['data']['type']; // Type was validated
+
+                $opResult = _deleteNoteInBatch($pdo, $payload, $tempIdMap);
+                $orderedResults[$originalIndex] = $opResult;
+                if (isset($opResult['status']) && $opResult['status'] === 'error') {
+                    $anyOperationFailed = true;
+                    $failedOperationsDetails[] = [
+                        'index' => $originalIndex,
+                        'type' => $operationType,
+                        'payload_identifier' => ['id' => $payload['id'] ?? null], // 'id' is expected for delete
+                        'error_message' => $opResult['message'] ?? 'Unknown error'
+                    ];
+                }
+            }
+
+            // 2. Process Creations
+            // Potentially add: if (!$anyOperationFailed || $continueOnErrorStrategy)
+            foreach ($createOps as $opItem) {
+                $originalIndex = $opItem['original_index'];
+                $payload = $opItem['data']['payload'];
+                $operationType = $opItem['data']['type'];
+
+                $opResult = _createNoteInBatch($pdo, $payload, $tempIdMap);
+                $orderedResults[$originalIndex] = $opResult;
+                if (isset($opResult['status']) && $opResult['status'] === 'error') {
+                    $anyOperationFailed = true;
+                    $failedOperationsDetails[] = [
+                        'index' => $originalIndex,
+                        'type' => $operationType,
+                        'payload_identifier' => ['client_temp_id' => $payload['client_temp_id'] ?? null, 'page_id' => $payload['page_id'] ?? null],
+                        'error_message' => $opResult['message'] ?? 'Unknown error'
+                    ];
+                }
+            }
+
+            // 3. Process Updates
+            // Potentially add: if (!$anyOperationFailed || $continueOnErrorStrategy)
+            foreach ($updateOps as $opItem) {
+                $originalIndex = $opItem['original_index'];
+                $payload = $opItem['data']['payload'];
+                $operationType = $opItem['data']['type'];
+
+                $opResult = _updateNoteInBatch($pdo, $payload, $tempIdMap);
+                $orderedResults[$originalIndex] = $opResult;
+                if (isset($opResult['status']) && $opResult['status'] === 'error') {
+                    $anyOperationFailed = true;
+                    $failedOperationsDetails[] = [
+                        'index' => $originalIndex,
+                        'type' => $operationType,
+                        'payload_identifier' => ['id' => $payload['id'] ?? null], // 'id' is expected for update
+                        'error_message' => $opResult['message'] ?? 'Unknown error'
+                    ];
+                }
+            }
+
+            if ($anyOperationFailed) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                ApiResponse::error('Batch operation failed. See details.', 400, [
+                    'details' => ['failed_operations' => $failedOperationsDetails]
+                ]);
+                exit;
+            } else {
+                $pdo->commit();
+                ApiResponse::success([
+                    'message' => 'Batch operations completed successfully.',
+                    'results' => $orderedResults
+                ]);
+                exit;
+            }
+
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log("Batch operation critical error: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
+            
+            // When a general exception occurs, do not include 'results'.
+            ApiResponse::error('An internal server error occurred during batch processing.', 500, [
+                 // 'status' => 'error',
+                 // 'message' => 'An internal server error occurred during batch processing.',
+                'details' => ['general_error' => $e->getMessage()]
+            ]);
+            exit;
+        }
+    }
+}
+
 if ($method === 'GET') {
     $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
     $dataManager = new DataManager($pdo);
@@ -210,12 +730,24 @@ if ($method === 'GET') {
         ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
     }
 } elseif ($method === 'POST') {
-    // Validate input
-    if (!isset($input['page_id']) || !is_numeric($input['page_id'])) {
-        ApiResponse::error('A valid page_id is required.', 400);
-    }
+    // Check if this is a batch operation
+    if (isset($input['action']) && $input['action'] === 'batch') {
+        if (isset($input['operations']) && is_array($input['operations'])) {
+            _handleBatchOperations($pdo, $input['operations']);
+            // _handleBatchOperations will call exit() or ApiResponse::success() which should exit.
+            // If it doesn't, ensure no further processing for single POST happens.
+            return; 
+        } else {
+            ApiResponse::error('Batch operations require an "operations" array.', 400);
+            return;
+        }
+    } else {
+        // Existing POST logic for single note creation
+        if (!isset($input['page_id']) || !is_numeric($input['page_id'])) {
+            ApiResponse::error('A valid page_id is required.', 400);
+        }
 
-    $pageId = (int)$input['page_id'];
+        $pageId = (int)$input['page_id'];
     $content = isset($input['content']) ? $input['content'] : '';
     $parentNoteId = null;
     
@@ -279,6 +811,7 @@ if ($method === 'GET') {
         error_log("Failed to create note: " . $e->getMessage());
         ApiResponse::error('Failed to create note.', 500, ['details' => $e->getMessage()]);
     }
+  } // End of else for single POST operation
 } elseif ($method === 'PUT') {
     // For phpdesktop compatibility, also check for ID in request body when using method override
     $noteId = null;

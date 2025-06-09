@@ -1,4 +1,12 @@
-// import { ui } from '../ui.js';
+// assets_js_app_note-actions.js
+
+/**
+ * @file Manages note-related actions such as creation, updates, deletion,
+ * indentation, and interaction handling (keyboard, clicks).
+ * It orchestrates optimistic UI updates, local state management,
+ * and communication with the backend API, primarily using batch operations
+ * for structural changes.
+ */
 
 import {
     notesForCurrentPage,
@@ -7,22 +15,15 @@ import {
     updateNoteInCurrentPage,
     removeNoteFromCurrentPageById,
     setNotesForCurrentPage,
-    saveStatus
-    // setSaveStatus, // No longer needed here as updateSaveStatusIndicator from ui.js will handle it
-    // getNoteDataById, // This will be a local helper using imported notesForCurrentPage
-    // setCurrentFocusedNoteId, // Not directly used by functions moved here yet, but might be needed by future note actions
+    // saveStatus, // UI state, managed by ui.js via updateSaveStatusIndicator
 } from './state.js';
 
 import { calculateOrderIndex } from './order-index-service.js';
+import { notesAPI, propertiesAPI } from '../api_client.js';
+import { debounce } from '../utils.js';
+// import { handleNoteDrop } from '../ui/note-elements.js'; // For Sortable.js, if used
 
-// Use window.ui instead of direct import
-// const { notesContainer } = ui.domRefs;
 const notesContainer = document.querySelector('#notes-container');
-
-// Assuming API objects are globally available.
-// e.g. notesAPI, propertiesAPI
-
-import { debounce } from '../utils.js'; // debounce imported from utils.js
 
 // --- Property Parsing Utility ---
 /**
@@ -45,24 +46,18 @@ export function parsePropertiesFromText(textContent) {
     return properties;
 }
 
-import { handleNoteDrop } from '../ui/note-elements.js'; // Import directly from note-elements.js
-
-import { notesAPI, propertiesAPI } from '../api_client.js';
-
-// --- Helper functions moved from app.js ---
+// --- Helper functions for text manipulation ---
 /**
- * Inserts text at the current cursor position and positions cursor
- * @param {string} text - Text to insert
- * @param {number} cursorOffset - Position cursor relative to start of inserted text
+ * Inserts text at the current cursor position and positions cursor.
+ * @param {string} text - Text to insert.
+ * @param {number} [cursorOffset=0] - Position cursor relative to start of inserted text.
  */
 function insertTextAtCursor(text, cursorOffset = 0) {
     const selection = window.getSelection();
-    if (selection.rangeCount === 0) return;
-    
+    if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
     const textNode = document.createTextNode(text);
     range.insertNode(textNode);
-    
     range.setStart(textNode, cursorOffset);
     range.setEnd(textNode, cursorOffset);
     selection.removeAllRanges();
@@ -70,90 +65,249 @@ function insertTextAtCursor(text, cursorOffset = 0) {
 }
 
 /**
- * Replaces text by deleting characters before cursor and inserting new text
- * @param {number} deleteCount - Number of characters to delete before cursor
- * @param {string} newText - Text to insert
- * @param {number} cursorOffset - Position cursor relative to start of inserted text
+ * Replaces text by deleting characters before cursor and inserting new text.
+ * @param {number} deleteCount - Number of characters to delete before cursor.
+ * @param {string} newText - Text to insert.
+ * @param {number} [cursorOffset=0] - Position cursor relative to start of inserted text.
  */
 function replaceTextAtCursor(deleteCount, newText, cursorOffset = 0) {
     const selection = window.getSelection();
-    if (selection.rangeCount === 0) return;
-    
+    if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
-    
+    if (range.startOffset < deleteCount) { // Ensure we don't delete beyond the start
+        deleteCount = range.startOffset;
+    }
     range.setStart(range.startContainer, range.startOffset - deleteCount);
     range.deleteContents();
-    
     const textNode = document.createTextNode(newText);
     range.insertNode(textNode);
-    
-    range.setStart(textNode, cursorOffset);
-    range.setEnd(textNode, cursorOffset);
+    // Ensure cursorOffset is within the bounds of the new textNode
+    const finalCursorOffset = Math.min(cursorOffset, textNode.length);
+    range.setStart(textNode, finalCursorOffset);
+    range.setEnd(textNode, finalCursorOffset);
     selection.removeAllRanges();
     selection.addRange(range);
 }
 
-
 // --- Note Data Accessors ---
+/**
+ * Retrieves note data from the current page's state by its ID.
+ * @param {string|number} noteId - The ID of the note to retrieve.
+ * @returns {Object|null} The note object if found, otherwise null.
+ */
 export function getNoteDataById(noteId) {
+    if (!noteId) return null;
     return notesForCurrentPage.find(n => String(n.id) === String(noteId));
 }
 
+/**
+ * Retrieves the DOM element for a note by its ID.
+ * @param {string|number} noteId - The ID of the note element to retrieve.
+ * @returns {HTMLElement|null} The note's DOM element if found, otherwise null.
+ */
 export function getNoteElementById(noteId) {
-    if (!notesContainer) {
-        console.error("notesContainer not found in note-actions:getNoteElementById");
-        return null;
-    }
+    if (!notesContainer || !noteId) return null;
     return notesContainer.querySelector(`.note-item[data-note-id="${noteId}"]`);
 }
 
+/**
+ * Helper function to update a newly created note (optimistically added with a temp ID)
+ * with its permanent ID and server data, in both local state and DOM.
+ * @param {string} clientTempId - The temporary ID used by the client.
+ * @param {Object} noteFromServer - The note object received from the server, containing the permanent ID.
+ */
+function _finalizeNewNote(clientTempId, noteFromServer) {
+    if (!noteFromServer || !noteFromServer.id) {
+        console.error("[_finalizeNewNote] Invalid note data from server for temp ID:", clientTempId, noteFromServer);
+        // Optionally, trigger a revert or error state if finalization fails critically
+        return;
+    }
+    const permanentId = noteFromServer.id;
+    console.log(`[_finalizeNewNote] Finalizing note. Temp ID: ${clientTempId}, Permanent ID: ${permanentId}`);
 
-// --- Note Saving Logic ---
+    // Update local state: Find the note by temp ID and update it with server data, ensuring permanent ID.
+    const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(clientTempId));
+    if (noteIndex > -1) {
+        // Merge server data into the existing optimistic note, making sure 'id' is the permanent one.
+        // Also, ensure client_temp_id is removed or handled if it was part of notesForCurrentPage[noteIndex].
+        const existingOptimisticNote = notesForCurrentPage[noteIndex];
+        notesForCurrentPage[noteIndex] = { 
+            ...existingOptimisticNote, // Keep any client-side optimistic fields not yet on server
+            ...noteFromServer,         // Override with server data
+            id: permanentId            // Explicitly set permanent ID
+        };
+        // If 'client_temp_id' was a property on the state object, remove it after finalization:
+        // delete notesForCurrentPage[noteIndex].client_temp_id;
+    } else {
+        console.warn(`[_finalizeNewNote] Could not find note with temp ID ${clientTempId} in local state to finalize.`);
+        // This might indicate an issue, e.g., the note was removed before finalization.
+        // Depending on strategy, you might re-add it here if it's guaranteed to exist.
+        // addNoteToCurrentPage({ ...noteFromServer, id: permanentId }); // If it should be added if missing
+    }
+
+    // Update DOM element's dataset.noteId
+    const tempNoteEl = getNoteElementById(clientTempId);
+    if (tempNoteEl) {
+        tempNoteEl.dataset.noteId = permanentId;
+        const contentDiv = tempNoteEl.querySelector('.note-content');
+        if (contentDiv) contentDiv.dataset.noteId = permanentId;
+        const bulletEl = tempNoteEl.querySelector('.note-bullet');
+        if (bulletEl) bulletEl.dataset.noteId = permanentId;
+    } else {
+        console.warn(`[_finalizeNewNote] Could not find DOM element for temp ID ${clientTempId} to update dataset.`);
+    }
+}
+
 
 /**
- * Core function to handle saving a note's content and properties to the server.
- * @param {string} noteId - The ID of the note to save.
+ * Executes a batch of note operations with optimistic updates and revert logic.
+ * Assumes `notesAPI.batchUpdateNotes` returns the array of individual operation results directly,
+ * or throws an error if the API call fails or the response structure is invalid.
+ *
+ * @param {Array<Object>} originalNotesState - A deep clone of the `notesForCurrentPage` state *before* any optimistic changes were made.
+ * @param {Array<Object>} operations - Array of operations for the batch API.
+ *                                   Each operation: { type: 'create'|'update'|'delete', payload: Object }
+ * @param {Function} optimisticDOMUpdater - A function to call to perform optimistic DOM updates.
+ *                                          It is called after local state updates.
+ * @param {string} userActionName - Name of the user action for logging/error messages (e.g., "Add Root Note").
+ * @returns {Promise<boolean>} True if all operations were successful (or no operations), false otherwise.
+ */
+async function executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, userActionName) {
+    if (!operations || operations.length === 0) {
+        console.warn(`[${userActionName} BATCH] No operations to execute.`);
+        // Consider returning true as no operations means no failures.
+        return true;
+    }
+
+    window.ui.updateSaveStatusIndicator('pending');
+    // The state backup is now passed in as `originalNotesState`.
+    // Callers (handleAddRootNote, etc.) are responsible for cloning the state BEFORE making optimistic changes.
+    // This function handles DOM updates and API communication/revert.
+    let success = false;
+
+    try {
+        // 1. Perform Optimistic DOM Updates (call the provided function)
+        //    This is called AFTER the caller has made optimistic state changes.
+        if (typeof optimisticDOMUpdater === 'function') {
+            optimisticDOMUpdater();
+        } else {
+            console.warn(`[${userActionName} BATCH] No optimisticDOMUpdater function provided.`);
+        }
+
+        // 2. API Call
+        console.log(`[${userActionName} BATCH] Sending operations:`, JSON.stringify(operations, null, 2));
+        // `batchResultsArray` is now expected to be the direct array of operation results,
+        // or an error would have been thrown by `notesAPI.batchUpdateNotes` (in api_client.js).
+        const batchResultsArray = await notesAPI.batchUpdateNotes(operations);
+        console.log(`[${userActionName} BATCH] API results array received:`, batchResultsArray);
+
+        // 3. Process Individual Results
+        //    (Though `notesAPI.batchUpdateNotes` should throw if the overall structure is bad,
+        //     we still check individual operation statuses for robustness)
+        if (!Array.isArray(batchResultsArray)) {
+            // This case should ideally be caught by the modified notesAPI.batchUpdateNotes in api_client.js
+            throw new Error(`[${userActionName} BATCH] notesAPI.batchUpdateNotes did not return an array as expected.`);
+        }
+
+        let allSubOperationsSucceeded = true;
+        batchResultsArray.forEach(opResult => {
+            // Validate each operation result object
+            if (!opResult || typeof opResult !== 'object') {
+                console.error(`[${userActionName} BATCH] Invalid operation result item:`, opResult);
+                allSubOperationsSucceeded = false;
+                return; // Skip to next opResult
+            }
+
+            if (opResult.status === 'error') {
+                allSubOperationsSucceeded = false;
+                const idForError = opResult.payload_identifier?.id || opResult.id || opResult.client_temp_id || 'N/A';
+                console.error(`[${userActionName} BATCH] Server reported sub-operation error: Type: ${opResult.type || 'Unknown'}, Identifier: ${idForError}, Message: ${opResult.error_message || opResult.message || 'Unknown sub-operation error'}`);
+            }
+
+            if (!allSubOperationsSucceeded) return; // Stop processing if one failed
+
+            const noteFromServer = opResult.note;       // Expected for 'create' and 'update'
+            const clientTempId = opResult.client_temp_id; // Expected for 'create' if sent by client
+            const deletedNoteId = opResult.deleted_note_id; // Expected for 'delete'
+
+            if (opResult.type === 'create' && clientTempId && noteFromServer) {
+                _finalizeNewNote(clientTempId, noteFromServer);
+            } else if (opResult.type === 'update' && noteFromServer) {
+                updateNoteInCurrentPage(noteFromServer);
+                // Optionally, trigger a targeted DOM update for this specific note if its properties changed
+                // e.g., if (window.ui.updateNoteElement) window.ui.updateNoteElement(noteFromServer.id, noteFromServer);
+            } else if (opResult.type === 'delete' && deletedNoteId) {
+                // Local state removal was optimistic and done by the caller. This is a server confirmation.
+                console.log(`[${userActionName} BATCH] Confirmed deletion of note ID: ${deletedNoteId}`);
+            } else if (opResult.status === 'success') {
+                // A successful operation type not covered above (e.g. a 'read' if batch ever supports it)
+                console.log(`[${userActionName} BATCH] Successfully processed unhandled operation type: ${opResult.type}`);
+            }
+        });
+
+        if (!allSubOperationsSucceeded) {
+            // If any sub-operation failed (as reported by server within a 2xx response),
+            // treat it as an overall failure needing a revert.
+            throw new Error(`One or more sub-operations in '${userActionName}' failed on the server side.`);
+        }
+
+        success = true;
+        window.ui.updateSaveStatusIndicator('saved');
+
+    } catch (error) { // Catches errors from API call, or errors thrown from processing results
+        const errorMessage = error.message || `Batch operation '${userActionName}' failed.`;
+        console.error(`[${userActionName} BATCH] Overall error: ${errorMessage}`, error.stack ? `\nStack: ${error.stack}` : '');
+        
+        // User feedback
+        alert(`${errorMessage} Reverting local changes.`);
+        window.ui.updateSaveStatusIndicator('error');
+
+        // Revert local state to the state *before* the caller made its optimistic changes
+        setNotesForCurrentPage(originalNotesState);
+
+        // Re-render the entire notes list from the reverted state
+        if (window.ui && typeof window.ui.displayNotes === 'function' && currentPageId) {
+            window.ui.displayNotes(notesForCurrentPage, currentPageId);
+            // TODO: Consider re-focusing the element that triggered the action.
+            // This is complex because the element might no longer exist or might have a different ID/state.
+            // Example: if a new note creation failed, the temporary note element is gone.
+            // If an indent failed, the original note element might need to be focused.
+        } else {
+            console.warn(`[${userActionName} BATCH] Could not re-render notes after batch failure. UI might be inconsistent.`);
+        }
+        success = false;
+    } finally {
+        // Always ensure the current local state (either successfully updated or reverted) is sorted.
+        notesForCurrentPage.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    }
+    return success;
+}
+
+
+// --- Note Saving Logic (Single Note - for content edits, tasks) ---
+/**
+ * Saves a single note's content and properties to the server.
+ * Used for debounced saves or immediate saves of content changes.
+ * @param {string} noteId - The ID of the note. Must be a permanent ID.
  * @param {string} rawContent - The raw string content of the note.
- * @param {boolean} [isImmediateSave=false] - Flag to indicate if this is an immediate save.
+ * @param {boolean} [isImmediateSave=false] - Flag for logging/differentiating save type.
  * @returns {Promise<Object|null>} The updated note object from the server, or null if save failed.
  */
 async function _saveNoteToServer(noteId, rawContent, isImmediateSave = false) {
+    if (String(noteId).startsWith('temp-')) {
+        console.warn(`[_saveNoteToServer] Attempted to save note with temporary ID: ${noteId}. This should be part of a batch create or update after ID assignment.`);
+        return null;
+    }
     const saveType = isImmediateSave ? "IMMEDIATE" : "DEBOUNCED";
-    
-    // It's possible noteId might still be temporary (e.g. 'new-xxx') if this is the very first save
-    // for a note created by handleEnterKey or handleAddRootNote, if the initial input handler
-    // that calls saveNoteImmediately hasn't yet received a permanent ID from the server.
-    // However, notesAPI.updateNote should ideally handle creating the note if ID is 'new-xxx'
-    // or the server should return an error if it can't find/create.
-    // For now, we assume the noteId will be resolvable by the server or is a permanent ID.
-    // if (noteId.startsWith('temp-') || noteId.startsWith('new-')) {
-    //     console.warn(`[_saveNoteToServer ${saveType}] Attempted to save temporary/new note: ${noteId}. This should ideally be handled by createNote first.`);
-    //     // Depending on backend, this might need to be a createNote call or special handling.
-    //     // For now, proceeding with updateNote, assuming backend might handle 'new-xxx' as create.
-    // }
-
     window.ui.updateSaveStatusIndicator('pending');
-    console.log(`[_saveNoteToServer ${saveType}] Attempting to save noteId: ${noteId}`);
-    console.log(`[_saveNoteToServer ${saveType}] Raw content for noteId ${noteId}:`, JSON.stringify(rawContent));
-
     try {
         const explicitProperties = parsePropertiesFromText(rawContent);
         let contentToSave = rawContent;
 
         if (window.currentPageEncryptionKey && window.decryptionPassword) {
-            try {
-                contentToSave = sjcl.encrypt(window.decryptionPassword, rawContent);
-                if (!explicitProperties['encrypted']) {
-                    explicitProperties['encrypted'] = [];
-                }
-                explicitProperties['encrypted'].push('true');
-                console.log(`[_saveNoteToServer ${saveType}] Encrypted content for noteId: ${noteId}`);
-            } catch (e) {
-                console.error(`_saveNoteToServer (${saveType}): Encryption failed for noteId ${noteId}. Error:`, e);
-                window.ui.updateSaveStatusIndicator('error');
-                alert('Critical Error: Encryption failed. Note was not saved. Please verify your password or contact support if the issue persists.');
-                return null;
-            }
+            contentToSave = sjcl.encrypt(window.decryptionPassword, rawContent);
+            if (!explicitProperties.encrypted) explicitProperties.encrypted = [];
+            if (!explicitProperties.encrypted.includes('true')) explicitProperties.encrypted.push('true');
         }
         
         const updatePayload = { 
@@ -162,211 +316,523 @@ async function _saveNoteToServer(noteId, rawContent, isImmediateSave = false) {
             properties_explicit: explicitProperties
         };
         
-        const updatedNote = await notesAPI.updateNote(noteId, updatePayload);
-        console.log(`_saveNoteToServer (${saveType}): Received updatedNote from server for noteId ${updatedNote.id}.`);
+        const updatedNote = await notesAPI.updateNote(noteId, updatePayload); // Uses single update API
         
-        if (noteId !== updatedNote.id) {
-            console.log(`_saveNoteToServer (${saveType}): Note ID changed from ${noteId} to ${updatedNote.id}. Updating state and DOM.`);
+        // It's unlikely a backend would change an ID on update, but this handles it.
+        if (String(updatedNote.id) !== String(noteId)) {
+             console.warn(`[_saveNoteToServer] Note ID changed by server from ${noteId} to ${updatedNote.id}. This is unusual for an update.`);
+            // If this happens, need to update the ID in notesForCurrentPage and DOM.
             const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(noteId));
-            if (noteIndex > -1) {
-                notesForCurrentPage[noteIndex].id = updatedNote.id;
-            }
+            if (noteIndex > -1) notesForCurrentPage[noteIndex].id = updatedNote.id;
             const noteEl = getNoteElementById(noteId); 
             if (noteEl) {
                 noteEl.dataset.noteId = updatedNote.id;
-                const contentDiv = noteEl.querySelector('.note-content');
-                if (contentDiv) contentDiv.dataset.noteId = updatedNote.id;
-                const bulletEl = noteEl.querySelector('.note-bullet');
-                if (bulletEl) bulletEl.dataset.noteId = updatedNote.id;
+                noteEl.querySelector('.note-content')?.setAttribute('data-note-id', updatedNote.id);
+                noteEl.querySelector('.note-bullet')?.setAttribute('data-note-id', updatedNote.id);
             }
         }
         
         updateNoteInCurrentPage(updatedNote); 
-        window.ui.updateNoteElement(updatedNote.id, updatedNote); 
+        if (window.ui && typeof window.ui.updateNoteElement === 'function') {
+            window.ui.updateNoteElement(updatedNote.id, updatedNote);
+        }
         window.ui.updateSaveStatusIndicator('saved');
         return updatedNote;
-
     } catch (error) {
-        const errorMessage = error.message || 'An unknown error occurred.';
         console.error(`_saveNoteToServer (${saveType}): Error updating note ${noteId}. Error:`, error);
         window.ui.updateSaveStatusIndicator('error');
-        if (error.response && error.response.data) {
-            console.error(`_saveNoteToServer (${saveType}): Server error details for note ${noteId}:`, error.response.data);
-        }
-        // No alert here as save status indicator is primary UI feedback for general save errors.
-        // Critical encryption error is alerted above.
+        // Avoid alert for non-critical background saves; status indicator is primary feedback.
         return null;
     }
 }
 
-
+/**
+ * Immediately saves the content of a note element.
+ * @param {HTMLElement} noteEl - The note's DOM element.
+ * @returns {Promise<Object|null>} The updated note object from server or null.
+ */
 export async function saveNoteImmediately(noteEl) {
     const noteId = noteEl.dataset.noteId;
-    // It's possible that noteId here is still a temporary 'new-XYZ' if this is the very first save.
-    // _saveNoteToServer and the backend should handle this scenario (e.g. by creating if ID is 'new-XYZ').
-
+    if (String(noteId).startsWith('temp-')) {
+        console.warn("[saveNoteImmediately] Attempted to save note with temporary ID:", noteId);
+        return null;
+    }
     const contentDiv = noteEl.querySelector('.note-content');
-    // For immediate save, always get the freshest content from the DOM
+    if (!contentDiv) return null;
+
     const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
     const rawContent = window.ui.normalizeNewlines(rawTextValue);
-    
-    // Update dataset.rawContent before saving, so it's consistent if debouncedSave follows.
-    contentDiv.dataset.rawContent = rawContent;
-
+    contentDiv.dataset.rawContent = rawContent; // Ensure dataset is up-to-date
     return await _saveNoteToServer(noteId, rawContent, true);
 }
 
+/**
+ * Debounced function to save a note's content.
+ * @param {HTMLElement} noteEl - The note's DOM element.
+ */
 export const debouncedSaveNote = debounce(async (noteEl) => {
     const noteId = noteEl.dataset.noteId;
+    if (String(noteId).startsWith('temp-')) return;
+
     const contentDiv = noteEl.querySelector('.note-content');
+    if (!contentDiv) return;
     
     // For debounced save, rely on dataset.rawContent which should be updated on input/blur
-    const currentRawContent = contentDiv.dataset.rawContent !== undefined && contentDiv.dataset.rawContent !== null 
-        ? contentDiv.dataset.rawContent 
-        : '';
-
+    const currentRawContent = contentDiv.dataset.rawContent || '';
     const noteData = getNoteDataById(noteId);
 
-    // If note content hasn't changed and it's not a newly created note (which might just be getting its initial save), skip.
-    // 'new-' prefix is used for notes that haven't been saved to the server yet.
-    // `noteData.content` here is the last known *saved* content from the server.
-    if (noteData && noteData.content === currentRawContent && !String(noteId).startsWith('new-')) {
-        // console.log('[DEBOUNCED SAVE] Content unchanged for noteId:', noteId, '. Skipping save.');
-        // Ensure status is 'saved' if no changes
-        const currentSaveStatus = saveStatus; // Use imported saveStatus
-        if (currentSaveStatus !== 'saved') {
+    // If note content hasn't changed, skip.
+    if (noteData && noteData.content === currentRawContent) {
+        if (window.ui && typeof window.ui.getSaveStatus === 'function' && window.ui.getSaveStatus() !== 'saved') {
             window.ui.updateSaveStatusIndicator('saved');
         }
         return;
     }
-    
-    // If noteId still starts with 'new-', it implies this is its first proper save attempt after creation.
-    // The content of a 'new-' note in noteData might be empty initially.
-    // The check above handles subsequent saves after the first successful one.
-
     await _saveNoteToServer(noteId, currentRawContent, false);
-}, 1000);
+}, 1000); // 1-second debounce
 
 
-// --- Event Handler: Add Root Note ---
+// --- Event Handlers for Structural Changes (Using Batch API) ---
+
+/**
+ * Handles adding a new root-level note to the current page.
+ */
 export async function handleAddRootNote() {
-    const pageIdToUse = currentPageId; 
+    const pageIdToUse = currentPageId;
     if (!pageIdToUse) {
         alert('Please select or create a page first.');
         return;
     }
 
-    try {
-        const rootNotes = notesForCurrentPage
-            .filter(n => n.parent_note_id === null || typeof n.parent_note_id === 'undefined')
-            .sort((a, b) => a.order_index - b.order_index);
+    const clientTempId = `temp-R-${Date.now()}`;
+    const operations = [];
+
+    // --- State backup MUST happen BEFORE any optimistic updates ---
+    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+
+    const rootNotes = notesForCurrentPage
+        .filter(n => !n.parent_note_id)
+        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const previousSiblingId = rootNotes.length > 0 ? String(rootNotes[rootNotes.length - 1].id) : null;
+    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, null, previousSiblingId, null);
+
+    const optimisticNewNote = {
+        id: clientTempId, page_id: pageIdToUse, content: '', parent_note_id: null,
+        order_index: targetOrderIndex, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        properties: {}, client_temp_id: clientTempId // Important for UI mapping
+    };
+    addNoteToCurrentPage(optimisticNewNote); // Optimistic state update
+
+    operations.push({
+        type: 'create',
+        payload: {
+            page_id: pageIdToUse, content: '', parent_note_id: null,
+            order_index: targetOrderIndex, client_temp_id: clientTempId
+        }
+    });
+
+    siblingUpdates.forEach(update => {
+        const noteToUpdate = getNoteDataById(update.id);
+        if (noteToUpdate) updateNoteInCurrentPage({ ...noteToUpdate, order_index: update.newOrderIndex });
+        operations.push({
+            type: 'update',
+            payload: { id: update.id, page_id: pageIdToUse, order_index: update.newOrderIndex }
+        });
+    });
+    // Local state sorting will be handled by executeBatchOperations.finally or after optimisticDOMUpdater
+
+    const optimisticDOMUpdater = () => {
+        notesForCurrentPage.sort((a,b) => (a.order_index || 0) - (b.order_index || 0)); // Sort before DOM update
+        // Sibling DOM elements might need reordering here if not handled by addNoteElement implicitly
+        // For now, relying on addNoteElement to place correctly or a refresh after batch.
+        const noteEl = window.ui.addNoteElement(optimisticNewNote, notesContainer, 0); // 0 for root level
+        const contentDiv = noteEl?.querySelector('.note-content');
+        if (contentDiv) {
+            contentDiv.dataset.rawContent = '';
+            window.ui.switchToEditMode(contentDiv);
+        }
+    };
+
+    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Add Root Note");
+}
+
+/**
+ * Handles the Enter key press in a note, creating a new sibling note.
+ * @param {Event} e - The keyboard event.
+ * @param {HTMLElement} noteItem - The DOM element of the current note.
+ * @param {Object} noteData - The data object for the current note.
+ * @param {HTMLElement} contentDiv - The content-editable div of the current note.
+ */
+async function handleEnterKey(e, noteItem, noteData, contentDiv) {
+    if (contentDiv.classList.contains('rendered-mode')) {
+        e.preventDefault(); window.ui.switchToEditMode(contentDiv); return;
+    }
+    if (e.shiftKey) { // Handle Shift+Enter for newline
+        // Allow default browser behavior for Shift+Enter (inserts <br> or new div)
+        // Then, ensure rawContent is updated for save
+        const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
+        contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue);
+        debouncedSaveNote(noteItem); // Save the current note's change with the newline
+        return; // Do not prevent default for Shift+Enter
+    }
+    e.preventDefault(); // Prevent default Enter behavior (usually newline) for non-Shift+Enter
+
+    if (!noteData) { console.error("EnterKey: current noteData missing."); return; }
+    const pageIdToUse = currentPageId;
+    if (!pageIdToUse) { console.error("EnterKey: currentPageId missing."); return; }
+
+    const clientTempId = `temp-E-${Date.now()}`;
+    const operations = [];
+    const parentIdForNewNote = noteData.parent_note_id;
+    const previousSiblingIdForNewNote = String(noteData.id);
+
+    // --- State backup MUST happen BEFORE any optimistic updates ---
+    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+
+    const siblingsOfCurrentNote = notesForCurrentPage.filter(n =>
+        String(n.parent_note_id ?? null) === String(parentIdForNewNote ?? null)
+    ).sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const currentNoteIdx = siblingsOfCurrentNote.findIndex(n => String(n.id) === String(noteData.id));
+    const nextSiblingIdForNewNote = (currentNoteIdx !== -1 && currentNoteIdx < siblingsOfCurrentNote.length - 1)
+        ? String(siblingsOfCurrentNote[currentNoteIdx + 1].id) : null;
+
+    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
+        notesForCurrentPage, parentIdForNewNote, previousSiblingIdForNewNote, nextSiblingIdForNewNote
+    );
+
+    const optimisticNewNote = {
+        id: clientTempId, page_id: pageIdToUse, content: '', parent_note_id: parentIdForNewNote,
+        order_index: targetOrderIndex, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        properties: {}, client_temp_id: clientTempId
+    };
+    addNoteToCurrentPage(optimisticNewNote);
+
+    operations.push({
+        type: 'create',
+        payload: {
+            page_id: pageIdToUse, content: '', parent_note_id: parentIdForNewNote,
+            order_index: targetOrderIndex, client_temp_id: clientTempId
+        }
+    });
+
+    siblingUpdates.forEach(update => {
+        const noteToUpdate = getNoteDataById(update.id);
+        if (noteToUpdate) updateNoteInCurrentPage({ ...noteToUpdate, order_index: update.newOrderIndex });
+        operations.push({
+            type: 'update',
+            payload: { id: update.id, page_id: pageIdToUse, order_index: update.newOrderIndex }
+        });
+    });
+
+    const optimisticDOMUpdater = () => {
+        notesForCurrentPage.sort((a,b) => (a.order_index || 0) - (b.order_index || 0));
+        const currentNestingLevel = window.ui.getNestingLevel(noteItem);
+        // renderNote is for a full note structure, addNoteElement might be more appropriate if it handles insertion
+        const newNoteEl = window.ui.renderNote(optimisticNewNote, currentNestingLevel);
+
+        const parentDomContainer = noteItem.parentElement; // New note is a sibling
+        if (parentDomContainer) {
+            parentDomContainer.insertBefore(newNoteEl, noteItem.nextSibling);
+        } else {
+            console.error("[EnterKey BATCH] Current note item has no parent. Appending to notesContainer.");
+            notesContainer.appendChild(newNoteEl); // Fallback
+        }
         
-        const previousSiblingId = rootNotes.length > 0 ? String(rootNotes[rootNotes.length - 1].id) : null;
-        const nextSiblingId = null; // New root notes are added at the end.
-        const parentId = null;
+        const newContentDiv = newNoteEl?.querySelector('.note-content');
+        if (newContentDiv) {
+            newContentDiv.dataset.rawContent = '';
+            window.ui.switchToEditMode(newContentDiv);
+        }
+    };
 
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
-            notesForCurrentPage,
-            parentId,
-            previousSiblingId,
-            nextSiblingId
-        );
+    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Note (Enter)");
+}
 
-        const newNotePayload = {
-            page_id: pageIdToUse,
-            content: '',
-            parent_note_id: parentId,
-            order_index: targetOrderIndex // Use targetOrderIndex from service
-        };
-        
-        console.log(`[NOTE CREATION] Adding root note. PrevSiblingId: ${previousSiblingId}, NextSiblingId: ${nextSiblingId}. Calculated targetOrderIndex: ${targetOrderIndex}, SiblingUpdates:`, siblingUpdates);
+/**
+ * Handles Tab (indent) and Shift+Tab (outdent) key presses in a note.
+ * @param {Event} e - The keyboard event.
+ * @param {HTMLElement} noteItem - The DOM element of the current note.
+ * @param {Object} noteData - The data object for the current note.
+ * @param {HTMLElement} contentDiv - The content-editable div of the current note.
+ */
+async function handleTabKey(e, noteItem, noteData, contentDiv) {
+    e.preventDefault();
+    if (!noteData) return;
 
-        // Optimistic local updates for siblings FIRST, before primary note creation changes array length/order
-        siblingUpdates.forEach(update => {
-            const noteToUpdate = getNoteDataById(update.id);
-            if (noteToUpdate) {
-                updateNoteInCurrentPage({ ...noteToUpdate, order_index: update.newOrderIndex });
+    const currentRawContent = contentDiv.dataset.rawContent || window.ui.getRawTextWithNewlines(contentDiv);
+    const normalizedCurrentContent = window.ui.normalizeNewlines(currentRawContent);
+
+    if (normalizedCurrentContent !== noteData.content) {
+        window.ui.updateSaveStatusIndicator('pending');
+        const savedNote = await _saveNoteToServer(noteData.id, normalizedCurrentContent, true);
+        if (savedNote) {
+            // Update noteData with confirmed values from server
+            noteData.content = savedNote.content;
+            noteData.updated_at = savedNote.updated_at;
+            noteData.properties = savedNote.properties || parsePropertiesFromText(savedNote.content); // Ensure properties are synced
+            contentDiv.dataset.rawContent = savedNote.content; // Update DOM dataset
+            window.ui.updateSaveStatusIndicator('saved');
+        } else {
+            alert("Failed to save current note's changes before indent/outdent. Aborting operation.");
+            window.ui.updateSaveStatusIndicator('error');
+            return;
+        }
+    }
+
+    // --- State backup MUST happen BEFORE any optimistic updates for the indent/outdent ---
+    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+
+    const operations = [];
+    let newParentIdForMovedNote = noteData.parent_note_id;
+    let newOrderIndexForMovedNote = noteData.order_index;
+    let destinationSiblingUpdates = []; // Updates for siblings in the new parent list
+    let sourceSiblingOperationsPayloads = []; // Payloads for updating siblings in the old parent list
+
+    const originalParentId = noteData.parent_note_id;
+    const originalOrderIndex = noteData.order_index;
+    const originalNoteDataForRevert = { ...getNoteDataById(noteData.id) }; // Backup before changing
+
+    if (e.shiftKey) { // Outdent
+        if (!originalParentId) return; // Already root
+        const oldParentNoteData = getNoteDataById(originalParentId);
+        if (!oldParentNoteData) { console.error("Outdent: Old parent data missing for ID:", originalParentId); return; }
+
+        newParentIdForMovedNote = oldParentNoteData.parent_note_id; // New parent is grandparent
+        const prevSiblingForMoved = String(oldParentNoteData.id); // Moved note comes after its old parent
+
+        const siblingsOfGrandparent = notesForCurrentPage.filter(n =>
+            String(n.parent_note_id ?? null) === String(newParentIdForMovedNote ?? null)
+        ).sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const oldParentIdxInGrandparentList = siblingsOfGrandparent.findIndex(n => String(n.id) === String(oldParentNoteData.id));
+        const nextSiblingForMoved = (oldParentIdxInGrandparentList !== -1 && oldParentIdxInGrandparentList < siblingsOfGrandparent.length - 1)
+            ? String(siblingsOfGrandparent[oldParentIdxInGrandparentList + 1].id) : null;
+
+        const calcResult = calculateOrderIndex(notesForCurrentPage, newParentIdForMovedNote, prevSiblingForMoved, nextSiblingForMoved);
+        newOrderIndexForMovedNote = calcResult.targetOrderIndex;
+        destinationSiblingUpdates = calcResult.siblingUpdates;
+    } else { // Indent
+        const currentLevelSiblings = notesForCurrentPage.filter(n =>
+            String(n.parent_note_id ?? null) === String(originalParentId ?? null)
+        ).sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const currentNoteIdx = currentLevelSiblings.findIndex(n => String(n.id) === String(noteData.id));
+
+        if (currentNoteIdx <= 0) return; // Cannot indent first child or if no previous sibling
+        const potentialNewParent = currentLevelSiblings[currentNoteIdx - 1];
+        if (!potentialNewParent) return;
+
+        newParentIdForMovedNote = String(potentialNewParent.id);
+        const childrenOfNewParent = notesForCurrentPage.filter(n =>
+            String(n.parent_note_id ?? null) === newParentIdForMovedNote
+        ).sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const prevSiblingForMoved = childrenOfNewParent.length > 0
+            ? String(childrenOfNewParent[childrenOfNewParent.length - 1].id) : null;
+
+        const calcResult = calculateOrderIndex(notesForCurrentPage, newParentIdForMovedNote, prevSiblingForMoved, null);
+        newOrderIndexForMovedNote = calcResult.targetOrderIndex;
+        destinationSiblingUpdates = calcResult.siblingUpdates;
+    }
+
+    // --- Optimistic Local State Update (Moved Note) ---
+    updateNoteInCurrentPage({ ...noteData, parent_note_id: newParentIdForMovedNote, order_index: newOrderIndexForMovedNote });
+    operations.push({
+        type: 'update',
+        payload: {
+            id: noteData.id, page_id: currentPageId,
+            parent_note_id: newParentIdForMovedNote, order_index: newOrderIndexForMovedNote,
+            content: noteData.content // Content is up-to-date
+        }
+    });
+
+    destinationSiblingUpdates.forEach(update => {
+        const noteToUpdate = getNoteDataById(update.id);
+        if (noteToUpdate) updateNoteInCurrentPage({ ...noteToUpdate, order_index: update.newOrderIndex });
+        operations.push({
+            type: 'update',
+            payload: { id: update.id, page_id: currentPageId, order_index: update.newOrderIndex }
+        });
+    });
+
+    // --- Re-index Source Siblings if parent changed ---
+    if (String(originalParentId ?? null) !== String(newParentIdForMovedNote ?? null)) {
+        const sourceSiblingsToReindex = notesForCurrentPage
+            .filter(n => String(n.parent_note_id ?? null) === String(originalParentId ?? null) && String(n.id) !== String(noteData.id))
+            .sort((a, b) => (a.order_index || 0) - (b.order_index || 0)); // Sort by current order_index
+
+        sourceSiblingsToReindex.forEach((sibling, index) => {
+            if ((sibling.order_index || 0) !== index) { // Check if order_index needs update
+                const noteToUpdate = getNoteDataById(sibling.id);
+                if (noteToUpdate) updateNoteInCurrentPage({ ...noteToUpdate, order_index: index });
+                sourceSiblingOperationsPayloads.push({ id: sibling.id, page_id: currentPageId, order_index: index });
             }
         });
-        // notesForCurrentPage.sort((a, b) => a.order_index - b.order_index); // Sort after all potential changes
+        sourceSiblingOperationsPayloads.forEach(payload => operations.push({ type: 'update', payload }));
+    }
+    
+    const optimisticDOMUpdater = () => {
+        notesForCurrentPage.sort((a,b) => (a.order_index || 0) - (b.order_index || 0));
+        const movedNoteElement = getNoteElementById(noteData.id); // Get the element again after state updates
+        if (!movedNoteElement) { console.error("Tab: Moved note element not found in DOM for update."); return; }
 
-        const apiPromises = [];
+        let targetParentDomEl;
+        let newNestingLevel;
+        let insertBeforeEl = null;
 
-        // Primary note creation
-        const primaryNotePromise = notesAPI.createNote(newNotePayload)
-            .then(savedNote => {
-                if (savedNote) {
-                    console.log(`[NOTE CREATION] Received from server: id=${savedNote.id}, server_assigned_order_index=${savedNote.order_index}, content="${savedNote.content}"`);
-                    // Optimistically add/update the primary note in local state
-                    addNoteToCurrentPage(savedNote); 
-                    
-                    // Sort notesForCurrentPage by order_index after all local updates are applied
-                    notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
-                    
-                    const noteEl = window.ui.addNoteElement(savedNote, notesContainer, 0); 
+        if (e.shiftKey) { // Outdent
+            const oldParentNoteEl = getNoteElementById(originalParentId); // This is the note that WAS the parent
+            targetParentDomEl = oldParentNoteEl ? oldParentNoteEl.parentElement : notesContainer; // New parent container is grandparent's children container
+            newNestingLevel = window.ui.getNestingLevel(targetParentDomEl); // Nesting level of target container
+             // The moved note should come *after* its old parent.
+            insertBeforeEl = oldParentNoteEl ? oldParentNoteEl.nextElementSibling : null;
 
-                    const contentDiv = noteEl ? noteEl.querySelector('.note-content') : null;
-                    if (contentDiv) {
-                        contentDiv.dataset.rawContent = '';
-                        window.ui.switchToEditMode(contentDiv); 
-                        
-                        const initialInputHandler = async (e) => {
-                            const currentContent = contentDiv.textContent;
-                            if (currentContent !== '') {
-                                contentDiv.dataset.rawContent = currentContent;
-                                await saveNoteImmediately(noteEl);
-                                contentDiv.removeEventListener('input', initialInputHandler);
-                            }
-                        };
-                        contentDiv.addEventListener('input', initialInputHandler);
-                    }
-                    return { status: 'fulfilled', value: savedNote };
-                }
-                return { status: 'rejected', reason: 'No saved note returned from API' };
-            })
-            .catch(error => ({ status: 'rejected', reason: error }));
+        } else { // Indent
+            const newParentNoteDomEl = getNoteElementById(newParentIdForMovedNote);
+            if (!newParentNoteDomEl) { console.error("Indent: New parent DOM element not found."); return; }
+            targetParentDomEl = newParentNoteDomEl.querySelector('.note-children');
+            if (!targetParentDomEl) {
+                targetParentDomEl = document.createElement('div');
+                targetParentDomEl.className = 'note-children';
+                newParentNoteDomEl.appendChild(targetParentDomEl);
+                // if (typeof Sortable !== 'undefined' && Sortable.create) { /* Make sortable */ }
+            }
+            newNestingLevel = window.ui.getNestingLevel(newParentNoteDomEl) + 1;
+            // No insertBeforeEl, append to end of new children list
+        }
         
-        apiPromises.push(primaryNotePromise);
+        window.ui.moveNoteElement(movedNoteElement, targetParentDomEl, newNestingLevel, insertBeforeEl);
+        const movedContentDiv = movedNoteElement.querySelector('.note-content');
+        if (movedContentDiv) window.ui.switchToEditMode(movedContentDiv);
+    };
 
-        // Sibling updates
-        siblingUpdates.forEach(update => {
-            const siblingNoteData = getNoteDataById(update.id); // get it again, in case it was the new note somehow (should not happen)
-            if (siblingNoteData) { // Ensure note exists before trying to update
-                 apiPromises.push(
-                    notesAPI.updateNote(update.id, { order_index: update.newOrderIndex, page_id: pageIdToUse })
-                        .then(updatedSiblingNote => {
-                             // Ensure local state matches server for this sibling
-                            updateNoteInCurrentPage(updatedSiblingNote); 
-                            return { status: 'fulfilled', value: updatedSiblingNote };
-                        })
-                        .catch(error => ({ status: 'rejected', reason: error, id: update.id }))
-                );
-            }
-        });
-
-        const results = await Promise.allSettled(apiPromises);
-        console.log('[handleAddRootNote] API call results:', results);
-        results.forEach(result => {
-            if (result.status === 'rejected') {
-                console.error(`[handleAddRootNote] Failed operation:`, result.reason);
-                // Basic alert for now, could be more sophisticated
-                // alert(`An error occurred while saving note changes. Some notes might not be updated correctly. Details: ${result.reason?.message || result.reason}`);
-            }
-        });
-        // Re-sort and re-render if necessary after all API calls, especially if optimistic updates were reverted on error
-        // For now, optimistic updates are kept.
-        notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
-        // Potentially call a function here to re-render the notes list if DOM isn't reflecting sorted state
-        // window.ui.displayNotes(notesForCurrentPage, currentPageId); // Example if full re-render is needed
-
-    } catch (error) {
-        const errorMessage = error.message || 'Please check connection and try again.';
-        console.error('handleAddRootNote: Overall error. Error:', error);
-        alert(`Failed to create new root note. ${errorMessage}`);
+    const success = await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
+    if (!success) {
+        // If batch fails, executeBatchOperations handles global revert.
+        // We might need to restore the specific moved note's original state if it was altered before the backup.
+        // However, originalNotesState in executeBatchOperations should capture the state before any changes in this function.
+        // The prerequisite save of content is the only change before originalNotesState is cloned.
     }
 }
 
-// --- Keyboard Interaction Helpers & Main Handler ---
+/**
+ * Handles Backspace key press in an empty note, deleting it.
+ * @param {Event} e - The keyboard event.
+ * @param {HTMLElement} noteItem - The DOM element of the current note.
+ * @param {Object} noteData - The data object for the current note.
+ * @param {HTMLElement} contentDiv - The content-editable div of the current note.
+ */
+async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
+    if (!noteData || String(noteData.id).startsWith('temp-')) return;
+
+    if (contentDiv.classList.contains('edit-mode') && (contentDiv.dataset.rawContent || contentDiv.textContent).trim() === '') {
+        const children = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteData.id));
+        if (children.length > 0) {
+            console.log('Backspace: Note has children, not deleting:', noteData.id); return;
+        }
+        if (notesForCurrentPage.length === 1 && !noteData.parent_note_id) {
+            console.log('Backspace: Cannot delete the only root note:', noteData.id); return;
+        }
+        e.preventDefault();
+
+        let noteToFocusAfterDeleteEl = null;
+        const allVisibleNoteItems = Array.from(notesContainer.querySelectorAll('.note-item:not(.note-hidden)'));
+        const currentDOMIndex = allVisibleNoteItems.findIndex(el => el === noteItem);
+
+        if (currentDOMIndex > 0) { // Try to focus previous sibling
+            noteToFocusAfterDeleteEl = allVisibleNoteItems[currentDOMIndex - 1];
+        } else if (allVisibleNoteItems.length > 1 && currentDOMIndex + 1 < allVisibleNoteItems.length) { // Try next sibling
+            noteToFocusAfterDeleteEl = allVisibleNoteItems[currentDOMIndex + 1];
+        } else if (noteData.parent_note_id) { // Try parent
+            noteToFocusAfterDeleteEl = getNoteElementById(noteData.parent_note_id);
+        } // If still null, no specific focus target after delete (e.g., last note on page deleted)
+
+
+        // --- State backup MUST happen BEFORE any optimistic updates ---
+        const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+
+        const noteIdToDelete = noteData.id;
+        const parentIdOfDeleted = noteData.parent_note_id;
+
+        // Optimistic Local State Update: Remove first
+        removeNoteFromCurrentPageById(noteIdToDelete);
+
+        // Prepare operations: delete + re-index siblings
+        const operations = [{ type: 'delete', payload: { id: noteIdToDelete } }];
+        const siblingsOfDeleted = notesForCurrentPage // Get siblings from already-updated list
+            .filter(n => String(n.parent_note_id ?? null) === String(parentIdOfDeleted ?? null))
+            .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+        siblingsOfDeleted.forEach((sibling, index) => {
+            if ((sibling.order_index || 0) !== index) {
+                const noteToUpdate = getNoteDataById(sibling.id);
+                if (noteToUpdate) updateNoteInCurrentPage({ ...noteToUpdate, order_index: index });
+                operations.push({
+                    type: 'update',
+                    payload: { id: sibling.id, page_id: currentPageId, order_index: index }
+                });
+            }
+        });
+
+        const optimisticDOMUpdater = () => {
+            // notesForCurrentPage is already sorted if sibling re-indexing happened.
+            // DOM update for siblings might be needed if visual order changes.
+            window.ui.removeNoteElement(noteIdToDelete);
+        };
+
+        const success = await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Delete Note (Backspace)");
+        if (success && noteToFocusAfterDeleteEl) {
+            const contentDivToFocus = noteToFocusAfterDeleteEl.querySelector('.note-content');
+            if (contentDivToFocus) window.ui.switchToEditMode(contentDivToFocus);
+        } else if (success && notesForCurrentPage.length === 0 && currentPageId) {
+            console.log("All notes deleted. Page is empty.");
+            // Optionally, trigger creation of a new first note:
+            // if (typeof window.handleCreateAndFocusFirstNote === 'function') { // Check if function exists
+            //     await window.handleCreateAndFocusFirstNote(currentPageId);
+            // }
+        }
+    }
+}
+
+// --- Standard Keyboard Handlers (Non-structural changes) ---
+/**
+ * Handles Arrow Up/Down key presses for navigating between notes.
+ * @param {Event} e - The keyboard event.
+ * @param {HTMLElement} contentDiv - The content-editable div of the current note.
+ */
+function handleArrowKey(e, contentDiv) {
+    e.preventDefault();
+    const allVisibleNotesContent = Array.from(notesContainer.querySelectorAll('.note-item:not(.note-hidden) .note-content'));
+    const currentVisibleIndex = allVisibleNotesContent.indexOf(contentDiv);
+    let nextVisibleIndex = -1;
+
+    if (e.key === 'ArrowUp' && currentVisibleIndex > 0) {
+        nextVisibleIndex = currentVisibleIndex - 1;
+    } else if (e.key === 'ArrowDown' && currentVisibleIndex < allVisibleNotesContent.length - 1) {
+        nextVisibleIndex = currentVisibleIndex + 1;
+    }
+
+    if (nextVisibleIndex !== -1) {
+        const nextNoteContent = allVisibleNotesContent[nextVisibleIndex];
+        window.ui.switchToEditMode(nextNoteContent);
+        // Place cursor at end of content in next note
+        const range = document.createRange();
+        const sel = window.getSelection();
+        if (nextNoteContent.firstChild) { // Check if there's content to select
+            range.selectNodeContents(nextNoteContent);
+            range.collapse(false); // false to collapse to end
+        } else { // If empty, just set cursor at the start
+            range.setStart(nextNoteContent, 0);
+            range.collapse(true);
+        }
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+}
+
+/**
+ * Handles shortcut expansions (e.g., :tag: -> {tag::}).
+ * @param {Event} e - The keyboard event.
+ * @param {HTMLElement} contentDiv - The content-editable div.
+ * @returns {Promise<boolean>} True if a shortcut was handled, false otherwise.
+ */
 async function handleShortcutExpansion(e, contentDiv) {
     if (e.key !== ' ') return false;
     const selection = window.getSelection();
@@ -379,719 +845,241 @@ async function handleShortcutExpansion(e, contentDiv) {
     const textContent = textNode.textContent;
     const precedingText2Chars = textContent.substring(cursorPos - 2, cursorPos);
     let shortcutHandled = false;
+    let replacementText = '';
+    let cursorOffsetAfterReplace = 0;
 
-    if (precedingText2Chars === ':t') { e.preventDefault(); replaceTextAtCursor(2, '{tag::}', 6); shortcutHandled = true; }
-    else if (precedingText2Chars === ':d') { e.preventDefault(); const today = new Date().toISOString().slice(0, 10); replaceTextAtCursor(2, `{date::${today}}`, 18); shortcutHandled = true; }
-    else if (precedingText2Chars === ':r') { e.preventDefault(); const now = new Date().toISOString(); replaceTextAtCursor(2, `{timestamp::${now}}`, 12 + now.length + 1); shortcutHandled = true; }
-    else if (precedingText2Chars === ':k') { e.preventDefault(); replaceTextAtCursor(2, '{keyword::}', 10); shortcutHandled = true; }
+    if (precedingText2Chars === ':t') { replacementText = '{tag::}'; cursorOffsetAfterReplace = 6; }
+    else if (precedingText2Chars === ':d') { const today = new Date().toISOString().slice(0, 10); replacementText = `{date::${today}}`; cursorOffsetAfterReplace = replacementText.length; }
+    else if (precedingText2Chars === ':r') { const now = new Date().toISOString(); replacementText = `{timestamp::${now}}`; cursorOffsetAfterReplace = replacementText.length; }
+    else if (precedingText2Chars === ':k') { replacementText = '{keyword::}'; cursorOffsetAfterReplace = 10; }
+
+    if (replacementText) {
+        e.preventDefault();
+        replaceTextAtCursor(2, replacementText, cursorOffsetAfterReplace);
+        shortcutHandled = true;
+    }
 
     if (shortcutHandled) {
         const noteItemForShortcut = contentDiv.closest('.note-item');
         if (noteItemForShortcut) {
-            const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv); // Assumes ui is global
-            contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue); // Assumes ui is global
-            debouncedSaveNote(noteItemForShortcut);
+            const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
+            contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue);
+            debouncedSaveNote(noteItemForShortcut); // Save after shortcut expansion
         }
         return true;
     }
     return false;
 }
 
-function handleAutocloseBrackets(e) { // e.target is the contentEditable div
+/**
+ * Handles auto-closing of brackets/parentheses/braces.
+ * @param {Event} e - The keyboard event.
+ * @returns {boolean} True if a bracket was auto-closed, false otherwise.
+ */
+function handleAutocloseBrackets(e) {
     let handled = false;
     const selection = window.getSelection();
-    if (!selection.rangeCount) return false;
+    if (!selection || !selection.rangeCount) return false;
     const range = selection.getRangeAt(0);
-    const editor = e.target; // This is the contentEditable div
+    const editor = e.target; // contentEditable div
 
-    if (e.key === '[') {
+    const keyActionMap = { '[': '[]', '{': '{}', '(': '()' };
+
+    if (keyActionMap[e.key]) {
+        const textToInsert = keyActionMap[e.key];
+        let cursorOffset = 1;
+
+        // Special handling for '[' to avoid conflict with manual '[[page]]' typing
+        // if (e.key === '[') {
+        //     const textNode = range.startContainer;
+        //     let textBeforeCursor = "";
+        //     if (textNode.nodeType === Node.TEXT_NODE && range.startOffset > 0) {
+        //         textBeforeCursor = textNode.textContent.substring(range.startOffset - 1, range.startOffset);
+        //     }
+        //     if (textBeforeCursor === '[') { // User typed '[[', let page link suggestions handle it
+        //         return false; // Don't auto-close to '[[[]]]'
+        //     }
+        // }
+        // Simpler: always auto-close. If user types [[, they can backspace one ] if needed.
+        // Or, page-link-suggestions.js might handle [[ typing more gracefully.
+
         e.preventDefault();
-        // Get text immediately before the current cursor position within the editor
-        const textNode = range.startContainer;
-        let textBeforeCursor = "";
-        if (textNode.nodeType === Node.TEXT_NODE) {
-            textBeforeCursor = textNode.textContent.substring(0, range.startOffset);
-        } else { 
-            // Fallback or more complex logic might be needed if cursor is not in a simple text node
-            // For now, using editor.textContent and range.startOffset as a general approach
-            // This might be less accurate if the DOM inside contentEditable is complex.
-            // However, for typical text entry, range.startContainer is often the text node.
-            textBeforeCursor = editor.textContent.substring(0, range.startOffset);
-        }
-        
-        if (textBeforeCursor.endsWith('[')) {
-            // User typed '[' when the char before was already '['.
-            // Initial state (e.g.): X[|Y (cursor is |)
-            // After this `insertTextAtCursor` call, we want X[[|]]Y
-            // `insertTextAtCursor('[]', 1)` will insert '[]' at the cursor position,
-            // and place the cursor at offset 1 within the newly inserted '[]'.
-            // So, X[|Y becomes X[[]|]]Y. This is the correct behavior.
-            insertTextAtCursor('[]', 1);
-        } else {
-            // Standard case: insert '[]', cursor in middle.
-            // e.g. X|Y becomes X[|]Y
-            insertTextAtCursor('[]', 1);
-        }
-        handled = true;
-    } else if (e.key === '{') {
-        e.preventDefault();
-        insertTextAtCursor('{}', 1);
-        handled = true;
-    } else if (e.key === '(') {
-        e.preventDefault();
-        insertTextAtCursor('()', 1);
+        insertTextAtCursor(textToInsert, cursorOffset);
         handled = true;
     }
 
-    // After modification, dispatch an input event so note-renderer's listeners are triggered
     if (handled) {
-        // Ensure the event is dispatched on the correct element that has the 'input' listeners (contentDiv)
+        // Dispatch an input event so note-renderer's listeners (like for page link suggestions) are triggered
         editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
     }
     return handled;
 }
 
-async function handleEnterKey(e, noteItem, noteData, contentDiv) {
-    if (contentDiv.classList.contains('rendered-mode')) {
-        e.preventDefault();
-        window.ui.switchToEditMode(contentDiv);
-        return;
-    }
-    if (e.shiftKey) {
-        const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
-        contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue);
-        debouncedSaveNote(noteItem);
-        return;
-    }
-    e.preventDefault();
-    if (!noteData) { console.error("Cannot create new note with Enter: current noteData is missing."); return; }
-    const pageIdToUse = currentPageId;
-    if (!pageIdToUse) { console.error("Cannot create new note with Enter: currentPageId from state is missing."); return; }
-
-    const parentIdForNewNote = noteData.parent_note_id;
-
-    // Determine previous and next sibling IDs for the new note
-    const previousSiblingId = String(noteData.id); // The new note is created after the current note
-    
-    // Find the next sibling of the current note in the data model
-    // (not just in the DOM, to ensure logical ordering)
-    const siblingsOfCurrentNote = notesForCurrentPage.filter(n => {
-        const nParentId = n.parent_note_id;
-        if (parentIdForNewNote === null || typeof parentIdForNewNote === 'undefined') {
-            return nParentId === null || typeof nParentId === 'undefined';
-        }
-        return String(nParentId) === String(parentIdForNewNote);
-    }).sort((a, b) => a.order_index - b.order_index);
-
-    const currentNoteDataIndexInSiblings = siblingsOfCurrentNote.findIndex(n => String(n.id) === String(noteData.id));
-    let nextSiblingId = null;
-    if (currentNoteDataIndexInSiblings !== -1 && currentNoteDataIndexInSiblings < siblingsOfCurrentNote.length - 1) {
-        nextSiblingId = String(siblingsOfCurrentNote[currentNoteDataIndexInSiblings + 1].id);
-    }
-
-    // Use the new service to calculate order_index
-    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
-        notesForCurrentPage,
-        parentIdForNewNote,
-        previousSiblingId,
-        nextSiblingId
-    );
-
-    console.log(`[NOTE CREATION] Using calculateOrderIndex. ParentId: ${parentIdForNewNote}, PrevSiblingId: ${previousSiblingId}, NextSiblingId: ${nextSiblingId}. Calculated targetOrderIndex: ${targetOrderIndex}, SiblingUpdates:`, siblingUpdates);
-
-    const newNotePayload = {
-        page_id: pageIdToUse,
-        content: '',
-        parent_note_id: parentIdForNewNote,
-        order_index: targetOrderIndex // Use the targetOrderIndex from the service
-    };
-    
-    // Optimistic local updates for siblings FIRST
-    siblingUpdates.forEach(update => {
-        const noteToUpdate = getNoteDataById(update.id);
-        if (noteToUpdate) {
-            updateNoteInCurrentPage({ ...noteToUpdate, order_index: update.newOrderIndex });
-        }
-    });
-
-    const apiPromises = [];
-    try {
-        // Primary note creation
-        const primaryNotePromise = notesAPI.createNote(newNotePayload)
-            .then(savedNewNote => {
-                if (savedNewNote) {
-                    console.log(`[NOTE CREATION] Received from server: id=${savedNewNote.id}, server_assigned_order_index=${savedNewNote.order_index}, content="${savedNewNote.content}"`);
-                    addNoteToCurrentPage(savedNewNote); // Add new note to local state
-
-                    // Sort notesForCurrentPage by order_index after all local updates are applied
-                    notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
-                    
-                    // DOM updates for the new note
-                    let targetDomContainer;
-                    let nestingLevel;
-                    // const currentNestingLevel = window.ui.getNestingLevel(noteItem); // Not used directly for new note placement logic
-
-                    if (parentIdForNewNote) {
-                        const parentNoteElement = getNoteElementById(parentIdForNewNote);
-                        if (parentNoteElement) {
-                            targetDomContainer = parentNoteElement.querySelector('.note-children');
-                            if (!targetDomContainer) {
-                                targetDomContainer = document.createElement('div');
-                                targetDomContainer.className = 'note-children';
-                                parentNoteElement.appendChild(targetDomContainer);
-                                if (typeof Sortable !== 'undefined' && Sortable.create) {
-                                    Sortable.create(targetDomContainer, { group: 'notes', animation: 150, handle: '.note-bullet', ghostClass: 'note-ghost', chosenClass: 'note-chosen', dragClass: 'note-drag', onEnd: handleNoteDrop });
-                                }
-                            }
-                            nestingLevel = window.ui.getNestingLevel(parentNoteElement) + 1;
-                        } else {
-                            console.warn(`Parent element for ID ${parentIdForNewNote} not found. Adding new note to root.`);
-                            targetDomContainer = notesContainer;
-                            nestingLevel = 0;
-                        }
-                    } else {
-                        targetDomContainer = notesContainer;
-                        nestingLevel = 0;
-                    }
-                    
-                    const newNoteEl = window.ui.renderNote(savedNewNote, nestingLevel);
-                    if (noteItem.nextSibling) { // Current note's DOM element
-                        targetDomContainer.insertBefore(newNoteEl, noteItem.nextSibling);
-                    } else {
-                        targetDomContainer.appendChild(newNoteEl);
-                    }
-
-                    const newContentDiv = newNoteEl ? newNoteEl.querySelector('.note-content') : null;
-                    if (newContentDiv) {
-                        newContentDiv.dataset.rawContent = '';
-                        window.ui.switchToEditMode(newContentDiv);
-                        const initialInputHandler = async (evt) => {
-                            const currentContent = newContentDiv.textContent;
-                            if (currentContent !== '') {
-                                newContentDiv.dataset.rawContent = currentContent;
-                                await saveNoteImmediately(newNoteEl);
-                                newContentDiv.removeEventListener('input', initialInputHandler);
-                            }
-                        };
-                        newContentDiv.addEventListener('input', initialInputHandler);
-                    }
-                    return { status: 'fulfilled', value: savedNewNote };
-                }
-                return { status: 'rejected', reason: 'No saved note returned from API for new note' };
-            })
-            .catch(error => ({ status: 'rejected', reason: error, type: 'newNote' }));
-        
-        apiPromises.push(primaryNotePromise);
-
-        // Sibling updates
-        siblingUpdates.forEach(update => {
-            const siblingNoteData = getNoteDataById(update.id);
-            if (siblingNoteData) {
-                apiPromises.push(
-                    notesAPI.updateNote(update.id, { order_index: update.newOrderIndex, page_id: pageIdToUse })
-                        .then(updatedSiblingNote => {
-                            updateNoteInCurrentPage(updatedSiblingNote); // Ensure local state matches server
-                            return { status: 'fulfilled', value: updatedSiblingNote };
-                        })
-                        .catch(error => ({ status: 'rejected', reason: error, id: update.id, type: 'siblingUpdate' }))
-                );
-            }
-        });
-
-        const results = await Promise.allSettled(apiPromises);
-        console.log('[handleEnterKey] API call results:', results);
-        results.forEach(result => {
-            if (result.status === 'rejected') {
-                console.error(`[handleEnterKey] Failed operation: Type: ${result.reason?.type}, ID: ${result.reason?.id}, Reason:`, result.reason);
-            }
-        });
-        // Final sort and potential UI refresh
-        notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
-        // If sibling DOM elements were affected, they might need explicit re-rendering or re-ordering here
-        // window.ui.updateMultipleNotesInDOM(siblingUpdates); // Example placeholder for such a function
-
-    } catch (error) { // Catch errors from calculateOrderIndex or other synchronous parts
-        const errorMessage = error.message || 'Please check connection and try again.';
-        console.error('handleEnterKey: Overall error creating note. Error:', error);
-        alert(`Failed to create new note. ${errorMessage}`);
-    }
-}
-
-async function handleTabKey(e, noteItem, noteData, contentDiv) {
-    e.preventDefault();
-    if (!noteData) return;
-    let actualSiblingUpdates = []; // Declare here to capture from indent/outdent blocks
-    const currentContentForTab = contentDiv.dataset.rawContent || contentDiv.textContent;
-    if (currentContentForTab !== noteData.content) {
-        await saveNoteImmediately(noteItem);
-        noteData.content = currentContentForTab;
-    }
-    
-    const originalNoteData = JSON.parse(JSON.stringify(noteData));
-    const originalParentDomElement = noteItem.parentElement.closest('.note-item') || notesContainer;
-    const originalNextSibling = noteItem.nextElementSibling;
-    const originalNestingLevel = window.ui.getNestingLevel(noteItem);
-
-    let newParentIdForAPI = null;
-    let newOrderIndexForAPI;
-
-    if (e.shiftKey) { // Outdent
-        if (!noteData.parent_note_id) return; // Already a root note
-        const oldParentNoteData = getNoteDataById(noteData.parent_note_id);
-        if (!oldParentNoteData) { console.error("Outdent: Old parent note data not found for ID:", noteData.parent_note_id); return; }
-
-        newParentIdForAPI = oldParentNoteData.parent_note_id; // This could be null if outdenting to root
-
-        // The note being moved will be placed AFTER its original parent.
-        const previousSiblingId = String(oldParentNoteData.id);
-
-        // Find the next sibling of the oldParentNoteData
-        const siblingsOfOldParent = notesForCurrentPage.filter(n => {
-            const nParentId = n.parent_note_id;
-            if (newParentIdForAPI === null || typeof newParentIdForAPI === 'undefined') {
-                return nParentId === null || typeof nParentId === 'undefined';
-            }
-            return String(nParentId) === String(newParentIdForAPI);
-        }).sort((a, b) => a.order_index - b.order_index);
-        
-        const oldParentIndexInSiblings = siblingsOfOldParent.findIndex(n => String(n.id) === String(oldParentNoteData.id));
-        let nextSiblingId = null;
-        if (oldParentIndexInSiblings !== -1 && oldParentIndexInSiblings < siblingsOfOldParent.length - 1) {
-            nextSiblingId = String(siblingsOfOldParent[oldParentIndexInSiblings + 1].id);
-        }
-        
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, newParentIdForAPI, previousSiblingId, nextSiblingId);
-        newOrderIndexForAPI = targetOrderIndex; // Use from service
-        actualSiblingUpdates = siblingUpdates; // Capture here
-        console.log(`[TAB-KEY OUTDENT] PrevSib: ${previousSiblingId}, NextSib: ${nextSiblingId}, NewParent: ${newParentIdForAPI}, NewOrder: ${newOrderIndexForAPI}, SiblingUpdates:`, actualSiblingUpdates);
-
-        // Optimistic local updates
-        updateNoteInCurrentPage({ ...noteData, parent_note_id: newParentIdForAPI, order_index: newOrderIndexForAPI });
-        siblingUpdates.forEach(update => {
-            const noteToUpdate = getNoteDataById(update.id);
-            if (noteToUpdate) {
-                updateNoteInCurrentPage({ ...noteToUpdate, order_index: update.newOrderIndex });
-            }
-        });
-        notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
-
-
-        // DOM Update (Optimistic) for primary note
-        const newParentDomElement = newParentIdForAPI ? getNoteElementById(newParentIdForAPI) : notesContainer;
-        if (!newParentDomElement && newParentIdForAPI) { console.error("Could not find new parent in DOM for outdent"); return; } // Should throw or revert
-        const newNestingLevel = newParentIdForAPI ? window.ui.getNestingLevel(newParentDomElement) + 1 : 0;
-        const domInsertBefore = oldParentNoteData ? getNoteElementById(oldParentNoteData.id)?.nextElementSibling : null;
-        window.ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, domInsertBefore);
-        // Sibling DOM elements might need re-ordering here if not handled by a general re-render.
-
-    } else { // Indent
-        let potentialNewParentNoteData;
-        const currentLevelSiblings = notesForCurrentPage.filter(n => {
-            const currentNoteParentId = noteData.parent_note_id;
-            const nParentId = n.parent_note_id;
-            if (currentNoteParentId === null || typeof currentNoteParentId === 'undefined') {
-                return nParentId === null || typeof nParentId === 'undefined';
-            }
-            return String(nParentId) === String(currentNoteParentId);
-        }).sort((a, b) => a.order_index - b.order_index);
-
-        const currentNoteIndexInLevel = currentLevelSiblings.findIndex(n => String(n.id) === String(noteData.id));
-        if (currentNoteIndexInLevel <= 0) return; 
-        
-        potentialNewParentNoteData = currentLevelSiblings[currentNoteIndexInLevel - 1];
-        if (!potentialNewParentNoteData) { console.error("Indent: Could not determine new parent note."); return; }
-        
-        newParentIdForAPI = String(potentialNewParentNoteData.id);
-
-        const childrenOfNewParent = notesForCurrentPage
-            .filter(n => String(n.parent_note_id) === newParentIdForAPI)
-            .sort((a, b) => a.order_index - b.order_index);
-        
-        const previousSiblingId = childrenOfNewParent.length > 0 ? String(childrenOfNewParent[childrenOfNewParent.length - 1].id) : null;
-        const nextSiblingId = null;
-
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, newParentIdForAPI, previousSiblingId, nextSiblingId);
-        newOrderIndexForAPI = targetOrderIndex; // Use from service
-        actualSiblingUpdates = siblingUpdates; // Capture here
-        console.log(`[TAB-KEY INDENT] PrevSib: ${previousSiblingId}, NextSib: ${nextSiblingId}, NewParent: ${newParentIdForAPI}, NewOrder: ${newOrderIndexForAPI}, SiblingUpdates:`, actualSiblingUpdates);
-
-        // Optimistic local updates
-        updateNoteInCurrentPage({ ...noteData, parent_note_id: newParentIdForAPI, order_index: newOrderIndexForAPI });
-        siblingUpdates.forEach(update => {
-            const noteToUpdate = getNoteDataById(update.id);
-            if (noteToUpdate) {
-                updateNoteInCurrentPage({ ...noteToUpdate, order_index: update.newOrderIndex });
-            }
-        });
-        notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
-        
-        // DOM Update (Optimistic) for primary note
-        const newParentDomElement = getNoteElementById(newParentIdForAPI); 
-        if (!newParentDomElement) { console.error("Could not find new parent in DOM for indent"); return; } // Should throw or revert
-        const newNestingLevel = window.ui.getNestingLevel(newParentDomElement) + 1;
-        
-        let childrenContainer = newParentDomElement.querySelector('.note-children');
-        if (!childrenContainer) {
-            childrenContainer = document.createElement('div');
-            childrenContainer.className = 'note-children';
-            newParentDomElement.appendChild(childrenContainer);
-            if (typeof Sortable !== 'undefined' && Sortable.create) {
-                Sortable.create(childrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', ghostClass: 'note-ghost', chosenClass: 'note-chosen', dragClass: 'note-drag', onEnd: handleNoteDrop });
-            }
-        }
-        window.ui.moveNoteElement(noteItem, childrenContainer, newNestingLevel, null); 
-        // Sibling DOM elements might need re-ordering here.
-    }
-    window.ui.switchToEditMode(contentDiv);
-
-    const apiPromises = [];
-    try {
-        // API call for the primary note
-        const primaryNotePayload = {
-            page_id: currentPageId,
-            content: noteData.content, 
-            parent_note_id: newParentIdForAPI,
-            order_index: newOrderIndexForAPI
-        };
-        console.log('[TAB-KEY API Call] Updating primary note:', noteData.id, primaryNotePayload);
-        const primaryNotePromise = notesAPI.updateNote(noteData.id, primaryNotePayload)
-            .then(updatedNoteFromServer => {
-                updateNoteInCurrentPage(updatedNoteFromServer); // Update local with server response
-                // noteData is already updated optimistically, here we just sync with server response
-                noteData.order_index = updatedNoteFromServer.order_index;
-                noteData.parent_note_id = updatedNoteFromServer.parent_note_id;
-                noteData.updated_at = updatedNoteFromServer.updated_at;
-                return { status: 'fulfilled', value: updatedNoteFromServer };
-            })
-            .catch(error => ({ status: 'rejected', reason: error, id: noteData.id, type: 'primaryTabUpdate' }));
-        apiPromises.push(primaryNotePromise);
-
-        // API calls for sibling updates (determined from the correct invocation of calculateOrderIndex)
-        // The `siblingUpdates` variable needs to be in scope from either Indent or Outdent block
-        let currentSiblingUpdates = []; // This needs to be correctly scoped from above logic
-        // This is tricky because siblingUpdates is defined within if/else.
-        // Re-calculate or pass it down. For now, assuming it would be available.
-        // For safety, let's re-fetch the calculation result for siblingUpdates based on the final decision.
-        // This is inefficient but safer for this refactor step.
-        // A better refactor would be to have calculateOrderIndex call outside and pass its results into if/else.
-        // However, calculateOrderIndex depends on previousSiblingId/nextSiblingId which are determined inside.
-        // Let's assume siblingUpdates from the relevant block (indent/outdent) is captured.
-        // The current diff structure makes this hard. I will assume siblingUpdates is available from the correct block.
-        // This part of the code (accessing siblingUpdates) will need careful integration with the previous blocks.
-        // For now, I'll write it as if `siblingUpdates` (the result of the relevant calculateOrderIndex call) is in scope.
-        // Use the captured actualSiblingUpdates from the indent/outdent block
-        actualSiblingUpdates.forEach(update => {
-            apiPromises.push(
-                notesAPI.updateNote(update.id, { order_index: update.newOrderIndex, page_id: currentPageId })
-                    .then(updatedSiblingNote => {
-                        updateNoteInCurrentPage(updatedSiblingNote); // Sync with server
-                        return { status: 'fulfilled', value: updatedSiblingNote };
-                    })
-                    .catch(error => ({ status: 'rejected', reason: error, id: update.id, type: 'siblingTabUpdate' }))
-            );
-        });
-
-        const results = await Promise.allSettled(apiPromises);
-        console.log('[handleTabKey] API call results:', results);
-        let revertNeeded = false;
-        results.forEach(result => {
-            if (result.status === 'rejected') {
-                console.error(`[handleTabKey] Failed operation: Type: ${result.reason?.type}, ID: ${result.reason?.id}, Reason:`, result.reason);
-                revertNeeded = true;
-            }
-        });
-
-        if (revertNeeded) {
-            alert(`Failed to update note structure. Some changes could not be saved. Reverting local changes.`);
-            const backupNotes = JSON.parse(sessionStorage.getItem('backupNotesBeforeTab'));
-            if (backupNotes) {
-                setNotesForCurrentPage(backupNotes); // Revert local state
-                if (window.ui && typeof window.ui.displayNotes === 'function' && currentPageId) {
-                     window.ui.displayNotes(notesForCurrentPage, currentPageId); // Re-render UI from reverted state
-                } else {
-                    console.warn('handleTabKey: Could not re-render notes after error, UI might be inconsistent.');
-                }
-            }
-        } else {
-            notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
-            // Potentially update DOM for siblings if not covered by displayNotes or individual updates
-        }
-        // sessionStorage.removeItem('latestSiblingUpdates'); // No longer needed
-
-    } catch (error) { // Catch errors from synchronous parts or if API calls themselves throw unhandled
-        const errorMessage = error.message || 'Please try again.';
-        console.error(`handleTabKey: Overall error updating note ${noteData.id} parent/order. Error:`, error);
-        alert(`Failed to update note structure. ${errorMessage} Attempting to revert changes.`);
-        
-        const backupNotes = JSON.parse(sessionStorage.getItem('backupNotesBeforeTab'));
-        if (backupNotes) {
-            setNotesForCurrentPage(backupNotes);
-            if (window.ui && typeof window.ui.displayNotes === 'function' && currentPageId) {
-                 window.ui.displayNotes(notesForCurrentPage, currentPageId);
-            }
-        }
-        const originalContentDiv = getNoteElementById(noteData.id)?.querySelector('.note-content');
-        if (originalContentDiv) {
-            window.ui.switchToEditMode(originalContentDiv);
-        }
-        // sessionStorage.removeItem('latestSiblingUpdates'); // Clean up in case of error too // No longer needed
-    }
-}
-
-async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
-    if (!noteData) return;
-    if (contentDiv.classList.contains('edit-mode') && (contentDiv.dataset.rawContent || contentDiv.textContent).trim() === '') {
-        const children = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteData.id));
-        if (children.length > 0) { 
-            console.log('handleBackspaceKey: Note has children, not deleting on backspace for noteId:', noteData.id); 
-            return; 
-        }
-        
-        const isRootNote = !noteData.parent_note_id;
-        const rootNotesCount = notesForCurrentPage.filter(n => !n.parent_note_id).length;
-        if (isRootNote && rootNotesCount === 1 && notesForCurrentPage.length === 1) { 
-            console.log('handleBackspaceKey: Cannot delete the only note on the page via Backspace for noteId:', noteData.id); 
-            return; 
-        }
-        
-        let noteToFocusAfterDelete = null;
-        const allNoteElements = Array.from(notesContainer.querySelectorAll('.note-item'));
-        const currentNoteIndexInDOM = allNoteElements.findIndex(el => el.dataset.noteId === noteData.id);
-        if (currentNoteIndexInDOM > 0) {
-            noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM - 1];
-        } else if (allNoteElements.length > 1 && currentNoteIndexInDOM + 1 < allNoteElements.length) {
-            noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM + 1];
-        } else if (noteData.parent_note_id) {
-            noteToFocusAfterDelete = getNoteElementById(noteData.parent_note_id);
-        }
-
-        e.preventDefault();
-        try {
-            await notesAPI.deleteNote(noteData.id);
-            removeNoteFromCurrentPageById(noteData.id);
-            window.ui.removeNoteElement(noteData.id);
-            if (noteToFocusAfterDelete) {
-                const contentDivToFocus = noteToFocusAfterDelete.querySelector('.note-content');
-                if (contentDivToFocus) window.ui.switchToEditMode(contentDivToFocus);
-            } else if (notesForCurrentPage.length === 0 && currentPageId) { 
-                console.log("handleBackspaceKey: All notes deleted from pageId:", currentPageId); 
-            }
-        } catch (error) { 
-            const errorMessage = error.message || 'Please try again.';
-            console.error(`handleBackspaceKey: Error deleting note ${noteData.id}. Error:`, error); 
-            alert(`Failed to delete note. ${errorMessage}`);
-        }
-    }
-}
-
-function handleArrowKey(e, contentDiv) {
-    e.preventDefault();
-    const allVisibleNotesContent = Array.from(notesContainer.querySelectorAll('.note-item:not(.note-hidden) .note-content'));
-    const currentVisibleIndex = allVisibleNotesContent.indexOf(contentDiv);
-    let nextVisibleIndex = -1;
-    if (e.key === 'ArrowUp' && currentVisibleIndex > 0) nextVisibleIndex = currentVisibleIndex - 1;
-    else if (e.key === 'ArrowDown' && currentVisibleIndex < allVisibleNotesContent.length - 1) nextVisibleIndex = currentVisibleIndex + 1;
-
-    if (nextVisibleIndex !== -1) {
-        const nextNoteContent = allVisibleNotesContent[nextVisibleIndex];
-        window.ui.switchToEditMode(nextNoteContent); // Assumes ui is global
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(nextNoteContent);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-    }
-}
-
+/**
+ * Master keydown handler for notes. Delegates to specific handlers based on key.
+ * @param {Event} e - The keyboard event.
+ */
 export async function handleNoteKeyDown(e) {
     if (!e.target.matches('.note-content')) return;
     const noteItem = e.target.closest('.note-item');
+    if (!noteItem) return;
+
     const noteId = noteItem.dataset.noteId;
     const contentDiv = e.target;
     const noteData = getNoteDataById(noteId);
 
+    // Handle shortcuts and auto-close brackets first if in edit mode
     if (contentDiv.classList.contains('edit-mode')) {
         if (await handleShortcutExpansion(e, contentDiv)) return;
-        if (handleAutocloseBrackets(e, contentDiv)) return;
-    }
-    if (!noteData || noteId.startsWith('temp-')) {
-        if (e.key === 'Enter' && contentDiv.classList.contains('rendered-mode')) { /* Allow Enter for edit mode */ }
-        else if (noteId.startsWith('temp-') && ['Enter', 'Tab', 'Backspace'].includes(e.key)) { console.warn('Action (' + e.key + ') blocked on temp note ID: ' + noteId); return; }
-        else if (!noteData && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) { console.warn('Note data not found for ID: ' + noteId + '. Key: ' + e.key + '. Blocking.'); return; }
-    }
-    
-    // Backup notes before Tab operation for potential revert
-    if (e.key === 'Tab') {
-        sessionStorage.setItem('backupNotesBeforeTab', JSON.stringify(notesForCurrentPage));
-        // The sessionStorage workaround for latestSiblingUpdates is removed.
+        if (handleAutocloseBrackets(e)) return;
     }
 
+    // --- Pre-action checks for structural changes ---
+    const structuralKeys = ['Enter', 'Tab', 'Backspace'];
+    if (structuralKeys.includes(e.key) && !e.shiftKey) { // Shift+Key usually has different meaning
+        if (String(noteId).startsWith('temp-')) {
+            console.warn(`Structural action (${e.key}) blocked on temp note ID: ${noteId}`);
+            e.preventDefault(); return;
+        }
+        if (!noteData) {
+            console.warn(`Note data not found for ID: ${noteId}. Key: ${e.key}. Blocking structural change.`);
+            e.preventDefault(); return;
+        }
+    }
+    // Allow Enter on rendered mode to switch to edit mode (handled in handleEnterKey)
+    // Allow arrow keys even if noteData is somehow missing (for navigation)
+
     switch (e.key) {
-        case 'Enter': await handleEnterKey(e, noteItem, noteData, contentDiv); break;
-        case 'Tab': await handleTabKey(e, noteItem, noteData, contentDiv); break;
+        case 'Enter':     await handleEnterKey(e, noteItem, noteData, contentDiv); break;
+        case 'Tab':       await handleTabKey(e, noteItem, noteData, contentDiv); break;
         case 'Backspace': await handleBackspaceKey(e, noteItem, noteData, contentDiv); break;
-        case 'ArrowUp': case 'ArrowDown': handleArrowKey(e, contentDiv); break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+            if (contentDiv.classList.contains('edit-mode')) { // Only navigate if in edit mode
+                 handleArrowKey(e, contentDiv);
+            }
+            break;
+        // Default: allow native behavior for other keys (typing, etc.)
     }
 }
 
 
 // --- Event Handler: Task Checkbox Click ---
+/**
+ * Handles clicks on task checkboxes, updating note content and properties.
+ * @param {Event} e - The click event.
+ */
 export async function handleTaskCheckboxClick(e) {
     const checkbox = e.target;
     const noteItem = checkbox.closest('.note-item');
     if (!noteItem) return;
     
     const noteId = noteItem.dataset.noteId;
+    if (String(noteId).startsWith('temp-')) {
+        console.warn("Task checkbox clicked on temp note. Action deferred until note is saved.");
+        checkbox.checked = !checkbox.checked; // Revert optimistic UI change
+        return;
+    }
+
     const contentDiv = noteItem.querySelector('.note-content');
     const noteData = getNoteDataById(noteId);
 
-    if (!noteData || !contentDiv || noteId.startsWith('temp-')) {
-        console.error('Note data, contentDiv not found, or temp note for task checkbox click', { noteId, noteData, contentDiv });
-        checkbox.checked = !checkbox.checked;
-        return;
+    if (!noteData || !contentDiv) {
+        console.error('Task Click: Note data or contentDiv not found for ID:', noteId);
+        checkbox.checked = !checkbox.checked; return;
     }
     
-    let rawContent = contentDiv.dataset.rawContent || contentDiv.textContent;
-    let newRawContent, newStatus, doneAt = null;
+    // Use dataset.rawContent if available (likely from edit mode), otherwise use noteData.content (from rendered mode)
+    let currentRawContent = contentDiv.dataset.rawContent !== undefined ? contentDiv.dataset.rawContent : noteData.content;
+    
+    let newRawContent = currentRawContent;
+    let doneAt = null;
     const isChecked = checkbox.checked;
-    const markerType = checkbox.dataset.markerType;
+    const markerType = checkbox.dataset.markerType?.toUpperCase();
 
-    // Handle different task statuses
+    const taskPrefixesWithSpace = ["TODO ", "DOING ", "SOMEDAY ", "DONE ", "WAITING ", "CANCELLED ", "NLR "];
+    const currentPrefix = taskPrefixesWithSpace.find(p => currentRawContent.toUpperCase().startsWith(p));
+    const contentWithoutPrefix = currentPrefix ? currentRawContent.substring(currentPrefix.length) : currentRawContent;
+
     switch (markerType) {
-        case 'TODO':
-            if (isChecked) {
-                newRawContent = 'DONE ' + rawContent.substring(5);
-                newStatus = 'DONE';
-                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            } else {
-                newRawContent = rawContent;
-                newStatus = 'TODO';
-            }
-            break;
-
-        case 'DOING':
-            if (isChecked) {
-                newRawContent = 'DONE ' + rawContent.substring(6);
-                newStatus = 'DONE';
-                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            } else {
-                newRawContent = 'TODO ' + rawContent.substring(6);
-                newStatus = 'TODO';
-            }
-            break;
-
-        case 'SOMEDAY':
-            if (isChecked) {
-                newRawContent = 'DONE ' + rawContent.substring(8);
-                newStatus = 'DONE';
-                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            } else {
-                newRawContent = 'TODO ' + rawContent.substring(8);
-                newStatus = 'TODO';
-            }
-            break;
-
-        case 'DONE':
-            if (!isChecked) {
-                newRawContent = 'TODO ' + rawContent.substring(5);
-                newStatus = 'TODO';
-            } else {
-                newRawContent = rawContent;
-                newStatus = 'DONE';
-                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            }
-            break;
-
-        case 'WAITING':
-            if (isChecked) {
-                newRawContent = 'DONE ' + rawContent.substring(8);
-                newStatus = 'DONE';
-                doneAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            } else {
-                newRawContent = 'TODO ' + rawContent.substring(8);
-                newStatus = 'TODO';
-            }
-            break;
-
-        case 'CANCELLED':
-        case 'NLR':
-            // These statuses are not interactive
-            checkbox.checked = true;
-            return;
-
-        default:
-            console.warn("Unknown task marker type:", markerType);
-            checkbox.checked = !checkbox.checked;
-            return;
+        case 'TODO':    newRawContent = (isChecked ? 'DONE ' : 'TODO ')    + contentWithoutPrefix; break;
+        case 'DOING':   newRawContent = (isChecked ? 'DONE ' : 'TODO ')    + contentWithoutPrefix; break;
+        case 'SOMEDAY': newRawContent = (isChecked ? 'DONE ' : 'TODO ')    + contentWithoutPrefix; break;
+        case 'DONE':    newRawContent = (isChecked ? 'DONE ' : 'TODO ')    + contentWithoutPrefix; break;
+        case 'WAITING': newRawContent = (isChecked ? 'DONE ' : 'TODO ')    + contentWithoutPrefix; break;
+        case 'CANCELLED': case 'NLR': checkbox.checked = true; /* Non-interactive, ensure it stays checked */ return;
+        default: console.warn("Unknown task marker type:", markerType); checkbox.checked = !checkbox.checked; return;
     }
 
+    if (newRawContent.toUpperCase().startsWith('DONE ')) {
+        doneAt = new Date().toISOString().slice(0, 19).replace('T', ' '); // YYYY-MM-DD HH:MM:SS format
+    }
+
+    // Optimistic update of local state and DOM
+    const originalNoteContentForRevert = noteData.content;
+    const originalNotePropertiesForRevert = JSON.parse(JSON.stringify(noteData.properties || {}));
+
+    noteData.content = newRawContent; // Update local state content
+    contentDiv.dataset.rawContent = newRawContent; // Update DOM dataset
+    if (contentDiv.classList.contains('edit-mode')) {
+        contentDiv.textContent = newRawContent;
+    } else {
+        // Re-render only if content actually changed to avoid unnecessary parsing
+        if (newRawContent !== currentRawContent) {
+            contentDiv.innerHTML = window.ui.parseAndRenderContent(newRawContent);
+        }
+    }
+    // Optimistically update properties (done_at)
+    if (!noteData.properties) noteData.properties = {};
+    if (doneAt) {
+        noteData.properties.done_at = [{ value: doneAt, internal: 0 }];
+    } else {
+        delete noteData.properties.done_at;
+    }
+    updateNoteInCurrentPage(noteData); // Propagate optimistic changes to global state
+
     try {
-        // 1. Update note content - this will trigger pattern processor to set status
-        console.log('[TASK_DEBUG] Updating note content:', { noteId, newRawContent });
+        window.ui.updateSaveStatusIndicator('pending');
+        // 1. Update note content (server's pattern processor should handle status property)
         const updatedNoteServer = await notesAPI.updateNote(noteId, { 
-            page_id: currentPageId,
-            content: newRawContent 
+            page_id: currentPageId, content: newRawContent 
         });
-        console.log('[TASK_DEBUG] Note content updated:', updatedNoteServer);
+        
+        // Sync local noteData with server response for content, timestamps, and server-processed properties
         noteData.content = updatedNoteServer.content;
         noteData.updated_at = updatedNoteServer.updated_at;
-        contentDiv.dataset.rawContent = updatedNoteServer.content;
+        noteData.properties = updatedNoteServer.properties || parsePropertiesFromText(updatedNoteServer.content); // Trust server's properties
 
-        // Re-render the content div with the new raw content
-        if (contentDiv.classList.contains('edit-mode')) {
-            contentDiv.textContent = updatedNoteServer.content;
-        } else {
-            contentDiv.innerHTML = window.ui.parseAndRenderContent(updatedNoteServer.content);
+        // 2. Explicitly manage 'done_at' property if server doesn't auto-handle it based on "DONE "
+        //    (This depends on backend implementation. If backend handles it, this block might be redundant)
+        const serverDoneAt = noteData.properties?.done_at?.[0]?.value;
+        if (doneAt && serverDoneAt !== doneAt) { // If we calculated doneAt and server doesn't have it (or different)
+            await propertiesAPI.setProperty({ entity_type: 'note', entity_id: parseInt(noteId), name: 'done_at', value: doneAt });
+            if(!noteData.properties.done_at) noteData.properties.done_at = [];
+            noteData.properties.done_at = [{value: doneAt, internal: 0}];
+        } else if (!doneAt && serverDoneAt) { // If we calculated no doneAt but server has one
+            await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at');
+             delete noteData.properties.done_at;
         }
-
-        // 2. Only handle done_at property directly (status is handled by pattern processor)
-        if (doneAt) {
-            console.log('[TASK_DEBUG] Setting done_at property:', { noteId, doneAt });
-            await propertiesAPI.setProperty({ 
-                entity_type: 'note', 
-                entity_id: parseInt(noteId), 
-                name: 'done_at', 
-                value: doneAt 
-            });
-            console.log('[TASK_DEBUG] done_at property set');
-        } else {
-            try {
-                console.log('[TASK_DEBUG] Deleting done_at property for note:', noteId);
-                await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at');
-                console.log('[TASK_DEBUG] done_at property deleted');
-            } catch (delError) {
-                console.warn('Could not delete done_at:', delError);
-            }
-        }
-
-        // 3. Fetch all properties for the note to update local cache
-        const updatedProperties = await propertiesAPI.getProperties('note', parseInt(noteId));
-        noteData.properties = updatedProperties;
-
-        // 4. Update global notes data for consistency
-        const noteIndexInGlobal = notesForCurrentPage.findIndex(n => String(n.id) === String(noteId));
-        if (noteIndexInGlobal > -1) {
-            notesForCurrentPage[noteIndexInGlobal] = { ...notesForCurrentPage[noteIndexInGlobal], ...noteData };
-            window.notesForCurrentPage = notesForCurrentPage;
-        }
-
-        updateNoteInCurrentPage(noteData);
-        console.log('Task status updated:', { noteId, newStatus, newRawContent, doneAt });
-    } catch (error) {
-        const errorMessage = error.message || 'Please try again.';
-        console.error(`handleTaskCheckboxClick: Error updating task status for note ${noteId}. Error:`, error);
-        alert(`Failed to update task status. ${errorMessage}`);
         
-        // Revert UI on error
+        updateNoteInCurrentPage(noteData); // Final update to global state with all server-confirmed data
+        window.ui.updateSaveStatusIndicator('saved');
+
+    } catch (error) {
+        console.error(`Task Click: Error updating task for note ${noteId}. Error:`, error);
+        alert(`Failed to update task status. ${error.message}`);
+        
+        // Revert optimistic changes
+        noteData.content = originalNoteContentForRevert;
+        noteData.properties = originalNotePropertiesForRevert;
         checkbox.checked = !checkbox.checked; 
-        contentDiv.dataset.rawContent = noteData.content; 
+        contentDiv.dataset.rawContent = originalNoteContentForRevert; 
         if (contentDiv.classList.contains('edit-mode')) {
-            contentDiv.textContent = noteData.content;
+            contentDiv.textContent = originalNoteContentForRevert;
         } else {
-            contentDiv.innerHTML = window.ui.parseAndRenderContent(noteData.content);
+            contentDiv.innerHTML = window.ui.parseAndRenderContent(originalNoteContentForRevert);
         }
-        // Revert noteData properties if they were optimistically changed before API calls.
-        // (Current logic seems to update noteData.properties only after successful API calls, which is good).
+        updateNoteInCurrentPage(noteData); // Revert in global state
+        window.ui.updateSaveStatusIndicator('error');
     }
 }

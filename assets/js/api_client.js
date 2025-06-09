@@ -363,7 +363,34 @@ const notesAPI = {
             id: noteId
         };
         return apiRequest('notes.php', 'POST', body);
-    }
+    },
+
+        /**
+     * Batch update notes.
+     * @param {Array<Object>} operations - Array of operations {type, payload}.
+     * @returns {Promise<Array<Object>>} A promise that resolves to the array of individual operation results.
+     * @throws {Error} If the batch operation fails or the response structure is unexpected.
+     */
+        batchUpdateNotes: async (operations) => { // Make it async to await apiRequest
+            const body = {
+                action: 'batch',
+                operations: operations
+            };
+            // apiRequest returns the content of the top-level 'data' field from the JSON response.
+            // For batch, this should be an object like { results: [...] }
+            const responseData = await apiRequest('notes.php', 'POST', body);
+    
+            // Now, specifically extract the 'results' array and perform validation here.
+            if (responseData && Array.isArray(responseData.results)) {
+                // Optionally, you could even validate each item in responseData.results here
+                // to ensure it has 'type', 'status', etc., before returning.
+                return responseData.results; // Return ONLY the array of results
+            } else {
+                // If the structure is not what's expected for a successful batch response.
+                console.error('batchUpdateNotes: Invalid response structure. Expected "responseData.results" to be an array.', responseData);
+                throw new Error('Batch update failed: Invalid server response format.');
+            }
+        }
 };
 
 /**

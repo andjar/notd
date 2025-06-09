@@ -112,6 +112,34 @@ class NotesApiTest extends BaseTestCase
 
     }
 
+    // --- Helper methods for batch tests ---
+    private function _getNoteById(int $id): ?array
+    {
+        $stmt = self::$pdo->prepare("SELECT * FROM Notes WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $note = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($note) {
+            // Fetch properties for the note
+            $propStmt = self::$pdo->prepare("SELECT name, value, internal FROM Properties WHERE note_id = :note_id");
+            $propStmt->execute([':note_id' => $id]);
+            $properties = [];
+            while ($row = $propStmt->fetch(PDO::FETCH_ASSOC)) {
+                if (!isset($properties[$row['name']])) {
+                    $properties[$row['name']] = [];
+                }
+                $properties[$row['name']][] = ['value' => $row['value'], 'internal' => (int)$row['internal']];
+            }
+            $note['properties'] = $properties;
+        }
+        return $note ?: null;
+    }
+
+    private function _countChildren(int $parentId): int
+    {
+        $stmt = self::$pdo->prepare("SELECT COUNT(*) FROM Notes WHERE parent_note_id = :parent_id");
+        $stmt->execute([':parent_id' => $parentId]);
+        return (int)$stmt->fetchColumn();
+    }
 
     // --- Test POST /api/notes.php (Create Note) ---
     public function testPostCreateNoteSuccessBasicContent()
@@ -838,6 +866,318 @@ class NotesApiTest extends BaseTestCase
         
         $this->assertNotNull($foundInternalWithAttachment, "Internal note (with attachment) should be present when include_internal=true.");
         $this->assertEquals(1, $foundInternalWithAttachment['has_attachments'], "Internal note with attachment should have has_attachments = 1 (include_internal=true).");
+    }
+
+    // --- Batch Operation Tests ---
+
+    public function testBatchEmptyOperationsArray()
+    {
+        $payload = [
+            'action' => 'batch',
+            'operations' => []
+        ];
+        // Assuming makeApiRequest is available from BaseTestCase and handles JSON encoding
+        // And that it directly calls the script, so the path might be relative or absolute
+        // For now, using the path from existing tests.
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($payload));
+
+        $this->assertEquals('success', $response['status']);
+        $this->assertArrayHasKey('data', $response);
+        $this->assertArrayHasKey('results', $response['data']);
+        $this->assertEmpty($response['data']['results']);
+    }
+
+    public function testBatchSuccessfulCreateOperations()
+    {
+        $pageId = self::$testPageId;
+        $operations = [
+            [
+                'type' => 'create',
+                'payload' => ['page_id' => $pageId, 'content' => 'Batch Create Note 1', 'client_temp_id' => 'temp:001']
+            ],
+            [
+                'type' => 'create',
+                'payload' => ['page_id' => $pageId, 'content' => 'Batch Create Note 2', 'client_temp_id' => 'temp:002']
+            ]
+        ];
+        $batchPayload = ['action' => 'batch', 'operations' => $operations];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+
+        $this->assertEquals('success', $response['status']);
+        $this->assertCount(2, $response['data']['results']);
+
+        $result1 = $response['data']['results'][0];
+        $this->assertEquals('create', $result1['type']);
+        $this->assertEquals('success', $result1['status']);
+        $this->assertEquals('temp:001', $result1['client_temp_id']);
+        $this->assertArrayHasKey('note', $result1);
+        $this->assertEquals('Batch Create Note 1', $result1['note']['content']);
+        $note1Id = $result1['note']['id'];
+        $this->assertNotNull($note1Id);
+
+        $dbNote1 = $this->_getNoteById($note1Id);
+        $this->assertNotNull($dbNote1);
+        $this->assertEquals('Batch Create Note 1', $dbNote1['content']);
+        $this->assertEquals($pageId, $dbNote1['page_id']);
+
+        $result2 = $response['data']['results'][1];
+        $this->assertEquals('create', $result2['type']);
+        $this->assertEquals('success', $result2['status']);
+        $this->assertEquals('temp:002', $result2['client_temp_id']);
+        $note2Id = $result2['note']['id'];
+        $dbNote2 = $this->_getNoteById($note2Id);
+        $this->assertNotNull($dbNote2);
+        $this->assertEquals('Batch Create Note 2', $dbNote2['content']);
+    }
+
+    public function testBatchSuccessfulUpdateOperations()
+    {
+        $pageId = self::$testPageId;
+        $note1Id = $this->createNoteDirectly('Original Content 1', $pageId);
+        $note2Id = $this->createNoteDirectly('Original Content 2', $pageId);
+
+        $operations = [
+            ['type' => 'update', 'payload' => ['id' => $note1Id, 'content' => 'Updated Content 1']],
+            ['type' => 'update', 'payload' => ['id' => $note2Id, 'content' => 'Updated Content 2', 'collapsed' => 1]]
+        ];
+        $batchPayload = ['action' => 'batch', 'operations' => $operations];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+
+        $this->assertEquals('success', $response['status']);
+        $this->assertCount(2, $response['data']['results']);
+
+        $result1 = $response['data']['results'][0];
+        $this->assertEquals('update', $result1['type']);
+        $this->assertEquals('success', $result1['status']);
+        $this->assertEquals('Updated Content 1', $result1['note']['content']);
+        $this->assertEquals($note1Id, $result1['note']['id']);
+
+        $dbNote1 = $this->_getNoteById($note1Id);
+        $this->assertEquals('Updated Content 1', $dbNote1['content']);
+
+        $result2 = $response['data']['results'][1];
+        $this->assertEquals('update', $result2['type']);
+        $this->assertEquals('success', $result2['status']);
+        $this->assertEquals('Updated Content 2', $result2['note']['content']);
+        $this->assertEquals(1, $result2['note']['collapsed']);
+        $dbNote2 = $this->_getNoteById($note2Id);
+        $this->assertEquals('Updated Content 2', $dbNote2['content']);
+        $this->assertEquals(1, $dbNote2['collapsed']);
+    }
+
+    public function testBatchSuccessfulDeleteOperations()
+    {
+        $pageId = self::$testPageId;
+        $note1Id = $this->createNoteDirectly('To Delete 1', $pageId);
+        $note2Id = $this->createNoteDirectly('To Delete 2', $pageId);
+
+        $operations = [
+            ['type' => 'delete', 'payload' => ['id' => $note1Id]],
+            ['type' => 'delete', 'payload' => ['id' => $note2Id]]
+        ];
+        $batchPayload = ['action' => 'batch', 'operations' => $operations];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+
+        $this->assertEquals('success', $response['status']);
+        $this->assertCount(2, $response['data']['results']);
+
+        $result1 = $response['data']['results'][0];
+        $this->assertEquals('delete', $result1['type']);
+        $this->assertEquals('success', $result1['status']);
+        $this->assertEquals($note1Id, $result1['deleted_note_id']);
+        $this->assertNull($this->_getNoteById($note1Id));
+
+        $result2 = $response['data']['results'][1];
+        $this->assertEquals('delete', $result2['type']);
+        $this->assertEquals('success', $result2['status']);
+        $this->assertEquals($note2Id, $result2['deleted_note_id']);
+        $this->assertNull($this->_getNoteById($note2Id));
+    }
+
+    public function testBatchMixedSuccessOperationsAndResultOrder()
+    {
+        $pageId = self::$testPageId;
+        // Note: Server IDs for created notes are only known after the batch call for this test design.
+        // To delete Note B by its server ID in the same batch, we'd need to predict it or have the API allow temp ID for delete.
+        // The current _deleteNoteInBatch resolves temp IDs, so this is possible.
+
+        $operations = [
+            ['type' => 'create', 'payload' => ['page_id' => $pageId, 'content' => 'Note A Original', 'client_temp_id' => 'tempA']], // Index 0
+            ['type' => 'create', 'payload' => ['page_id' => $pageId, 'content' => 'Note B To Delete', 'client_temp_id' => 'tempB']], // Index 1
+            ['type' => 'update', 'payload' => ['id' => 'tempA', 'content' => 'Note A Updated']], // Index 2
+            ['type' => 'delete', 'payload' => ['id' => 'tempB']]  // Index 3
+        ];
+        $batchPayload = ['action' => 'batch', 'operations' => $operations];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+
+        $this->assertEquals('success', $response['status'], "Batch failed: " . print_r($response, true));
+        $this->assertCount(4, $response['data']['results']);
+
+        // Result for Op 0 (Create A)
+        $resCreateA = $response['data']['results'][0];
+        $this->assertEquals('create', $resCreateA['type']);
+        $this->assertEquals('success', $resCreateA['status']);
+        $this->assertEquals('tempA', $resCreateA['client_temp_id']);
+        $noteAId = $resCreateA['note']['id'];
+        $this->assertNotNull($noteAId);
+
+        // Result for Op 1 (Create B)
+        $resCreateB = $response['data']['results'][1];
+        $this->assertEquals('create', $resCreateB['type']);
+        $this->assertEquals('success', $resCreateB['status']);
+        $this->assertEquals('tempB', $resCreateB['client_temp_id']);
+        $noteBId = $resCreateB['note']['id'];
+        $this->assertNotNull($noteBId);
+        
+        // Result for Op 2 (Update A)
+        $resUpdateA = $response['data']['results'][2];
+        $this->assertEquals('update', $resUpdateA['type']);
+        $this->assertEquals('success', $resUpdateA['status']);
+        $this->assertEquals($noteAId, $resUpdateA['note']['id']);
+        $this->assertEquals('Note A Updated', $resUpdateA['note']['content']);
+
+        // Result for Op 3 (Delete B)
+        $resDeleteB = $response['data']['results'][3];
+        $this->assertEquals('delete', $resDeleteB['type']);
+        $this->assertEquals('success', $resDeleteB['status']);
+        $this->assertEquals($noteBId, $resDeleteB['deleted_note_id']);
+
+        // Verify DB state
+        $dbNoteA = $this->_getNoteById($noteAId);
+        $this->assertNotNull($dbNoteA);
+        $this->assertEquals('Note A Updated', $dbNoteA['content']);
+        $this->assertNull($this->_getNoteById($noteBId), "Note B should be deleted.");
+    }
+
+    public function testBatchAtomicityRollbackOnFailure()
+    {
+        $pageId = self::$testPageId;
+        $operations = [
+            ['type' => 'create', 'payload' => ['page_id' => $pageId, 'content' => 'Note X (should rollback)', 'client_temp_id' => 'tempX']], // Index 0
+            ['type' => 'update', 'payload' => ['id' => 99999, 'content' => 'Update Non-Existent Note Y']], // Index 1 (This will fail)
+            ['type' => 'create', 'payload' => ['page_id' => $pageId, 'content' => 'Note Z (should rollback)', 'client_temp_id' => 'tempZ']]  // Index 2
+        ];
+        $batchPayload = ['action' => 'batch', 'operations' => $operations];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+        
+        $this->assertEquals('error', $response['status']); // HTTP 400
+        $this->assertArrayHasKey('details', $response);
+        $this->assertArrayHasKey('failed_operations', $response['details']);
+        $this->assertCount(1, $response['details']['failed_operations']);
+        
+        $failedOp = $response['details']['failed_operations'][0];
+        $this->assertEquals(1, $failedOp['index']); // Failure was at original index 1
+        $this->assertEquals('update', $failedOp['type']);
+        $this->assertEquals(['id' => 99999], $failedOp['payload_identifier']);
+        $this->assertStringContainsString('Note not found for update', $failedOp['error_message']); // Or similar from _updateNoteInBatch
+
+        // Verify atomicity: Note X and Z should not exist
+        // Since client_temp_ids are used, we can't easily query by ID if they were never created.
+        // We can query by content if content is unique for the test, or ensure count of notes on page hasn't changed.
+        $stmt = self::$pdo->prepare("SELECT COUNT(*) FROM Notes WHERE page_id = :page_id AND (content LIKE '%(should rollback)%')");
+        $stmt->execute([':page_id' => $pageId]);
+        $this->assertEquals(0, $stmt->fetchColumn(), "Notes X and Z should have been rolled back.");
+    }
+    
+    public function testBatchValidationFailureMissingType()
+    {
+        $batchPayload = ['action' => 'batch', 'operations' => [['payload' => ['page_id' => self::$testPageId]]]];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+        $this->assertEquals('error', $response['status']);
+        $this->assertArrayHasKey('details', $response);
+        $this->assertArrayHasKey('validation_errors', $response['details']);
+        $this->assertCount(1, $response['details']['validation_errors']);
+        $this->assertEquals(0, $response['details']['validation_errors'][0]['index']);
+        $this->assertStringContainsString('Missing or invalid type field', $response['details']['validation_errors'][0]['error']);
+    }
+
+    public function testBatchValidationFailureInvalidType()
+    {
+        $batchPayload = ['action' => 'batch', 'operations' => [['type' => 'unknown', 'payload' => ['page_id' => self::$testPageId]]]];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+        $this->assertEquals('error', $response['status']);
+        $this->assertArrayHasKey('validation_errors', $response['details']);
+        $this->assertEquals(0, $response['details']['validation_errors'][0]['index']);
+        $this->assertStringContainsString('Invalid operation type', $response['details']['validation_errors'][0]['error']);
+    }
+
+    public function testBatchValidationFailureMissingPayload()
+    {
+        $batchPayload = ['action' => 'batch', 'operations' => [['type' => 'create']]];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+        $this->assertEquals('error', $response['status']);
+        $this->assertArrayHasKey('validation_errors', $response['details']);
+        $this->assertEquals(0, $response['details']['validation_errors'][0]['index']);
+        $this->assertStringContainsString('Missing or invalid payload field', $response['details']['validation_errors'][0]['error']);
+    }
+
+    public function testBatchValidationFailureCreateMissingPageId()
+    {
+        $batchPayload = ['action' => 'batch', 'operations' => [['type' => 'create', 'payload' => ['content' => 'test']]]];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+        $this->assertEquals('error', $response['status']);
+        $this->assertArrayHasKey('validation_errors', $response['details']);
+        $this->assertEquals(0, $response['details']['validation_errors'][0]['index']);
+        $this->assertEquals('create', $response['details']['validation_errors'][0]['type']);
+        $this->assertStringContainsString('Missing page_id in payload', $response['details']['validation_errors'][0]['error']);
+    }
+    
+    public function testBatchOperationFailureDeleteNoteWithChildren()
+    {
+        $pageId = self::$testPageId;
+        $parentId = $this->createNoteDirectly('Parent Note for Delete Test', $pageId);
+        $childId = $this->createNoteDirectly('Child Note for Delete Test', $pageId, [], $parentId);
+
+        $operations = [
+            ['type' => 'delete', 'payload' => ['id' => $parentId]]
+        ];
+        $batchPayload = ['action' => 'batch', 'operations' => $operations];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+
+        $this->assertEquals('error', $response['status']);
+        $this->assertArrayHasKey('details', $response);
+        $this->assertArrayHasKey('failed_operations', $response['details']);
+        $this->assertCount(1, $response['details']['failed_operations']);
+        $failedOp = $response['details']['failed_operations'][0];
+        $this->assertEquals(0, $failedOp['index']);
+        $this->assertEquals('delete', $failedOp['type']);
+        $this->assertStringContainsString('Note has child notes', $failedOp['error_message']);
+
+        // Verify notes still exist due to rollback
+        $this->assertNotNull($this->_getNoteById($parentId));
+        $this->assertNotNull($this->_getNoteById($childId));
+    }
+
+    public function testBatchCreateAndUpdateWithTempId()
+    {
+        $pageId = self::$testPageId;
+        $operations = [
+            ['type' => 'create', 'payload' => ['page_id' => $pageId, 'content' => 'Initial Content', 'client_temp_id' => 'temp:xyz123']],
+            ['type' => 'update', 'payload' => ['id' => 'temp:xyz123', 'content' => 'Updated Content via Temp ID']]
+        ];
+        $batchPayload = ['action' => 'batch', 'operations' => $operations];
+        $response = $this->request('POST', '/v1/api/notes.php', [], [], json_encode($batchPayload));
+
+        $this->assertEquals('success', $response['status'], "Batch response indicates failure: " . print_r($response, true));
+        $this->assertCount(2, $response['data']['results']);
+
+        $createResult = $response['data']['results'][0];
+        $this->assertEquals('create', $createResult['type']);
+        $this->assertEquals('success', $createResult['status']);
+        $this->assertEquals('temp:xyz123', $createResult['client_temp_id']);
+        $this->assertNotNull($createResult['note']['id']);
+        $createdNoteId = $createResult['note']['id'];
+
+        $updateResult = $response['data']['results'][1];
+        $this->assertEquals('update', $updateResult['type']);
+        $this->assertEquals('success', $updateResult['status']);
+        $this->assertEquals($createdNoteId, $updateResult['note']['id']);
+        $this->assertEquals('Updated Content via Temp ID', $updateResult['note']['content']);
+
+        // Verify DB state
+        $dbNote = $this->_getNoteById($createdNoteId);
+        $this->assertNotNull($dbNote);
+        $this->assertEquals('Updated Content via Temp ID', $dbNote['content']);
     }
 }
 ?>
