@@ -363,6 +363,19 @@ const notesAPI = {
             id: noteId
         };
         return apiRequest('notes.php', 'POST', body);
+    },
+
+    /**
+     * Batch update notes
+     * @param {Array<Object>} operations - Array of operations
+     * @returns {Promise<any>} API response data
+     */
+    batchUpdateNotes: (operations) => {
+        const body = {
+            action: 'batch',
+            operations: operations
+        };
+        return apiRequest('notes.php', 'POST', body);
     }
 };
 
