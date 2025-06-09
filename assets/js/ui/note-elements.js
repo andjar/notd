@@ -9,7 +9,7 @@ import { domRefs } from './dom-refs.js';
 import { renderNote, parseAndRenderContent, renderAttachments } from './note-renderer.js';
 // Assuming note-interactions.js will export updateParentVisuals and handleNoteDrop
 // import { updateParentVisuals } from './note-interactions.js';  // Remove this import as the function is in ui.js
-import { calculateOrderIndex } from '../../app/order-index-service.js'; // Added import
+import { calculateOrderIndex } from '../app/order-index-service.js'; // Added import
 
 // Globals assumed to be available: Sortable, feather, window.notesAPI, window.notesForCurrentPage, window.currentPageId, ui (for ui.displayNotes in handleNoteDrop error case)
 
