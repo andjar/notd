@@ -63,18 +63,43 @@ if (!class_exists('PageManager')) {
         error_log("[PageManager] Parsed input: " . json_encode($input));
         error_log("[PageManager] JSON decode error: " . json_last_error_msg());
 
+        // Handle POST-based updates and deletes
+        if ($method === 'POST' && isset($input['action'])) {
+            switch ($input['action']) {
+                case 'update':
+                    $this->handlePostUpdate($input);
+                    break;
+                case 'delete':
+                    $this->handlePostDelete($input);
+                    break;
+                default:
+                    ApiResponse::error('Invalid action specified', 400);
+            }
+            return;
+        }
+
+        // Handle POST with _method for REST compatibility
+        if ($method === 'POST' && isset($input['_method'])) {
+            switch (strtoupper($input['_method'])) {
+                case 'PUT':
+                    $this->handlePostUpdate($input);
+                    break;
+                case 'DELETE':
+                    $this->handlePostDelete($input);
+                    break;
+                default:
+                    ApiResponse::error('Invalid _method specified', 400);
+            }
+            return;
+        }
+
+        // Handle standard HTTP methods
         switch ($method) {
             case 'GET':
                 $this->handleGetRequest();
                 break;
             case 'POST':
                 $this->handlePostRequest($input);
-                break;
-            case 'PUT':
-                $this->handlePutRequest($input);
-                break;
-            case 'DELETE':
-                $this->handleDeleteRequest();
                 break;
             default:
                 ApiResponse::error('Method Not Allowed', 405);
@@ -122,7 +147,18 @@ if (!class_exists('PageManager')) {
                         $this->dataManager->getPageDetailsById($aliasedPageInfo['id'], $include_internal);
                 }
             }
-            ApiResponse::success($pageData);
+
+            // Ensure consistent response format
+            if ($include_details) {
+                // For detailed view, wrap in data object to match list format
+                ApiResponse::success([
+                    'data' => $pageData,
+                    'pagination' => null // No pagination for single item
+                ]);
+            } else {
+                // For basic view, return the page directly
+                ApiResponse::success($pageData);
+            }
         } else {
             ApiResponse::error('Page not found', 404);
         }
@@ -157,11 +193,7 @@ if (!class_exists('PageManager')) {
                 }
                 ApiResponse::success($page);
             } else {
-                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName)) {
-                    $this->createJournalPage($pageName, $include_internal);
-                } else {
-                    ApiResponse::error('Page not found', 404);
-                }
+                ApiResponse::error('Page not found', 404);
             }
         } catch (PDOException $e) {
             ApiResponse::error('Database error.', 500, ['details' => $e->getMessage()]);
@@ -171,11 +203,25 @@ if (!class_exists('PageManager')) {
     private function handleGetAll($followAliases, $include_details, $include_internal) {
         $excludeJournal = isset($_GET['exclude_journal']) && $_GET['exclude_journal'] === '1';
         
-        $sql = $excludeJournal ?
-            "SELECT id, name, alias, updated_at FROM Pages WHERE NOT (name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR LOWER(name) = 'journal') ORDER BY updated_at DESC, name ASC" :
-            "SELECT id, name, alias, updated_at FROM Pages ORDER BY updated_at DESC, name ASC";
+        // Pagination parameters
+        $page = max(1, isset($_GET['page']) ? (int)$_GET['page'] : 1);
+        $perPage = max(1, min(100, isset($_GET['per_page']) ? (int)$_GET['per_page'] : 20));
+        $offset = ($page - 1) * $perPage;
+
+        // Get total count for pagination
+        $countSql = $excludeJournal ?
+            "SELECT COUNT(*) FROM Pages WHERE NOT (name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR LOWER(name) = 'journal')" :
+            "SELECT COUNT(*) FROM Pages";
         
-        $stmt = $this->pdo->query($sql);
+        $totalCount = $this->pdo->query($countSql)->fetchColumn();
+        
+        // Get paginated results
+        $sql = $excludeJournal ?
+            "SELECT id, name, alias, updated_at FROM Pages WHERE NOT (name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR LOWER(name) = 'journal') ORDER BY updated_at DESC, name ASC LIMIT ? OFFSET ?" :
+            "SELECT id, name, alias, updated_at FROM Pages ORDER BY updated_at DESC, name ASC LIMIT ? OFFSET ?";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$perPage, $offset]);
         $pages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if ($followAliases) {
@@ -205,7 +251,21 @@ if (!class_exists('PageManager')) {
             $pages = $detailedPages;
         }
         
-        ApiResponse::success($pages);
+        // Prepare pagination metadata
+        $totalPages = ceil($totalCount / $perPage);
+        $pagination = [
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+            'total_items' => $totalCount,
+            'has_next_page' => $page < $totalPages,
+            'has_prev_page' => $page > 1
+        ];
+        
+        ApiResponse::success([
+            'data' => $pages,
+            'pagination' => $pagination
+        ]);
     }
 
     private function handlePostRequest($input) {
@@ -255,13 +315,26 @@ if (!class_exists('PageManager')) {
                 return;
             }
 
+            // If it's a journal page and doesn't exist, create it
+            if ($this->isJournalPage($name)) {
+                $stmt = $this->pdo->prepare("INSERT INTO Pages (name, alias, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
+                $stmt->execute([$name, $alias]);
+                $page_id = $this->pdo->lastInsertId();
+                $this->addJournalProperty($page_id);
+                
+                $stmt_new = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
+                $stmt_new->execute([$page_id]);
+                $newPage = $stmt_new->fetch();
+                
+                $this->pdo->commit();
+                ApiResponse::success($newPage);
+                return;
+            }
+
+            // For non-journal pages, proceed with normal creation
             $stmt = $this->pdo->prepare("INSERT INTO Pages (name, alias, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
             $stmt->execute([$name, $alias]);
             $page_id = $this->pdo->lastInsertId();
-            
-            if ($this->isJournalPage($name)) {
-                $this->addJournalProperty($page_id);
-            }
             
             $stmt_new = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
             $stmt_new->execute([$page_id]);
@@ -275,14 +348,17 @@ if (!class_exists('PageManager')) {
         }
     }
 
-    private function handlePutRequest($input) {
-        $validationRulesGET = ['id' => 'required|isPositiveInteger'];
-        $errorsGET = Validator::validate($_GET, $validationRulesGET);
-        if (!empty($errorsGET)) {
-            ApiResponse::error('Invalid page ID in URL.', 400, $errorsGET);
+    private function handlePostUpdate($input) {
+        // Get page ID from either URL parameter or request body
+        $pageId = isset($_GET['id']) ? (int)$_GET['id'] : (isset($input['id']) ? (int)$_input['id'] : null);
+        
+        if (!$pageId) {
+            ApiResponse::error('Page ID is required for update', 400);
             return;
         }
-        $pageId = (int)$_GET['id'];
+
+        // Remove action/_method from input before validation
+        unset($input['action'], $input['_method']);
 
         if (!isset($input['name']) && !array_key_exists('alias', $input)) {
             ApiResponse::error('Either name or alias must be provided for update.', 400);
@@ -299,6 +375,7 @@ if (!class_exists('PageManager')) {
             return;
         }
 
+        // Rest of the update logic remains the same as handlePutRequest
         $fields_to_update = [];
         $params = [];
         
@@ -372,15 +449,15 @@ if (!class_exists('PageManager')) {
         }
     }
 
-    private function handleDeleteRequest() {
-        $validationRules = ['id' => 'required|isPositiveInteger'];
-        $errors = Validator::validate($_GET, $validationRules);
-        if (!empty($errors)) {
-            ApiResponse::error('Invalid page ID in URL.', 400, $errors);
+    private function handlePostDelete($input) {
+        // Get page ID from either URL parameter or request body
+        $pageId = isset($_GET['id']) ? (int)$_GET['id'] : (isset($input['id']) ? (int)$_input['id'] : null);
+        
+        if (!$pageId) {
+            ApiResponse::error('Page ID is required for deletion', 400);
             return;
         }
-        $pageId = (int)$_GET['id'];
-        
+
         try {
             $this->pdo->beginTransaction();
             

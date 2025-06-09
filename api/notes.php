@@ -81,6 +81,19 @@ if ($method === 'GET') {
             $note = $dataManager->getNoteById($noteId, $includeInternal);
             
             if ($note) {
+                // Standardize property structure
+                if (isset($note['properties'])) {
+                    $standardizedProps = [];
+                    foreach ($note['properties'] as $name => $values) {
+                        if (!is_array($values)) {
+                            $values = [$values];
+                        }
+                        $standardizedProps[$name] = array_map(function($value) {
+                            return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
+                        }, $values);
+                    }
+                    $note['properties'] = $standardizedProps;
+                }
                 sendJsonResponse(['success' => true, 'data' => $note]);
             } else {
                 sendJsonResponse(['success' => false, 'error' => 'Note not found or is internal'], 404);
@@ -88,30 +101,109 @@ if ($method === 'GET') {
         } elseif (isset($_GET['page_id'])) {
             // Get page with notes using DataManager
             $pageId = (int)$_GET['page_id'];
+            
+            // First verify the page exists
+            $pageCheckStmt = $pdo->prepare("SELECT id FROM Pages WHERE id = ?");
+            $pageCheckStmt->execute([$pageId]);
+            if (!$pageCheckStmt->fetch()) {
+                sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
+            }
+            
             $pageData = $dataManager->getPageWithNotes($pageId, $includeInternal);
 
             if ($pageData) {
-                // Return just the notes array as the JavaScript expects
+                // Standardize property structure for all notes
+                foreach ($pageData['notes'] as &$note) {
+                    if (isset($note['properties'])) {
+                        $standardizedProps = [];
+                        foreach ($note['properties'] as $name => $values) {
+                            if (!is_array($values)) {
+                                $values = [$values];
+                            }
+                            $standardizedProps[$name] = array_map(function($value) {
+                                return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
+                            }, $values);
+                        }
+                        $note['properties'] = $standardizedProps;
+                    }
+                }
                 sendJsonResponse([
                     'success' => true,
-                    'data' => $pageData['notes']  // Extract notes from the pageData structure
+                    'data' => $pageData['notes']
                 ]);
             } else {
-                // If the page itself is not found, getPageWithNotes returns null.
                 sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
             }
         } else {
-            // This path should ideally not be used by the main app flow which specifies an ID.
-            // However, to prevent breaking other potential uses, we'll keep it.
-            // Get all notes (existing logic, not causing the error)
+            // Get all notes with pagination
+            $page = max(1, filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?? 1);
+            $perPage = max(1, min(100, filter_input(INPUT_GET, 'per_page', FILTER_VALIDATE_INT) ?? 20));
+            $offset = ($page - 1) * $perPage;
+
+            // Get total count
+            $countSql = "SELECT COUNT(*) FROM Notes";
+            if (!$includeInternal) {
+                $countSql .= " WHERE internal = 0";
+            }
+            $totalCount = $pdo->query($countSql)->fetchColumn();
+
+            // Get paginated notes
             $sql = "SELECT * FROM Notes";
             if (!$includeInternal) {
                 $sql .= " WHERE internal = 0";
             }
-            $sql .= " ORDER BY created_at DESC";
-            $stmt = $pdo->query($sql);
+            $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$perPage, $offset]);
             $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            sendJsonResponse(['success' => true, 'data' => $notes]);
+
+            // Get properties for all notes in this page
+            if (!empty($notes)) {
+                $noteIds = array_column($notes, 'id');
+                $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
+                $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders) ORDER BY note_id, name";
+                $propStmt = $pdo->prepare($propSql);
+                $propStmt->execute($noteIds);
+                $properties = $propStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Group properties by note_id
+                $noteProperties = [];
+                foreach ($properties as $prop) {
+                    $noteId = $prop['note_id'];
+                    if (!isset($noteProperties[$noteId])) {
+                        $noteProperties[$noteId] = [];
+                    }
+                    if (!isset($noteProperties[$noteId][$prop['name']])) {
+                        $noteProperties[$noteId][$prop['name']] = [];
+                    }
+                    $noteProperties[$noteId][$prop['name']][] = [
+                        'value' => $prop['value'],
+                        'internal' => (int)$prop['internal']
+                    ];
+                }
+
+                // Attach properties to notes
+                foreach ($notes as &$note) {
+                    $note['properties'] = $noteProperties[$note['id']] ?? [];
+                }
+            }
+
+            // Calculate pagination metadata
+            $totalPages = ceil($totalCount / $perPage);
+            
+            sendJsonResponse([
+                'success' => true,
+                'data' => $notes,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total_count' => (int)$totalCount,
+                    'total_pages' => $totalPages,
+                    'has_next_page' => $page < $totalPages,
+                    'has_previous_page' => $page > 1
+                ]
+            ]);
         }
     } catch (Exception $e) {
         error_log("API Error in notes.php: " . $e->getMessage());

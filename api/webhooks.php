@@ -65,8 +65,15 @@ class WebhooksManager {
     }
 
     private function listWebhooks() {
-        $stmt = $this->pdo->query("SELECT id, url, entity_type, property_name, active, verified, last_verified, last_triggered FROM Webhooks ORDER BY created_at DESC");
+        $stmt = $this->pdo->query("SELECT id, url, entity_type, property_names, event_types, active, verified, last_verified, last_triggered FROM Webhooks ORDER BY created_at DESC");
         $webhooks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Decode JSON fields for better readability
+        foreach ($webhooks as &$webhook) {
+            $webhook['property_names'] = json_decode($webhook['property_names'], true);
+            $webhook['event_types'] = json_decode($webhook['event_types'], true);
+        }
+        
         ApiResponse::success($webhooks);
     }
 
@@ -75,6 +82,9 @@ class WebhooksManager {
         $stmt->execute([$id]);
         $webhook = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($webhook) {
+            // Decode JSON fields for better readability
+            $webhook['property_names'] = json_decode($webhook['property_names'], true);
+            $webhook['event_types'] = json_decode($webhook['event_types'], true);
             ApiResponse::success($webhook);
         } else {
             ApiResponse::error('Webhook not found.', 404);
@@ -85,7 +95,8 @@ class WebhooksManager {
         $validationRules = [
             'url' => 'required',
             'entity_type' => 'required|isValidEntityType',
-            'property_name' => 'required|isNotEmpty'
+            'property_names' => 'required|isValidPropertyNames',
+            'event_types' => 'optional|isValidEventTypes'
         ];
         $errors = Validator::validate($data, $validationRules);
         if (!empty($errors)) {
@@ -98,19 +109,28 @@ class WebhooksManager {
              return;
         }
 
+        // Convert property_names to JSON if it's an array
+        $propertyNames = is_array($data['property_names']) ? json_encode($data['property_names']) : $data['property_names'];
+        
+        // Set default event types if not provided
+        $eventTypes = isset($data['event_types']) ? 
+            (is_array($data['event_types']) ? json_encode($data['event_types']) : $data['event_types']) : 
+            '["property_change"]';
+
         $secret = 'whsec_' . bin2hex(random_bytes(32)); // Generate a secure secret
         $active = isset($data['active']) ? (int)(bool)$data['active'] : 1;
 
-        $sql = "INSERT INTO Webhooks (url, entity_type, property_name, secret, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+        $sql = "INSERT INTO Webhooks (url, entity_type, property_names, event_types, secret, active, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$data['url'], $data['entity_type'], $data['property_name'], $secret, $active]);
+        $stmt->execute([$data['url'], $data['entity_type'], $propertyNames, $eventTypes, $secret, $active]);
         
         $newId = $this->pdo->lastInsertId();
         $this->getWebhook($newId);
     }
 
     private function updateWebhook($id, $data) {
-         $stmt = $this->pdo->prepare("SELECT id FROM Webhooks WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT id FROM Webhooks WHERE id = ?");
         $stmt->execute([$id]);
         if (!$stmt->fetch()) {
             ApiResponse::error('Webhook not found.', 404);
@@ -132,9 +152,15 @@ class WebhooksManager {
             $fields[] = 'entity_type = ?';
             $params[] = $data['entity_type'];
         }
-        if (isset($data['property_name'])) {
-            $fields[] = 'property_name = ?';
-            $params[] = $data['property_name'];
+        if (isset($data['property_names'])) {
+            $propertyNames = is_array($data['property_names']) ? json_encode($data['property_names']) : $data['property_names'];
+            $fields[] = 'property_names = ?';
+            $params[] = $propertyNames;
+        }
+        if (isset($data['event_types'])) {
+            $eventTypes = is_array($data['event_types']) ? json_encode($data['event_types']) : $data['event_types'];
+            $fields[] = 'event_types = ?';
+            $params[] = $eventTypes;
         }
         if (isset($data['active'])) {
             $fields[] = 'active = ?';

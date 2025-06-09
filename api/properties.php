@@ -33,6 +33,19 @@ if (!function_exists('validate_property_data')) {
     }
 }
 
+// Add this helper function after validate_property_data
+if (!function_exists('checkEntityExists')) {
+    function checkEntityExists($pdo, $entityType, $entityId) {
+        if ($entityType === 'note') {
+            $stmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
+        } else { // 'page'
+            $stmt = $pdo->prepare("SELECT id FROM Pages WHERE id = ?");
+        }
+        $stmt->execute([$entityId]);
+        return $stmt->fetch() !== false;
+    }
+}
+
 /**
  * Core function to add/update a property, determine its internal status, and dispatch triggers.
  * This function assumes $pdo is available and a transaction might be externally managed if multiple operations are batched.
@@ -122,7 +135,14 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
         $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
 
         try {
-            $pdo = get_db_connection(); // DataManager needs PDO
+            $pdo = get_db_connection();
+            
+            // Check if entity exists
+            if (!checkEntityExists($pdo, $entityType, $entityId)) {
+                ApiResponse::error($entityType === 'note' ? 'Note not found' : 'Page not found', 404);
+                exit;
+            }
+
             $dataManager = new DataManager($pdo);
             $properties = null;
 
@@ -131,8 +151,19 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             } elseif ($entityType === 'page') {
                 $properties = $dataManager->getPageProperties($entityId, $includeInternal);
             }
-            // $properties will be an array, empty if no properties found or entity_id is invalid.
-            ApiResponse::success($properties);
+
+            // Standardize property format
+            $standardizedProperties = [];
+            foreach ($properties as $name => $values) {
+                if (!is_array($values)) {
+                    $values = [$values];
+                }
+                $standardizedProperties[$name] = array_map(function($value) {
+                    return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
+                }, $values);
+            }
+            
+            ApiResponse::success($standardizedProperties);
             
         } catch (Exception $e) {
             ApiResponse::error('Server error: ' . $e->getMessage(), 500);
@@ -144,55 +175,125 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
         $input = json_decode(file_get_contents('php://input'), true);
         if (!$input) {
             ApiResponse::error('Invalid JSON', 400);
-            exit; // Ensure script termination
+            exit;
         }
         
         // Check if this is a delete action
-        if (isset($input['action']) && $input['action'] === 'delete') {
-            $validationRules = [
-                'entity_type' => 'required|isValidEntityType',
-                'entity_id' => 'required|isPositiveInteger',
-                'name' => 'required|isNotEmpty'
-            ];
-            $errors = Validator::validate($input, $validationRules);
-            if (!empty($errors)) {
-                ApiResponse::error('Invalid input for deleting property.', 400, $errors);
+        if (isset($input['action'])) {
+            if ($input['action'] === 'delete') {
+                $validationRules = [
+                    'entity_type' => 'required|isValidEntityType',
+                    'entity_id' => 'required|isPositiveInteger',
+                    'name' => 'required|isNotEmpty'
+                ];
+                $errors = Validator::validate($input, $validationRules);
+                if (!empty($errors)) {
+                    ApiResponse::error('Invalid input for deleting property.', 400, $errors);
+                    exit;
+                }
+                
+                $entityType = $input['entity_type']; // Validated
+                $entityId = (int)$input['entity_id']; // Validated
+                $name = $input['name']; // Validated
+                
+                try {
+                    $pdo = get_db_connection();
+                    
+                    // Check if entity exists
+                    if (!checkEntityExists($pdo, $entityType, $entityId)) {
+                        ApiResponse::error($entityType === 'note' ? 'Note not found' : 'Page not found', 404);
+                        exit;
+                    }
+
+                    if ($entityType === 'page') {
+                        $stmt = $pdo->prepare("DELETE FROM Properties WHERE page_id = ? AND note_id IS NULL AND name = ?");
+                    } else { // 'note'
+                        $stmt = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND page_id IS NULL AND name = ?");
+                    }
+                    $stmt->execute([$entityId, $name]);
+                    
+                    ApiResponse::success(null, 200);
+                    
+                } catch (Exception $e) {
+                    ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+                }
+                exit;
+            } elseif ($input['action'] === 'set_internal_status') {
+                $validationRules = [
+                    'entity_type' => 'required|isValidEntityType',
+                    'entity_id' => 'required|isPositiveInteger',
+                    'name' => 'required|isNotEmpty',
+                    'internal' => 'required|isBooleanLike'
+                ];
+                $errors = Validator::validate($input, $validationRules);
+                if (!empty($errors)) {
+                    ApiResponse::error('Invalid input for setting internal status.', 400, $errors);
+                    exit;
+                }
+
+                $entityType = $input['entity_type']; // Validated
+                $entityId = (int)$input['entity_id']; // Validated
+                $name = $input['name']; // Validated
+                $internalFlag = (int)$input['internal']; // Validated
+
+                if ($internalFlag !== 0 && $internalFlag !== 1) {
+                    ApiResponse::error('Invalid internal flag value. Must be 0 or 1.', 400);
+                    exit;
+                }
+
+                try {
+                    $pdo = get_db_connection();
+                    
+                    // Check if entity exists
+                    if (!checkEntityExists($pdo, $entityType, $entityId)) {
+                        ApiResponse::error($entityType === 'note' ? 'Note not found' : 'Page not found', 404);
+                        exit;
+                    }
+
+                    $idColumn = ($entityType === 'page') ? 'page_id' : 'note_id';
+
+                    // Check if property exists
+                    $stmtCheck = $pdo->prepare("SELECT id FROM Properties WHERE {$idColumn} = ? AND name = ?");
+                    $stmtCheck->execute([$entityId, $name]);
+                    if (!$stmtCheck->fetch()) {
+                        ApiResponse::error('Property not found. Cannot set internal status for a non-existent property.', 404);
+                        exit;
+                    }
+
+                    // Update internal status
+                    $stmt = $pdo->prepare("UPDATE Properties SET internal = ? WHERE {$idColumn} = ? AND name = ?");
+                    $success = $stmt->execute([$internalFlag, $entityId, $name]);
+
+                    if ($success) {
+                        // Get property value for trigger dispatch
+                        $stmtGetValue = $pdo->prepare("SELECT value FROM Properties WHERE {$idColumn} = ? AND name = ?");
+                        $stmtGetValue->execute([$entityId, $name]);
+                        $propertyRow = $stmtGetValue->fetch(PDO::FETCH_ASSOC);
+
+                        if ($propertyRow) {
+                            $triggerService = new PropertyTriggerService($pdo);
+                            $triggerService->dispatch($entityType, $entityId, $name, $propertyRow['value']);
+                        } else {
+                            error_log("Could not retrieve property value after updating internal status for {$name} on {$entityType} {$entityId}");
+                        }
+
+                        ApiResponse::success(['message' => 'Property internal status updated.']);
+                    } else {
+                        ApiResponse::error('Failed to update property internal status', 500);
+                    }
+                } catch (Exception $e) {
+                    ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+                }
                 exit;
             }
-            
-            $entityType = $input['entity_type']; // Validated
-            $entityId = (int)$input['entity_id']; // Validated
-            $name = $input['name']; // Validated
-            
-            try {
-                $pdo = get_db_connection();
-                // Transaction for delete? Usually not necessary for single deletes unless triggers do complex things.
-                // For now, assuming delete itself is atomic and triggers handle their own logic.
-                if ($entityType === 'page') {
-                    $stmt = $pdo->prepare("DELETE FROM Properties WHERE page_id = ? AND note_id IS NULL AND name = ?");
-                } else { // 'note'
-                    $stmt = $pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND page_id IS NULL AND name = ?");
-                }
-                $stmt->execute([$entityId, $name]);
-                
-                // FUTURE: Consider if delete operations should also have a "before_delete" or "after_delete" trigger mechanism.
-                // For now, keeping it simple.
-                
-                ApiResponse::success(null, 200); // Or perhaps a more descriptive success message if needed.
-                
-            } catch (Exception $e) {
-                ApiResponse::error('Server error: ' . $e->getMessage(), 500);
-            }
-            // Important: exit after handling delete action
-            exit; 
         }
         
         // Handle regular property creation/update
         $validationRules = [
             'entity_type' => 'required|isValidEntityType',
             'entity_id' => 'required|isPositiveInteger',
-            'name' => 'required|isNotEmpty', // Name is required
-            'value' => 'required',          // Value is required (can be empty string, so not isNotEmpty)
+            'name' => 'required|isNotEmpty',
+            'value' => 'required',
             'internal' => 'optional|isBooleanLike'
         ];
         $errors = Validator::validate($input, $validationRules);
@@ -205,22 +306,26 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
         $entityId = (int)$input['entity_id']; // Validated
         $name = $input['name']; // Validated
         $value = $input['value']; // Validated (presence)
-        // 'internal' is optional, Validator ensures it's 0/1 if present
         $explicitInternal = isset($input['internal']) ? (int)$input['internal'] : null;
 
         // The specific validate_property_data function can still be used for its tag normalization logic
-        // after basic validation passes.
         $normalizedPropertyData = validate_property_data(['name' => $name, 'value' => $value]);
         if (!$normalizedPropertyData) {
-            // This indicates an issue with tag format specifically, as basic presence was validated.
             ApiResponse::error('Invalid property format (e.g., tag:: without tag name).', 400);
             exit;
         }
-        $name = $normalizedPropertyData['name']; // Potentially normalized name (though current logic doesn't change it)
-        $value = $normalizedPropertyData['value']; // Potentially normalized value (for tags)
+        $name = $normalizedPropertyData['name'];
+        $value = $normalizedPropertyData['value'];
 
         try {
             $pdo = get_db_connection();
+            
+            // Check if entity exists
+            if (!checkEntityExists($pdo, $entityType, $entityId)) {
+                ApiResponse::error($entityType === 'note' ? 'Note not found' : 'Page not found', 404);
+                exit;
+            }
+
             $pdo->beginTransaction();
             
             $savedProperty = _updateOrAddPropertyAndDispatchTriggers(
@@ -233,7 +338,17 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             );
             
             $pdo->commit();
-            ApiResponse::success(['property' => $savedProperty]);
+            
+            // Standardize the response format
+            $response = [
+                'property' => [
+                    'name' => $savedProperty['name'],
+                    'value' => $savedProperty['value'],
+                    'internal' => (int)$savedProperty['internal']
+                ]
+            ];
+            
+            ApiResponse::success($response);
             
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {
@@ -241,7 +356,7 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             }
             ApiResponse::error('Server error: ' . $e->getMessage(), 500);
         }
-        exit; // Ensure script termination after POST
+        exit;
     }
 
     // Method not allowed (if not GET or POST)

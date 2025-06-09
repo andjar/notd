@@ -29,6 +29,15 @@ if ($method === 'POST' || $method === 'PUT') {
         ApiResponse::error('Invalid template type', 400);
         exit;
     }
+
+    // Validate action for POST requests
+    if ($method === 'POST' && isset($input['action'])) {
+        if (!in_array($input['action'], ['create', 'delete', 'update'])) {
+            logError("Invalid action", ['action' => $input['action']]);
+            ApiResponse::error('Invalid action. Must be one of: create, delete, update', 400);
+            exit;
+        }
+    }
 }
 
 try {
@@ -83,33 +92,75 @@ try {
         }
     }
     else if ($method === 'POST') {
-        if (!isset($input['name']) || !isset($input['content'])) {
-            ApiResponse::error('Template name and content are required', 400);
-            exit;
-        }
+        $action = $input['action'] ?? 'create'; // Default to create for backward compatibility
 
-        $processor = new TemplateProcessor($input['type']);
-        $success = $processor->addTemplate($input['name'], $input['content']);
-        
-        if ($success) {
-            ApiResponse::success(['message' => 'Template created successfully']);
-        } else {
-            ApiResponse::error('Failed to create template', 500);
-        }
-    }
-    else if ($method === 'DELETE') {
-        if (!isset($_GET['name']) || !isset($_GET['type'])) {
-            ApiResponse::error('Template name and type are required', 400);
-            exit;
-        }
+        switch ($action) {
+            case 'create':
+                if (!isset($input['name']) || !isset($input['content'])) {
+                    ApiResponse::error('Template name and content are required', 400);
+                    exit;
+                }
 
-        $processor = new TemplateProcessor($_GET['type']);
-        $success = $processor->deleteTemplate($_GET['name']);
-        
-        if ($success) {
-            ApiResponse::success(['message' => 'Template deleted successfully']);
-        } else {
-            ApiResponse::error('Failed to delete template', 500);
+                $processor = new TemplateProcessor($input['type']);
+                $success = $processor->addTemplate($input['name'], $input['content']);
+                
+                if ($success) {
+                    ApiResponse::success(['message' => 'Template created successfully']);
+                } else {
+                    ApiResponse::error('Failed to create template', 500);
+                }
+                break;
+
+            case 'delete':
+                if (!isset($input['name'])) {
+                    ApiResponse::error('Template name is required for deletion', 400);
+                    exit;
+                }
+
+                $processor = new TemplateProcessor($input['type']);
+                $success = $processor->deleteTemplate($input['name']);
+                
+                if ($success) {
+                    ApiResponse::success(['message' => 'Template deleted successfully']);
+                } else {
+                    ApiResponse::error('Failed to delete template', 500);
+                }
+                break;
+
+            case 'update':
+                if (!isset($input['current_name']) || !isset($input['content'])) {
+                    ApiResponse::error('Current template name and content are required for update', 400);
+                    exit;
+                }
+
+                $processor = new TemplateProcessor($input['type']);
+                
+                // If new_name is provided, we need to rename the template
+                if (isset($input['new_name']) && $input['new_name'] !== $input['current_name']) {
+                    // First delete the old template
+                    $deleteSuccess = $processor->deleteTemplate($input['current_name']);
+                    if (!$deleteSuccess) {
+                        ApiResponse::error('Failed to update template - could not remove old version', 500);
+                        exit;
+                    }
+                    // Then create the new template
+                    $success = $processor->addTemplate($input['new_name'], $input['content']);
+                } else {
+                    // Just update the content of the existing template
+                    $deleteSuccess = $processor->deleteTemplate($input['current_name']);
+                    if (!$deleteSuccess) {
+                        ApiResponse::error('Failed to update template - could not remove old version', 500);
+                        exit;
+                    }
+                    $success = $processor->addTemplate($input['current_name'], $input['content']);
+                }
+                
+                if ($success) {
+                    ApiResponse::success(['message' => 'Template updated successfully']);
+                } else {
+                    ApiResponse::error('Failed to update template', 500);
+                }
+                break;
         }
     }
     else {
