@@ -1,12 +1,12 @@
 <?php
-require_once '../config.php';
-require_once 'db_connect.php';
-// require_once 'property_triggers.php'; // Old trigger system replaced
-require_once 'property_trigger_service.php'; // New trigger service
-require_once 'property_auto_internal.php';
-require_once 'response_utils.php'; // Include the new response utility
-require_once 'data_manager.php';   // Include the new DataManager
-require_once 'validator_utils.php'; // Include the new Validator
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../db_connect.php';
+// require_once __DIR__ . '/../property_triggers.php'; // Old trigger system replaced
+require_once __DIR__ . '/../property_trigger_service.php'; // New trigger service
+require_once __DIR__ . '/../property_auto_internal.php';
+require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
+require_once __DIR__ . '/../data_manager.php';   // Include the new DataManager
+require_once __DIR__ . '/../validator_utils.php'; // Include the new Validator
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 

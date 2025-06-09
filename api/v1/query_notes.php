@@ -26,9 +26,9 @@
  *   
  * Security: Only SELECT queries are allowed, limited to Notes, Properties, and Pages tables.
  */
-require_once '../config.php';
-require_once 'db_connect.php';
-require_once 'response_utils.php'; // Include the new response utility
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 

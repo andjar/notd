@@ -1,7 +1,7 @@
 <?php
-require_once 'db_connect.php';
-require_once 'response_utils.php'; // Include the new response utility
-require_once 'data_manager.php';   // Include the new DataManager
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
+require_once __DIR__ . '/../data_manager.php';   // Include the new DataManager
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 $pdo = get_db_connection();

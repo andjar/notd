@@ -1,8 +1,8 @@
 <?php
-require_once 'db_connect.php';
-require_once 'response_utils.php'; // Include the new response utility
-require_once 'data_manager.php';   // Include the new DataManager
-require_once 'validator_utils.php'; // Include the new Validator
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
+require_once __DIR__ . '/../data_manager.php';   // Include the new DataManager
+require_once __DIR__ . '/../validator_utils.php'; // Include the new Validator
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 $pdo = get_db_connection();
@@ -62,21 +62,6 @@ if (!class_exists('PageManager')) {
         error_log("[PageManager] Raw input: " . $rawInput);
         error_log("[PageManager] Parsed input: " . json_encode($input));
         error_log("[PageManager] JSON decode error: " . json_last_error_msg());
-
-        // Handle POST-based updates and deletes
-        if ($method === 'POST' && isset($input['action'])) {
-            switch ($input['action']) {
-                case 'update':
-                    $this->handlePostUpdate($input);
-                    break;
-                case 'delete':
-                    $this->handlePostDelete($input);
-                    break;
-                default:
-                    ApiResponse::error('Invalid action specified', 400);
-            }
-            return;
-        }
 
         // Handle POST with _method for REST compatibility
         if ($method === 'POST' && isset($input['_method'])) {
@@ -327,7 +312,7 @@ if (!class_exists('PageManager')) {
                 $newPage = $stmt_new->fetch();
                 
                 $this->pdo->commit();
-                ApiResponse::success($newPage);
+                ApiResponse::success($newPage, 201);
                 return;
             }
 
@@ -341,7 +326,7 @@ if (!class_exists('PageManager')) {
             $newPage = $stmt_new->fetch();
             
             $this->pdo->commit();
-            ApiResponse::success($newPage);
+            ApiResponse::success($newPage, 201);
         } catch (PDOException $e) {
             $this->pdo->rollBack();
             ApiResponse::error('Failed to create page: ' . $e->getMessage(), 500);

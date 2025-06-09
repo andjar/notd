@@ -1,14 +1,14 @@
 <?php
-require_once '../config.php';
-require_once '../api/db_connect.php';
-require_once '../template_processor.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../../template_processor.php';
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
-require_once 'response_utils.php'; // Include the new response utility
+require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
 
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
@@ -92,76 +92,81 @@ try {
         }
     }
     else if ($method === 'POST') {
-        $action = $input['action'] ?? 'create'; // Default to create for backward compatibility
+            $overrideMethod = null;
+            if (isset($input['_method'])) {
+                $overrideMethod = strtoupper($input['_method']);
+            }
 
-        switch ($action) {
-            case 'create':
-                if (!isset($input['name']) || !isset($input['content'])) {
-                    ApiResponse::error('Template name and content are required', 400);
+            if ($overrideMethod === 'PUT') {
+                // UPDATE LOGIC
+                // Validate: current_name, content (new_name is optional)
+                if (!isset($input['type']) || !in_array($input['type'], ['note', 'page'])) {
+                    ApiResponse::error('Invalid template type', 400);
                     exit;
                 }
-
-                $processor = new TemplateProcessor($input['type']);
-                $success = $processor->addTemplate($input['name'], $input['content']);
-                
-                if ($success) {
-                    ApiResponse::success(['message' => 'Template created successfully']);
-                } else {
-                    ApiResponse::error('Failed to create template', 500);
-                }
-                break;
-
-            case 'delete':
-                if (!isset($input['name'])) {
-                    ApiResponse::error('Template name is required for deletion', 400);
-                    exit;
-                }
-
-                $processor = new TemplateProcessor($input['type']);
-                $success = $processor->deleteTemplate($input['name']);
-                
-                if ($success) {
-                    ApiResponse::success(['message' => 'Template deleted successfully']);
-                } else {
-                    ApiResponse::error('Failed to delete template', 500);
-                }
-                break;
-
-            case 'update':
                 if (!isset($input['current_name']) || !isset($input['content'])) {
                     ApiResponse::error('Current template name and content are required for update', 400);
                     exit;
                 }
-
                 $processor = new TemplateProcessor($input['type']);
-                
-                // If new_name is provided, we need to rename the template
+                $success = false;
                 if (isset($input['new_name']) && $input['new_name'] !== $input['current_name']) {
-                    // First delete the old template
                     $deleteSuccess = $processor->deleteTemplate($input['current_name']);
-                    if (!$deleteSuccess) {
-                        ApiResponse::error('Failed to update template - could not remove old version', 500);
-                        exit;
+                    if ($deleteSuccess) {
+                         $success = $processor->addTemplate($input['new_name'], $input['content']);
                     }
-                    // Then create the new template
-                    $success = $processor->addTemplate($input['new_name'], $input['content']);
                 } else {
-                    // Just update the content of the existing template
                     $deleteSuccess = $processor->deleteTemplate($input['current_name']);
-                    if (!$deleteSuccess) {
-                        ApiResponse::error('Failed to update template - could not remove old version', 500);
-                        exit;
+                    if ($deleteSuccess) {
+                        $success = $processor->addTemplate($input['current_name'], $input['content']);
                     }
-                    $success = $processor->addTemplate($input['current_name'], $input['content']);
                 }
-                
                 if ($success) {
                     ApiResponse::success(['message' => 'Template updated successfully']);
                 } else {
                     ApiResponse::error('Failed to update template', 500);
                 }
-                break;
-        }
+
+            } elseif ($overrideMethod === 'DELETE') {
+                // DELETE LOGIC
+                // Validate: name, type
+                if (!isset($input['type']) || !in_array($input['type'], ['note', 'page'])) {
+                    ApiResponse::error('Invalid template type', 400);
+                    exit;
+                }
+                if (!isset($input['name'])) {
+                    ApiResponse::error('Template name is required for deletion', 400);
+                    exit;
+                }
+                $processor = new TemplateProcessor($input['type']);
+                $success = $processor->deleteTemplate($input['name']);
+                if ($success) {
+                    ApiResponse::success(['message' => 'Template deleted successfully']);
+                } else {
+                    ApiResponse::error('Failed to delete template', 500);
+                }
+
+            } elseif ($overrideMethod === null || $overrideMethod === 'POST') {
+                // CREATE LOGIC (original POST)
+                // Validate: type, name, content
+                if (!isset($input['type']) || !in_array($input['type'], ['note', 'page'])) {
+                    ApiResponse::error('Invalid template type', 400);
+                    exit;
+                }
+                if (!isset($input['name']) || !isset($input['content'])) {
+                    ApiResponse::error('Template name and content are required', 400);
+                    exit;
+                }
+                $processor = new TemplateProcessor($input['type']);
+                $success = $processor->addTemplate($input['name'], $input['content']);
+                if ($success) {
+                    ApiResponse::success(['message' => 'Template created successfully'], 201);
+                } else {
+                    ApiResponse::error('Failed to create template', 500);
+                }
+            } else {
+                ApiResponse::error('Invalid _method specified for POST.', 400);
+            }
     }
     else {
         ApiResponse::error('Method not allowed', 405);

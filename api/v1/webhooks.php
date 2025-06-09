@@ -1,8 +1,8 @@
 <?php
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/db_connect.php';
-require_once __DIR__ . '/response_utils.php';
-require_once __DIR__ . '/validator_utils.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../response_utils.php';
+require_once __DIR__ . '/../validator_utils.php';
 
 class WebhooksManager {
     private $pdo;

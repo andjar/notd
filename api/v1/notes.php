@@ -1,14 +1,14 @@
 <?php
-require_once '../config.php';
-require_once 'db_connect.php';
-require_once 'property_trigger_service.php';
-require_once 'pattern_processor.php';
-require_once 'property_parser.php';
-require_once 'property_auto_internal.php'; // Added for determinePropertyInternalStatus
-require_once 'properties.php'; // Required for _updateOrAddPropertyAndDispatchTriggers
-require_once 'data_manager.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../property_trigger_service.php';
+require_once __DIR__ . '/../pattern_processor.php';
+require_once __DIR__ . '/../property_parser.php';
+require_once __DIR__ . '/../property_auto_internal.php'; // Added for determinePropertyInternalStatus
+require_once __DIR__ . '/properties.php'; // Required for _updateOrAddPropertyAndDispatchTriggers
+require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../response_utils.php';
 
-header('Content-Type: application/json');
 $pdo = get_db_connection();
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
@@ -24,20 +24,11 @@ if ($method === 'POST' && isset($input['_method'])) {
     // However, validateNoteData only checks for 'content', so it's likely fine to leave it.
 }
 
-// Helper function to send JSON response
-if (!function_exists('sendJsonResponse')) {
-    function sendJsonResponse($data, $statusCode = 200) {
-        http_response_code($statusCode);
-        echo json_encode($data);
-        exit;
-    }
-}
-
 // Helper function to validate note data
 if (!function_exists('validateNoteData')) {
     function validateNoteData($data) {
         if (!isset($data['content'])) {
-            sendJsonResponse(['success' => false, 'error' => 'Note content is required'], 400);
+            ApiResponse::error('Note content is required', 400);
         }
         return true;
     }
@@ -94,9 +85,9 @@ if ($method === 'GET') {
                     }
                     $note['properties'] = $standardizedProps;
                 }
-                sendJsonResponse(['success' => true, 'data' => $note]);
+                ApiResponse::success($note);
             } else {
-                sendJsonResponse(['success' => false, 'error' => 'Note not found or is internal'], 404);
+                ApiResponse::error('Note not found or is internal', 404);
             }
         } elseif (isset($_GET['page_id'])) {
             // Get page with notes using DataManager
@@ -106,7 +97,7 @@ if ($method === 'GET') {
             $pageCheckStmt = $pdo->prepare("SELECT id FROM Pages WHERE id = ?");
             $pageCheckStmt->execute([$pageId]);
             if (!$pageCheckStmt->fetch()) {
-                sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
+                ApiResponse::error('Page not found', 404);
             }
             
             $pageData = $dataManager->getPageWithNotes($pageId, $includeInternal);
@@ -127,12 +118,9 @@ if ($method === 'GET') {
                         $note['properties'] = $standardizedProps;
                     }
                 }
-                sendJsonResponse([
-                    'success' => true,
-                    'data' => $pageData['notes']
-                ]);
+                ApiResponse::success($pageData['notes']);
             } else {
-                sendJsonResponse(['success' => false, 'error' => 'Page not found'], 404);
+                ApiResponse::error('Page not found', 404);
             }
         } else {
             // Get all notes with pagination
@@ -192,8 +180,7 @@ if ($method === 'GET') {
             // Calculate pagination metadata
             $totalPages = ceil($totalCount / $perPage);
             
-            sendJsonResponse([
-                'success' => true,
+            ApiResponse::success([
                 'data' => $notes,
                 'pagination' => [
                     'current_page' => $page,
@@ -207,12 +194,12 @@ if ($method === 'GET') {
         }
     } catch (Exception $e) {
         error_log("API Error in notes.php: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'error' => 'An error occurred while fetching data: ' . $e->getMessage()], 500);
+        ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
     }
 } elseif ($method === 'POST') {
     // Validate input
     if (!isset($input['page_id']) || !is_numeric($input['page_id'])) {
-        sendJsonResponse(['success' => false, 'error' => 'A valid page_id is required.'], 400);
+        ApiResponse::error('A valid page_id is required.', 400);
     }
 
     $pageId = (int)$input['page_id'];
@@ -270,14 +257,14 @@ if ($method === 'GET') {
         // Attach the parsed properties to the response
         $newNote['properties'] = $properties;
 
-        sendJsonResponse(['success' => true, 'data' => $newNote], 201); // 201 Created
+        ApiResponse::success($newNote, 201); // 201 Created
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
         error_log("Failed to create note: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'error' => 'Failed to create note.', 'details' => $e->getMessage()], 500);
+        ApiResponse::error('Failed to create note.', 500, ['details' => $e->getMessage()]);
     }
 } elseif ($method === 'PUT') {
     // For phpdesktop compatibility, also check for ID in request body when using method override
@@ -289,7 +276,7 @@ if ($method === 'GET') {
     }
     
     if (!$noteId) {
-        sendJsonResponse(['success' => false, 'error' => 'Note ID is required'], 400);
+        ApiResponse::error('Note ID is required', 400);
     }
     
     // Content is not always required for PUT (e.g. only changing parent/order)
@@ -305,7 +292,7 @@ if ($method === 'GET') {
         
         if (!$existingNote) {
             $pdo->rollBack();
-            sendJsonResponse(['success' => false, 'error' => 'Note not found'], 404);
+            ApiResponse::error('Note not found', 404);
         }
 
         // --- BEGIN order_index recalculation logic: Step 1 ---
@@ -346,7 +333,7 @@ if ($method === 'GET') {
 
         if (empty($setClauses)) {
             $pdo->rollBack();
-            sendJsonResponse(['success' => false, 'error' => 'No updateable fields provided'], 400);
+            ApiResponse::error('No updateable fields provided', 400);
             return; // Exit early
         }
 
@@ -438,11 +425,11 @@ if ($method === 'GET') {
         }
         
         $pdo->commit();
-        sendJsonResponse(['success' => true, 'data' => $note]);
+        ApiResponse::success($note);
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log("Failed to update note: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'error' => 'Failed to update note: ' . $e->getMessage()], 500);
+        ApiResponse::error('Failed to update note: ' . $e->getMessage(), 500);
     }
 } elseif ($method === 'DELETE') {
     // For phpdesktop compatibility, also check for ID in request body when using method override
@@ -454,7 +441,7 @@ if ($method === 'GET') {
     }
     
     if (!$noteId) {
-        sendJsonResponse(['success' => false, 'error' => 'Note ID is required'], 400);
+        ApiResponse::error('Note ID is required', 400);
     }
     
     try {
@@ -465,7 +452,7 @@ if ($method === 'GET') {
         $stmt->execute([$noteId]);
         if (!$stmt->fetch()) {
             $pdo->rollBack();
-            sendJsonResponse(['success' => false, 'error' => 'Note not found'], 404);
+            ApiResponse::error('Note not found', 404);
         }
         
         // Delete properties first (due to foreign key constraint)
@@ -477,11 +464,11 @@ if ($method === 'GET') {
         $stmt->execute([$noteId]);
         
         $pdo->commit();
-        sendJsonResponse(['success' => true, 'data' => ['deleted_note_id' => $noteId]]);
+        ApiResponse::success(['deleted_note_id' => $noteId]);
     } catch (PDOException $e) {
         $pdo->rollBack();
-        sendJsonResponse(['success' => false, 'error' => 'Failed to delete note: ' . $e->getMessage()], 500);
+        ApiResponse::error('Failed to delete note: ' . $e->getMessage(), 500);
     }
 } else {
-    sendJsonResponse(['success' => false, 'error' => 'Method not allowed'], 405);
+    ApiResponse::error('Method not allowed', 405);
 }

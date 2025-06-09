@@ -5,7 +5,7 @@ class ApiResponse {
         http_response_code($statusCode);
         header('Content-Type: application/json');
         echo json_encode([
-            'success' => true,
+            'status' => 'success', // Changed from 'success' => true
             'data' => $data
         ]);
     }
@@ -14,13 +14,11 @@ class ApiResponse {
         http_response_code($statusCode);
         header('Content-Type: application/json');
         $response = [
-            'success' => false,
-            'error' => [
-                'message' => $message
-            ]
+            'status' => 'error', // Changed from 'success' => false
+            'message' => $message // Moved up from 'error']['message']
         ];
         if ($details !== null) {
-            $response['error']['details'] = $details;
+            $response['details'] = $details; // Moved up from 'error']['details']
         }
         echo json_encode($response);
     }
