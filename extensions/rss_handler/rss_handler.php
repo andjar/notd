@@ -16,8 +16,22 @@ function log_message($level, $message) {
     fwrite(($level === 'ERROR' || $level === 'WARNING' ? STDERR : STDOUT), "[$timestamp] [$level] $message\n");
 }
 
-// --- SimplePie Direct Include ---
-require_once __DIR__ . '/SimplePie.php';
+// --- SimplePie Library Loading ---
+$simplepie_path = __DIR__ . '/SimplePie.php';
+if (!file_exists($simplepie_path)) {
+    $error_msg = "SimplePie.php not found at: $simplepie_path";
+    log_message('ERROR', $error_msg);
+    if (php_sapi_name() === 'cli') {
+        fwrite(STDERR, $error_msg . "\n");
+        exit(1);
+    } else {
+        http_response_code(500);
+        echo json_encode(['error' => 'Required library not found']);
+        exit(1);
+    }
+}
+require_once $simplepie_path;
+log_message('INFO', "Loaded SimplePie library from: $simplepie_path");
 
 // --- Helper Functions ---
 
