@@ -222,11 +222,22 @@ const pagesAPI = {
     },
 
     /**
-     * Create a new page
-     * @param {{name: string, alias?: string}} pageData - Page data
-     * @returns {Promise<Object>} Created page object
+     * Create a new page with a given name.
+     * @param {string} pageName - The name for the new page.
+     * @returns {Promise<Object>} Created page object (typically {id, name, title, ...})
+     * @throws {Error} If pageName is not a non-empty string or if API request fails.
      */
-    createPage: (pageData) => apiRequest('pages.php', 'POST', pageData),
+    createPage: async (pageName) => {
+        if (typeof pageName !== 'string' || pageName.trim() === '') {
+            // apiRequest would likely reject or the API would return an error,
+            // but explicit client-side check is good practice.
+            return Promise.reject(new Error('Page name must be a non-empty string.'));
+        }
+        // apiRequest handles JSON.stringify for the body { name: pageName }
+        // and returns a promise that resolves with the parsed JSON response data (data.data)
+        // or rejects with an error.
+        return apiRequest('pages.php', 'POST', { name: pageName });
+    },
 
     /**
      * Update a page
