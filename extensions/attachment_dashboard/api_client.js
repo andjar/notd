@@ -25,8 +25,7 @@ const attachmentsAPI = {
      */
     getAllAttachments: async (params) => {
         // Resolve APP_BASE_URL. Fallback to empty string if not defined globally.
-        const baseUrl = typeof APP_BASE_URL !== 'undefined' ? APP_BASE_URL : '';
-        const endpoint = `${baseUrl}/api/v1/attachments.php`;
+        const endpoint = '../../api/v1/attachments.php';
 
         const queryParams = new URLSearchParams();
         if (params) {
