@@ -459,7 +459,6 @@ function switchToEditMode(contentEl) {
     } else {
         console.warn('Suggestion box element not found to attach click listener.');
     }
-    document.addEventListener('suggestion-select', suggestionClickListener);
 
     const handleBlur = () => {
         setTimeout(() => {
@@ -474,7 +473,6 @@ function switchToEditMode(contentEl) {
         contentEl.removeEventListener('paste', handlePasteImage);
         contentEl.removeEventListener('input', handleInputForSuggestions);
         contentEl.removeEventListener('keydown', handleKeydownForSuggestions);
-        document.removeEventListener('suggestion-select', suggestionClickListener);
         if (suggestionBoxElement) {
             suggestionBoxElement.removeEventListener('suggestion-select', suggestionClickListener); // Clean up
         }
