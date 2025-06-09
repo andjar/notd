@@ -610,7 +610,7 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
     closeSearchOrCreatePageModal();
     if (isCreate) {
         try {
-            const newPage = await pagesAPI.createPage({ name: pageName });
+            const newPage = await pagesAPI.createPage(pageName);
             if (newPage && newPage.id) {
                 // Optimistically update the page list
                 if (window.ui && window.ui.domRefs && window.ui.domRefs.pageListContainer) {
@@ -639,7 +639,7 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
                     await fetchAndDisplayPages(newPage.name);
                 }
                 
-                await loadPage(newPage.name, true, true, newPage); // Load the new page (force reload, switch to it, pass newPage object)
+                await loadPage(newPage.name, true, true, newPage);
             } else {
                 alert(`Failed to create page: ${pageName}`);
             }

@@ -160,7 +160,7 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
     closeSearchOrCreatePageModal();
     if (isCreate) {
         try {
-            const newPage = await pagesAPI.createPage({ name: pageName }); // Assumes pagesAPI is global
+            const newPage = await pagesAPI.createPage(pageName); // Pass pageName directly as string
             if (newPage && newPage.id) {
                 await fetchAndDisplayPages(newPage.name); 
                 await loadPage(newPage.name, true); 
