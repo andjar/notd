@@ -18,10 +18,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let filterType = '';
     let perPage = 10; // Default items per page
 
+    // Helper function to reset pagination controls in error scenarios
+    function updatePaginationForError() {
+        pageInfoSpan.textContent = 'Page 1 of 1';
+        prevPageButton.disabled = true;
+        nextPageButton.disabled = true;
+    }
+
     // Helper Functions
     function formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
-        if (!bytes || isNaN(bytes)) return 'N/A'; // Handle null, undefined or NaN
+        if (!bytes || isNaN(bytes)) return 'N/A';
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -32,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dateString) return 'N/A';
         try {
             const date = new Date(dateString);
-            // Check if date is valid
             if (isNaN(date.getTime())) {
                 return 'Invalid Date';
             }
@@ -66,25 +72,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         console.log("Fetching with params:", params);
+        tableBody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>'; // Optional: Loading indicator
 
         try {
             const response = await attachmentsAPI.getAllAttachments(params);
             console.log("API Response:", response);
 
-            if (!response || !response.data) {
-                console.error('Invalid API response structure:', response);
-                tableBody.innerHTML = '<tr><td colspan="5">Error: Invalid data received from server.</td></tr>';
-                // Update pagination to show default/error state
-                pageInfoSpan.textContent = 'Page 1 of 1';
-                prevPageButton.disabled = true;
-                nextPageButton.disabled = true;
+            if (!response) {
+                console.error('No response received from API client.');
+                tableBody.innerHTML = '<tr><td colspan="5">Error: No response from server.</td></tr>';
+                updatePaginationForError();
+                return;
+            }
+
+            if (response.status === 'error') {
+                console.error('API Error:', response.message, response.details || '');
+                tableBody.innerHTML = `<tr><td colspan="5">Error: ${response.message || 'An unknown API error occurred.'}</td></tr>`;
+                updatePaginationForError();
+                return;
+            }
+            
+            // Assuming success if status is not 'error' and data is present
+            if (!response.data || !response.pagination) {
+                console.error('Invalid API response structure (missing data or pagination):', response);
+                tableBody.innerHTML = '<tr><td colspan="5">Error: Invalid data format received from server.</td></tr>';
+                updatePaginationForError();
                 return;
             }
             
             const attachments = response.data;
             const pagination = response.pagination;
 
-            tableBody.innerHTML = ''; // Clear existing rows
+            tableBody.innerHTML = ''; // Clear loading or previous error rows
 
             if (attachments.length > 0) {
                 attachments.forEach(att => {
@@ -109,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const linkCell = row.insertCell();
                     linkCell.setAttribute('data-label', 'Preview/Link');
                     const link = document.createElement('a');
-                    link.href = att.url; // Already includes APP_BASE_URL from backend
+                    link.href = att.url; 
                     link.textContent = 'View/Download';
                     link.target = '_blank';
                     linkCell.appendChild(link);
@@ -118,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const imgPreview = document.createElement('img');
                         imgPreview.src = att.url;
                         imgPreview.alt = att.name + " preview";
-                        imgPreview.classList.add('attachment-preview-image'); // For styling
+                        imgPreview.classList.add('attachment-preview-image');
                         linkCell.appendChild(imgPreview);
                     }
                 });
@@ -130,37 +149,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 cell.style.textAlign = 'center';
             }
 
-            // Update pagination
             pageInfoSpan.textContent = `Page ${pagination.current_page} of ${pagination.total_pages || 1}`;
             prevPageButton.disabled = pagination.current_page <= 1;
-            nextPageButton.disabled = pagination.current_page >= pagination.total_pages;
+            nextPageButton.disabled = pagination.current_page >= (pagination.total_pages || 1);
 
-            // Dynamically populate type filter (basic version - only if not already populated)
-            // This could be improved to gather all unique types from *all* pages,
-            // or have a dedicated endpoint. For now, it adds types from the current page.
-            if (typeFilter.options.length <= 1 && attachments.length > 0) { // Keep "All Types"
+            if (typeFilter.options.length <= 1 && attachments.length > 0) {
                 const uniqueTypes = new Set(attachments.map(att => att.type).filter(Boolean));
                 const existingOptions = new Set(Array.from(typeFilter.options).map(opt => opt.value));
                 uniqueTypes.forEach(type => {
                     if (!existingOptions.has(type)) {
                         const option = document.createElement('option');
                         option.value = type;
-                        option.textContent = type; // Or a more friendly name
+                        option.textContent = type;
                         typeFilter.appendChild(option);
                     }
                 });
             }
 
-        } catch (error) {
-            console.error('Error fetching attachments:', error);
-            tableBody.innerHTML = `<tr><td colspan="5">Error loading attachments: ${error.message || 'Unknown error'}. Check console for details.</td></tr>`;
-            pageInfoSpan.textContent = 'Page 1 of 1';
-            prevPageButton.disabled = true;
-            nextPageButton.disabled = true;
+        } catch (error) { // Catches errors from fetch operation itself or if api_client.js re-throws
+            console.error('Error fetching attachments:', error.message, error.response || error);
+            // Display the error message from the error object, which api_client.js should provide
+            tableBody.innerHTML = `<tr><td colspan="5">Error: ${error.message || 'A client-side error occurred.'} Check console.</td></tr>`;
+            updatePaginationForError();
         }
     }
 
-    // Event Listeners
+    // Event Listeners (remain unchanged)
     searchBar.addEventListener('input', debounce(() => {
         searchTerm = searchBar.value.trim();
         currentPage = 1;
@@ -182,10 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 sortBy = newSortBy;
                 sortOrder = 'desc';
             }
-            // Visual indicator for sorting (optional)
             tableHeaders.forEach(th => th.classList.remove('sort-asc', 'sort-desc'));
             header.classList.add(sortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
-            
             fetchAndRenderAttachments();
         });
     });
@@ -198,9 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     nextPageButton.addEventListener('click', () => {
-        // Check against total_pages which should be updated by fetchAndRenderAttachments
-        // This requires pagination.total_pages to be available in a broader scope or re-fetched
-        // For simplicity, the disabled state handles this, but for robustness, one might check here too.
+        // nextPageButton.disabled is updated after fetch, so direct check here is less reliable
+        // The disabled state itself should prevent going beyond total_pages
         currentPage++;
         fetchAndRenderAttachments();
     });

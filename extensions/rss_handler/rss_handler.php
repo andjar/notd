@@ -76,7 +76,7 @@ function make_api_request($url, $method = 'GET', $data = null, $headers = []) {
 }
 
 function check_duplicate($api_url, $item_hash) {
-    $query_endpoint = rtrim($api_url, '/') . '/query_notes.php';
+    $query_endpoint = rtrim($api_url, '/') . '/v1/query_notes.php';
     
     // Construct the SQL query.
     // IMPORTANT: Ensure $item_hash is safe. Hashes are generally safe, but for other values, parameter binding would be essential.
@@ -123,7 +123,7 @@ function check_duplicate($api_url, $item_hash) {
 }
 
 function create_note($api_url, $page_id, $title, $content_markdown, $feed_url, $item_link, $item_hash, $item_date) {
-    $notes_endpoint = rtrim($api_url, '/') . '/notes.php';
+    $notes_endpoint = rtrim($api_url, '/') . '/v1/notes.php';
 
     // Append internal properties to content_markdown
     // Note: $content_markdown might already contain the title and basic structure.

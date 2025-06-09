@@ -6,7 +6,7 @@ require_once __DIR__ . '/email_parser_utils.php';
 // --- 2. Configuration ---
 // Define the base URL for the application's API.
 // In a production environment, this might be dynamically determined or set in a config file.
-define('API_BASE_URL', 'http://localhost/api'); // Adjust if your local setup uses a different URL or port
+define('API_BASE_URL', 'http://localhost/api/v1'); // Adjust if your local setup uses a different URL or port
 
 // --- External Mail Fetching Mechanism ---
 // This script assumes that raw email content is provided to it.

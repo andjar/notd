@@ -1,4 +1,4 @@
-import { notesAPI, pagesAPI } from '../assets/js/api_client.js'; // Corrected path and added pagesAPI
+import { notesAPI, pagesAPI, queryAPI } from '../assets/js/api_client.js'; // Corrected path and added pagesAPI
 import { displayKanbanBoard } from './ui.js'; // Corrected path assuming ui.js is in the same directory
 import { setNotesForCurrentPage, notesForCurrentPage } from '../assets/js/app/state.js'; // Corrected path
 
@@ -30,42 +30,17 @@ export async function initializeKanban() {
         console.log('Attempting to fetch all notes for Kanban board...');
         let allNotes = [];
         try {
-            // Fetch all pages with their notes
-            console.log('Fetching all pages with details for Kanban board...');
-            const pagesWithDetails = await pagesAPI.getPages({ include_details: 1, include_internal: 0 });
-            
-            let allNotes = [];
-            if (pagesWithDetails && Array.isArray(pagesWithDetails)) {
-                pagesWithDetails.forEach(pageContainer => {
-                    // The structure from pagesAPI.getPages with include_details=1 is:
-                    // [ { page: {...}, notes: [...] }, ... ] when fetching multiple pages.
-                    // However, api_client.js for pagesAPI.getPages currently returns an array of page objects,
-                    // and if include_details is true, notes are directly embedded in each page object.
-                    // Let's check the actual api_client.js pagesAPI.getPages behavior.
-                    // It returns apiRequest(`pages.php...`), which returns `response.data`.
-                    // The spec for GET api/pages.php (all pages) with include_details=1 suggests
-                    // data: [ { page: { id, name, ..., notes: [...] } }, ... ] OR
-                    // data: [ { id, name, ..., notes: [...] }, ... ]
-                    // The client code for pagesAPI.getPages doesn't seem to transform this structure further.
-                    // Let's assume `pageContainer` is an object that has a `notes` array.
-                    if (pageContainer.notes && Array.isArray(pageContainer.notes)) {
-                        allNotes = allNotes.concat(pageContainer.notes);
-                    }
-                });
-            }
-            
-            // Remove duplicate notes if any (e.g. if a note somehow appears on multiple pages, though unlikely with current model)
-            const uniqueNotesMap = new Map();
-            allNotes.forEach(note => uniqueNotesMap.set(note.id, note));
-            allNotes = Array.from(uniqueNotesMap.values());
+            // Fetch notes using queryAPI
+            console.log('Fetching task notes using queryAPI...');
+            allNotes = await queryAPI.queryNotes({ query: 'type:task', include_properties: true });
 
-            if (allNotes.length === 0) {
-                 console.warn('No notes found after fetching all pages. Kanban board might be empty.');
+            if (!allNotes || allNotes.length === 0) {
+                console.warn('No task notes found. Kanban board might be empty.');
+                allNotes = []; // Ensure it's an array in case of null/undefined response
             }
-
         } catch (fetchError) {
             console.error('Error fetching initial notes for Kanban:', fetchError);
-            allNotes = []; // Ensure it's an array
+            allNotes = []; // Ensure it's an array on error
         }
         
         setNotesForCurrentPage(allNotes); // Store globally

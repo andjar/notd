@@ -271,24 +271,24 @@ async function logSession(sessionType, durationMinutes, customProperties) {
   // - Create the page if it doesn't exist and then return its details.
   // - Return an array of pages, so we typically expect one page or an empty array if error.
   try {
-    const response = await fetch(`../../api/pages.php?name=${encodeURIComponent(pageTitle)}`);
+    const response = await fetch(`../../api/v1/pages.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: pageTitle })
+    });
     if (response.ok) {
       const responseData = await response.json();
-      // Assuming the API returns an array of pages, and if successful (found or created),
-      // it will contain one page object. Or, it might directly return the page object.
-      // Let's check common patterns.
-      let pageData = null;
-      if (Array.isArray(responseData) && responseData.length > 0) {
-        pageData = responseData[0]; // Take the first page if an array is returned
-      } else if (!Array.isArray(responseData) && responseData && typeof responseData.id !== 'undefined') {
-        pageData = responseData; // If a single page object is returned
-      }
-
-      if (pageData && pageData.id) {
-        pageId = pageData.id;
-        console.log(`Successfully fetched/created page for today: '${pageTitle}', ID ${pageId}`);
+      if (responseData && responseData.status === 'success' && responseData.data) {
+        const pageData = responseData.data; // Use responseData.data
+        if (pageData && pageData.id) {
+          pageId = pageData.id;
+          console.log(`Successfully fetched/created page for today: '${pageTitle}', ID ${pageId}`);
+        } else {
+          console.error('Failed to get page ID: API response did not contain expected page ID in data.', responseData);
+          return; // Abort if no valid page data/ID
+        }
       } else {
-        console.error('Failed to get page ID: API response did not contain expected page data.', responseData);
+        console.error('Failed to get page ID: API response error or invalid data.', responseData);
         return; // Abort if no valid page data/ID
       }
     } else {
@@ -333,7 +333,7 @@ async function logSession(sessionType, durationMinutes, customProperties) {
 
   // 3. Create Note
   try {
-    const noteResponse = await fetch(`../../api/notes.php`, {
+    const noteResponse = await fetch(`../../api/v1/notes.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -344,7 +344,11 @@ async function logSession(sessionType, durationMinutes, customProperties) {
 
     if (noteResponse.ok) {
       const newNote = await noteResponse.json();
-      console.log('Pomodoro session logged successfully:', newNote);
+      if (newNote && newNote.status === 'success' && newNote.data) {
+        console.log('Pomodoro session logged successfully:', newNote.data);
+      } else {
+        console.error('Failed to create note: API response error or invalid data.', newNote);
+      }
     } else {
       console.error('Failed to create note:', noteResponse.status, await noteResponse.text());
     }
