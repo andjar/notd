@@ -407,25 +407,24 @@ if (!function_exists('_handleBatchOperations')) {
         // Early validation of the overall batch structure and individual operation structures
         $validationErrors = [];
         foreach ($operations as $index => $operation) {
+            $operationHasError = false;
             if (!isset($operation['type']) || !is_string($operation['type'])) {
                 $validationErrors[] = ['index' => $index, 'error' => 'Missing or invalid type field.'];
-                // Continue to collect all structural errors for this item, but skip deeper validation if type is missing/invalid
+                $operationHasError = true;
             }
             if (!isset($operation['payload']) || !is_array($operation['payload'])) {
                 $validationErrors[] = ['index' => $index, 'error' => 'Missing or invalid payload field.'];
+                $operationHasError = true;
             }
 
-            // If basic structure is too broken for an operation, don't try to validate 'type' or 'payload' contents
-            if (isset($validationErrors[count($validationErrors)-1]['index']) && $validationErrors[count($validationErrors)-1]['index'] === $index) {
-                 if ( (isset($validationErrors[count($validationErrors)-2]['index']) && $validationErrors[count($validationErrors)-2]['index'] === $index) ||
-                      (strpos($validationErrors[count($validationErrors)-1]['error'], 'type field') !== false || strpos($validationErrors[count($validationErrors)-1]['error'], 'payload field') !== false) ) {
-                    continue;
-                 }
+            // If the basic structure of the operation is invalid, skip to the next one.
+            if ($operationHasError) {
+                continue;
             }
 
 
-            $type = $operation['type'] ?? null; // Use null coalescing in case type wasn't set (already caught above, but good for safety)
-            $payload = $operation['payload'] ?? []; // Default to empty array if payload wasn't set
+            $type = $operation['type'];
+            $payload = $operation['payload'];
 
             if (!in_array($type, ['create', 'update', 'delete'])) {
                 $validationErrors[] = ['index' => $index, 'type' => $type, 'error' => 'Invalid operation type.'];
