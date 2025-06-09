@@ -672,52 +672,44 @@ export async function handleSqlQueries() {
         }
 
         try {
-            // NEW: Call using queryAPI.queryNotes
-            // Assuming queryNotes takes the query and options (like include_properties, page, per_page)
-            // For this specific use case, we're only passing sql_query.
-            // The API client will use defaults for include_properties, page, per_page.
-            const notesArray = await queryAPI.queryNotes(sqlQuery); // NEW
-
-            // apiRequest throws on error, so no need for !response.ok or result.success check here.
-            // notesArray is the equivalent of the old result.data
+            // Call queryAPI.queryNotes and ensure we get the notes array
+            const response = await queryAPI.queryNotes(sqlQuery);
             
-            // if (result.success && result.data) { // OLD
-            if (notesArray) { // NEW - check if notesArray is not null/undefined (though apiRequest should return array or throw)
-                placeholder.innerHTML = ''; 
-                if (notesArray.length === 0) {
-                    placeholder.textContent = 'Query returned no results.';
-                } else {
-                    const childrenContainer = document.createElement('div');
-                    childrenContainer.className = 'note-children sql-query-results';
+            // Ensure we have a valid array of notes
+            const notesArray = Array.isArray(response) ? response : 
+                             (response && Array.isArray(response.data) ? response.data : []);
+            
+            placeholder.innerHTML = ''; 
+            if (notesArray.length === 0) {
+                placeholder.textContent = 'Query returned no results.';
+            } else {
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'note-children sql-query-results';
 
-                    notesArray.forEach(noteData => { // OLD: result.data.forEach
-                        const parentNoteItem = placeholder.closest('.note-item');
-                        let nestingLevel = 0;
-                        if (parentNoteItem) {
-                            const currentNesting = parseInt(parentNoteItem.style.getPropertyValue('--nesting-level') || '0');
-                            nestingLevel = currentNesting + 1;
-                        }
-                        if (window.ui && typeof window.ui.renderNote === 'function') {
-                            const noteElement = window.ui.renderNote(noteData, nestingLevel);
-                            childrenContainer.appendChild(noteElement);
-                        } else {
-                            console.error('window.ui.renderNote is not available to render SQL query results.');
-                            placeholder.textContent = 'Error: UI function to render notes is missing.';
-                            placeholder.classList.add('error');
-                            return; 
-                        }
-                    });
-                    placeholder.appendChild(childrenContainer);
-                    if (typeof feather !== 'undefined' && feather.replace) {
-                         feather.replace(); 
+                notesArray.forEach(noteData => {
+                    const parentNoteItem = placeholder.closest('.note-item');
+                    let nestingLevel = 0;
+                    if (parentNoteItem) {
+                        const currentNesting = parseInt(parentNoteItem.style.getPropertyValue('--nesting-level') || '0');
+                        nestingLevel = currentNesting + 1;
                     }
+                    if (window.ui && typeof window.ui.renderNote === 'function') {
+                        const noteElement = window.ui.renderNote(noteData, nestingLevel);
+                        childrenContainer.appendChild(noteElement);
+                    } else {
+                        console.error('window.ui.renderNote is not available to render SQL query results.');
+                        placeholder.textContent = 'Error: UI function to render notes is missing.';
+                        placeholder.classList.add('error');
+                        return; 
+                    }
+                });
+                placeholder.appendChild(childrenContainer);
+                if (typeof feather !== 'undefined' && feather.replace) {
+                     feather.replace(); 
                 }
-            } else { // Should not be reached if apiRequest works as expected (throws or returns data)
-                placeholder.textContent = 'Error: Failed to execute SQL query (no data returned).'; // OLD: result.error
-                placeholder.classList.add('error');
             }
             placeholder.classList.add('loaded'); 
-        } catch (error) { // Error from apiRequest or other issues
+        } catch (error) {
             console.error('Error fetching SQL query results for query:', sqlQuery, error);
             placeholder.textContent = `Error loading query results: ${error.message}`;
             placeholder.classList.add('error');
