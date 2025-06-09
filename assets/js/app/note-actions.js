@@ -837,8 +837,8 @@ async function handleShortcutExpansion(e, contentDiv) {
     let cursorOffsetAfterReplace = 0;
 
     if (precedingText2Chars === ':t') { replacementText = '{tag::}'; cursorOffsetAfterReplace = 6; }
-    else if (precedingText2Chars === ':d') { const today = new Date().toISOString().slice(0, 10); replacementText = `{date::${today}}`; cursorOffsetAfterReplace = replacementText.length -1; }
-    else if (precedingText2Chars === ':r') { const now = new Date().toISOString(); replacementText = `{timestamp::${now}}`; cursorOffsetAfterReplace = replacementText.length -1;}
+    else if (precedingText2Chars === ':d') { const today = new Date().toISOString().slice(0, 10); replacementText = `{date::${today}}`; cursorOffsetAfterReplace = replacementText.length; }
+    else if (precedingText2Chars === ':r') { const now = new Date().toISOString(); replacementText = `{timestamp::${now}}`; cursorOffsetAfterReplace = replacementText.length; }
     else if (precedingText2Chars === ':k') { replacementText = '{keyword::}'; cursorOffsetAfterReplace = 10; }
 
     if (replacementText) {
