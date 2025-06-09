@@ -750,7 +750,7 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
 
         siblingsOfDeleted.forEach((sibling, index) => {
             if ((sibling.order_index || 0) !== index) {
-                const noteToUpdate = getNoteDataById(sibling.id); // Get fresh copy for update
+                const noteToUpdate = getNoteDataById(sibling.id);
                 if (noteToUpdate) updateNoteInCurrentPage({ ...noteToUpdate, order_index: index });
                 operations.push({
                     type: 'update',
@@ -1046,7 +1046,7 @@ export async function handleTaskCheckboxClick(e) {
             if(!noteData.properties.done_at) noteData.properties.done_at = [];
             noteData.properties.done_at = [{value: doneAt, internal: 0}];
         } else if (!doneAt && serverDoneAt) { // If we calculated no doneAt but server has one
-            await propertiesAPI.deleteProperty('note', parseInt(noteId), 'name', 'done_at');
+            await propertiesAPI.deleteProperty('note', parseInt(noteId), 'done_at');
              delete noteData.properties.done_at;
         }
         
