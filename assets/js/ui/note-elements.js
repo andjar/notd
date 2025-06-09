@@ -359,38 +359,22 @@ async function handleNoteDrop(evt) {
         }
     }
 
-    // Determine logical previous and next siblings based on the drop position.
-    // newSortableIndex is the DOM index in the new list provided by SortableJS.
-    // We need to map this to the data-model (`order_index` sorted) list of siblings.
-
-    const siblingsInNewParentContext = window.notesForCurrentPage
-        .filter(note => 
-            (note.parent_note_id ? String(note.parent_note_id) : null) === (newParentId ? String(newParentId) : null) && // Same parent
-            String(note.id) !== String(noteId) // Exclude the note being moved itself
-        )
-        .sort((a, b) => a.order_index - b.order_index);
+    // Determine logical previous and next siblings based on the item's final DOM position.
+    // This correctly uses the visual order from the DOM instead of relying on the
+    // data model's order (order_index), which can be out of sync during a drag-and-drop operation.
+    const previousEl = evt.item.previousElementSibling;
+    const nextEl = evt.item.nextElementSibling;
 
     let previousSiblingId = null;
-    let nextSiblingId = null;
-
-    if (siblingsInNewParentContext.length === 0) {
-        // No other siblings in the new parent context.
-        previousSiblingId = null;
-        nextSiblingId = null;
-    } else if (newSortableIndex === 0) {
-        // Dropped at the very beginning of the list (of siblings).
-        previousSiblingId = null;
-        nextSiblingId = String(siblingsInNewParentContext[0].id);
-    } else if (newSortableIndex >= siblingsInNewParentContext.length) {
-        // Dropped at the very end of the list (of siblings).
-        previousSiblingId = String(siblingsInNewParentContext[siblingsInNewParentContext.length - 1].id);
-        nextSiblingId = null;
-    } else {
-        // Dropped between two existing siblings.
-        previousSiblingId = String(siblingsInNewParentContext[newSortableIndex - 1].id);
-        nextSiblingId = String(siblingsInNewParentContext[newSortableIndex].id);
+    if (previousEl && previousEl.classList.contains('note-item') && previousEl.dataset.noteId) {
+        previousSiblingId = previousEl.dataset.noteId;
     }
-    
+
+    let nextSiblingId = null;
+    if (nextEl && nextEl.classList.contains('note-item') && nextEl.dataset.noteId) {
+        nextSiblingId = nextEl.dataset.noteId;
+    }
+
     const targetOrderIndex = calculateOrderIndex(
         window.notesForCurrentPage, // Full notes array for lookups by the service
         newParentId,

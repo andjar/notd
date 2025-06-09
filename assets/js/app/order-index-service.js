@@ -59,9 +59,10 @@ export function calculateOrderIndex(notesArray, parentId, previousSiblingId, nex
     
     // Ensure it's a float and handle potential issues like division by zero if nextSiblingOrderIndex was 0
     if (newOrderIndex === 0 && previousSiblingId === null && nextSiblingId !== null) {
-        // If inserting before a note with order_index 0, need a different strategy (e.g., negative or re-index)
-        // For now, let's make it a small positive number. This case should be rare if order_index starts at 1.0.
-        newOrderIndex = nextSiblingOrderIndex > 0 ? nextSiblingOrderIndex / 2.0 : -1.0; // Or throw error, or re-index
+        // If inserting before a note with order_index 0, we can't generate a smaller positive index.
+        // The previous logic incorrectly assigned -1.0, and a small positive value is preferred
+        // to avoid issues with negative indices.
+        newOrderIndex = 0.5; // A small positive value to avoid a negative index.
         console.warn('[calculateOrderIndex] Adjusted index for inserting before 0. New index:', newOrderIndex);
     }
     
