@@ -49,4 +49,4 @@ jobs:
         echo "Server is up!"
 
     - name: Run PHPUnit tests
-      run: ./vendor/bin/phpunit --configuration phpunit.xml --process-isolation
+      run: ./vendor/bin/phpunit --configuration phpunit.xml
