@@ -1,0 +1,150 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #2c3e50; /* Dark blue-grey, similar to a splash screen */
+    margin: 0;
+    color: #ecf0f1; /* Light text color */
+  }
+  
+  #pomodoro-container {
+    background-color: #34495e; /* Slightly lighter container background */
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    width: 400px;
+  }
+  
+  #timer-orb {
+    width: 200px;
+    height: 200px;
+    background-color: #e74c3c; /* Pomodoro red */
+    border-radius: 50%;
+    margin: 20px auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative; /* For animation placeholders */
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.3), 0 5px 10px rgba(0,0,0,0.2);
+  }
+  
+  #timer-display {
+    font-size: 3.5em;
+    color: white;
+    font-weight: bold;
+  }
+  
+  /* Basic animation placeholders - can be enhanced with JS */
+  .bubble {
+    width: 30px;
+    height: 30px;
+    background-color: rgba(236, 240, 241, 0.3); /* Light, semi-transparent */
+    border-radius: 50%;
+    position: absolute;
+    bottom: 10px;
+    left: 20px;
+    animation: bubble-float 5s infinite ease-in-out;
+  }
+  
+  .dot {
+    width: 10px;
+    height: 10px;
+    background-color: rgba(236, 240, 241, 0.5);
+    border-radius: 50%;
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    animation: dot-pulse 2s infinite alternate;
+  }
+  
+  @keyframes bubble-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+  }
+  
+  @keyframes dot-pulse {
+    0% { transform: scale(1); opacity: 0.7; }
+    100% { transform: scale(1.2); opacity: 1; }
+  }
+  
+  #controls button {
+    background-color: #3498db; /* Blue */
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    font-size: 1.1em;
+    margin: 10px 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  #controls button:hover {
+    background-color: #2980b9;
+  }
+  
+  #controls button#pause {
+    background-color: #f39c12; /* Orange for pause */
+  }
+  #controls button#pause:hover {
+    background-color: #e67e22;
+  }
+  
+  #controls button#reset {
+    background-color: #95a5a6; /* Grey for reset */
+  }
+  #controls button#reset:hover {
+    background-color: #7f8c8d;
+  }
+  
+  #settings {
+    margin-top: 30px;
+    text-align: left;
+  }
+  
+  #settings div {
+    margin-bottom: 15px;
+  }
+  
+  #settings label {
+    display: block;
+    margin-bottom: 5px;
+    color: #bdc3c7; /* Lighter grey for labels */
+  }
+  
+  #settings input[type="number"] {
+    width: 60px;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #7f8c8d;
+    background-color: #ecf0f1;
+    color: #34495e;
+    font-size: 1em;
+  }
+  
+  #notes-config {
+    margin-top: 20px;
+    text-align: left;
+  }
+  
+  #notes-config label {
+    display: block;
+    margin-bottom: 5px;
+    color: #bdc3c7;
+  }
+  
+  #notes-config textarea {
+    width: calc(100% - 20px); /* Full width minus padding */
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #7f8c8d;
+    background-color: #ecf0f1;
+    color: #34495e;
+    font-size: 0.9em;
+    min-height: 60px;
+    resize: vertical;
+  }
+  

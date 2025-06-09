@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pomodoro Timer Tests</title>
+    <link rel="stylesheet" type="text/css" href="style.css"> <!-- Optional: for styling test results -->
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #test-results { border: 1px solid #ccc; padding: 10px; }
+        .test-case { margin-bottom: 5px; }
+        .pass { color: green; }
+        .fail { color: red; font-weight: bold; }
+        pre { background-color: #f0f0f0; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Pomodoro Timer Unit Tests</h1>
+    <div id="test-results"></div>
+
+    <!-- Minimal Testing Framework -->
+    <script>
+        const testResultsDiv = document.getElementById('test-results');
+        let testsRun = 0;
+        let testsPassed = 0;
+
+        function appendTestResult(message, passed) {
+            const p = document.createElement('p');
+            p.className = passed ? 'pass' : 'fail';
+            p.textContent = (passed ? 'PASS: ' : 'FAIL: ') + message;
+            testResultsDiv.appendChild(p);
+        }
+
+        function assertEquals(expected, actual, message) {
+            testsRun++;
+            const passed = expected === actual;
+            if (passed) testsPassed++;
+            appendTestResult(`${message} (Expected: ${expected}, Actual: ${actual})`, passed);
+            if (!passed) console.error(`FAIL: ${message} (Expected: ${expected}, Actual: ${actual})`);
+        }
+
+        function assertDeepEquals(expected, actual, message) {
+            testsRun++;
+            const passed = JSON.stringify(expected) === JSON.stringify(actual);
+            if (passed) testsPassed++;
+            appendTestResult(`${message} (Expected: ${JSON.stringify(expected)}, Actual: ${JSON.stringify(actual)})`, passed);
+            if (!passed) console.error(`FAIL: ${message} (Expected: ${JSON.stringify(expected)}, Actual: ${JSON.stringify(actual)})`);
+        }
+
+        function assertTrue(condition, message) {
+            testsRun++;
+            const passed = Boolean(condition);
+            if (passed) testsPassed++;
+            appendTestResult(message, passed);
+            if (!passed) console.error(`FAIL: ${message}`);
+        }
+
+        function summarizeTests() {
+            const summary = document.createElement('h3');
+            summary.textContent = `Tests completed: ${testsPassed} / ${testsRun} passed.`;
+            testResultsDiv.appendChild(summary);
+            if (testsPassed !== testsRun) {
+                console.error(`Test summary: ${testsPassed} / ${testsRun} passed.`);
+            } else {
+                console.log(`Test summary: ${testsPassed} / ${testsRun} passed.`);
+            }
+        }
+        
+        // Mock for requestAnimationFrame for animation tests if needed later
+        // window.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+        // window.cancelAnimationFrame = (id) => clearTimeout(id);
+
+    </script>
+
+    <!-- Include the main Pomodoro Timer script (or parts of it) -->
+    <!-- For simplicity, we'll include the whole thing. DOM elements won't be fully available. -->
+    <!-- We need to mock DOM elements that main.js expects on load -->
+    <div id="pomodoro-container" style="display:none;">
+        <div id="timer-orb">
+            <div id="timer-display">25:00</div>
+        </div>
+        <div id="controls">
+            <button id="start">Start</button>
+            <button id="pause">Pause</button>
+            <button id="reset">Reset</button>
+        </div>
+        <div id="settings">
+            <div><input type="number" id="work-duration" value="25"></div>
+            <div><input type="number" id="short-break-duration" value="5"></div>
+            <div><input type="number" id="long-break-duration" value="15"></div>
+        </div>
+        <div id="notes-config">
+            <textarea id="note-properties"></textarea>
+        </div>
+    </div>
+    <script src="main.js"></script>
+
+    <!-- Include the test script -->
+    <script src="test_pomodoro.js"></script>
+
+</body>
+</html>
