@@ -3,80 +3,92 @@
  */
 
 /**
- * Calculates a proposed order_index for a note based on its desired position
- * relative to its siblings.
+ * Calculates a target order_index for a note and determines any sibling updates required.
  *
- * @param {Array<Object>} notesArray - The current array of all notes for the page.
- *                                    Each note object is expected to have at least `id` and `order_index`.
- * @param {string|null} parentId - The ID of the parent note. Null for root notes.
+ * @param {Array<Object>} notesArray - The current array of all notes.
+ *                                    Each note object is expected to have `id`, `order_index`, and `parentId`.
+ * @param {string|null} parentId - The ID of the parent note for the note being moved/inserted. Null for root notes.
  * @param {string|null} previousSiblingId - The ID of the note that will be immediately before the new/moved note.
- *                                        Null if inserting at the beginning of the list (or if it's the only note).
+ *                                        Null if inserting at the beginning or if it's the only child.
  * @param {string|null} nextSiblingId - The ID of the note that will be immediately after the new/moved note.
- *                                    Null if inserting at the end of the list (or if it's the only note).
- * @returns {number} The calculated floating-point order_index.
- * @throws {Error} If required sibling notes are not found in notesArray.
+ *                                    Null if inserting at the end or if it's the only child.
+ * @returns {Object} An object containing:
+ *                   `targetOrderIndex` (number): The calculated order_index for the note.
+ *                   `siblingUpdates` (Array<{id: string, newOrderIndex: number}>): An array of notes that need their order_index updated.
+ * @throws {Error} If sibling notes (if provided) are not found in notesArray.
  */
 export function calculateOrderIndex(notesArray, parentId, previousSiblingId, nextSiblingId) {
-    console.log('[calculateOrderIndex] Inputs:', { parentId, previousSiblingId, nextSiblingId });
+    let targetOrderIndex;
+    const siblingUpdates = [];
 
-    let previousSiblingOrderIndex = null;
-    if (previousSiblingId) {
-        const previousSibling = notesArray.find(n => String(n.id) === String(previousSiblingId));
-        if (!previousSibling) {
-            console.error('[calculateOrderIndex] Error: Previous sibling not found for ID:', previousSiblingId);
-            throw new Error(`calculateOrderIndex: Previous sibling with ID ${previousSiblingId} not found.`);
-        }
-        previousSiblingOrderIndex = parseFloat(previousSibling.order_index);
+    // Filter children of the same parent and parse order_index as integer
+    const parentChildren = notesArray
+        .filter(note => String(note.parentId) === String(parentId))
+        .map(note => ({
+            ...note,
+            order_index: parseInt(note.order_index, 10)
+        }))
+        .sort((a, b) => a.order_index - b.order_index);
+
+    const previousSibling = previousSiblingId ? parentChildren.find(n => String(n.id) === String(previousSiblingId)) : null;
+    const nextSibling = nextSiblingId ? parentChildren.find(n => String(n.id) === String(nextSiblingId)) : null;
+
+    if (previousSiblingId && !previousSibling) {
+        throw new Error(`calculateOrderIndex: Previous sibling with ID ${previousSiblingId} not found.`);
+    }
+    if (nextSiblingId && !nextSibling) {
+        throw new Error(`calculateOrderIndex: Next sibling with ID ${nextSiblingId} not found.`);
     }
 
-    let nextSiblingOrderIndex = null;
-    if (nextSiblingId) {
-        const nextSibling = notesArray.find(n => String(n.id) === String(nextSiblingId));
-        if (!nextSibling) {
-            console.error('[calculateOrderIndex] Error: Next sibling not found for ID:', nextSiblingId);
-            throw new Error(`calculateOrderIndex: Next sibling with ID ${nextSiblingId} not found.`);
-        }
-        nextSiblingOrderIndex = parseFloat(nextSibling.order_index);
-    }
-
-    let newOrderIndex;
+    const previousSiblingOrderIndex = previousSibling ? previousSibling.order_index : null;
+    const nextSiblingOrderIndex = nextSibling ? nextSibling.order_index : null;
 
     if (previousSiblingId === null) { // Inserting at the beginning
+        targetOrderIndex = 0;
         if (nextSiblingId === null) { // Only child
-            newOrderIndex = 1.0;
-            console.log('[calculateOrderIndex] Case: Only child. Index:', newOrderIndex);
+            // No siblings to update
         } else { // Inserting before nextSibling
-            newOrderIndex = nextSiblingOrderIndex / 2.0;
-            console.log('[calculateOrderIndex] Case: Before next sibling. Next sibling index:', nextSiblingOrderIndex, 'New index:', newOrderIndex);
+            // All existing children of this parent need their order_index incremented
+            parentChildren.forEach((child, index) => {
+                siblingUpdates.push({ id: String(child.id), newOrderIndex: index + 1 });
+            });
         }
     } else if (nextSiblingId === null) { // Inserting at the end
-        newOrderIndex = previousSiblingOrderIndex + 1.0;
-        console.log('[calculateOrderIndex] Case: After previous sibling. Previous sibling index:', previousSiblingOrderIndex, 'New index:', newOrderIndex);
+        targetOrderIndex = previousSiblingOrderIndex + 1;
+        // No siblings after this one to update
     } else { // Inserting between previousSibling and nextSibling
-        newOrderIndex = (previousSiblingOrderIndex + nextSiblingOrderIndex) / 2.0;
-        console.log('[calculateOrderIndex] Case: Between siblings. Previous index:', previousSiblingOrderIndex, 'Next index:', nextSiblingOrderIndex, 'New index:', newOrderIndex);
+        if (nextSiblingOrderIndex - previousSiblingOrderIndex > 1) {
+            targetOrderIndex = previousSiblingOrderIndex + 1;
+            // No re-numbering needed for subsequent siblings
+        } else {
+            targetOrderIndex = previousSiblingOrderIndex + 1;
+            // Re-number nextSibling and all subsequent siblings
+            const nextSiblingIndexInParentArray = parentChildren.findIndex(n => String(n.id) === String(nextSiblingId));
+            if (nextSiblingIndexInParentArray !== -1) {
+                for (let i = nextSiblingIndexInParentArray; i < parentChildren.length; i++) {
+                    siblingUpdates.push({
+                        id: String(parentChildren[i].id),
+                        newOrderIndex: targetOrderIndex + 1 + (i - nextSiblingIndexInParentArray)
+                    });
+                }
+            }
+        }
     }
     
-    // Ensure it's a float and handle potential issues like division by zero if nextSiblingOrderIndex was 0
-    if (newOrderIndex === 0 && previousSiblingId === null && nextSiblingId !== null) {
-        // If inserting before a note with order_index 0, we can't generate a smaller positive index.
-        // The previous logic incorrectly assigned -1.0, and a small positive value is preferred
-        // to avoid issues with negative indices.
-        newOrderIndex = 0.5; // A small positive value to avoid a negative index.
-        console.warn('[calculateOrderIndex] Adjusted index for inserting before 0. New index:', newOrderIndex);
-    }
-    
-    if (isNaN(newOrderIndex) || !isFinite(newOrderIndex)) {
-        console.error('[calculateOrderIndex] Error: Calculated order_index is NaN or Infinity.', {previousSiblingOrderIndex, nextSiblingOrderIndex});
-        // Fallback or error based on more robust requirements, e.g. if siblings had non-numeric order_index.
-        // For now, attempt a simple recovery or throw.
-        if (previousSiblingOrderIndex !== null && isFinite(previousSiblingOrderIndex)) newOrderIndex = previousSiblingOrderIndex + 1.0;
-        else if (nextSiblingOrderIndex !== null && isFinite(nextSiblingOrderIndex)) newOrderIndex = nextSiblingOrderIndex / 2.0;
-        else newOrderIndex = Date.now() / 1000; // Last resort, not ideal
-        console.warn('[calculateOrderIndex] Recovered newOrderIndex to:', newOrderIndex);
-        // throw new Error('calculateOrderIndex: Resulting order_index is NaN or Infinity.');
+    // Ensure targetOrderIndex is an integer, should be by logic but as a safeguard.
+    if (targetOrderIndex === undefined || targetOrderIndex === null || isNaN(parseInt(targetOrderIndex, 10))) {
+        console.error('[calculateOrderIndex] Critical error: targetOrderIndex is not a valid integer.', { parentId, previousSiblingId, nextSiblingId, previousSiblingOrderIndex, nextSiblingOrderIndex });
+        // This case should ideally not be reached if logic is correct.
+        // Fallback to 0 if it's the only child, or append if others exist.
+        if (parentChildren.length === 0) {
+            targetOrderIndex = 0;
+        } else {
+            targetOrderIndex = parentChildren[parentChildren.length -1].order_index + 1;
+        }
+         console.warn('[calculateOrderIndex] Fallback targetOrderIndex set to:', targetOrderIndex);
+    } else {
+        targetOrderIndex = parseInt(targetOrderIndex, 10);
     }
 
-    console.log('[calculateOrderIndex] Output:', newOrderIndex);
-    return newOrderIndex;
+    return { targetOrderIndex, siblingUpdates };
 }

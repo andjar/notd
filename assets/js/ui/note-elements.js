@@ -375,123 +375,142 @@ async function handleNoteDrop(evt) {
         nextSiblingId = nextEl.dataset.noteId;
     }
 
-    const targetOrderIndex = calculateOrderIndex(
-        window.notesForCurrentPage, // Full notes array for lookups by the service
+    const originalNotesState = JSON.parse(JSON.stringify(window.notesForCurrentPage)); // For revert
+
+    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
+        window.notesForCurrentPage,
         newParentId,
         previousSiblingId,
         nextSiblingId
     );
     
-    console.log(`[HANDLE_NOTE_DROP] For Note ID: ${noteId}, New Parent ID: ${newParentId}, Prev Sib ID: ${previousSiblingId}, Next Sib ID: ${nextSiblingId}, DOM newIndex: ${newSortableIndex}, Calculated Target OrderIndex: ${targetOrderIndex}`);
-    
-    const updateData = {
+    console.log(`[HANDLE_NOTE_DROP] For Note ID: ${noteId}, New Parent ID: ${newParentId}, Prev Sib ID: ${previousSiblingId}, Next Sib ID: ${nextSiblingId}. Calculated: targetOrderIndex=${targetOrderIndex}, siblingUpdates:`, siblingUpdates);
+
+    // Optimistic local state updates
+    const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
+    if (noteToUpdate) {
+        noteToUpdate.parent_note_id = newParentId;
+        noteToUpdate.order_index = targetOrderIndex;
+    } else {
+        console.error(`[HANDLE_NOTE_DROP] Dropped note with ID ${noteId} not found in local cache for optimistic update.`);
+        // Revert and bail, something is wrong.
+        window.notesForCurrentPage = originalNotesState;
+        window.ui.displayNotes(window.notesForCurrentPage, window.currentPageId); // Re-render
+        return;
+    }
+
+    siblingUpdates.forEach(update => {
+        const siblingNote = window.notesForCurrentPage.find(n => String(n.id) === String(update.id));
+        if (siblingNote) {
+            siblingNote.order_index = update.newOrderIndex;
+        } else {
+            console.warn(`[HANDLE_NOTE_DROP] Sibling note with ID ${update.id} for order_index update not found in local cache.`);
+        }
+    });
+    window.notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
+
+    // Prepare API calls
+    const apiPromises = [];
+    const droppedNotePayload = {
         page_id: window.currentPageId,
-        content: currentNoteData.content || '', 
+        // content: currentNoteData.content || '', // Content is not changed on drop
         parent_note_id: newParentId,
         order_index: targetOrderIndex
     };
+    apiPromises.push(window.notesAPI.updateNote(noteId, droppedNotePayload));
 
-    console.log('Attempting to update note position (using calculateOrderIndex):', { noteId, ...updateData });
+    siblingUpdates.forEach(update => {
+        apiPromises.push(window.notesAPI.updateNote(update.id, {
+            order_index: update.newOrderIndex,
+            page_id: window.currentPageId
+            // parent_note_id is not changed for siblings
+        }));
+    });
 
     try {
-        const updatedNote = await window.notesAPI.updateNote(noteId, updateData);
-        console.log('Note position updated successfully on server:', updatedNote);
+        const results = await Promise.allSettled(apiPromises);
+        console.log('[HANDLE_NOTE_DROP] API call results:', results);
 
-        // Update local data cache accurately WITH THE SERVER'S RESPONSE
-        const noteIndexInCache = window.notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
-        if (noteIndexInCache > -1) {
-            // Preserve local children if any, update fields from server response
-            // Note: updatedNote from server typically won't have 'children' array.
-            // We merge server data into the existing local cache item.
-            window.notesForCurrentPage[noteIndexInCache] = { 
-                ...window.notesForCurrentPage[noteIndexInCache], // Keep existing local fields like 'children'
-                ...updatedNote // Overwrite with server data (id, content, parent_note_id, order_index, etc.)
-            };
-        } else {
-            // This case should ideally not happen if currentNoteData was found earlier.
-            window.notesForCurrentPage.push(updatedNote); // Add if somehow missing
-            console.warn(`[HANDLE_NOTE_DROP] Note with ID ${updatedNote.id} was not in notesForCurrentPage cache but was updated on server. Added to cache.`);
+        let isError = false;
+        results.forEach(result => {
+            if (result.status === 'rejected') {
+                isError = true;
+                console.error(`[HANDLE_NOTE_DROP] Failed API operation:`, result.reason);
+            } else if (result.status === 'fulfilled') {
+                // Sync successful updates back to local state (e.g., updated_at, server-confirmed order_index)
+                const updatedNoteFromServer = result.value;
+                const localNoteIndex = window.notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNoteFromServer.id));
+                if (localNoteIndex > -1) {
+                    window.notesForCurrentPage[localNoteIndex] = {
+                        ...window.notesForCurrentPage[localNoteIndex], // Preserve local properties like 'children'
+                        ...updatedNoteFromServer // Apply server updates
+                    };
+                }
+            }
+        });
+
+        if (isError) {
+            throw new Error('One or more note updates failed during drag and drop.');
         }
         
-        // Ensure the entire notesForCurrentPage is sorted by the now definitive server-side order_index
+        // Final sort after successful server updates
         window.notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
 
         // DOM is already updated by SortableJS.
-        // Update nesting level visual property for the moved item.
+        // Update visual properties for the moved item and parents.
         const movedNoteElement = evt.item;
         const newParentNoteElement = newContainer.closest('.note-item');
         const newNestingLevel = newParentId ? ui.getNestingLevel(newParentNoteElement) + 1 : 0;
         movedNoteElement.style.setProperty('--nesting-level', newNestingLevel);
         
-        // Update parent visuals for old and new parents.
-        const oldParentEl = oldContainer.closest('.note-item'); // evt.from is oldContainer
-        const newParentEl = newContainer.closest('.note-item'); // evt.to is newContainer
+        const oldParentEl = oldContainer.closest('.note-item');
+        const newParentEl = newContainer.closest('.note-item');
 
         if (oldParentEl) {
             ui.updateParentVisuals(oldParentEl);
-            // If old parent's children container is now empty, remove it.
             if (oldContainer.classList.contains('note-children') && oldContainer.children.length === 0) {
                 oldContainer.remove();
-                oldParentEl.classList.remove('has-children'); // Update visual indicator
+                oldParentEl.classList.remove('has-children');
             }
         }
-        // Update new parent, only if it's different from old parent, or if it's a root container
         if (newParentEl && newParentEl !== oldParentEl) {
             ui.updateParentVisuals(newParentEl);
         } else if (!newParentEl && newContainer === domRefs.notesContainer) {
-            // Dropped into root, no specific parent item to update, but ensure old parent (if any) is updated.
-            // This is covered if oldParentEl exists.
+            // Handled by oldParentEl logic if it exists
         }
         
-        // If the note was moved to the root, and the original container was a children container that is now empty
-        if (!newParentId && oldContainer.classList.contains('note-children') && oldContainer.children.length === 0) {
-            // This check is redundant if oldParentEl logic above is comprehensive.
-            // However, ensuring the direct parent of oldContainer is updated if it exists.
-            const parentOfOldContainer = oldContainer.parentElement?.closest('.note-item');
-            if (parentOfOldContainer) {
-                 ui.updateParentVisuals(parentOfOldContainer);
-                 if (oldContainer.children.length === 0) { // Double check
-                    oldContainer.remove();
-                    parentOfOldContainer.classList.remove('has-children');
-                 }
-            }
-        }
+        console.log(`[HANDLE_NOTE_DROP] Successfully processed drop for note ${noteId}.`);
+
+    } catch (error) { // Catches errors from Promise.allSettled block or if isError was true
+        console.error('[HANDLE_NOTE_DROP] Error processing note drop, attempting to revert:', error);
         
-        console.log(`[HANDLE_NOTE_DROP] Successfully updated note ${updatedNote.id}. New parent: ${updatedNote.parent_note_id}, New order: ${updatedNote.order_index}`);
-
-
-    } catch (error) {
-        console.error('Error updating note position on server:', error);
+        // Revert local state
+        window.notesForCurrentPage = originalNotesState;
+        
         // Show user-friendly error message
         const feedback = document.createElement('div');
-        feedback.className = 'copy-feedback'; // Reuse existing class, maybe add an error variant
-        feedback.style.background = 'var(--color-error, #dc2626)'; // Use CSS variable for error color
-        feedback.textContent = `Failed to save position: ${error.message}`;
+        feedback.className = 'copy-feedback error-feedback'; 
+        feedback.style.background = 'var(--color-error, #dc2626)';
+        feedback.textContent = `Failed to save position: ${error.message || 'Unknown error'}`;
         document.body.appendChild(feedback);
         setTimeout(() => feedback.remove(), 3000);
 
-        // Revert the DOM change by moving the item back
-        // This is tricky because Sortable already moved it. We might need to re-render from original data.
-        // For now, a simple revert based on old indices:
-        // Revert based on oldSortableIndex
-        if (oldContainer !== newContainer) {
-            oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]);
+        // Re-render the entire notes list from the reverted state
+        // This effectively reverts DOM changes made by SortableJS as well.
+        if (window.ui && typeof window.ui.displayNotes === 'function') {
+            window.ui.displayNotes(window.notesForCurrentPage, window.currentPageId);
         } else {
-            // If same container, newSortableIndex might be off by 1 after item removal for revert.
-            // This logic attempts to place it back correctly.
-            if (oldSortableIndex < newSortableIndex) { // Item was moved down
+            console.warn("[HANDLE_NOTE_DROP] ui.displayNotes not available for error recovery. UI might be inconsistent.");
+            // Fallback DOM revert (might not be perfect if SortableJS made complex changes)
+            if (oldContainer !== newContainer) {
                 oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]);
-            } else { // Item was moved up
-                oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex + 1]);
+            } else {
+                if (oldSortableIndex < newSortableIndex) {
+                    oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]);
+                } else {
+                    oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex + 1]);
+                }
             }
-        }
-        // Ideally, after reverting, also re-fetch and re-render notes for consistency
-        if (window.currentPageId && typeof window.ui !== 'undefined' && typeof window.ui.displayNotes === 'function') {
-            const pageData = await window.notesAPI.getPageData(window.currentPageId);
-            window.notesForCurrentPage = pageData.notes;
-            window.ui.displayNotes(pageData.notes, window.currentPageId);
-        } else if (window.currentPageId) {
-            console.warn("ui.displayNotes not available for error recovery. State may be inconsistent until next refresh.");
         }
     }
 }
