@@ -2,6 +2,52 @@ import { currentPageId } from './state.js';
 import { ui } from '../ui.js';
 import { propertiesAPI } from '../api_client.js';
 
+function handleAddPropertyButtonClick() {
+    const pagePropertiesList = ui.domRefs.pagePropertiesList;
+    if (!pagePropertiesList) {
+        console.error('pagePropertiesList element not found for adding property!');
+        return;
+    }
+
+    const noPropertiesMessage = pagePropertiesList.querySelector('p.no-properties-message');
+    if (noPropertiesMessage) {
+        noPropertiesMessage.remove();
+    }
+
+    const propItem = document.createElement('div');
+    propItem.className = 'page-property-item new-property-row';
+    // const uniqueIdSuffix = Date.now(); // Not strictly needed for ID if we grab element directly
+
+    propItem.innerHTML = `
+        <span class="page-property-key" contenteditable="true" data-original-key="" data-is-new="true" placeholder="PropertyName"></span>
+        <span class="page-property-separator">:</span>
+        <input type="text" class="page-property-value" data-property="" value="" data-is-new-value="true" placeholder="PropertyValue" />
+        <button class="page-property-delete" data-property="" data-is-new-delete="true" title="Remove this new property">&times;</button>
+    `;
+    pagePropertiesList.appendChild(propItem);
+
+    const newKeySpan = propItem.querySelector('.page-property-key');
+    if (newKeySpan) {
+        newKeySpan.focus();
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(newKeySpan); // Selects placeholder text if any, or just sets cursor if empty
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+    if (typeof feather !== 'undefined' && feather.replace) {
+        feather.replace(); // Refresh icons for the new delete button
+    }
+}
+
+function setupAddPropertyButtonListener() {
+    const addBtn = ui.domRefs.addPagePropertyBtn;
+    if (addBtn && !addBtn.dataset.listenerAttached) {
+        addBtn.addEventListener('click', handleAddPropertyButtonClick);
+        addBtn.dataset.listenerAttached = 'true';
+    }
+}
+
 /**
  * Displays page properties in the modal.
  * (This is the version from app.js, to be used by the modal)
@@ -28,7 +74,7 @@ export function displayPageProperties(properties) {
                 propItem.innerHTML = `
                     <span class="page-property-key" contenteditable="true" data-original-key="${key}" data-is-array="true" data-array-index="${index}">${key}</span>
                     <span class="page-property-separator">:</span>
-                    <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${singleValue}" value="${singleValue}" />
+                    <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${singleValue.value}" value="${singleValue.value}" />
                     <button class="page-property-delete" data-property="${key}" data-array-index="${index}" title="Delete this ${key} value">×</button>
                 `;
                 pagePropertiesList.appendChild(propItem);
@@ -39,7 +85,7 @@ export function displayPageProperties(properties) {
             propItem.innerHTML = `
                 <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
                 <span class="page-property-separator">:</span>
-                <input type="text" class="page-property-value" data-property="${key}" data-original-value="${value || ''}" value="${value || ''}" />
+                <input type="text" class="page-property-value" data-property="${key}" data-original-value="${(typeof value === 'object' && value !== null && value.hasOwnProperty('value')) ? value.value : (value || '')}" value="${(typeof value === 'object' && value !== null && value.hasOwnProperty('value')) ? value.value : (value || '')}" />
                 <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
             `;
             pagePropertiesList.appendChild(propItem);
@@ -54,33 +100,108 @@ export function displayPageProperties(properties) {
         pagePropertiesList.removeEventListener('change', existingListener);
     }
     const propertyEventListener = async (e) => {
+        // Change on property value
         if (e.type === 'change' && e.target.matches('.page-property-value')) {
-            const key = e.target.dataset.property;
-            const newValue = e.target.value.trim();
-            const originalValue = e.target.dataset.originalValue;
-            const arrayIndex = e.target.dataset.arrayIndex;
-            if (newValue !== originalValue) {
-                if (arrayIndex !== undefined) {
-                    await updateArrayPropertyValue(key, parseInt(arrayIndex), newValue);
-                } else {
-                    await updatePageProperty(key, newValue);
+            const valueInput = e.target;
+            const keyForValue = valueInput.dataset.property;
+            const finalNewValue = valueInput.value.trim(); 
+            const originalValue = valueInput.dataset.originalValue;
+
+            if (valueInput.dataset.isNewValue === 'true') {
+                if (!keyForValue) {
+                    // console.warn("Attempted to save a new property value, but its key is not set.");
+                    // If the key is empty, the blur handler for the key should have removed the row.
+                    // If for some reason it's still here with an empty key, don't save.
+                    const keySpan = valueInput.closest('.page-property-item')?.querySelector('.page-property-key');
+                    if (!keySpan || !keySpan.textContent.trim()) {
+                         valueInput.closest('.page-property-item')?.remove(); // Clean up row if key is truly empty
+                         if (ui.domRefs.pagePropertiesList.children.length === 0 && !ui.domRefs.pagePropertiesList.querySelector('p.no-properties-message')) {
+                            ui.domRefs.pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
+                         }
+                    }
+                    return; 
                 }
-                e.target.dataset.originalValue = newValue;
+                await addPageProperty(keyForValue, finalNewValue); 
+                valueInput.dataset.originalValue = finalNewValue; 
+                delete valueInput.dataset.isNewValue;
+
+                const propertyItemRow = valueInput.closest('.page-property-item');
+                const deleteButton = propertyItemRow.querySelector('.page-property-delete');
+                if (deleteButton && deleteButton.dataset.isNewDelete) {
+                    delete deleteButton.dataset.isNewDelete;
+                    deleteButton.title = `Delete ${keyForValue} property`;
+                }
+                const keySpan = propertyItemRow.querySelector('.page-property-key');
+                if (keySpan && keySpan.dataset.isNew){ 
+                    delete keySpan.dataset.isNew;
+                    keySpan.dataset.originalKey = keyForValue; 
+                }
+
+            } else {
+                // Existing logic for updating property value
+                if (finalNewValue !== originalValue) {
+                    const arrayIndexStr = valueInput.dataset.arrayIndex;
+                    if (arrayIndexStr !== undefined) {
+                        await updateArrayPropertyValue(keyForValue, parseInt(arrayIndexStr), finalNewValue);
+                    } else {
+                        await updatePageProperty(keyForValue, finalNewValue);
+                    }
+                    valueInput.dataset.originalValue = finalNewValue;
+                }
             }
         } else if (e.type === 'blur' && e.target.matches('.page-property-key')) {
-            const originalKey = e.target.dataset.originalKey;
-            const newKey = e.target.textContent.trim();
-            const isArray = e.target.dataset.isArray === 'true';
-            const arrayIndex = e.target.dataset.arrayIndex; // Corrected to get arrayIndex
-            if (newKey !== originalKey && newKey !== '') {
-                if (isArray) {
-                     await renameArrayPropertyKey(originalKey, newKey, parseInt(arrayIndex)); // Pass arrayIndex
-                } else {
-                    await renamePropertyKey(originalKey, newKey);
+            // Blur on property key
+            const keySpan = e.target;
+            const propertyItemRow = keySpan.closest('.page-property-item');
+
+            if (keySpan.dataset.isNew === 'true') {
+                const newKeyName = keySpan.textContent.trim();
+
+                if (!newKeyName && propertyItemRow) {
+                    propertyItemRow.remove();
+                    if (ui.domRefs.pagePropertiesList.children.length === 0 && !ui.domRefs.pagePropertiesList.querySelector('p.no-properties-message')) {
+                        ui.domRefs.pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
+                    }
+                    return; 
                 }
-                e.target.dataset.originalKey = newKey;
-            } else if (newKey === '') {
-                e.target.textContent = originalKey;
+                
+                keySpan.dataset.originalKey = newKeyName;
+                delete keySpan.dataset.isNew; 
+
+                const valueInput = propertyItemRow.querySelector('.page-property-value');
+                valueInput.dataset.property = newKeyName; 
+
+                const deleteButton = propertyItemRow.querySelector('.page-property-delete');
+                deleteButton.dataset.property = newKeyName;
+                deleteButton.title = `Delete ${newKeyName} property`; 
+                if (deleteButton.dataset.isNewDelete) {
+                    delete deleteButton.dataset.isNewDelete;
+                }
+                
+                if (valueInput.value.trim() !== '' && valueInput.dataset.isNewValue === 'true') {
+                   valueInput.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+                } else if (valueInput.value.trim() === '' && valueInput.dataset.isNewValue === 'true') {
+                    // Also dispatch change for empty new values to ensure they are processed (e.g. saved as empty or potentially validated)
+                    valueInput.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+                }
+
+            } else {
+                // Existing logic for renaming property key
+                const originalKey = keySpan.dataset.originalKey;
+                const newKey = keySpan.textContent.trim();
+                if (newKey !== originalKey && newKey !== '') {
+                    const isArray = keySpan.dataset.isArray === 'true';
+                    const arrayIndexStr = keySpan.dataset.arrayIndex; 
+
+                    if (isArray && arrayIndexStr !== undefined) { 
+                        await renameArrayPropertyKey(originalKey, newKey, parseInt(arrayIndexStr));
+                    } else {
+                        await renamePropertyKey(originalKey, newKey);
+                    }
+                    keySpan.dataset.originalKey = newKey; 
+                } else if (newKey === '' && originalKey) { 
+                    keySpan.textContent = originalKey; 
+                }
             }
         } else if (e.type === 'keydown' && e.key === 'Enter') {
             if (e.target.matches('.page-property-value')) {
@@ -89,15 +210,28 @@ export function displayPageProperties(properties) {
                 e.target.blur();
             }
         } else if (e.type === 'click' && e.target.matches('.page-property-delete')) {
-            const key = e.target.dataset.property;
-            const arrayIndex = e.target.dataset.arrayIndex;
-            let confirmMessage = arrayIndex !== undefined ? `Are you sure you want to delete this "${key}" value?` : `Are you sure you want to delete the property "${key}"?`;
-            const confirmed = await ui.showGenericConfirmModal('Delete Property', confirmMessage); // Assumes ui.showGenericConfirmModal
-            if (confirmed) {
-                if (arrayIndex !== undefined) {
-                    await deleteArrayPropertyValue(key, parseInt(arrayIndex));
-                } else {
-                    await deletePageProperty(key);
+            // Click on delete button
+            const deleteButton = e.target;
+            const propertyItemRow = deleteButton.closest('.page-property-item');
+
+            if (deleteButton.dataset.isNewDelete === 'true') {
+                if (propertyItemRow) propertyItemRow.remove(); 
+                if (ui.domRefs.pagePropertiesList.children.length === 0 && !ui.domRefs.pagePropertiesList.querySelector('p.no-properties-message')) {
+                    ui.domRefs.pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
+                }
+            } else {
+                // Existing logic for deleting property (with confirmation)
+                const key = deleteButton.dataset.property;
+                const arrayIndexStr = deleteButton.dataset.arrayIndex;
+                let confirmMessage = arrayIndexStr !== undefined ? `Are you sure you want to delete this "${key}" value?` : `Are you sure you want to delete the property "${key}"?`;
+                
+                const confirmed = await ui.showGenericConfirmModal('Delete Property', confirmMessage); 
+                if (confirmed) {
+                    if (arrayIndexStr !== undefined) {
+                        await deleteArrayPropertyValue(key, parseInt(arrayIndexStr));
+                    } else {
+                        await deletePageProperty(key);
+                    }
                 }
             }
         }
@@ -111,6 +245,8 @@ export function displayPageProperties(properties) {
     // Set up the encryption icon listener
     setupPagePropertiesModalListeners();
     
+    setupAddPropertyButtonListener(); // Ensure the listener for the Add button is active
+
     if (typeof feather !== 'undefined' && feather.replace) feather.replace();
 }
 

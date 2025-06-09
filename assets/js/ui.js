@@ -739,6 +739,29 @@ function initPagePropertiesModal() {
 
     // Function to hide the modal
     const hideModal = () => {
+        // --- START Added cleanup logic ---
+        const pagePropertiesList = domRefs.pagePropertiesList; // domRefs should be available in initPagePropertiesModal scope
+        if (pagePropertiesList) {
+            const newRows = pagePropertiesList.querySelectorAll('.new-property-row');
+            newRows.forEach(row => {
+                const keySpan = row.querySelector('.page-property-key');
+                const valueInput = row.querySelector('.page-property-value');
+
+                // Check if key is still marked as new (data-is-new) and its text content is empty,
+                // AND the value input is also empty.
+                if (keySpan && keySpan.dataset.isNew === 'true' && keySpan.textContent.trim() === '' &&
+                    valueInput && valueInput.value.trim() === '') {
+                    row.remove();
+                }
+            });
+
+            // If, after removals, the list is empty, show the "No properties" message
+            if (pagePropertiesList.children.length === 0 && !pagePropertiesList.querySelector('p.no-properties-message')) {
+                pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
+            }
+        }
+        // --- END Added cleanup logic ---
+
         modal.classList.remove('active');
         const modalContent = modal.querySelector('.generic-modal-content');
         if (modalContent) {
