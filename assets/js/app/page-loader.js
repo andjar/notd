@@ -271,15 +271,15 @@ async function _fetchPageFromNetwork(pageName) {
     try {
         pageDetails = await pagesAPI.getPageByName(pageName);
     } catch (error) {
-        if (error.message === 'Page not found' && /^\d{4}-\d{2}-\d{2}$/.test(pageName)) {
-            console.log(`Journal page ${pageName} not found, attempting to create it...`);
+        if (error.message === 'Page not found') {
+            console.log(`Page ${pageName} not found, attempting to create it...`); // Modified log message
             try {
                 pageDetails = await pagesAPI.createPage(pageName);
                 isNewPage = true; // Mark that this page was just created
-                console.log(`Successfully created journal page ${pageName}`);
+                console.log(`Successfully created page ${pageName}`); // Modified log message
             } catch (createError) {
-                console.error(`Failed to create journal page ${pageName}:`, createError);
-                throw new Error(`Failed to create journal page: ${createError.message}`);
+                console.error(`Failed to create page ${pageName}:`, createError); // Modified log message
+                throw new Error(`Failed to create page: ${createError.message}`); // Modified error
             }
         } else {
             throw error;
