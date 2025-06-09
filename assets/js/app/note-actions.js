@@ -108,10 +108,10 @@ export function getNoteElementById(noteId) {
 // --- Note Saving Logic ---
 export async function saveNoteImmediately(noteEl) {
     const noteId = noteEl.dataset.noteId;
-    if (noteId.startsWith('temp-')) {
-        console.warn('Attempted to save temporary note immediately.');
-        return; 
-    }
+    // if (noteId.startsWith('temp-')) {
+    //     console.warn('Attempted to save temporary note immediately.');
+    //     return; 
+    // }
 
     const contentDiv = noteEl.querySelector('.note-content');
     const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
@@ -163,7 +163,7 @@ export async function saveNoteImmediately(noteEl) {
 
 export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounce is imported/available
     const noteId = noteEl.dataset.noteId;
-    if (noteId.startsWith('temp-')) return;
+    // if (noteId.startsWith('temp-')) return;
 
     const contentDiv = noteEl.querySelector('.note-content');
     const rawContentFromDataset = contentDiv.dataset.rawContent; 

@@ -4,6 +4,7 @@
  * @module ui/note-renderer
  */
 
+import { saveNoteImmediately } from '../app/note-actions.js';
 import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
 // The path to api_client.js is ../../api_client.js if note-renderer.js is in assets/js/ui/
@@ -672,6 +673,13 @@ function normalizeNewlines(str) {
  * @param {HTMLElement} contentEl - The note content element
  */
 function switchToRenderedMode(contentEl) {
+    const noteEl = contentEl.closest('.note-item');
+    if (noteEl && noteEl.dataset.noteId && !noteEl.dataset.noteId.startsWith('temp-')) {
+        // It's important that saveNoteImmediately is available in this scope.
+        // Assuming it's imported or globally available.
+        // console.log('[DEBUG switchToRenderedMode] Calling saveNoteImmediately for noteId:', noteEl.dataset.noteId);
+        saveNoteImmediately(noteEl);
+    }
     if (contentEl.classList.contains('rendered-mode')) return;
 
     const rawTextValue = getRawTextWithNewlines(contentEl);

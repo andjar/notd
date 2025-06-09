@@ -338,9 +338,10 @@ const notesAPI = {
      */
     updateNote: (noteId, noteUpdateData) => {
         const body = {
-            action: 'update',
-            id: noteId, // Ensure noteId is the 'id' field in the body
-            ...noteUpdateData // content, page_id, parent_note_id, order_index, collapsed, properties_explicit
+            _method: 'PUT', // Add this line
+            action: 'update', // This might be redundant if _method is PUT, but backend might use it
+            id: noteId,
+            ...noteUpdateData
         };
         // Remove any potential undefined fields that might have been explicitly passed
         Object.keys(body).forEach(key => {
