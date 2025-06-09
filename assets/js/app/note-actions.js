@@ -110,9 +110,60 @@ export function getNoteElementById(noteId) {
     return notesContainer.querySelector(`.note-item[data-note-id="${noteId}"]`);
 }
 
-// --- Core Batch Operation Executor ---
+/**
+ * Helper function to update a newly created note (optimistically added with a temp ID)
+ * with its permanent ID and server data, in both local state and DOM.
+ * @param {string} clientTempId - The temporary ID used by the client.
+ * @param {Object} noteFromServer - The note object received from the server, containing the permanent ID.
+ */
+function _finalizeNewNote(clientTempId, noteFromServer) {
+    if (!noteFromServer || !noteFromServer.id) {
+        console.error("[_finalizeNewNote] Invalid note data from server for temp ID:", clientTempId, noteFromServer);
+        // Optionally, trigger a revert or error state if finalization fails critically
+        return;
+    }
+    const permanentId = noteFromServer.id;
+    console.log(`[_finalizeNewNote] Finalizing note. Temp ID: ${clientTempId}, Permanent ID: ${permanentId}`);
+
+    // Update local state: Find the note by temp ID and update it with server data, ensuring permanent ID.
+    const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(clientTempId));
+    if (noteIndex > -1) {
+        // Merge server data into the existing optimistic note, making sure 'id' is the permanent one.
+        // Also, ensure client_temp_id is removed or handled if it was part of notesForCurrentPage[noteIndex].
+        const existingOptimisticNote = notesForCurrentPage[noteIndex];
+        notesForCurrentPage[noteIndex] = { 
+            ...existingOptimisticNote, // Keep any client-side optimistic fields not yet on server
+            ...noteFromServer,         // Override with server data
+            id: permanentId            // Explicitly set permanent ID
+        };
+        // If 'client_temp_id' was a property on the state object, remove it after finalization:
+        // delete notesForCurrentPage[noteIndex].client_temp_id;
+    } else {
+        console.warn(`[_finalizeNewNote] Could not find note with temp ID ${clientTempId} in local state to finalize.`);
+        // This might indicate an issue, e.g., the note was removed before finalization.
+        // Depending on strategy, you might re-add it here if it's guaranteed to exist.
+        // addNoteToCurrentPage({ ...noteFromServer, id: permanentId }); // If it should be added if missing
+    }
+
+    // Update DOM element's dataset.noteId
+    const tempNoteEl = getNoteElementById(clientTempId);
+    if (tempNoteEl) {
+        tempNoteEl.dataset.noteId = permanentId;
+        const contentDiv = tempNoteEl.querySelector('.note-content');
+        if (contentDiv) contentDiv.dataset.noteId = permanentId;
+        const bulletEl = tempNoteEl.querySelector('.note-bullet');
+        if (bulletEl) bulletEl.dataset.noteId = permanentId;
+    } else {
+        console.warn(`[_finalizeNewNote] Could not find DOM element for temp ID ${clientTempId} to update dataset.`);
+    }
+}
+
+
 /**
  * Executes a batch of note operations with optimistic updates and revert logic.
+ * Assumes `notesAPI.batchUpdateNotes` returns the array of individual operation results directly,
+ * or throws an error if the API call fails or the response structure is invalid.
+ *
  * @param {Array<Object>} operations - Array of operations for the batch API.
  *                                   Each operation: { type: 'create'|'update'|'delete', payload: Object }
  * @param {Function} optimisticDOMUpdater - A function to call to perform optimistic DOM updates.
@@ -123,86 +174,110 @@ export function getNoteElementById(noteId) {
 async function executeBatchOperations(operations, optimisticDOMUpdater, userActionName) {
     if (!operations || operations.length === 0) {
         console.warn(`[${userActionName} BATCH] No operations to execute.`);
+        // Consider returning true as no operations means no failures.
         return true;
     }
 
     window.ui.updateSaveStatusIndicator('pending');
-    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+    // Clone the state *before* any optimistic changes by the CALLER of this function.
+    // Callers (handleAddRootNote, etc.) are responsible for optimistic STATE updates.
+    // This function handles DOM updates and API communication/revert.
+    const originalNotesStateBeforeOptimisticChanges = JSON.parse(JSON.stringify(notesForCurrentPage));
     let success = false;
 
     try {
-        // Optimistic local state updates are expected to be done by the CALLER before forming 'operations'.
-        // Optimistic DOM updates are done via the optimisticDOMUpdater callback.
+        // 1. Perform Optimistic DOM Updates (call the provided function)
+        //    This is called AFTER the caller has made optimistic state changes.
         if (typeof optimisticDOMUpdater === 'function') {
             optimisticDOMUpdater();
-        }
-
-        console.log(`[${userActionName} BATCH] Sending operations:`, JSON.stringify(operations, null, 2));
-        // apiResponse is expected to be { status: "success", data: { results: [...] } }
-        // apiRequest returns the content of the top-level 'data' field.
-        const batchData = await notesAPI.batchUpdateNotes(operations);
-        console.log(`[${userActionName} BATCH] API response data:`, batchData);
-
-        if (batchData && batchData.results && Array.isArray(batchData.results)) {
-            let allSubOperationsSucceeded = true;
-            batchData.results.forEach(opResult => {
-                if (opResult.status === 'error') {
-                    allSubOperationsSucceeded = false;
-                    console.error(`[${userActionName} BATCH] Sub-operation error: Type: ${opResult.type}, Identifier: ${opResult.payload_identifier?.id || opResult.client_temp_id}, Message: ${opResult.error_message || 'Unknown sub-operation error'}`);
-                    // If backend guarantees atomicity, this path means the whole batch should have failed at a higher level.
-                    // If backend *could* return partial success, this error needs to be aggregated.
-                    // For now, assume full atomicity: if we see an error here, it's unexpected or a specific sub-op detail.
-                }
-
-                if (!allSubOperationsSucceeded) return; // Stop processing results if one failed (assuming atomicity)
-
-                const noteFromServer = opResult.note;
-                const clientTempId = opResult.client_temp_id;
-
-                if (opResult.type === 'create' && clientTempId && noteFromServer) {
-                    const permanentId = noteFromServer.id;
-                    const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(clientTempId));
-                    if (noteIndex > -1) {
-                        notesForCurrentPage[noteIndex] = { ...notesForCurrentPage[noteIndex], ...noteFromServer, id: permanentId };
-                    }
-                    const tempNoteEl = getNoteElementById(clientTempId);
-                    if (tempNoteEl) {
-                        tempNoteEl.dataset.noteId = permanentId;
-                        tempNoteEl.querySelector('.note-content')?.setAttribute('data-note-id', permanentId);
-                        tempNoteEl.querySelector('.note-bullet')?.setAttribute('data-note-id', permanentId);
-                    }
-                } else if (opResult.type === 'update' && noteFromServer) {
-                    updateNoteInCurrentPage(noteFromServer);
-                    // Optionally, window.ui.updateNoteElement(noteFromServer.id, noteFromServer) if targeted DOM update is needed.
-                } else if (opResult.type === 'delete' && opResult.deleted_note_id) {
-                    // Local state removal was optimistic. This confirms.
-                }
-            });
-
-            if (!allSubOperationsSucceeded) {
-                throw new Error(`One or more sub-operations in '${userActionName}' failed on the server.`);
-            }
-            success = true;
-            window.ui.updateSaveStatusIndicator('saved');
         } else {
-            throw new Error(`[${userActionName} BATCH] Invalid API response structure. Expected 'data.results' array.`);
+            console.warn(`[${userActionName} BATCH] No optimisticDOMUpdater function provided.`);
         }
 
-    } catch (error) {
+        // 2. API Call
+        console.log(`[${userActionName} BATCH] Sending operations:`, JSON.stringify(operations, null, 2));
+        // `batchResultsArray` is now expected to be the direct array of operation results,
+        // or an error would have been thrown by `notesAPI.batchUpdateNotes` (in api_client.js).
+        const batchResultsArray = await notesAPI.batchUpdateNotes(operations);
+        console.log(`[${userActionName} BATCH] API results array received:`, batchResultsArray);
+
+        // 3. Process Individual Results
+        //    (Though `notesAPI.batchUpdateNotes` should throw if the overall structure is bad,
+        //     we still check individual operation statuses for robustness)
+        if (!Array.isArray(batchResultsArray)) {
+            // This case should ideally be caught by the modified notesAPI.batchUpdateNotes in api_client.js
+            throw new Error(`[${userActionName} BATCH] notesAPI.batchUpdateNotes did not return an array as expected.`);
+        }
+
+        let allSubOperationsSucceeded = true;
+        batchResultsArray.forEach(opResult => {
+            // Validate each operation result object
+            if (!opResult || typeof opResult !== 'object') {
+                console.error(`[${userActionName} BATCH] Invalid operation result item:`, opResult);
+                allSubOperationsSucceeded = false;
+                return; // Skip to next opResult
+            }
+
+            if (opResult.status === 'error') {
+                allSubOperationsSucceeded = false;
+                const idForError = opResult.payload_identifier?.id || opResult.id || opResult.client_temp_id || 'N/A';
+                console.error(`[${userActionName} BATCH] Server reported sub-operation error: Type: ${opResult.type || 'Unknown'}, Identifier: ${idForError}, Message: ${opResult.error_message || opResult.message || 'Unknown sub-operation error'}`);
+            }
+
+            if (!allSubOperationsSucceeded) return; // Stop processing if one failed
+
+            const noteFromServer = opResult.note;       // Expected for 'create' and 'update'
+            const clientTempId = opResult.client_temp_id; // Expected for 'create' if sent by client
+            const deletedNoteId = opResult.deleted_note_id; // Expected for 'delete'
+
+            if (opResult.type === 'create' && clientTempId && noteFromServer) {
+                _finalizeNewNote(clientTempId, noteFromServer);
+            } else if (opResult.type === 'update' && noteFromServer) {
+                updateNoteInCurrentPage(noteFromServer);
+                // Optionally, trigger a targeted DOM update for this specific note if its properties changed
+                // e.g., if (window.ui.updateNoteElement) window.ui.updateNoteElement(noteFromServer.id, noteFromServer);
+            } else if (opResult.type === 'delete' && deletedNoteId) {
+                // Local state removal was optimistic and done by the caller. This is a server confirmation.
+                console.log(`[${userActionName} BATCH] Confirmed deletion of note ID: ${deletedNoteId}`);
+            } else if (opResult.status === 'success') {
+                // A successful operation type not covered above (e.g. a 'read' if batch ever supports it)
+                console.log(`[${userActionName} BATCH] Successfully processed unhandled operation type: ${opResult.type}`);
+            }
+        });
+
+        if (!allSubOperationsSucceeded) {
+            // If any sub-operation failed (as reported by server within a 2xx response),
+            // treat it as an overall failure needing a revert.
+            throw new Error(`One or more sub-operations in '${userActionName}' failed on the server side.`);
+        }
+
+        success = true;
+        window.ui.updateSaveStatusIndicator('saved');
+
+    } catch (error) { // Catches errors from API call, or errors thrown from processing results
         const errorMessage = error.message || `Batch operation '${userActionName}' failed.`;
-        console.error(`[${userActionName} BATCH] Overall error:`, error);
-        alert(`${errorMessage} Reverting local changes.`); // User feedback
+        console.error(`[${userActionName} BATCH] Overall error: ${errorMessage}`, error.stack ? `\nStack: ${error.stack}` : '');
+        
+        // User feedback
+        alert(`${errorMessage} Reverting local changes.`);
         window.ui.updateSaveStatusIndicator('error');
 
-        setNotesForCurrentPage(originalNotesState);
+        // Revert local state to the state *before* the caller made its optimistic changes
+        setNotesForCurrentPage(originalNotesStateBeforeOptimisticChanges);
+
+        // Re-render the entire notes list from the reverted state
         if (window.ui && typeof window.ui.displayNotes === 'function' && currentPageId) {
             window.ui.displayNotes(notesForCurrentPage, currentPageId);
+            // TODO: Consider re-focusing the element that triggered the action.
+            // This is complex because the element might no longer exist or might have a different ID/state.
+            // Example: if a new note creation failed, the temporary note element is gone.
+            // If an indent failed, the original note element might need to be focused.
         } else {
-            console.warn(`[${userActionName} BATCH] Could not re-render notes after batch failure.`);
+            console.warn(`[${userActionName} BATCH] Could not re-render notes after batch failure. UI might be inconsistent.`);
         }
         success = false;
     } finally {
-        // Ensure local state is always sorted by order_index.
+        // Always ensure the current local state (either successfully updated or reverted) is sorted.
         notesForCurrentPage.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
     }
     return success;

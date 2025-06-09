@@ -572,9 +572,8 @@ if (!function_exists('_handleBatchOperations')) {
             } else {
                 $pdo->commit();
                 ApiResponse::success([
-                    'status' => 'success',
                     'message' => 'Batch operations completed successfully.',
-                    'data' => ['results' => $orderedResults] // Use orderedResults here
+                    'results' => $orderedResults
                 ]);
                 exit;
             }
