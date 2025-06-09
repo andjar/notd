@@ -6,7 +6,8 @@ import {
     addNoteToCurrentPage,
     updateNoteInCurrentPage,
     removeNoteFromCurrentPageById,
-    setNotesForCurrentPage
+    setNotesForCurrentPage,
+    saveStatus
     // setSaveStatus, // No longer needed here as updateSaveStatusIndicator from ui.js will handle it
     // getNoteDataById, // This will be a local helper using imported notesForCurrentPage
     // setCurrentFocusedNoteId, // Not directly used by functions moved here yet, but might be needed by future note actions
@@ -232,7 +233,7 @@ export const debouncedSaveNote = debounce(async (noteEl) => {
     if (noteData && noteData.content === currentRawContent && !String(noteId).startsWith('new-')) {
         // console.log('[DEBOUNCED SAVE] Content unchanged for noteId:', noteId, '. Skipping save.');
         // Ensure status is 'saved' if no changes
-        const currentSaveStatus = window.ui.saveStatus; // Assuming saveStatus is exposed or use a getter
+        const currentSaveStatus = saveStatus; // Use imported saveStatus
         if (currentSaveStatus !== 'saved') {
             window.ui.updateSaveStatusIndicator('saved');
         }
