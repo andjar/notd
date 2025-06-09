@@ -8,20 +8,14 @@ class WebhooksApiTest extends TestCase {
     private static $dbPath;
 
     public static function setUpBeforeClass(): void {
-        self::$dbPath = __DIR__ . '/../../db/test_database.sqlite';
-        // Ensure the test database file is clean before starting
-        if (file_exists(self::$dbPath)) {
-            unlink(self::$dbPath);
-        }
-        
         // Setup Guzzle client
         self::$client = new Client([
             'base_uri' => 'http://localhost:8000', // Assuming the app is served here for testing
             'http_errors' => false // Don't throw exceptions for 4xx/5xx responses
         ]);
 
-        // Manually trigger the database setup for the test database
-        $_ENV['DB_PATH'] = self::$dbPath;
+        // Use in-memory database instead of file-based
+        $_ENV['DB_PATH'] = ':memory:';
         require_once __DIR__ . '/../../api/db_connect.php';
         run_database_setup(get_db_connection());
 
@@ -37,10 +31,7 @@ class WebhooksApiTest extends TestCase {
     }
 
     public static function tearDownAfterClass(): void {
-        // Clean up the test database
-        if (file_exists(self::$dbPath)) {
-            unlink(self::$dbPath);
-        }
+        // No need to clean up database file since we're using in-memory
         self::$client = null;
     }
 

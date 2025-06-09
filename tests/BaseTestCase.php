@@ -18,10 +18,8 @@ class BaseTestCase extends TestCase
 
     protected function setUp(): void
     {
-        // Define DB_PATH for in-memory SQLite database for each test
-        if (!defined('DB_PATH')) {
-            define('DB_PATH', ':memory:');
-        }
+        // Always use in-memory database for tests to prevent file locking issues
+        define('DB_PATH', ':memory:');
 
         // Setup temporary directory for uploads
         self::$tempUploadsDir = sys_get_temp_dir() . '/api_tests_uploads_' . uniqid();
@@ -48,29 +46,25 @@ class BaseTestCase extends TestCase
         if (!defined('API_KEY')) define('API_KEY', 'test_api_key'); // For API client tests if any
 
         // Include db_connect.php to establish the connection and run schema setup
-        // db_connect.php internally calls setup_db.php if DB_PATH is :memory:
         require_once APP_ROOT_PATH . '/api/db_connect.php';
         
-        // The get_db_connection() function is in db_connect.php
-        // It initializes $pdo and also calls setup_db() which creates schema.
-        global $pdo; // db_connect.php makes $pdo global
-        if (isset($GLOBALS['pdo_instance'])) { // db_connect.php might store it in $GLOBALS
-            self::$pdo = $GLOBALS['pdo_instance'];
-        } elseif ($pdo instanceof PDO) {
-             self::$pdo = $pdo;
-        } else {
-            // Fallback if global $pdo isn't set as expected, try to get it directly
-            self::$pdo = get_db_connection(); 
-        }
-
+        // Get a fresh database connection for this test
+        self::$pdo = get_db_connection();
         if (!self::$pdo) {
             $this->fail("Failed to establish a database connection for tests.");
         }
+
+        // Ensure we're using a transaction for this test
+        self::$pdo->beginTransaction();
     }
 
     protected function tearDown(): void
     {
         if (self::$pdo) {
+            // Rollback any pending transaction
+            if (self::$pdo->inTransaction()) {
+                self::$pdo->rollBack();
+            }
             self::$pdo = null; // Close the connection
         }
         
