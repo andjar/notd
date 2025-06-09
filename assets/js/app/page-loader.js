@@ -195,7 +195,15 @@ function displayBacklinks(backlinksData) {
         return;
     }
 
-    if (!backlinksData || backlinksData.length === 0) {
+    // New check for array type
+    if (!Array.isArray(backlinksData)) {
+        console.error('displayBacklinks: backlinksData is not an array. Received:', backlinksData);
+        backlinksContainer.innerHTML = '<p>Error loading backlinks or no backlinks found.</p>';
+        return;
+    }
+
+    // Existing check, now only for length after confirming it's an array
+    if (backlinksData.length === 0) {
         backlinksContainer.innerHTML = '<p>No backlinks found.</p>';
         return;
     }

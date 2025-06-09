@@ -135,7 +135,7 @@ const pagesAPI = {
      * @param {boolean} [options.include_internal=false] - Whether to include internal properties and notes (if include_details is true)
      * @returns {Promise<Array>} Array of page objects (potentially detailed if include_details is true)
      */
-    getPages: (options = {}) => {
+    getPages: async (options = {}) => { // Added async
         const params = new URLSearchParams();
         if (options.excludeJournal) params.append('exclude_journal', '1');
         if (options.followAliases === false) params.append('follow_aliases', '0'); // Note: API spec default is 1 (true)
@@ -149,7 +149,23 @@ const pagesAPI = {
         if (options.sort_order) params.append('sort_order', options.sort_order);
         
         const queryString = params.toString();
-        return apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
+        const responseData = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`); // Added await and stored in responseData
+
+        if (Array.isArray(responseData)) {
+            return responseData;
+        }
+
+        if (responseData && typeof responseData === 'object') {
+            const keysToTry = ['pages', 'items', 'results', 'data'];
+            for (const key of keysToTry) {
+                if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
+                    return responseData[key];
+                }
+            }
+        }
+
+        console.warn('[pagesAPI.getPages] Response was not an array and no known data key was found. Response:', responseData);
+        return []; // Return empty array as a fallback
     },
 
     /**
@@ -471,12 +487,28 @@ const searchAPI = {
      * @param {string} pageName - Page name
      * @returns {Promise<Array<{note_id: number, content: string, page_id: number, source_page_name: string, content_snippet: string}>>}
      */
-    getBacklinks: (pageName, options = {}) => {
+    getBacklinks: async (pageName, options = {}) => { // Added async
         const params = new URLSearchParams();
         params.append('backlinks_for_page_name', pageName); // pageName is already URI encoded
         if (options.page) params.append('page', options.page.toString());
         if (options.per_page) params.append('per_page', options.per_page.toString());
-        return apiRequest(`search.php?${params.toString()}`);
+        const responseData = await apiRequest(`search.php?${params.toString()}`); // Added await and stored in responseData
+
+        if (Array.isArray(responseData)) {
+            return responseData;
+        }
+
+        if (responseData && typeof responseData === 'object') {
+            const keysToTry = ['backlinks', 'items', 'results', 'data'];
+            for (const key of keysToTry) {
+                if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
+                    return responseData[key];
+                }
+            }
+        }
+
+        console.warn('[searchAPI.getBacklinks] Response was not an array and no known data key was found. Response:', responseData);
+        return []; // Return empty array as a fallback
     },
 
     /**
