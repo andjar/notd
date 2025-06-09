@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/response_utils.php';
-require_once __DIR__ . '/webhooks.php'; // Include the new WebhooksManager
+require_once __DIR__ . '/v1/webhooks.php'; // Include the new WebhooksManager
 
 class PropertyTriggerService {
     private $pdo;
@@ -65,19 +65,41 @@ class PropertyTriggerService {
      */
     private function handleWebhookTrigger($entityType, $entityId, $propertyName, $propertyValue) {
         try {
+            // Get all active and verified webhooks for this entity type
             $stmt = $this->pdo->prepare(
-                "SELECT * FROM Webhooks WHERE entity_type = ? AND property_name = ? AND active = 1 AND verified = 1"
+                "SELECT * FROM Webhooks WHERE entity_type = ? AND active = 1 AND verified = 1"
             );
-            $stmt->execute([$entityType, $propertyName]);
+            $stmt->execute([$entityType]);
             $webhooks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (empty($webhooks)) {
                 return; // No webhooks to trigger
             }
 
-            // In a real-world scenario with many webhooks, this should be offloaded to a queue.
-            // For this application, direct dispatch is acceptable.
             foreach ($webhooks as $webhook) {
+                // Decode JSON fields
+                $propertyNames = json_decode($webhook['property_names'], true);
+                $eventTypes = json_decode($webhook['event_types'], true);
+
+                // Skip if property_change is not in event_types
+                if (!in_array('property_change', $eventTypes)) {
+                    continue;
+                }
+
+                // Check if this webhook should trigger for this property
+                $shouldTrigger = false;
+                if ($propertyNames === '*') {
+                    $shouldTrigger = true;
+                } else if (is_array($propertyNames)) {
+                    $shouldTrigger = in_array($propertyName, $propertyNames);
+                } else {
+                    $shouldTrigger = ($propertyNames === $propertyName);
+                }
+
+                if (!$shouldTrigger) {
+                    continue;
+                }
+
                 $payload = [
                     'event' => 'property_change',
                     'webhook_id' => $webhook['id'],
@@ -89,11 +111,54 @@ class PropertyTriggerService {
                         'value' => $propertyValue
                     ]
                 ];
-                // Use the new WebhooksManager to dispatch the event
+
+                // Use the WebhooksManager to dispatch the event
                 $this->webhooksManager->dispatchEvent($webhook, 'property_change', $payload);
             }
         } catch (Exception $e) {
             error_log("Error during webhook dispatch: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Dispatch entity lifecycle events (create, update, delete)
+     */
+    public function dispatchEntityEvent($eventType, $entityType, $entityId, $data = []) {
+        try {
+            // Get all active and verified webhooks for this entity type
+            $stmt = $this->pdo->prepare(
+                "SELECT * FROM Webhooks WHERE entity_type = ? AND active = 1 AND verified = 1"
+            );
+            $stmt->execute([$entityType]);
+            $webhooks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($webhooks)) {
+                return; // No webhooks to trigger
+            }
+
+            foreach ($webhooks as $webhook) {
+                $eventTypes = json_decode($webhook['event_types'], true);
+                
+                // Skip if this event type is not in the webhook's event_types
+                if (!in_array($eventType, $eventTypes)) {
+                    continue;
+                }
+
+                $payload = [
+                    'event' => $eventType,
+                    'webhook_id' => $webhook['id'],
+                    'timestamp' => time(),
+                    'data' => array_merge([
+                        'entity_type' => $entityType,
+                        'entity_id' => $entityId
+                    ], $data)
+                ];
+
+                // Use the WebhooksManager to dispatch the event
+                $this->webhooksManager->dispatchEvent($webhook, $eventType, $payload);
+            }
+        } catch (Exception $e) {
+            error_log("Error during entity event webhook dispatch: " . $e->getMessage());
         }
     }
 

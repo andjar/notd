@@ -26,19 +26,25 @@
  *   
  * Security: Only SELECT queries are allowed, limited to Notes, Properties, and Pages tables.
  */
-require_once '../config.php';
-require_once 'db_connect.php';
-require_once 'response_utils.php'; // Include the new response utility
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 
 $pdo = get_db_connection();
 $input = json_decode(file_get_contents('php://input'), true);
 
+// Validate required and optional parameters
 if (!isset($input['sql_query'])) {
     ApiResponse::error('Missing sql_query parameter.', 400);
     exit;
 }
+
+// Set default pagination values
+$page = isset($input['page']) ? max(1, intval($input['page'])) : 1;
+$perPage = isset($input['per_page']) ? max(1, min(100, intval($input['per_page']))) : 20;
+$includeProperties = isset($input['include_properties']) ? (bool)$input['include_properties'] : false;
 
 $sqlQuery = trim($input['sql_query']);
 
@@ -115,18 +121,45 @@ if (preg_match('/\bFROM\s+(?!(?:Notes|Properties|Pages)\b)\w+/i', $sqlQuery) ||
 
 // --- Query Execution ---
 try {
-    // Step 1: Execute the provided query to get note IDs
+    // Step 1: Execute the provided query to get total count and paginated note IDs
+    // First, get total count by wrapping the original query
+    $countQuery = "SELECT COUNT(*) FROM (" . $sqlQuery . ") as count_query";
+    $stmtCount = $pdo->prepare($countQuery);
+    $stmtCount->execute();
+    $totalCount = (int)$stmtCount->fetchColumn();
+
+    // Calculate pagination
+    $totalPages = ceil($totalCount / $perPage);
+    $offset = ($page - 1) * $perPage;
+
+    // Modify the original query to include LIMIT and OFFSET
+    // We need to handle different query patterns
+    if (preg_match('/^SELECT\s+DISTINCT\s+N\.id\s+FROM\s+Notes\s+N\s+JOIN/i', $sqlQuery)) {
+        // For JOIN queries, we need to wrap in a subquery to apply pagination
+        $sqlQuery = "SELECT id FROM (" . $sqlQuery . ") as paginated_query LIMIT ? OFFSET ?";
+    } else {
+        // For simple queries, we can just append LIMIT and OFFSET
+        $sqlQuery .= " LIMIT ? OFFSET ?";
+    }
+
     $stmtGetIds = $pdo->prepare($sqlQuery);
-    $stmtGetIds->execute();
+    $stmtGetIds->execute([$perPage, $offset]);
     $noteIds = $stmtGetIds->fetchAll(PDO::FETCH_COLUMN, 0);
 
     if (empty($noteIds)) {
-        ApiResponse::success([]);
+        ApiResponse::success([
+            'data' => [],
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total_count' => $totalCount,
+                'total_pages' => $totalPages
+            ]
+        ]);
         exit;
     }
 
     // Step 2: Fetch full note data for the retrieved IDs
-    // Create placeholders for the IN clause
     $placeholders = implode(',', array_fill(0, count($noteIds), '?'));
     $sqlFetchNotes = "SELECT * FROM Notes WHERE id IN ({$placeholders})";
     
@@ -134,7 +167,38 @@ try {
     $stmtFetchNotes->execute($noteIds);
     $notes = $stmtFetchNotes->fetchAll(PDO::FETCH_ASSOC);
 
-    ApiResponse::success($notes);
+    // Step 3: If properties are requested, fetch them for all notes
+    if ($includeProperties && !empty($notes)) {
+        $sqlFetchProperties = "SELECT * FROM Properties WHERE note_id IN ({$placeholders})";
+        $stmtFetchProperties = $pdo->prepare($sqlFetchProperties);
+        $stmtFetchProperties->execute($noteIds);
+        $properties = $stmtFetchProperties->fetchAll(PDO::FETCH_ASSOC);
+
+        // Group properties by note_id
+        $propertiesByNoteId = [];
+        foreach ($properties as $property) {
+            $noteId = $property['note_id'];
+            if (!isset($propertiesByNoteId[$noteId])) {
+                $propertiesByNoteId[$noteId] = [];
+            }
+            $propertiesByNoteId[$noteId][] = $property;
+        }
+
+        // Attach properties to their respective notes
+        foreach ($notes as &$note) {
+            $note['properties'] = $propertiesByNoteId[$note['id']] ?? [];
+        }
+    }
+
+    ApiResponse::success([
+        'data' => $notes,
+        'pagination' => [
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total_count' => $totalCount,
+            'total_pages' => $totalPages
+        ]
+    ]);
 
 } catch (PDOException $e) {
     // Log the detailed error to server logs for debugging

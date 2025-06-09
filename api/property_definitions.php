@@ -88,16 +88,11 @@ $propertyDefinitionManager = new PropertyDefinitionManager($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
-        if (isset($_GET['apply_all'])) {
-            $updatedCount = $propertyDefinitionManager->applyPropertyDefinitionsToExisting();
-            ApiResponse::success(['message' => "Applied property definitions to {$updatedCount} existing properties"]);
-        } else {
-            $stmt = $pdo->prepare("SELECT * FROM PropertyDefinitions ORDER BY name");
-            $stmt->execute();
-            $definitions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            ApiResponse::success($definitions);
-        }
+        $stmt = $pdo->prepare("SELECT * FROM PropertyDefinitions ORDER BY name");
+        $stmt->execute();
+        $definitions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        ApiResponse::success($definitions);
     } catch (Exception $e) {
         ApiResponse::error('Server error: ' . $e->getMessage(), 500);
     }
@@ -111,7 +106,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     
     try {
         if (isset($input['action'])) {
-            if ($input['action'] === 'apply_definition') {
+            if ($input['action'] === 'apply_all') {
+                $updatedCount = $propertyDefinitionManager->applyPropertyDefinitionsToExisting();
+                ApiResponse::success(['message' => "Applied property definitions to {$updatedCount} existing properties"]);
+                
+            } elseif ($input['action'] === 'apply_definition') {
                 $propertyName = isset($input['name']) ? $input['name'] : null;
                 if (!$propertyName) {
                     ApiResponse::error('Property name required', 400);

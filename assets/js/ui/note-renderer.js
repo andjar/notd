@@ -176,7 +176,10 @@ function renderNote(note, nestingLevel = 0) {
             arrowEl.dataset.collapsed = isCurrentlyCollapsed ? 'true' : 'false';
 
             try {
-                await notesAPI.updateNote(note.id, { collapsed: isCurrentlyCollapsed });
+                await notesAPI.updateNote(note.id, { 
+                    page_id: window.currentPageId,
+                    collapsed: isCurrentlyCollapsed 
+                });
                 console.log('Collapsed state saved:', { noteId: note.id, collapsed: isCurrentlyCollapsed });
                 
                 note.collapsed = isCurrentlyCollapsed;

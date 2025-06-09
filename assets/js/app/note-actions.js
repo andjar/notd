@@ -144,6 +144,7 @@ export async function saveNoteImmediately(noteEl) {
         }
         
         const updatePayload = { 
+            page_id: currentPageId,
             content: contentToSave,
             properties_explicit: explicitProperties
         };
@@ -200,10 +201,10 @@ export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounc
                 alert('Critical error: Encryption failed. Note not saved. Please try again or contact support.');
                 return; 
             }
-            // Removed old propertiesAPI.setProperty call for 'encrypted'
         }
         
         const updatePayload = {
+            page_id: currentPageId, // Add the page_id to the update payload
             content: finalContentToSave,
             properties_explicit: explicitProperties
         };
@@ -499,7 +500,10 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
     e.preventDefault();
     if (!noteData) return;
     const currentContentForTab = contentDiv.dataset.rawContent || contentDiv.textContent;
-    if (currentContentForTab !== noteData.content) { await saveNoteImmediately(noteItem); noteData.content = currentContentForTab; }
+    if (currentContentForTab !== noteData.content) {
+        await saveNoteImmediately(noteItem);
+        noteData.content = currentContentForTab;
+    }
     
     const originalNoteData = JSON.parse(JSON.stringify(noteData));
     const originalParentDomElement = noteItem.parentElement.closest('.note-item') || notesContainer;
@@ -593,7 +597,8 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
     window.ui.switchToEditMode(contentDiv);
 
     try {
-        await notesAPI.updateNote(noteData.id, { 
+        await notesAPI.updateNote(noteData.id, {
+            page_id: currentPageId, // Added this line
             content: noteData.content, 
             parent_note_id: newParentNoteIdToSet, 
             order_index: newOrderIndex 
@@ -601,9 +606,10 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
     } catch (error) {
         console.error('Error updating note parent/order (API):', error);
         alert('Error updating note structure. Reverting changes.');
-        window.ui.setNotesForCurrentPage(JSON.parse(sessionStorage.getItem('backupNotesBeforeTab')) || notesForCurrentPage);
-        window.ui.displayNotes(notesForCurrentPage, currentPageId);
-        window.ui.switchToEditMode(contentDiv);
+        // Ensure the imported setNotesForCurrentPage is used below, not window.ui.setNotesForCurrentPage
+        setNotesForCurrentPage(JSON.parse(sessionStorage.getItem('backupNotesBeforeTab')) || notesForCurrentPage); 
+        window.ui.displayNotes(notesForCurrentPage, currentPageId); // This uses the global ui object method
+        window.ui.switchToEditMode(contentDiv); // This uses the global ui object method
     }
 }
 
@@ -780,7 +786,10 @@ export async function handleTaskCheckboxClick(e) {
     try {
         // 1. Update note content - this will trigger pattern processor to set status
         console.log('[TASK_DEBUG] Updating note content:', { noteId, newRawContent });
-        const updatedNoteServer = await notesAPI.updateNote(noteId, { content: newRawContent });
+        const updatedNoteServer = await notesAPI.updateNote(noteId, { 
+            page_id: currentPageId,
+            content: newRawContent 
+        });
         console.log('[TASK_DEBUG] Note content updated:', updatedNoteServer);
         noteData.content = updatedNoteServer.content;
         noteData.updated_at = updatedNoteServer.updated_at;

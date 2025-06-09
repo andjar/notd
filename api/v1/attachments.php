@@ -6,10 +6,10 @@ error_log("FILES data: " . print_r($_FILES, true));
 
 ob_start(); // Start output buffering
 
-require_once __DIR__ . '/db_connect.php';
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/response_utils.php';
-require_once __DIR__ . '/validator_utils.php';
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../response_utils.php';
+require_once __DIR__ . '/../validator_utils.php';
 
 class AttachmentManager {
     private $pdo;
@@ -225,7 +225,7 @@ class AttachmentManager {
             $attachment = $attachment_stmt->fetch();
 
             $this->pdo->commit();
-            ApiResponse::success($attachment);
+            ApiResponse::success($attachment, 201);
             ob_end_flush();
         } catch (RuntimeException $e) {
             if (isset($full_path) && file_exists($full_path)) {

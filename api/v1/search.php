@@ -1,7 +1,7 @@
 <?php
-require_once 'db_connect.php';
-require_once 'response_utils.php'; // Include the new response utility
-require_once 'data_manager.php';   // Include the new DataManager
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
+require_once __DIR__ . '/../data_manager.php';   // Include the new DataManager
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 $pdo = get_db_connection();
@@ -37,13 +37,24 @@ function sanitize_fts_term($term) {
     return $term;
 }
 
+// Helper function to get pagination parameters with defaults
+function get_pagination_params() {
+    $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $per_page = isset($_GET['per_page']) ? max(1, min(100, intval($_GET['per_page']))) : 20;
+    $offset = ($page - 1) * $per_page;
+    return [$page, $per_page, $offset];
+}
+
 if ($method === 'GET') {
     try {
+        // Get pagination parameters
+        [$page, $per_page, $offset] = get_pagination_params();
+
         if (isset($_GET['q'])) {
             // Full-text search
             $term = sanitize_fts_term($_GET['q']);
             if (empty($term)) {
-                ApiResponse::success([]);
+                ApiResponse::success(['results' => [], 'pagination' => ['total' => 0, 'page' => $page, 'per_page' => $per_page, 'total_pages' => 0]]);
                 exit;
             }
 
@@ -51,7 +62,17 @@ if ($method === 'GET') {
             $fts_check = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='Notes_fts'")->fetch();
             
             if ($fts_check) {
-                // Use FTS5 for better performance
+                // Get total count for FTS5
+                $count_stmt = $pdo->prepare("
+                    SELECT COUNT(*) as total
+                    FROM Notes N 
+                    JOIN Notes_fts FTS ON N.id = FTS.rowid 
+                    WHERE Notes_fts MATCH ?
+                ");
+                $count_stmt->execute([$term]);
+                $total = $count_stmt->fetch()['total'];
+
+                // Use FTS5 for better performance with pagination
                 $stmt = $pdo->prepare("
                     SELECT 
                         N.id as note_id,
@@ -64,11 +85,22 @@ if ($method === 'GET') {
                     JOIN Notes_fts FTS ON N.id = FTS.rowid 
                     WHERE Notes_fts MATCH ?
                     ORDER BY rank
-                    LIMIT 100
+                    LIMIT ? OFFSET ?
                 ");
-                $stmt->execute([$term]);
+                $stmt->execute([$term, $per_page, $offset]);
             } else {
-                // Fallback to LIKE search
+                // Get total count for LIKE search
+                $count_stmt = $pdo->prepare("
+                    SELECT COUNT(*) as total
+                    FROM Notes N 
+                    JOIN Pages P ON N.page_id = P.id 
+                    WHERE N.content LIKE ? OR P.name LIKE ?
+                ");
+                $like_term = '%' . str_replace('%', '\\%', $term) . '%';
+                $count_stmt->execute([$like_term, $like_term]);
+                $total = $count_stmt->fetch()['total'];
+
+                // Fallback to LIKE search with pagination
                 $stmt = $pdo->prepare("
                     SELECT 
                         N.id as note_id,
@@ -78,10 +110,9 @@ if ($method === 'GET') {
                     FROM Notes N 
                     JOIN Pages P ON N.page_id = P.id 
                     WHERE N.content LIKE ? OR P.name LIKE ?
-                    LIMIT 100
+                    LIMIT ? OFFSET ?
                 ");
-                $like_term = '%' . str_replace('%', '\\%', $term) . '%';
-                $stmt->execute([$like_term, $like_term]);
+                $stmt->execute([$like_term, $like_term, $per_page, $offset]);
             }
 
             $results = $stmt->fetchAll();
@@ -93,42 +124,67 @@ if ($method === 'GET') {
                 }
             }
 
-            ApiResponse::success($results);
+            $total_pages = ceil($total / $per_page);
+            ApiResponse::success([
+                'results' => $results,
+                'pagination' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'per_page' => $per_page,
+                    'total_pages' => $total_pages
+                ]
+            ]);
 
         } elseif (isset($_GET['backlinks_for_page_name'])) {
             // Backlink search using 'links_to_page' properties
             $target_page_name = trim($_GET['backlinks_for_page_name']);
             if (empty($target_page_name)) {
-                ApiResponse::success([]);
+                ApiResponse::success(['results' => [], 'pagination' => ['total' => 0, 'page' => $page, 'per_page' => $per_page, 'total_pages' => 0]]);
                 exit;
             }
+
+            // Get total count for backlinks
+            $count_stmt = $pdo->prepare("
+                SELECT COUNT(*) as total
+                FROM Properties Prop
+                JOIN Notes N ON Prop.note_id = N.id
+                WHERE Prop.name = 'links_to_page' AND Prop.value = ? AND Prop.note_id IS NOT NULL
+            ");
+            $count_stmt->execute([$target_page_name]);
+            $total = $count_stmt->fetch()['total'];
 
             $stmt = $pdo->prepare("
                 SELECT 
                     N.id as note_id,
                     N.content,
                     N.page_id,
-                    P.name as source_page_name -- This is the page that CONTAINS the link
+                    P.name as source_page_name
                 FROM Properties Prop
                 JOIN Notes N ON Prop.note_id = N.id
                 JOIN Pages P ON N.page_id = P.id
                 WHERE Prop.name = 'links_to_page' AND Prop.value = ? AND Prop.note_id IS NOT NULL
                 ORDER BY N.updated_at DESC
+                LIMIT ? OFFSET ?
             ");
             
-            $stmt->execute([$target_page_name]);
+            $stmt->execute([$target_page_name, $per_page, $offset]);
             $results = $stmt->fetchAll();
 
-            // Generate snippets with context around the backlink
-            // The snippet should still be generated from N.content, looking for [[target_page_name]]
             foreach ($results as &$result) {
-                // Ensure the snippet is generated by looking for the actual link syntax
-                // in the content of the linking note.
                 $result['content_snippet'] = get_content_snippet($result['content'], '[[' . $target_page_name . ']]');
             }
-            unset($result); // release reference
+            unset($result);
 
-            ApiResponse::success($results);
+            $total_pages = ceil($total / $per_page);
+            ApiResponse::success([
+                'results' => $results,
+                'pagination' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'per_page' => $per_page,
+                    'total_pages' => $total_pages
+                ]
+            ]);
 
         } elseif (isset($_GET['tasks'])) {
             // Task search
@@ -138,9 +194,17 @@ if ($method === 'GET') {
                 exit;
             }
 
-            // Map 'todo'/'done' to actual status property values used by the app
-            // Based on app.js, it seems to be 'TODO' and 'DONE' (uppercase)
             $property_value = $status_filter === 'todo' ? 'TODO' : 'DONE';
+            
+            // Get total count for tasks
+            $count_stmt = $pdo->prepare("
+                SELECT COUNT(*) as total
+                FROM Properties Prop
+                JOIN Notes N ON Prop.note_id = N.id
+                WHERE Prop.name = 'status' AND Prop.value = ? AND Prop.note_id IS NOT NULL
+            ");
+            $count_stmt->execute([$property_value]);
+            $total = $count_stmt->fetch()['total'];
             
             $stmt = $pdo->prepare("
                 SELECT 
@@ -148,34 +212,23 @@ if ($method === 'GET') {
                     N.content,
                     N.page_id,
                     Pg.name as page_name,
-                    Prop.name as property_name,  -- For debugging/verification
-                    Prop.value as property_value -- For debugging/verification
+                    Prop.name as property_name,
+                    Prop.value as property_value
                 FROM Properties Prop
                 JOIN Notes N ON Prop.note_id = N.id
                 JOIN Pages Pg ON N.page_id = Pg.id
                 WHERE Prop.name = 'status' AND Prop.value = ? AND Prop.note_id IS NOT NULL
                 ORDER BY N.updated_at DESC
+                LIMIT ? OFFSET ?
             ");
-            $stmt->execute([$property_value]);
+            $stmt->execute([$property_value, $per_page, $offset]);
             $results = $stmt->fetchAll();
 
-            // Properties are already implicitly part of the main query's selection criteria.
-            // We might still want to fetch *all* properties for each note if the UI expects them.
-            // For now, let's simplify and assume the primary goal is finding the notes.
-            // If all properties are needed, the N+1 loop would still be here,
-            // but the initial filtering of notes is much faster.
-
-            // The old code fetched all properties for each note. Let's keep that for consistency,
-            // but the initial selection of notes is now much more efficient.
-            
             $noteIds = array_column($results, 'note_id');
             $propertiesByNoteId = [];
 
             if (!empty($noteIds)) {
-                // Decide on includeInternal for properties. For task search, usually all properties are relevant.
-                // If a specific include_internal GET param was available for task search, it would be used here.
-                // Defaulting to true for now to get all properties and let formatting handle if some are internal.
-                $includeInternalProperties = true; 
+                $includeInternalProperties = true;
                 $propertiesByNoteId = $dataManager->getPropertiesForNoteIds($noteIds, $includeInternalProperties);
             }
 
@@ -185,7 +238,16 @@ if ($method === 'GET') {
             }
             unset($result);
 
-            ApiResponse::success($results);
+            $total_pages = ceil($total / $per_page);
+            ApiResponse::success([
+                'results' => $results,
+                'pagination' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'per_page' => $per_page,
+                    'total_pages' => $total_pages
+                ]
+            ]);
 
         } else {
             ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, or tasks', 400);

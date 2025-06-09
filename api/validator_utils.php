@@ -29,6 +29,62 @@ if (!class_exists('Validator')) {
         return in_array($type, ['note', 'page']);
     }
 
+    public static function isValidPropertyNames($value) {
+        if ($value === '*') {
+            return true;
+        }
+        
+        if (is_array($value)) {
+            foreach ($value as $name) {
+                if (!is_string($name) || empty($name)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        if (is_string($value)) {
+            try {
+                $decoded = json_decode($value, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    return false;
+                }
+                return self::isValidPropertyNames($decoded);
+            } catch (Exception $e) {
+                return false;
+            }
+        }
+        
+        return false;
+    }
+
+    public static function isValidEventTypes($value) {
+        $validEventTypes = ['property_change', 'entity_created', 'entity_updated', 'entity_deleted'];
+        
+        if (is_array($value)) {
+            foreach ($value as $type) {
+                if (!is_string($type) || !in_array($type, $validEventTypes)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        if (is_string($value)) {
+            try {
+                $decoded = json_decode($value, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    return false;
+                }
+                return self::isValidEventTypes($decoded);
+            } catch (Exception $e) {
+                return false;
+            }
+        }
+        
+        return false;
+    }
+
     /**
      * Validates fields in a data array based on a rules array.
      *

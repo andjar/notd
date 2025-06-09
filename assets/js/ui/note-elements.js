@@ -390,6 +390,7 @@ async function handleNoteDrop(evt) {
     // Optimistically update UI (SortableJS already did this)
     // Prepare data for API call
     const updateData = {
+        page_id: window.currentPageId, // Add page_id to the update payload
         content: currentNoteData.content || '', // Ensure content is always present
         parent_note_id: newParentId,
         order_index: targetOrderIndex
@@ -469,15 +470,11 @@ async function handleNoteDrop(evt) {
             }
         }
         // Ideally, after reverting, also re-fetch and re-render notes for consistency
-        // This part requires access to `ui.displayNotes` which might not be directly available here
-        // if `ui` is the object being constructed. For now, we assume it might be available on window or passed.
         if (window.currentPageId && typeof window.ui !== 'undefined' && typeof window.ui.displayNotes === 'function') {
-            const notes = await window.notesAPI.getNotesForPage(window.currentPageId);
-            window.notesForCurrentPage = notes;
-            window.ui.displayNotes(notes, window.currentPageId); // Use window.ui as a fallback
+            const pageData = await window.notesAPI.getPageData(window.currentPageId);
+            window.notesForCurrentPage = pageData.notes;
+            window.ui.displayNotes(pageData.notes, window.currentPageId);
         } else if (window.currentPageId) {
-            // If ui.displayNotes is not available, a page reload might be the simplest way to restore consistency
-            // or implement a more direct re-render without full ui object dependency.
             console.warn("ui.displayNotes not available for error recovery. State may be inconsistent until next refresh.");
         }
     }

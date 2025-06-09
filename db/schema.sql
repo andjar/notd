@@ -115,7 +115,8 @@ CREATE TABLE IF NOT EXISTS Webhooks (
     url TEXT NOT NULL,
     secret TEXT NOT NULL,
     entity_type TEXT NOT NULL, -- 'note' or 'page'
-    property_name TEXT NOT NULL, -- The property that triggers the webhook
+    property_names TEXT NOT NULL, -- JSON array of property names or "*" for all properties
+    event_types TEXT NOT NULL DEFAULT '["property_change"]', -- JSON array of event types to trigger on
     active INTEGER NOT NULL DEFAULT 1,
     verified INTEGER NOT NULL DEFAULT 0,
     last_verified DATETIME,
@@ -123,7 +124,7 @@ CREATE TABLE IF NOT EXISTS Webhooks (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_webhooks_lookup ON Webhooks(entity_type, property_name, active);
+CREATE INDEX IF NOT EXISTS idx_webhooks_lookup ON Webhooks(entity_type, active);
 
 -- Webhook Events Log Table
 CREATE TABLE IF NOT EXISTS WebhookEvents (
