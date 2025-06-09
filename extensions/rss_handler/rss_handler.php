@@ -16,17 +16,8 @@ function log_message($level, $message) {
     fwrite(($level === 'ERROR' || $level === 'WARNING' ? STDERR : STDOUT), "[$timestamp] [$level] $message\n");
 }
 
-// --- SimplePie Autoloader (adjust path if not using Composer) ---
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-} elseif (file_exists(__DIR__ . '/SimplePie/autoloader.php')) { // Manual include path
-    require_once __DIR__ . '/SimplePie/autoloader.php';
-} else {
-    log_message('ERROR', 'SimplePie library not found. Please install it via Composer or place it in a SimplePie directory.');
-    exit(1);
-}
-
-use SimplePie\SimplePie;
+// --- SimplePie Direct Include ---
+require_once __DIR__ . '/SimplePie.php';
 
 // --- Helper Functions ---
 
