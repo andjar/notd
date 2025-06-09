@@ -1,9 +1,13 @@
 // Imports
-import { loadPage } from './page-loader.js';
+import { loadPage, getNextDayPageName, getPreviousDayPageName } from './page-loader.js';
+import { currentPageName } from './state.js';
 import { safeAddEventListener } from '../utils.js';
 // Assuming 'ui' is global and provides ui.domRefs. If not, it would need to be imported.
     // import { ui } from '../ui.js'; // If ui is a module, it needs to be imported like this.
                                   // Given the existing code uses `ui.domRefs`, it's assumed to be available.
+
+let gKeyPressed = false;
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 export function initGlobalEventListeners() {
     // Handle browser back/forward navigation
@@ -113,4 +117,64 @@ export function initGlobalEventListeners() {
     } else {
         console.warn('[event-handlers] Could not find ui.domRefs.backlinksContainer to attach backlink click listener. Backlinks might not work.');
     }
+
+    // Keyboard shortcuts for g+n and g+p
+    window.addEventListener('keydown', (event) => {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable);
+
+        console.log('[Keyboard Shortcuts] Key pressed:', event.key, 'gKeyPressed:', gKeyPressed, 'isInputFocused:', isInputFocused, 'currentPageName:', currentPageName);
+
+        if (event.key === 'g' && !event.repeat && !isInputFocused) {
+            gKeyPressed = true;
+            event.preventDefault();
+            console.log('[Keyboard Shortcuts] g key pressed, gKeyPressed set to true');
+        } else if (gKeyPressed && event.key === 'n') {
+            event.preventDefault();
+            if (isInputFocused) {
+                console.log('[Keyboard Shortcuts] g+n ignored because input is focused');
+                gKeyPressed = false;
+                return;
+            }
+            const pageName = currentPageName;
+            console.log('[Keyboard Shortcuts] g+n pressed, current page:', pageName, 'is valid date:', dateRegex.test(pageName));
+            if (pageName && dateRegex.test(pageName)) {
+                const nextPage = getNextDayPageName(pageName);
+                console.log('[Keyboard Shortcuts] Loading next page:', nextPage);
+                loadPage(nextPage);
+            } else {
+                console.warn('[Keyboard Shortcuts] Current page name is not a valid date for g+n shortcut:', pageName);
+            }
+            gKeyPressed = false;
+        } else if (gKeyPressed && event.key === 'p') {
+            event.preventDefault();
+            if (isInputFocused) {
+                console.log('[Keyboard Shortcuts] g+p ignored because input is focused');
+                gKeyPressed = false;
+                return;
+            }
+            const pageName = currentPageName;
+            console.log('[Keyboard Shortcuts] g+p pressed, current page:', pageName, 'is valid date:', dateRegex.test(pageName));
+            if (pageName && dateRegex.test(pageName)) {
+                const prevPage = getPreviousDayPageName(pageName);
+                console.log('[Keyboard Shortcuts] Loading previous page:', prevPage);
+                loadPage(prevPage);
+            } else {
+                console.warn('[Keyboard Shortcuts] Current page name is not a valid date for g+p shortcut:', pageName);
+            }
+            gKeyPressed = false;
+        } else if (gKeyPressed) {
+            console.log('[Keyboard Shortcuts] g was pressed but next key was not n or p, resetting gKeyPressed');
+            gKeyPressed = false;
+        }
+    });
+
+    window.addEventListener('keyup', (event) => {
+        if (event.key === 'g') {
+            // If 'g' is released, reset gKeyPressed.
+            // This handles cases where 'g' is pressed and released alone, or after a sequence
+            // (in which case gKeyPressed would already be false, setting it again is harmless).
+            gKeyPressed = false;
+        }
+    });
 }

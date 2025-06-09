@@ -41,6 +41,36 @@ function getTodaysJournalPageName() {
 }
 
 /**
+ * Gets the previous day's date in YYYY-MM-DD format
+ * @param {string} currentDateStr - Date string in YYYY-MM-DD format
+ * @returns {string} Date string for the previous day in YYYY-MM-DD format
+ */
+export function getPreviousDayPageName(currentDateStr) {
+    const [year, month, day] = currentDateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // Month is 0-indexed
+    date.setDate(date.getDate() - 1);
+    const prevYear = date.getFullYear();
+    const prevMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const prevDay = String(date.getDate()).padStart(2, '0');
+    return `${prevYear}-${prevMonth}-${prevDay}`;
+}
+
+/**
+ * Gets the next day's date in YYYY-MM-DD format
+ * @param {string} currentDateStr - Date string in YYYY-MM-DD format
+ * @returns {string} Date string for the next day in YYYY-MM-DD format
+ */
+export function getNextDayPageName(currentDateStr) {
+    const [year, month, day] = currentDateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // Month is 0-indexed
+    date.setDate(date.getDate() + 1);
+    const nextYear = date.getFullYear();
+    const nextMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const nextDay = String(date.getDate()).padStart(2, '0');
+    return `${nextYear}-${nextMonth}-${nextDay}`;
+}
+
+/**
  * Gets the initial page name to load
  * @returns {string} The name of the initial page (today's journal page by default)
  */
