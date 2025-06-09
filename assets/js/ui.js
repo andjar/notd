@@ -28,7 +28,8 @@ import {
     getRawTextWithNewlines,
     normalizeNewlines,
     renderAttachments,
-    renderProperties
+    renderProperties,
+    initializeDelegatedNoteEventListeners
 } from './ui/note-renderer.js';
 
 // Functions that will remain in ui.js or be moved to other specific UI modules (e.g., modals, page-specific UI)
@@ -289,6 +290,12 @@ const calendarWidget = {
 
 document.addEventListener('DOMContentLoaded', () => {
     calendarWidget.init();
+    updateSidebarToggleButtons(); // Already here, good.
+    if (domRefs.notesContainer) {
+        initializeDelegatedNoteEventListeners(domRefs.notesContainer);
+    } else {
+        console.error("Failed to initialize delegated note event listeners: notesContainer not found.");
+    }
 });
 
 
@@ -553,9 +560,6 @@ function updateSidebarToggleButtons() {
     if (rightToggle) { rightToggle.textContent = isRightCollapsed ? '☰' : '✕'; rightToggle.title = isRightCollapsed ? 'Show right sidebar' : 'Hide right sidebar'; }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    updateSidebarToggleButtons();
-});
 
 /**
  * Focuses on a specific note by hiding all other notes at the same level and above
@@ -1316,7 +1320,8 @@ export const ui = {
     handleNoteTemplateInsertion,
     showPageTemplateMenu,
     addTemplateButtonToPageProperties,
-    templateAutocomplete
+    templateAutocomplete,
+    // initializeDelegatedNoteEventListeners // It's used internally in this file now, not re-exported typically
 };
 
 // Make ui available globally for backward compatibility

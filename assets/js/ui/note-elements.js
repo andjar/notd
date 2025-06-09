@@ -6,9 +6,10 @@
 
 import { domRefs } from './dom-refs.js';
 // Assuming note-renderer.js will export renderNote, parseAndRenderContent, and renderAttachments
-import { renderNote, parseAndRenderContent, renderAttachments } from './note-renderer.js'; 
+import { renderNote, parseAndRenderContent, renderAttachments } from './note-renderer.js';
 // Assuming note-interactions.js will export updateParentVisuals and handleNoteDrop
 // import { updateParentVisuals } from './note-interactions.js';  // Remove this import as the function is in ui.js
+import { calculateOrderIndex } from '../../app/order-index-service.js'; // Added import
 
 // Globals assumed to be available: Sortable, feather, window.notesAPI, window.notesForCurrentPage, window.currentPageId, ui (for ui.displayNotes in handleNoteDrop error case)
 
@@ -324,8 +325,8 @@ async function handleNoteDrop(evt) {
 
     const newContainer = evt.to;
     const oldContainer = evt.from;
-    const newIndex = evt.newIndex;
-    const oldIndex = evt.oldIndex;
+    const newSortableIndex = evt.newDraggableIndex !== undefined ? evt.newDraggableIndex : evt.newIndex;
+    const oldSortableIndex = evt.oldDraggableIndex !== undefined ? evt.oldDraggableIndex : evt.oldIndex;
 
     // Get the current note data to preserve content
     const currentNoteData = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
@@ -358,93 +359,121 @@ async function handleNoteDrop(evt) {
         }
     }
 
-    // Calculate the correct order index based on its new siblings in the data model
-    let targetOrderIndex = 0;
-    const siblingsInNewParent = window.notesForCurrentPage.filter(note =>
-        (note.parent_note_id ? String(note.parent_note_id) : null) === (newParentId ? String(newParentId) : null) &&
-        String(note.id) !== String(noteId) // Exclude the note being moved
-    ).sort((a, b) => a.order_index - b.order_index);
+    // Determine logical previous and next siblings based on the drop position.
+    // newSortableIndex is the DOM index in the new list provided by SortableJS.
+    // We need to map this to the data-model (`order_index` sorted) list of siblings.
 
-    if (siblingsInNewParent.length === 0) {
-        targetOrderIndex = 0;
-    } else if (newIndex >= siblingsInNewParent.length) {
-        // If dropped at the end, use the highest order_index + 1
-        targetOrderIndex = Math.max(...siblingsInNewParent.map(n => n.order_index)) + 1;
+    const siblingsInNewParentContext = window.notesForCurrentPage
+        .filter(note => 
+            (note.parent_note_id ? String(note.parent_note_id) : null) === (newParentId ? String(newParentId) : null) && // Same parent
+            String(note.id) !== String(noteId) // Exclude the note being moved itself
+        )
+        .sort((a, b) => a.order_index - b.order_index);
+
+    let previousSiblingId = null;
+    let nextSiblingId = null;
+
+    if (siblingsInNewParentContext.length === 0) {
+        // No other siblings in the new parent context.
+        previousSiblingId = null;
+        nextSiblingId = null;
+    } else if (newSortableIndex === 0) {
+        // Dropped at the very beginning of the list (of siblings).
+        previousSiblingId = null;
+        nextSiblingId = String(siblingsInNewParentContext[0].id);
+    } else if (newSortableIndex >= siblingsInNewParentContext.length) {
+        // Dropped at the very end of the list (of siblings).
+        previousSiblingId = String(siblingsInNewParentContext[siblingsInNewParentContext.length - 1].id);
+        nextSiblingId = null;
     } else {
-        // If dropped between items, calculate the average of surrounding order indices
-        const prevSibling = siblingsInNewParent[newIndex - 1];
-        const nextSibling = siblingsInNewParent[newIndex];
-        
-        if (!prevSibling) {
-            // Dropped at the beginning
-            targetOrderIndex = nextSibling.order_index - 1;
-        } else if (!nextSibling) {
-            // Dropped at the end
-            targetOrderIndex = prevSibling.order_index + 1;
-        } else {
-            // Dropped between two items
-            targetOrderIndex = Math.floor((prevSibling.order_index + nextSibling.order_index) / 2);
-        }
+        // Dropped between two existing siblings.
+        previousSiblingId = String(siblingsInNewParentContext[newSortableIndex - 1].id);
+        nextSiblingId = String(siblingsInNewParentContext[newSortableIndex].id);
     }
     
-    // Optimistically update UI (SortableJS already did this)
-    // Prepare data for API call
+    const targetOrderIndex = calculateOrderIndex(
+        window.notesForCurrentPage, // Full notes array for lookups by the service
+        newParentId,
+        previousSiblingId,
+        nextSiblingId
+    );
+    
+    console.log(`[HANDLE_NOTE_DROP] For Note ID: ${noteId}, New Parent ID: ${newParentId}, Prev Sib ID: ${previousSiblingId}, Next Sib ID: ${nextSiblingId}, DOM newIndex: ${newSortableIndex}, Calculated Target OrderIndex: ${targetOrderIndex}`);
+    
     const updateData = {
-        page_id: window.currentPageId, // Add page_id to the update payload
-        content: currentNoteData.content || '', // Ensure content is always present
+        page_id: window.currentPageId,
+        content: currentNoteData.content || '', 
         parent_note_id: newParentId,
         order_index: targetOrderIndex
     };
 
-    console.log('Attempting to update note position:', { noteId, ...updateData });
+    console.log('Attempting to update note position (using calculateOrderIndex):', { noteId, ...updateData });
 
     try {
         const updatedNote = await window.notesAPI.updateNote(noteId, updateData);
         console.log('Note position updated successfully on server:', updatedNote);
 
-        // Update local data cache accurately
-        currentNoteData.parent_note_id = updatedNote.parent_note_id;
-        currentNoteData.order_index = updatedNote.order_index;
-        currentNoteData.updated_at = updatedNote.updated_at; // Sync timestamp
-
-        // Potentially re-fetch all notes for the page to ensure perfect order and hierarchy
-        // This is a trade-off: ensures consistency but can be a bit slower.
-        // For now, we'll rely on the optimistic update and correct data sync.
-        // If inconsistencies appear, re-enable full refresh:
-        if (window.currentPageId && !window.isDragInProgress) {
-            // Optimistic UI update is done by SortableJS.
-            // Local data (notesForCurrentPage) should be updated with canonical data from server.
-            const noteIndex = window.notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
-            if (noteIndex > -1) {
-                // Preserve local children, update other fields from server response
-                const localChildren = window.notesForCurrentPage[noteIndex].children;
-                window.notesForCurrentPage[noteIndex] = {...updatedNote, children: localChildren};
-            } else {
-                // Note was not found, this case should ideally not happen if currentNoteData was found earlier
-                window.notesForCurrentPage.push(updatedNote);
-            }
-            window.notesForCurrentPage.sort((a,b) => a.order_index - b.order_index); // Ensure order
-
-            // Update the specific element if its content/properties might have changed server-side
-            // (unlikely for a pure move, but good for robustness)
-            updateNoteElement(updatedNote.id, updatedNote);
-
-            // Update visuals of old and new parent (if not already handled by moveNoteElement logic)
-            // This needs to be done carefully. Sortable has moved the item.
-            // We need to find the old parent from originalNoteData and new parent from updatedNote.
-            // For now, this is simplified; ui.moveNoteElement handles this if used directly.
-            // If not using ui.moveNoteElement, explicit calls to updateParentVisuals for old/new parents are needed.
-            const oldParentEl = evt.from.closest('.note-item');
-            const newParentEl = evt.to.closest('.note-item');
-            if(oldParentEl) ui.updateParentVisuals(oldParentEl);
-            if(newParentEl && newParentEl !== oldParentEl) ui.updateParentVisuals(newParentEl);
-
-
-        } else if (window.isDragInProgress) {
-             // If another drag started, a full refresh might be safer once all operations settle.
-             // For now, we rely on the server providing consistent data for the next full load.
-            console.log("Drag in progress, skipping targeted UI update for note drop, full refresh might occur later.");
+        // Update local data cache accurately WITH THE SERVER'S RESPONSE
+        const noteIndexInCache = window.notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
+        if (noteIndexInCache > -1) {
+            // Preserve local children if any, update fields from server response
+            // Note: updatedNote from server typically won't have 'children' array.
+            // We merge server data into the existing local cache item.
+            window.notesForCurrentPage[noteIndexInCache] = { 
+                ...window.notesForCurrentPage[noteIndexInCache], // Keep existing local fields like 'children'
+                ...updatedNote // Overwrite with server data (id, content, parent_note_id, order_index, etc.)
+            };
+        } else {
+            // This case should ideally not happen if currentNoteData was found earlier.
+            window.notesForCurrentPage.push(updatedNote); // Add if somehow missing
+            console.warn(`[HANDLE_NOTE_DROP] Note with ID ${updatedNote.id} was not in notesForCurrentPage cache but was updated on server. Added to cache.`);
         }
+        
+        // Ensure the entire notesForCurrentPage is sorted by the now definitive server-side order_index
+        window.notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
+
+        // DOM is already updated by SortableJS.
+        // Update nesting level visual property for the moved item.
+        const movedNoteElement = evt.item;
+        const newParentNoteElement = newContainer.closest('.note-item');
+        const newNestingLevel = newParentId ? ui.getNestingLevel(newParentNoteElement) + 1 : 0;
+        movedNoteElement.style.setProperty('--nesting-level', newNestingLevel);
+        
+        // Update parent visuals for old and new parents.
+        const oldParentEl = oldContainer.closest('.note-item'); // evt.from is oldContainer
+        const newParentEl = newContainer.closest('.note-item'); // evt.to is newContainer
+
+        if (oldParentEl) {
+            ui.updateParentVisuals(oldParentEl);
+            // If old parent's children container is now empty, remove it.
+            if (oldContainer.classList.contains('note-children') && oldContainer.children.length === 0) {
+                oldContainer.remove();
+                oldParentEl.classList.remove('has-children'); // Update visual indicator
+            }
+        }
+        // Update new parent, only if it's different from old parent, or if it's a root container
+        if (newParentEl && newParentEl !== oldParentEl) {
+            ui.updateParentVisuals(newParentEl);
+        } else if (!newParentEl && newContainer === domRefs.notesContainer) {
+            // Dropped into root, no specific parent item to update, but ensure old parent (if any) is updated.
+            // This is covered if oldParentEl exists.
+        }
+        
+        // If the note was moved to the root, and the original container was a children container that is now empty
+        if (!newParentId && oldContainer.classList.contains('note-children') && oldContainer.children.length === 0) {
+            // This check is redundant if oldParentEl logic above is comprehensive.
+            // However, ensuring the direct parent of oldContainer is updated if it exists.
+            const parentOfOldContainer = oldContainer.parentElement?.closest('.note-item');
+            if (parentOfOldContainer) {
+                 ui.updateParentVisuals(parentOfOldContainer);
+                 if (oldContainer.children.length === 0) { // Double check
+                    oldContainer.remove();
+                    parentOfOldContainer.classList.remove('has-children');
+                 }
+            }
+        }
+        
+        console.log(`[HANDLE_NOTE_DROP] Successfully updated note ${updatedNote.id}. New parent: ${updatedNote.parent_note_id}, New order: ${updatedNote.order_index}`);
 
 
     } catch (error) {
@@ -460,13 +489,16 @@ async function handleNoteDrop(evt) {
         // Revert the DOM change by moving the item back
         // This is tricky because Sortable already moved it. We might need to re-render from original data.
         // For now, a simple revert based on old indices:
+        // Revert based on oldSortableIndex
         if (oldContainer !== newContainer) {
-            oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
+            oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]);
         } else {
-            if (oldIndex < newIndex) {
-                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex]);
-            } else {
-                oldContainer.insertBefore(evt.item, oldContainer.children[oldIndex + 1]);
+            // If same container, newSortableIndex might be off by 1 after item removal for revert.
+            // This logic attempts to place it back correctly.
+            if (oldSortableIndex < newSortableIndex) { // Item was moved down
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex]);
+            } else { // Item was moved up
+                oldContainer.insertBefore(evt.item, oldContainer.children[oldSortableIndex + 1]);
             }
         }
         // Ideally, after reverting, also re-fetch and re-render notes for consistency

@@ -106,41 +106,51 @@ export function getNoteElementById(noteId) {
 
 
 // --- Note Saving Logic ---
-export async function saveNoteImmediately(noteEl) {
-    const noteId = noteEl.dataset.noteId;
-    // if (noteId.startsWith('temp-')) {
-    //     console.warn('Attempted to save temporary note immediately.');
-    //     return; 
+
+/**
+ * Core function to handle saving a note's content and properties to the server.
+ * @param {string} noteId - The ID of the note to save.
+ * @param {string} rawContent - The raw string content of the note.
+ * @param {boolean} [isImmediateSave=false] - Flag to indicate if this is an immediate save.
+ * @returns {Promise<Object|null>} The updated note object from the server, or null if save failed.
+ */
+async function _saveNoteToServer(noteId, rawContent, isImmediateSave = false) {
+    const saveType = isImmediateSave ? "IMMEDIATE" : "DEBOUNCED";
+    
+    // It's possible noteId might still be temporary (e.g. 'new-xxx') if this is the very first save
+    // for a note created by handleEnterKey or handleAddRootNote, if the initial input handler
+    // that calls saveNoteImmediately hasn't yet received a permanent ID from the server.
+    // However, notesAPI.updateNote should ideally handle creating the note if ID is 'new-xxx'
+    // or the server should return an error if it can't find/create.
+    // For now, we assume the noteId will be resolvable by the server or is a permanent ID.
+    // if (noteId.startsWith('temp-') || noteId.startsWith('new-')) {
+    //     console.warn(`[_saveNoteToServer ${saveType}] Attempted to save temporary/new note: ${noteId}. This should ideally be handled by createNote first.`);
+    //     // Depending on backend, this might need to be a createNote call or special handling.
+    //     // For now, proceeding with updateNote, assuming backend might handle 'new-xxx' as create.
     // }
 
-    const contentDiv = noteEl.querySelector('.note-content');
-    const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
-    const rawContent = window.ui.normalizeNewlines(rawTextValue);
-    
-    window.ui.updateSaveStatusIndicator('pending'); 
-    console.log('[DEBUG IMMEDIATE SAVE] Attempting to save noteId:', noteId);
-    console.log('[DEBUG IMMEDIATE SAVE] Raw content for noteId ' + noteId + ':', JSON.stringify(rawContent));
+    window.ui.updateSaveStatusIndicator('pending');
+    console.log(`[_saveNoteToServer ${saveType}] Attempting to save noteId: ${noteId}`);
+    console.log(`[_saveNoteToServer ${saveType}] Raw content for noteId ${noteId}:`, JSON.stringify(rawContent));
 
     try {
-        let contentToSave = rawContent;
         const explicitProperties = parsePropertiesFromText(rawContent);
+        let contentToSave = rawContent;
 
         if (window.currentPageEncryptionKey && window.decryptionPassword) {
             try {
                 contentToSave = sjcl.encrypt(window.decryptionPassword, rawContent);
-                // console.log('Encrypting (immediate): Original rawContent:', rawContent);
-                // console.log('Encrypting (immediate): Encrypted contentToSave:', contentToSave);
                 if (!explicitProperties['encrypted']) {
                     explicitProperties['encrypted'] = [];
                 }
-                explicitProperties['encrypted'].push('true'); 
+                explicitProperties['encrypted'].push('true');
+                console.log(`[_saveNoteToServer ${saveType}] Encrypted content for noteId: ${noteId}`);
             } catch (e) {
-                console.error('Encryption failed (immediate):', e);
+                console.error(`_saveNoteToServer (${saveType}): Encryption failed for noteId ${noteId}. Error:`, e);
                 window.ui.updateSaveStatusIndicator('error');
-                alert('Critical error: Encryption failed. Note not saved. Please try again or contact support.');
-                return; // Do not proceed with saving if encryption fails
+                alert('Critical Error: Encryption failed. Note was not saved. Please verify your password or contact support if the issue persists.');
+                return null;
             }
-            // Removed old propertiesAPI.setProperty call for 'encrypted'
         }
         
         const updatePayload = { 
@@ -150,76 +160,88 @@ export async function saveNoteImmediately(noteEl) {
         };
         
         const updatedNote = await notesAPI.updateNote(noteId, updatePayload);
-        console.log('[DEBUG IMMEDIATE SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content), 'Properties:', updatedNote.properties);
-        updateNoteInCurrentPage(updatedNote);
+        console.log(`_saveNoteToServer (${saveType}): Received updatedNote from server for noteId ${updatedNote.id}.`);
         
-        window.ui.updateNoteElement(updatedNote.id, updatedNote);
-        window.ui.updateSaveStatusIndicator('saved');
-    } catch (error) {
-        console.error('Error updating note (immediately):', error);
-        window.ui.updateSaveStatusIndicator('error');
-    }
-}
-
-export const debouncedSaveNote = debounce(async (noteEl) => { // Assumes debounce is imported/available
-    const noteId = noteEl.dataset.noteId;
-    // if (noteId.startsWith('temp-')) return;
-
-    const contentDiv = noteEl.querySelector('.note-content');
-    const rawContentFromDataset = contentDiv.dataset.rawContent; 
-    
-    const noteData = getNoteDataById(noteId);
-    // If rawContentFromDataset is undefined or null, provide a default empty string.
-    const currentRawContent = rawContentFromDataset !== undefined && rawContentFromDataset !== null ? rawContentFromDataset : '';
-
-    // If note content hasn't changed and it's not a newly created note (which might just be getting its initial save), skip.
-    if (noteData && noteData.content === currentRawContent && !noteId.startsWith('new-')) {
-        // console.log('[DEBUG SAVE] Content unchanged for noteId:', noteId, '. Skipping save.');
-        return;
-    }
-
-    window.ui.updateSaveStatusIndicator('pending');
-    console.log('[DEBUG SAVE] Attempting to save noteId:', noteId);
-    console.log('[DEBUG SAVE] Raw content for noteId ' + noteId + ':', JSON.stringify(currentRawContent));
-    
-    try {
-        let finalContentToSave = currentRawContent;
-        const explicitProperties = parsePropertiesFromText(currentRawContent);
-
-        if (window.currentPageEncryptionKey && window.decryptionPassword) {
-            try {
-                finalContentToSave = sjcl.encrypt(window.decryptionPassword, currentRawContent); // Encrypt the original currentRawContent
-                // console.log('Encrypting (debounced): Original currentRawContent:', currentRawContent);
-                // console.log('Encrypting (debounced): Encrypted finalContentToSave:', finalContentToSave);
-                if (!explicitProperties['encrypted']) {
-                    explicitProperties['encrypted'] = [];
-                }
-                explicitProperties['encrypted'].push('true');
-            } catch (e) {
-                console.error('Encryption failed (debounced):', e);
-                window.ui.updateSaveStatusIndicator('error');
-                alert('Critical error: Encryption failed. Note not saved. Please try again or contact support.');
-                return; 
+        if (noteId !== updatedNote.id) {
+            console.log(`_saveNoteToServer (${saveType}): Note ID changed from ${noteId} to ${updatedNote.id}. Updating state and DOM.`);
+            const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(noteId));
+            if (noteIndex > -1) {
+                notesForCurrentPage[noteIndex].id = updatedNote.id;
+            }
+            const noteEl = getNoteElementById(noteId); 
+            if (noteEl) {
+                noteEl.dataset.noteId = updatedNote.id;
+                const contentDiv = noteEl.querySelector('.note-content');
+                if (contentDiv) contentDiv.dataset.noteId = updatedNote.id;
+                const bulletEl = noteEl.querySelector('.note-bullet');
+                if (bulletEl) bulletEl.dataset.noteId = updatedNote.id;
             }
         }
         
-        const updatePayload = {
-            page_id: currentPageId, // Add the page_id to the update payload
-            content: finalContentToSave,
-            properties_explicit: explicitProperties
-        };
-        
-        const updatedNote = await notesAPI.updateNote(noteId, updatePayload);
-        console.log('[DEBUG SAVE] Received updatedNote from server for noteId ' + noteId + '. Content:', JSON.stringify(updatedNote.content), 'Properties:', updatedNote.properties);
-        updateNoteInCurrentPage(updatedNote);
-        
-        window.ui.updateNoteElement(updatedNote.id, updatedNote); // Assumes ui is global
+        updateNoteInCurrentPage(updatedNote); 
+        window.ui.updateNoteElement(updatedNote.id, updatedNote); 
         window.ui.updateSaveStatusIndicator('saved');
+        return updatedNote;
+
     } catch (error) {
-        console.error('Error updating note (debounced):', error);
+        const errorMessage = error.message || 'An unknown error occurred.';
+        console.error(`_saveNoteToServer (${saveType}): Error updating note ${noteId}. Error:`, error);
         window.ui.updateSaveStatusIndicator('error');
+        if (error.response && error.response.data) {
+            console.error(`_saveNoteToServer (${saveType}): Server error details for note ${noteId}:`, error.response.data);
+        }
+        // No alert here as save status indicator is primary UI feedback for general save errors.
+        // Critical encryption error is alerted above.
+        return null;
     }
-    // finally block removed as updateSaveStatusIndicator is called in try/catch
+}
+
+
+export async function saveNoteImmediately(noteEl) {
+    const noteId = noteEl.dataset.noteId;
+    // It's possible that noteId here is still a temporary 'new-XYZ' if this is the very first save.
+    // _saveNoteToServer and the backend should handle this scenario (e.g. by creating if ID is 'new-XYZ').
+
+    const contentDiv = noteEl.querySelector('.note-content');
+    // For immediate save, always get the freshest content from the DOM
+    const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
+    const rawContent = window.ui.normalizeNewlines(rawTextValue);
+    
+    // Update dataset.rawContent before saving, so it's consistent if debouncedSave follows.
+    contentDiv.dataset.rawContent = rawContent;
+
+    return await _saveNoteToServer(noteId, rawContent, true);
+}
+
+export const debouncedSaveNote = debounce(async (noteEl) => {
+    const noteId = noteEl.dataset.noteId;
+    const contentDiv = noteEl.querySelector('.note-content');
+    
+    // For debounced save, rely on dataset.rawContent which should be updated on input/blur
+    const currentRawContent = contentDiv.dataset.rawContent !== undefined && contentDiv.dataset.rawContent !== null 
+        ? contentDiv.dataset.rawContent 
+        : '';
+
+    const noteData = getNoteDataById(noteId);
+
+    // If note content hasn't changed and it's not a newly created note (which might just be getting its initial save), skip.
+    // 'new-' prefix is used for notes that haven't been saved to the server yet.
+    // `noteData.content` here is the last known *saved* content from the server.
+    if (noteData && noteData.content === currentRawContent && !String(noteId).startsWith('new-')) {
+        // console.log('[DEBOUNCED SAVE] Content unchanged for noteId:', noteId, '. Skipping save.');
+        // Ensure status is 'saved' if no changes
+        const currentSaveStatus = window.ui.saveStatus; // Assuming saveStatus is exposed or use a getter
+        if (currentSaveStatus !== 'saved') {
+            window.ui.updateSaveStatusIndicator('saved');
+        }
+        return;
+    }
+    
+    // If noteId still starts with 'new-', it implies this is its first proper save attempt after creation.
+    // The content of a 'new-' note in noteData might be empty initially.
+    // The check above handles subsequent saves after the first successful one.
+
+    await _saveNoteToServer(noteId, currentRawContent, false);
 }, 1000);
 
 
@@ -232,21 +254,29 @@ export async function handleAddRootNote() {
     }
 
     try {
-        const rootNotes = notesForCurrentPage.filter(n => n.parent_note_id === null || typeof n.parent_note_id === 'undefined');
-        let newRootOrderIndex = 0;
-        if (rootNotes.length > 0) {
-            const maxRootOrderIndex = Math.max(...rootNotes.map(s => Number(s.order_index) || 0));
-            newRootOrderIndex = maxRootOrderIndex + 1;
-        }
+        const rootNotes = notesForCurrentPage
+            .filter(n => n.parent_note_id === null || typeof n.parent_note_id === 'undefined')
+            .sort((a, b) => a.order_index - b.order_index);
+        
+        const previousSiblingId = rootNotes.length > 0 ? String(rootNotes[rootNotes.length - 1].id) : null;
+        const nextSiblingId = null; // New root notes are added at the end.
+        const parentId = null;
+
+        const newRootOrderIndex = calculateOrderIndex(
+            notesForCurrentPage,
+            parentId,
+            previousSiblingId,
+            nextSiblingId
+        );
 
         const newNotePayload = {
             page_id: pageIdToUse,
             content: '',
-            parent_note_id: null,
-            order_index: newRootOrderIndex // Send calculated order_index
+            parent_note_id: parentId,
+            order_index: newRootOrderIndex
         };
         
-        console.log(`[NOTE CREATION] Sending to server for new note: page_id=${newNotePayload.page_id}, parent_id=${newNotePayload.parent_note_id}, client_calculated_order_index=${newNotePayload.order_index}`);
+        console.log(`[NOTE CREATION] Adding root note. PrevSiblingId: ${previousSiblingId}, NextSiblingId: ${nextSiblingId}. Calculated newOrderIndex: ${newRootOrderIndex}`);
 
         const savedNote = await notesAPI.createNote(newNotePayload);
 
@@ -272,8 +302,9 @@ export async function handleAddRootNote() {
             }
         }
     } catch (error) {
-        console.error('Error creating root note:', error);
-        alert('Failed to save new note. Please try again.');
+        const errorMessage = error.message || 'Please check connection and try again.';
+        console.error('handleAddRootNote: Error creating root note. Error:', error);
+        alert(`Failed to create new root note. ${errorMessage}`);
     }
 }
 
@@ -379,9 +410,14 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     const pageIdToUse = currentPageId;
     if (!pageIdToUse) { console.error("Cannot create new note with Enter: currentPageId from state is missing."); return; }
 
-    // Calculate order_index for the new note
     const parentIdForNewNote = noteData.parent_note_id;
-    const siblings = notesForCurrentPage.filter(n => {
+
+    // Determine previous and next sibling IDs for the new note
+    const previousSiblingId = String(noteData.id); // The new note is created after the current note
+    
+    // Find the next sibling of the current note in the data model
+    // (not just in the DOM, to ensure logical ordering)
+    const siblingsOfCurrentNote = notesForCurrentPage.filter(n => {
         const nParentId = n.parent_note_id;
         if (parentIdForNewNote === null || typeof parentIdForNewNote === 'undefined') {
             return nParentId === null || typeof nParentId === 'undefined';
@@ -389,31 +425,27 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
         return String(nParentId) === String(parentIdForNewNote);
     }).sort((a, b) => a.order_index - b.order_index);
 
-    // Find the current note's index in the siblings array
-    const currentNoteIndex = siblings.findIndex(n => String(n.id) === String(noteData.id));
-    if (currentNoteIndex === -1) {
-        console.error("Current note not found in siblings array");
-        return;
+    const currentNoteDataIndexInSiblings = siblingsOfCurrentNote.findIndex(n => String(n.id) === String(noteData.id));
+    let nextSiblingId = null;
+    if (currentNoteDataIndexInSiblings !== -1 && currentNoteDataIndexInSiblings < siblingsOfCurrentNote.length - 1) {
+        nextSiblingId = String(siblingsOfCurrentNote[currentNoteDataIndexInSiblings + 1].id);
     }
 
-    // Calculate new order_index based on the current note's position
-    let newOrderIndex;
-    if (currentNoteIndex === siblings.length - 1) {
-        // If this is the last note, add after it
-        newOrderIndex = noteData.order_index + 1;
-    } else {
-        // If there are notes after this one, insert between current and next
-        const nextNote = siblings[currentNoteIndex + 1];
-        newOrderIndex = (noteData.order_index + nextNote.order_index) / 2;
-    }
+    // Use the new service to calculate order_index
+    const newOrderIndex = calculateOrderIndex(
+        notesForCurrentPage,
+        parentIdForNewNote,
+        previousSiblingId,
+        nextSiblingId
+    );
 
-    console.log(`[NOTE CREATION] Sending to server for new note: page_id=${pageIdToUse}, parent_id=${parentIdForNewNote}, client_calculated_order_index=${newOrderIndex}`);
+    console.log(`[NOTE CREATION] Using calculateOrderIndex. ParentId: ${parentIdForNewNote}, PrevSiblingId: ${previousSiblingId}, NextSiblingId: ${nextSiblingId}. Calculated newOrderIndex: ${newOrderIndex}`);
 
     const newNotePayload = {
         page_id: pageIdToUse,
         content: '',
         parent_note_id: parentIdForNewNote,
-        order_index: newOrderIndex
+        order_index: newOrderIndex // Use the order_index from the service
     };
 
     try {
@@ -491,8 +523,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
             }
         }
     } catch (error) {
-        console.error('Error creating note on Enter:', error);
-        alert('Failed to save new note. Please try again.');
+        const errorMessage = error.message || 'Please check connection and try again.';
+        console.error('handleEnterKey: Error creating note. Error:', error);
+        alert(`Failed to create new note. ${errorMessage}`);
     }
 }
 
@@ -510,106 +543,148 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
     const originalNextSibling = noteItem.nextElementSibling;
     const originalNestingLevel = window.ui.getNestingLevel(noteItem);
 
-    let newParentNoteIdToSet = null;
-    let newOrderIndex = noteData.order_index;
+    let newParentIdForAPI = null;
+    let newOrderIndexForAPI;
 
     if (e.shiftKey) { // Outdent
-        if (!noteData.parent_note_id) return;
-        const parentNoteData = getNoteDataById(noteData.parent_note_id);
-        if (!parentNoteData) return;
-        newParentNoteIdToSet = parentNoteData.parent_note_id;
-        const oldParentId = noteData.parent_note_id;
-        
-        // Update local data structure first
-        noteData.parent_note_id = newParentNoteIdToSet;
-        newOrderIndex = parentNoteData.order_index + 1;
-        noteData.order_index = newOrderIndex;
-        updateNoteInCurrentPage(noteData);
+        if (!noteData.parent_note_id) return; // Already a root note
+        const oldParentNoteData = getNoteDataById(noteData.parent_note_id);
+        if (!oldParentNoteData) { console.error("Outdent: Old parent note data not found for ID:", noteData.parent_note_id); return; }
 
-        // Update DOM
-        const newParentDomElement = newParentNoteIdToSet ? getNoteElementById(newParentNoteIdToSet) : notesContainer;
-        if (!newParentDomElement && newParentNoteIdToSet) { console.error("Could not find new parent in DOM for outdent"); return; }
-        const newNestingLevel = newParentNoteIdToSet ? window.ui.getNestingLevel(newParentDomElement) + 1 : 0;
-        window.ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, parentNoteData ? getNoteElementById(parentNoteData.id)?.nextElementSibling : null);
+        newParentIdForAPI = oldParentNoteData.parent_note_id; // This could be null if outdenting to root
+
+        // The note being moved will be placed AFTER its original parent.
+        const previousSiblingId = String(oldParentNoteData.id);
+
+        // Find the next sibling of the oldParentNoteData
+        const siblingsOfOldParent = notesForCurrentPage.filter(n => {
+            const nParentId = n.parent_note_id;
+            if (newParentIdForAPI === null || typeof newParentIdForAPI === 'undefined') {
+                return nParentId === null || typeof nParentId === 'undefined';
+            }
+            return String(nParentId) === String(newParentIdForAPI);
+        }).sort((a, b) => a.order_index - b.order_index);
+        
+        const oldParentIndexInSiblings = siblingsOfOldParent.findIndex(n => String(n.id) === String(oldParentNoteData.id));
+        let nextSiblingId = null;
+        if (oldParentIndexInSiblings !== -1 && oldParentIndexInSiblings < siblingsOfOldParent.length - 1) {
+            nextSiblingId = String(siblingsOfOldParent[oldParentIndexInSiblings + 1].id);
+        }
+        
+        newOrderIndexForAPI = calculateOrderIndex(notesForCurrentPage, newParentIdForAPI, previousSiblingId, nextSiblingId);
+        console.log(`[TAB-KEY OUTDENT] PrevSib: ${previousSiblingId}, NextSib: ${nextSiblingId}, NewParent: ${newParentIdForAPI}, NewOrder: ${newOrderIndexForAPI}`);
+
+        // DOM Update (Optimistic)
+        noteData.parent_note_id = newParentIdForAPI;
+        noteData.order_index = newOrderIndexForAPI;
+        updateNoteInCurrentPage(noteData); // Update local state before DOM manipulation
+
+        const newParentDomElement = newParentIdForAPI ? getNoteElementById(newParentIdForAPI) : notesContainer;
+        if (!newParentDomElement && newParentIdForAPI) { console.error("Could not find new parent in DOM for outdent"); return; }
+        const newNestingLevel = newParentIdForAPI ? window.ui.getNestingLevel(newParentDomElement) + 1 : 0;
+        // Determine the DOM element to insert before (the original parent's next sibling)
+        const domInsertBefore = oldParentNoteData ? getNoteElementById(oldParentNoteData.id)?.nextElementSibling : null;
+        window.ui.moveNoteElement(noteItem, newParentDomElement || notesContainer, newNestingLevel, domInsertBefore);
+
     } else { // Indent
-        let newParentNoteData;
-        if (noteData.parent_note_id === null || typeof noteData.parent_note_id === 'undefined') {
-            // Handle indenting a root note
-            const rootNotes = notesForCurrentPage.filter(n => n.parent_note_id === null || typeof n.parent_note_id === 'undefined').sort((a, b) => a.order_index - b.order_index);
-            const currentIndex = rootNotes.findIndex(n => String(n.id) === String(noteData.id));
-            if (currentIndex === 0) return; // Cannot indent the first root note
-            if (currentIndex === -1) { console.error("Current root note not found for indent"); return; }
-            newParentNoteData = rootNotes[currentIndex - 1];
-        } else {
-            // Handle indenting a non-root note (existing logic)
-            const siblings = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteData.parent_note_id) && n.order_index < noteData.order_index).sort((a, b) => b.order_index - a.order_index);
-            if (siblings.length === 0) return;
-            newParentNoteData = siblings[0];
-        }
+        let potentialNewParentNoteData;
+        // Determine the note to indent under (its previous sibling at the same level)
+        const currentLevelSiblings = notesForCurrentPage.filter(n => {
+            const currentNoteParentId = noteData.parent_note_id;
+            const nParentId = n.parent_note_id;
+            if (currentNoteParentId === null || typeof currentNoteParentId === 'undefined') {
+                return nParentId === null || typeof nParentId === 'undefined';
+            }
+            return String(nParentId) === String(currentNoteParentId);
+        }).sort((a, b) => a.order_index - b.order_index);
 
-        if (!newParentNoteData) { console.error("Could not determine new parent for indent"); return; }
-        newParentNoteIdToSet = newParentNoteData.id;
-
-        // Update local data structure first
-        noteData.parent_note_id = newParentNoteIdToSet;
+        const currentNoteIndexInLevel = currentLevelSiblings.findIndex(n => String(n.id) === String(noteData.id));
+        if (currentNoteIndexInLevel <= 0) return; // Cannot indent first item or if not found
         
-        // Calculate new order index for the indented note
-        // Ensure notesForCurrentPage is sorted or filter children correctly
-        const childrenOfNewParent = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(newParentNoteIdToSet)).sort((a,b) => a.order_index - b.order_index);
-        if (childrenOfNewParent.length === 0) {
-            newOrderIndex = 0;
-        } else {
-            // If the note being moved was already a child of the new parent (e.g. due to a quick succession of tab/shift-tab)
-            // and is now the last child, its order index might not need to change relative to others,
-            // but it should be greater than the current max.
-            // However, standard indent behavior is to become the last child.
-            newOrderIndex = Math.max(...childrenOfNewParent.map(n => n.order_index)) + 1;
-        }
-        noteData.order_index = newOrderIndex;
-        updateNoteInCurrentPage(noteData);
+        potentialNewParentNoteData = currentLevelSiblings[currentNoteIndexInLevel - 1];
+        if (!potentialNewParentNoteData) { console.error("Indent: Could not determine new parent note."); return; }
+        
+        newParentIdForAPI = String(potentialNewParentNoteData.id);
 
-        // Update DOM
-        const newParentDomElement = getNoteElementById(newParentNoteData.id);
+        // The indented note becomes the last child of this new parent.
+        const childrenOfNewParent = notesForCurrentPage
+            .filter(n => String(n.parent_note_id) === newParentIdForAPI)
+            .sort((a, b) => a.order_index - b.order_index);
+        
+        const previousSiblingId = childrenOfNewParent.length > 0 ? String(childrenOfNewParent[childrenOfNewParent.length - 1].id) : null;
+        const nextSiblingId = null; // Becomes the last child
+
+        newOrderIndexForAPI = calculateOrderIndex(notesForCurrentPage, newParentIdForAPI, previousSiblingId, nextSiblingId);
+        console.log(`[TAB-KEY INDENT] PrevSib: ${previousSiblingId}, NextSib: ${nextSiblingId}, NewParent: ${newParentIdForAPI}, NewOrder: ${newOrderIndexForAPI}`);
+
+        // DOM Update (Optimistic)
+        noteData.parent_note_id = newParentIdForAPI;
+        noteData.order_index = newOrderIndexForAPI;
+        updateNoteInCurrentPage(noteData); // Update local state before DOM manipulation
+        
+        const newParentDomElement = getNoteElementById(newParentIdForAPI); // newParentIdForAPI is ID of potentialNewParentNoteData
         if (!newParentDomElement) { console.error("Could not find new parent in DOM for indent"); return; }
         const newNestingLevel = window.ui.getNestingLevel(newParentDomElement) + 1;
         
-        // Ensure the parent has a children container
         let childrenContainer = newParentDomElement.querySelector('.note-children');
         if (!childrenContainer) {
             childrenContainer = document.createElement('div');
             childrenContainer.className = 'note-children';
             newParentDomElement.appendChild(childrenContainer);
-            if (typeof Sortable !== 'undefined' && Sortable.create) { // Check Sortable.create
-                Sortable.create(childrenContainer, { 
-                    group: 'notes', 
-                    animation: 150, 
-                    handle: '.note-bullet', 
-                    ghostClass: 'note-ghost', 
-                    chosenClass: 'note-chosen', 
-                    dragClass: 'note-drag', 
-                    onEnd: handleNoteDrop 
-                });
+            if (typeof Sortable !== 'undefined' && Sortable.create) {
+                Sortable.create(childrenContainer, { group: 'notes', animation: 150, handle: '.note-bullet', ghostClass: 'note-ghost', chosenClass: 'note-chosen', dragClass: 'note-drag', onEnd: handleNoteDrop });
             }
         }
-        
-        window.ui.moveNoteElement(noteItem, childrenContainer, newNestingLevel);
+        // Indented note usually goes to the end of children list
+        window.ui.moveNoteElement(noteItem, childrenContainer, newNestingLevel, null); 
     }
     window.ui.switchToEditMode(contentDiv);
 
     try {
-        await notesAPI.updateNote(noteData.id, {
-            page_id: currentPageId, // Added this line
-            content: noteData.content, 
-            parent_note_id: newParentNoteIdToSet, 
-            order_index: newOrderIndex 
-        });
+        const payload = {
+            page_id: currentPageId,
+            content: noteData.content, // Ensure content is part of the payload
+            parent_note_id: newParentIdForAPI,
+            order_index: newOrderIndexForAPI
+        };
+        console.log('[TAB-KEY API Call] Updating note:', noteData.id, payload);
+        const updatedNoteFromServer = await notesAPI.updateNote(noteData.id, payload);
+        
+        // Update local cache with server response
+        updateNoteInCurrentPage(updatedNoteFromServer);
+        // The DOM was already updated optimistically. If server changed something, it might need reconciliation,
+        // but for parent_id and order_index, the optimistic update should match if API call is successful.
+        // If server changes order_index (e.g. due to conflict), that needs to be reflected.
+        // For now, we assume server respects the client's calculated order_index if valid.
+        noteData.order_index = updatedNoteFromServer.order_index; // Ensure local data has server's version
+        noteData.parent_note_id = updatedNoteFromServer.parent_note_id; 
+        noteData.updated_at = updatedNoteFromServer.updated_at; // Sync timestamp
+
+        notesForCurrentPage.sort((a, b) => a.order_index - b.order_index);
+        
+        // updateNoteElement might be called by _saveNoteToServer if content changed,
+        // but if only parent/order changed, ensure DOM is reflecting the optimistic update,
+        // or re-render if server data is substantially different.
+        // For now, optimistic DOM move is primary.
+
     } catch (error) {
-        console.error('Error updating note parent/order (API):', error);
-        alert('Error updating note structure. Reverting changes.');
-        // Ensure the imported setNotesForCurrentPage is used below, not window.ui.setNotesForCurrentPage
-        setNotesForCurrentPage(JSON.parse(sessionStorage.getItem('backupNotesBeforeTab')) || notesForCurrentPage); 
-        window.ui.displayNotes(notesForCurrentPage, currentPageId); // This uses the global ui object method
-        window.ui.switchToEditMode(contentDiv); // This uses the global ui object method
+        const errorMessage = error.message || 'Please try again.';
+        console.error(`handleTabKey: Error updating note ${noteData.id} parent/order. Error:`, error);
+        alert(`Failed to update note structure. ${errorMessage} Reverting changes.`);
+        
+        const backupNotes = JSON.parse(sessionStorage.getItem('backupNotesBeforeTab'));
+        if (backupNotes) {
+            setNotesForCurrentPage(backupNotes);
+        }
+        if (window.ui && typeof window.ui.displayNotes === 'function' && currentPageId) {
+             window.ui.displayNotes(notesForCurrentPage, currentPageId);
+        } else {
+            console.warn('handleTabKey: Could not re-render notes after error, UI might be inconsistent.');
+        }
+        const originalContentDiv = getNoteElementById(noteData.id)?.querySelector('.note-content');
+        if (originalContentDiv) {
+            window.ui.switchToEditMode(originalContentDiv);
+        }
     }
 }
 
@@ -617,28 +692,45 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
     if (!noteData) return;
     if (contentDiv.classList.contains('edit-mode') && (contentDiv.dataset.rawContent || contentDiv.textContent).trim() === '') {
         const children = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteData.id));
-        if (children.length > 0) { console.log('Note has children, not deleting on backspace.'); return; }
+        if (children.length > 0) { 
+            console.log('handleBackspaceKey: Note has children, not deleting on backspace for noteId:', noteData.id); 
+            return; 
+        }
+        
         const isRootNote = !noteData.parent_note_id;
         const rootNotesCount = notesForCurrentPage.filter(n => !n.parent_note_id).length;
-        if (isRootNote && rootNotesCount === 1 && notesForCurrentPage.length === 1) { console.log('Cannot delete the only note on the page via Backspace.'); return; }
+        if (isRootNote && rootNotesCount === 1 && notesForCurrentPage.length === 1) { 
+            console.log('handleBackspaceKey: Cannot delete the only note on the page via Backspace for noteId:', noteData.id); 
+            return; 
+        }
         
         let noteToFocusAfterDelete = null;
         const allNoteElements = Array.from(notesContainer.querySelectorAll('.note-item'));
         const currentNoteIndexInDOM = allNoteElements.findIndex(el => el.dataset.noteId === noteData.id);
-        if (currentNoteIndexInDOM > 0) noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM - 1];
-        else if (allNoteElements.length > 1) noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM + 1];
-        else if (noteData.parent_note_id) noteToFocusAfterDelete = getNoteElementById(noteData.parent_note_id);
+        if (currentNoteIndexInDOM > 0) {
+            noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM - 1];
+        } else if (allNoteElements.length > 1 && currentNoteIndexInDOM + 1 < allNoteElements.length) {
+            noteToFocusAfterDelete = allNoteElements[currentNoteIndexInDOM + 1];
+        } else if (noteData.parent_note_id) {
+            noteToFocusAfterDelete = getNoteElementById(noteData.parent_note_id);
+        }
 
         e.preventDefault();
         try {
-            await notesAPI.deleteNote(noteData.id); // Assumes notesAPI is global
+            await notesAPI.deleteNote(noteData.id);
             removeNoteFromCurrentPageById(noteData.id);
-            window.ui.removeNoteElement(noteData.id); // Assumes ui is global
+            window.ui.removeNoteElement(noteData.id);
             if (noteToFocusAfterDelete) {
                 const contentDivToFocus = noteToFocusAfterDelete.querySelector('.note-content');
-                if (contentDivToFocus) window.ui.switchToEditMode(contentDivToFocus); // Assumes ui is global
-            } else if (notesForCurrentPage.length === 0 && currentPageId) { console.log("All notes deleted. Page is empty."); }
-        } catch (error) { console.error('Error deleting note:', error); }
+                if (contentDivToFocus) window.ui.switchToEditMode(contentDivToFocus);
+            } else if (notesForCurrentPage.length === 0 && currentPageId) { 
+                console.log("handleBackspaceKey: All notes deleted from pageId:", currentPageId); 
+            }
+        } catch (error) { 
+            const errorMessage = error.message || 'Please try again.';
+            console.error(`handleBackspaceKey: Error deleting note ${noteData.id}. Error:`, error); 
+            alert(`Failed to delete note. ${errorMessage}`);
+        }
     }
 }
 
@@ -836,15 +928,19 @@ export async function handleTaskCheckboxClick(e) {
         updateNoteInCurrentPage(noteData);
         console.log('Task status updated:', { noteId, newStatus, newRawContent, doneAt });
     } catch (error) {
-        console.error('Error updating task status:', error);
-        alert('Failed to update task status: ' + error.message);
+        const errorMessage = error.message || 'Please try again.';
+        console.error(`handleTaskCheckboxClick: Error updating task status for note ${noteId}. Error:`, error);
+        alert(`Failed to update task status. ${errorMessage}`);
+        
         // Revert UI on error
-        checkbox.checked = !checkbox.checked;
-        contentDiv.dataset.rawContent = noteData.content;
+        checkbox.checked = !checkbox.checked; 
+        contentDiv.dataset.rawContent = noteData.content; 
         if (contentDiv.classList.contains('edit-mode')) {
             contentDiv.textContent = noteData.content;
         } else {
             contentDiv.innerHTML = window.ui.parseAndRenderContent(noteData.content);
         }
+        // Revert noteData properties if they were optimistically changed before API calls.
+        // (Current logic seems to update noteData.properties only after successful API calls, which is good).
     }
 }

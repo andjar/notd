@@ -162,46 +162,7 @@ function renderNote(note, nestingLevel = 0) {
         arrowEl.dataset.noteId = note.id;
         arrowEl.dataset.collapsed = note.collapsed ? 'true' : 'false';
 
-        arrowEl.addEventListener('click', async (e) => {
-            e.stopPropagation(); 
-            const currentNoteItem = arrowEl.closest('.note-item');
-            if (!currentNoteItem) return;
-
-            const childrenContainer = currentNoteItem.querySelector('.note-children');
-            const isCurrentlyCollapsed = currentNoteItem.classList.toggle('collapsed');
-            
-            if (childrenContainer) {
-                childrenContainer.classList.toggle('collapsed', isCurrentlyCollapsed);
-            }
-            
-            arrowEl.dataset.collapsed = isCurrentlyCollapsed ? 'true' : 'false';
-
-            try {
-                await notesAPI.updateNote(note.id, { 
-                    page_id: window.currentPageId,
-                    collapsed: isCurrentlyCollapsed 
-                });
-                console.log('Collapsed state saved:', { noteId: note.id, collapsed: isCurrentlyCollapsed });
-                
-                note.collapsed = isCurrentlyCollapsed;
-                
-                if (window.notesForCurrentPage) {
-                    const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(note.id));
-                    if (noteToUpdate) {
-                        noteToUpdate.collapsed = isCurrentlyCollapsed;
-                    }
-                }
-            } catch (error) {
-                console.error('Error saving collapsed state:', error);
-                const feedback = document.createElement('div');
-                feedback.className = 'copy-feedback';
-                feedback.style.background = 'var(--color-error, #dc2626)';
-                feedback.textContent = 'Failed to save collapse state';
-                document.body.appendChild(feedback);
-                setTimeout(() => feedback.remove(), 2000);
-            }
-        });
-
+        // Listener removed for delegation
         const bulletElFromControls = controlsEl.querySelector('.note-bullet');
         const dragHandle = controlsEl.querySelector('.note-drag-handle');
         if (dragHandle) {
@@ -216,114 +177,7 @@ function renderNote(note, nestingLevel = 0) {
     controlsEl.appendChild(dragHandleEl);
     controlsEl.appendChild(bulletEl);
 
-    bulletEl.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        const menu = document.createElement('div');
-        menu.className = 'bullet-context-menu';
-        menu.innerHTML = `
-            <div class="menu-item" data-action="copy-transclusion">
-                <i data-feather="link"></i> Copy transclusion link
-            </div>
-            <div class="menu-item" data-action="delete">
-                <i data-feather="trash-2"></i> Delete
-            </div>
-            <div class="menu-item" data-action="upload">
-                <i data-feather="upload"></i> Upload attachment
-            </div>
-        `;
-        menu.style.position = 'fixed';
-        menu.style.left = `${e.pageX}px`;
-        menu.style.top = `${e.pageY}px`;
-
-        menu.addEventListener('click', async (ev) => {
-            const action = ev.target.closest('.menu-item')?.dataset.action;
-            if (!action) return;
-
-            switch (action) {
-                case 'copy-transclusion':
-                    const transclusionLink = `!{{${note.id}}}`;
-                    await navigator.clipboard.writeText(transclusionLink);
-                    const feedbackCopy = document.createElement('div');
-                    feedbackCopy.className = 'copy-feedback';
-                    feedbackCopy.textContent = 'Transclusion link copied!';
-                    document.body.appendChild(feedbackCopy);
-                    setTimeout(() => feedbackCopy.remove(), 2000);
-                    break;
-                case 'delete':
-                    // Confirming deletion would ideally use a shared modal function
-                    // For now, using confirm() as it was in the original code.
-                    // if (await showGenericConfirmModal('Delete Note', 'Are you sure you want to delete this note?')) {
-                    if (confirm('Are you sure you want to delete this note?')) {
-                        try {
-                            await notesAPI.deleteNote(note.id);
-                            const noteElToDelete = document.querySelector(`.note-item[data-note-id="${note.id}"]`);
-                            if (noteElToDelete) noteElToDelete.remove();
-                        } catch (error) {
-                            console.error('Error deleting note:', error);
-                            alert('Failed to delete note');
-                        }
-                    }
-                    break;
-                case 'upload':
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.multiple = true;
-                    input.onchange = async (eventUpload) => {
-                        const files = Array.from(eventUpload.target.files);
-                        for (const file of files) {
-                            const formData = new FormData();
-                            formData.append('attachmentFile', file);
-                            formData.append('note_id', note.id);
-                            try {
-                                await attachmentsAPI.uploadAttachment(formData);
-                                const feedbackUpload = document.createElement('div');
-                                feedbackUpload.className = 'copy-feedback';
-                                feedbackUpload.textContent = `File "${file.name}" uploaded successfully!`;
-                                document.body.appendChild(feedbackUpload);
-                                setTimeout(() => feedbackUpload.remove(), 3000);
-                                // Refreshing notes requires displayNotes, which might be in a different module now.
-                                // This could be `window.ui.displayNotes` or passed as a callback.
-                                                if (window.ui && typeof window.ui.displayNotes === 'function') {
-                    const pageData = await notesAPI.getPageData(note.page_id);
-                    window.ui.displayNotes(pageData.notes, note.page_id);
-                } else {
-                    console.warn('displayNotes function not available to refresh after upload.')
-                }
-                            } catch (error) {
-                                console.error('Error uploading file:', error);
-                                alert(`Failed to upload file "${file.name}": ${error.message}`);
-                            }
-                        }
-                    };
-                    input.click();
-                    break;
-            }
-            menu.remove();
-        });
-
-        const closeMenu = (ev) => {
-            if (!menu.contains(ev.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        };
-        document.addEventListener('click', closeMenu);
-
-        document.body.appendChild(menu);
-        if (typeof feather !== 'undefined') feather.replace();
-    });
-
-    bulletEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // focusOnNote is expected to be imported or available globally/via ui object
-        if (typeof focusOnNote === 'function') { // Check if focusOnNote is defined
-             focusOnNote(note.id);
-        } else if (window.ui && typeof window.ui.focusOnNote === 'function') {
-            window.ui.focusOnNote(note.id);
-        } else {
-            console.warn('focusOnNote function not available.');
-        }
-    });
+    // Listeners for bullet click and contextmenu removed for delegation
 
     const contentWrapperEl = document.createElement('div');
     contentWrapperEl.className = 'note-content-wrapper';
@@ -338,12 +192,7 @@ function renderNote(note, nestingLevel = 0) {
         contentEl.innerHTML = parseAndRenderContent(note.content);
     }
 
-    contentEl.addEventListener('click', (e) => {
-        if (e.target.matches('.task-checkbox, .page-link, .property-inline, .task-status-badge')) {
-            return;
-        }
-        switchToEditMode(contentEl);
-    });
+    // Listener for content click removed for delegation
 
     contentWrapperEl.appendChild(contentEl);
 
@@ -955,55 +804,14 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
 
             attachmentsContainer.appendChild(attachmentEl);
 
+            // Event listeners for image click and delete button will be handled by delegation.
+            // Ensure necessary data attributes are present on the elements for the delegated handlers.
             if (isImage) {
-                const imageLinkInDOM = attachmentEl.querySelector('.attachment-name');
-                if (imageLinkInDOM) {
-                    imageLinkInDOM.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        if (domRefs.imageViewerModal && domRefs.imageViewerModalImg && domRefs.imageViewerModalClose) {
-                            domRefs.imageViewerModalImg.src = attachment.url;
-                            domRefs.imageViewerModal.classList.add('active');
-
-                            const closeImageModal = () => {
-                                domRefs.imageViewerModal.classList.remove('active');
-                                domRefs.imageViewerModalImg.src = ''; 
-                                domRefs.imageViewerModalClose.removeEventListener('click', closeImageModal);
-                                domRefs.imageViewerModal.removeEventListener('click', outsideClickHandler);
-                            };
-
-                            const outsideClickHandler = (event) => {
-                                if (event.target === domRefs.imageViewerModal) { 
-                                    closeImageModal();
-                                }
-                            };
-
-                            domRefs.imageViewerModalClose.addEventListener('click', closeImageModal);
-                            domRefs.imageViewerModal.addEventListener('click', outsideClickHandler);
-                        } else {
-                            console.error('Image viewer modal elements not found.');
-                            window.open(attachment.url, '_blank');
-                        }
-                    });
+                const imageLink = attachmentEl.querySelector('.attachment-name');
+                if (imageLink) {
+                    imageLink.dataset.attachmentUrl = attachment.url; // For delegated image view
+                    imageLink.classList.add('delegated-attachment-image'); // Class for easier selection
                 }
-            }
-
-            const deleteBtn = attachmentEl.querySelector('.attachment-delete-btn');
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', async () => {
-                    // if (await showGenericConfirmModal('Delete Attachment', `Are you sure you want to delete "${attachment.name}"?`)) {
-                    if (confirm(`Are you sure you want to delete "${attachment.name}"?`)) { // Using confirm as showGenericConfirmModal might not be available yet
-                        try {
-                            await attachmentsAPI.deleteAttachment(attachment.id);
-                            attachmentEl.remove(); 
-                            if (attachmentsContainer.children.length === 0) {
-                                attachmentsContainer.style.display = 'none';
-                            }
-                        } catch (error) {
-                            console.error('Error deleting attachment:', error);
-                            alert('Failed to delete attachment: ' + error.message);
-                        }
-                    }
-                });
             }
         });
 
@@ -1099,5 +907,341 @@ export {
     getRawTextWithNewlines,
     normalizeNewlines,
     renderAttachments,
-    renderProperties
+    renderProperties,
+    initializeDelegatedNoteEventListeners // Exporting the initializer
 };
+
+// --- Delegated Event Handler Functions ---
+
+async function handleDelegatedCollapseArrowClick(targetElement) {
+    const noteItem = targetElement.closest('.note-item');
+    const noteId = noteItem?.dataset.noteId;
+    if (!noteId) return;
+
+    const childrenContainer = noteItem.querySelector('.note-children');
+    const isCurrentlyCollapsed = noteItem.classList.toggle('collapsed');
+    
+    if (childrenContainer) {
+        childrenContainer.classList.toggle('collapsed', isCurrentlyCollapsed);
+    }
+    targetElement.dataset.collapsed = isCurrentlyCollapsed.toString();
+
+    try {
+        await notesAPI.updateNote(noteId, { 
+            page_id: window.currentPageId, // Assuming window.currentPageId is accessible
+            collapsed: isCurrentlyCollapsed 
+        });
+        // Update local cache
+        if (window.notesForCurrentPage) {
+            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
+            if (noteToUpdate) {
+                noteToUpdate.collapsed = isCurrentlyCollapsed;
+            }
+        }
+    } catch (error) {
+        const errorMessage = error.message || 'Please try again.';
+        console.error(`handleDelegatedCollapseArrowClick: Error saving collapse state for note ${noteId}. Error:`, error);
+        // Revert UI changes on error
+        noteItem.classList.toggle('collapsed'); // Toggle back
+        if (childrenContainer) childrenContainer.classList.toggle('collapsed'); // Toggle back
+        targetElement.dataset.collapsed = (!isCurrentlyCollapsed).toString();
+        
+        // Show feedback to user - using a temporary feedback div for this non-critical error
+        const feedback = document.createElement('div');
+        feedback.className = 'copy-feedback error-feedback'; // Added 'error-feedback' for specific styling
+        feedback.textContent = `Failed to save collapse state: ${errorMessage}`;
+        document.body.appendChild(feedback);
+        setTimeout(() => feedback.remove(), 3000); // Longer timeout for errors
+    }
+}
+
+function handleDelegatedBulletClick(targetElement) {
+    const noteId = targetElement.dataset.noteId;
+    if (!noteId) return;
+
+    if (typeof focusOnNote === 'function') {
+         focusOnNote(noteId);
+    } else if (window.ui && typeof window.ui.focusOnNote === 'function') {
+        window.ui.focusOnNote(noteId);
+    } else {
+        console.warn('focusOnNote function not available.');
+    }
+}
+
+async function handleDelegatedBulletContextMenu(event, targetElement) {
+    event.preventDefault();
+    const noteId = targetElement.dataset.noteId;
+    const notePageId = targetElement.closest('.note-item')?.dataset.pageId; // Assuming pageId might be on note-item
+
+    if (!noteId) return;
+    
+    // Remove any existing context menus
+    document.querySelectorAll('.bullet-context-menu').forEach(menu => menu.remove());
+
+    const menu = document.createElement('div');
+    menu.className = 'bullet-context-menu';
+    // Note: Using data-note-id on menu items to pass noteId to the action handler
+    menu.innerHTML = `
+        <div class="menu-item" data-action="copy-transclusion" data-note-id="${noteId}">
+            <i data-feather="link"></i> Copy transclusion link
+        </div>
+        <div class="menu-item" data-action="delete" data-note-id="${noteId}">
+            <i data-feather="trash-2"></i> Delete
+        </div>
+        <div class="menu-item" data-action="upload" data-note-id="${noteId}" data-page-id="${notePageId || window.currentPageId}">
+            <i data-feather="upload"></i> Upload attachment
+        </div>
+    `;
+    menu.style.position = 'fixed';
+    menu.style.left = `${event.pageX}px`;
+    menu.style.top = `${event.pageY}px`;
+
+    const handleMenuAction = async (actionEvent) => {
+        const selectedMenuItem = actionEvent.target.closest('.menu-item');
+        if (!selectedMenuItem) return;
+        
+        const action = selectedMenuItem.dataset.action;
+        const actionNoteId = selectedMenuItem.dataset.noteId; // Get noteId from the item
+        const actionPageId = selectedMenuItem.dataset.pageId;
+
+
+        switch (action) {
+            case 'copy-transclusion':
+                const transclusionLink = `!{{${actionNoteId}}}`;
+                await navigator.clipboard.writeText(transclusionLink);
+                // Show feedback (consider a global feedback function)
+                const feedbackCopy = document.createElement('div');
+                feedbackCopy.className = 'copy-feedback';
+                feedbackCopy.textContent = 'Transclusion link copied!';
+                document.body.appendChild(feedbackCopy);
+                setTimeout(() => feedbackCopy.remove(), 2000);
+                break;
+            case 'delete':
+                if (confirm(`Are you sure you want to delete note ${actionNoteId}?`)) {
+                    try {
+                        await notesAPI.deleteNote(actionNoteId);
+                        document.querySelector(`.note-item[data-note-id="${actionNoteId}"]`)?.remove();
+                        // Also remove from window.notesForCurrentPage
+                        if (window.notesForCurrentPage) {
+                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(actionNoteId));
+                        }
+                    } catch (error) {
+                        const deleteErrorMessage = error.message || 'Please try again.';
+                        console.error(`handleDelegatedBulletContextMenu (delete action): Error deleting note ${actionNoteId}. Error:`, error);
+                        alert(`Failed to delete note. ${deleteErrorMessage}`);
+                    }
+                }
+                break;
+            case 'upload':
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.multiple = true;
+                input.onchange = async (uploadEvent) => {
+                    const files = Array.from(uploadEvent.target.files);
+                    for (const file of files) {
+                        const formData = new FormData();
+                        formData.append('attachmentFile', file);
+                        formData.append('note_id', actionNoteId);
+                        try {
+                            await attachmentsAPI.uploadAttachment(formData);
+                            const feedbackUpload = document.createElement('div');
+                            feedbackUpload.className = 'copy-feedback'; // Success feedback
+                            feedbackUpload.textContent = `File "${file.name}" uploaded successfully!`;
+                            document.body.appendChild(feedbackUpload);
+                            setTimeout(() => feedbackUpload.remove(), 3000);
+                            if (window.ui && typeof window.ui.displayNotes === 'function' && actionPageId) {
+                                const pageData = await notesAPI.getPageData(actionPageId); // Refresh page
+                                window.ui.displayNotes(pageData.notes, actionPageId);
+                            } else {
+                                console.warn('handleDelegatedBulletContextMenu (upload action): displayNotes function or pageId not available to refresh after upload for noteId:', actionNoteId);
+                            }
+                        } catch (error) {
+                            const uploadErrorMessage = error.message || 'Please try again.';
+                            console.error(`handleDelegatedBulletContextMenu (upload action): Error uploading file "${file.name}" for note ${actionNoteId}. Error:`, error);
+                            alert(`Failed to upload file "${file.name}". ${uploadErrorMessage}`);
+                        }
+                    }
+                };
+                input.click();
+                break;
+        }
+        menu.remove(); 
+        document.removeEventListener('click', closeMenuOnClickOutside); 
+    };
+
+    menu.addEventListener('click', handleMenuAction);
+
+    const closeMenuOnClickOutside = (closeEvent) => {
+        if (!menu.contains(closeEvent.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenuOnClickOutside);
+        }
+    };
+    // Add timeout to allow current event loop to finish before attaching,
+    // preventing immediate close if contextmenu was via click.
+    setTimeout(() => {
+        document.addEventListener('click', closeMenuOnClickOutside);
+    }, 0);
+
+
+    document.body.appendChild(menu);
+    if (typeof feather !== 'undefined') feather.replace();
+}
+
+function handleDelegatedNoteContentClick(targetElement) {
+    // Check if the click was on an interactive element within the content that should not trigger edit mode
+    if (targetElement.matches('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image') || 
+        targetElement.closest('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image')) {
+        return;
+    }
+    switchToEditMode(targetElement);
+}
+
+async function handleDelegatedAttachmentDelete(targetElement) {
+    const attachmentId = targetElement.dataset.attachmentId;
+    const noteId = targetElement.dataset.noteId; // Ensure this is on the button
+    const attachmentItem = targetElement.closest('.note-attachment-item');
+    const attachmentName = attachmentItem?.querySelector('.attachment-name')?.textContent || 'this attachment';
+
+    if (!attachmentId || !noteId) return;
+
+    if (confirm(`Are you sure you want to delete "${attachmentName}"?`)) {
+        try {
+            await attachmentsAPI.deleteAttachment(attachmentId);
+            attachmentItem?.remove();
+            const attachmentsContainer = targetElement.closest('.note-attachments');
+            if (attachmentsContainer && attachmentsContainer.children.length === 0) {
+                attachmentsContainer.style.display = 'none';
+            }
+             // Update has_attachments on the note in local cache
+            if (window.notesForCurrentPage) {
+                const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
+                if (noteToUpdate) {
+                    const remainingAttachments = attachmentsContainer ? attachmentsContainer.children.length : 0;
+                    noteToUpdate.has_attachments = remainingAttachments > 0;
+                }
+            }
+
+        } catch (error) {
+            const deleteAttachMessage = error.message || 'Please try again.';
+            console.error(`handleDelegatedAttachmentDelete: Error deleting attachment ${attachmentId} for note ${noteId}. Error:`, error);
+            alert(`Failed to delete attachment "${attachmentName}". ${deleteAttachMessage}`);
+        }
+    }
+}
+
+function handleDelegatedAttachmentImageView(targetElement) {
+    const attachmentUrl = targetElement.dataset.attachmentUrl;
+    if (!attachmentUrl) { // Might be the img itself, not the link
+        const imgPreview = targetElement.closest('.attachment-preview-image');
+        if (imgPreview) {
+           const attachmentItem = imgPreview.closest('.note-attachment-item');
+           const linkElement = attachmentItem?.querySelector('.attachment-name[data-attachment-url]');
+           if(linkElement) handleDelegatedAttachmentImageView(linkElement); // Recurse with the link
+        }
+        return;
+    }
+
+
+    if (domRefs.imageViewerModal && domRefs.imageViewerModalImg && domRefs.imageViewerModalClose) {
+        domRefs.imageViewerModalImg.src = attachmentUrl;
+        domRefs.imageViewerModal.classList.add('active');
+
+        const closeImageModal = () => {
+            domRefs.imageViewerModal.classList.remove('active');
+            domRefs.imageViewerModalImg.src = ''; 
+            domRefs.imageViewerModalClose.removeEventListener('click', closeImageModal);
+            domRefs.imageViewerModal.removeEventListener('click', outsideClickHandlerForModal);
+        };
+
+        const outsideClickHandlerForModal = (event) => {
+            if (event.target === domRefs.imageViewerModal) { 
+                closeImageModal();
+            }
+        };
+
+        domRefs.imageViewerModalClose.addEventListener('click', closeImageModal, { once: true });
+        domRefs.imageViewerModal.addEventListener('click', outsideClickHandlerForModal, { once: true });
+    } else {
+        console.error('Image viewer modal elements not found.');
+        window.open(attachmentUrl, '_blank');
+    }
+}
+
+
+/**
+ * Initializes delegated event listeners for notes on the provided container.
+ * This function should be called once after the main notes container is in the DOM.
+ * @param {HTMLElement} notesContainerEl - The main container where notes are rendered.
+ */
+function initializeDelegatedNoteEventListeners(notesContainerEl) {
+    if (!notesContainerEl) {
+        console.error("Notes container not provided for event delegation.");
+        return;
+    }
+
+    notesContainerEl.addEventListener('click', (event) => {
+        const target = event.target;
+        
+        // Collapse arrow
+        const collapseArrow = target.closest('.note-collapse-arrow');
+        if (collapseArrow) {
+            event.stopPropagation(); // Keep stopPropagation if it was there for a reason
+            handleDelegatedCollapseArrowClick(collapseArrow);
+            return;
+        }
+
+        // Bullet click
+        const bullet = target.closest('.note-bullet');
+        if (bullet) {
+            event.stopPropagation(); // Keep stopPropagation
+            handleDelegatedBulletClick(bullet);
+            return;
+        }
+
+        // Content click to edit
+        const contentArea = target.closest('.note-content.rendered-mode');
+        if (contentArea) {
+            // No stopPropagation here, allow normal bubbling unless specific condition
+            handleDelegatedNoteContentClick(contentArea);
+            return;
+        }
+        
+        // Attachment delete
+        const deleteBtn = target.closest('.attachment-delete-btn');
+        if (deleteBtn) {
+            handleDelegatedAttachmentDelete(deleteBtn);
+            return;
+        }
+
+        // Attachment image view (delegated from .attachment-name or .attachment-preview-image)
+        const imageLink = target.closest('.attachment-name.delegated-attachment-image');
+        if (imageLink) {
+            event.preventDefault();
+            handleDelegatedAttachmentImageView(imageLink);
+            return;
+        }
+        const imagePreview = target.closest('.attachment-preview-image');
+        if(imagePreview){
+            // The preview itself might not have the URL, find the associated link
+            const attachmentItem = imagePreview.closest('.note-attachment-item');
+            const actualLink = attachmentItem?.querySelector('.attachment-name.delegated-attachment-image');
+            if(actualLink) {
+                 event.preventDefault();
+                 handleDelegatedAttachmentImageView(actualLink);
+            }
+            return;
+        }
+    });
+
+    notesContainerEl.addEventListener('contextmenu', (event) => {
+        const target = event.target;
+        const bullet = target.closest('.note-bullet');
+        if (bullet) {
+            // event.preventDefault() is handled by handleDelegatedBulletContextMenu
+            handleDelegatedBulletContextMenu(event, bullet);
+        }
+    });
+
+    console.log("Delegated note event listeners initialized.");
+}
