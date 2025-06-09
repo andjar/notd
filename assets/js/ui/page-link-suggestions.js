@@ -108,7 +108,7 @@ function showSuggestions(query, position) {
   ).slice(0, 10); 
 
   if (matchedPages.length > 0) {
-    matchedPages.forEach(pageName => {
+    matchedPages.forEach((pageName, index) => {
       const listItem = document.createElement('li');
       listItem.textContent = pageName;
       listItem.dataset.pageName = pageName;
@@ -116,10 +116,9 @@ function showSuggestions(query, position) {
       listItem.style.cursor = 'pointer';
       listItem.style.borderBottom = '1px solid var(--color-border-subtle, #eee)'; 
       // Remove last item's border bottom for cleaner look
-      if (matchedPages.indexOf(pageName) === matchedPages.length -1) {
+      if (index === matchedPages.length - 1) {
         listItem.style.borderBottom = 'none';
       }
-
 
       listItem.addEventListener('mouseover', () => {
         Array.from(suggestionList.children).forEach(child => child.classList.remove('selected'));
