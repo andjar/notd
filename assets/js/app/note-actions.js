@@ -164,6 +164,7 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
  * Assumes `notesAPI.batchUpdateNotes` returns the array of individual operation results directly,
  * or throws an error if the API call fails or the response structure is invalid.
  *
+ * @param {Array<Object>} originalNotesState - A deep clone of the `notesForCurrentPage` state *before* any optimistic changes were made.
  * @param {Array<Object>} operations - Array of operations for the batch API.
  *                                   Each operation: { type: 'create'|'update'|'delete', payload: Object }
  * @param {Function} optimisticDOMUpdater - A function to call to perform optimistic DOM updates.
@@ -171,7 +172,7 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
  * @param {string} userActionName - Name of the user action for logging/error messages (e.g., "Add Root Note").
  * @returns {Promise<boolean>} True if all operations were successful (or no operations), false otherwise.
  */
-async function executeBatchOperations(operations, optimisticDOMUpdater, userActionName) {
+async function executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, userActionName) {
     if (!operations || operations.length === 0) {
         console.warn(`[${userActionName} BATCH] No operations to execute.`);
         // Consider returning true as no operations means no failures.
@@ -179,10 +180,9 @@ async function executeBatchOperations(operations, optimisticDOMUpdater, userActi
     }
 
     window.ui.updateSaveStatusIndicator('pending');
-    // Clone the state *before* any optimistic changes by the CALLER of this function.
-    // Callers (handleAddRootNote, etc.) are responsible for optimistic STATE updates.
+    // The state backup is now passed in as `originalNotesState`.
+    // Callers (handleAddRootNote, etc.) are responsible for cloning the state BEFORE making optimistic changes.
     // This function handles DOM updates and API communication/revert.
-    const originalNotesStateBeforeOptimisticChanges = JSON.parse(JSON.stringify(notesForCurrentPage));
     let success = false;
 
     try {
@@ -263,7 +263,7 @@ async function executeBatchOperations(operations, optimisticDOMUpdater, userActi
         window.ui.updateSaveStatusIndicator('error');
 
         // Revert local state to the state *before* the caller made its optimistic changes
-        setNotesForCurrentPage(originalNotesStateBeforeOptimisticChanges);
+        setNotesForCurrentPage(originalNotesState);
 
         // Re-render the entire notes list from the reverted state
         if (window.ui && typeof window.ui.displayNotes === 'function' && currentPageId) {
@@ -407,6 +407,9 @@ export async function handleAddRootNote() {
     const clientTempId = `temp-R-${Date.now()}`;
     const operations = [];
 
+    // --- State backup MUST happen BEFORE any optimistic updates ---
+    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+
     const rootNotes = notesForCurrentPage
         .filter(n => !n.parent_note_id)
         .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
@@ -450,7 +453,7 @@ export async function handleAddRootNote() {
         }
     };
 
-    await executeBatchOperations(operations, optimisticDOMUpdater, "Add Root Note");
+    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Add Root Note");
 }
 
 /**
@@ -482,6 +485,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     const operations = [];
     const parentIdForNewNote = noteData.parent_note_id;
     const previousSiblingIdForNewNote = String(noteData.id);
+
+    // --- State backup MUST happen BEFORE any optimistic updates ---
+    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
 
     const siblingsOfCurrentNote = notesForCurrentPage.filter(n =>
         String(n.parent_note_id ?? null) === String(parentIdForNewNote ?? null)
@@ -539,7 +545,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
         }
     };
 
-    await executeBatchOperations(operations, optimisticDOMUpdater, "Create Note (Enter)");
+    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Note (Enter)");
 }
 
 /**
@@ -572,6 +578,9 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
             return;
         }
     }
+
+    // --- State backup MUST happen BEFORE any optimistic updates for the indent/outdent ---
+    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
 
     const operations = [];
     let newParentIdForMovedNote = noteData.parent_note_id;
@@ -694,7 +703,7 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
         if (movedContentDiv) window.ui.switchToEditMode(movedContentDiv);
     };
 
-    const success = await executeBatchOperations(operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
+    const success = await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
     if (!success) {
         // If batch fails, executeBatchOperations handles global revert.
         // We might need to restore the specific moved note's original state if it was altered before the backup.
@@ -736,6 +745,9 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
         } // If still null, no specific focus target after delete (e.g., last note on page deleted)
 
 
+        // --- State backup MUST happen BEFORE any optimistic updates ---
+        const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+
         const noteIdToDelete = noteData.id;
         const parentIdOfDeleted = noteData.parent_note_id;
 
@@ -765,7 +777,7 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
             window.ui.removeNoteElement(noteIdToDelete);
         };
 
-        const success = await executeBatchOperations(operations, optimisticDOMUpdater, "Delete Note (Backspace)");
+        const success = await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Delete Note (Backspace)");
         if (success && noteToFocusAfterDeleteEl) {
             const contentDivToFocus = noteToFocusAfterDeleteEl.querySelector('.note-content');
             if (contentDivToFocus) window.ui.switchToEditMode(contentDivToFocus);
