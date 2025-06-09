@@ -55,9 +55,22 @@ if (!function_exists('_checkAndSetNoteInternalFlag')) {
 // Helper function to process note content and extract properties
 if (!function_exists('processNoteContent')) {
     function processNoteContent($pdo, $content, $entityType, $entityId) {
-        // This now correctly syncs properties with the database and returns the parsed properties.
-        // The entityType parameter is not used by syncNotePropertiesFromContent but is kept for compatibility.
-        return syncNotePropertiesFromContent($pdo, $entityId, $content);
+        // Create a PropertyParser instance and use it to process the content
+        $propertyParser = new PropertyParser($pdo);
+        $properties = $propertyParser->parsePropertiesFromContent($content);
+        
+        // Save the properties using the centralized function
+        foreach ($properties as $name => $value) {
+            _updateOrAddPropertyAndDispatchTriggers(
+                $pdo,
+                $entityType,
+                $entityId,
+                $name,
+                $value
+            );
+        }
+        
+        return $properties;
     }
 }
 

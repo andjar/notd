@@ -149,23 +149,40 @@ const pagesAPI = {
         if (options.sort_order) params.append('sort_order', options.sort_order);
         
         const queryString = params.toString();
-        const responseData = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`); // Added await and stored in responseData
+        const responseData = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
 
+        // 1. Direct array check (ideal case per spec and apiRequest returning data.data)
         if (Array.isArray(responseData)) {
             return responseData;
         }
 
+        // 2. Object checks for common deviations or nested structures
         if (responseData && typeof responseData === 'object') {
-            const keysToTry = ['pages', 'items', 'results', 'data'];
+            // 2a. Handles if apiRequest returned { status, data: { pages: [...] } }
+            // or if pages.php wrapped the array in a 'data' field like { data: [...] }
+            if (responseData.data && Array.isArray(responseData.data)) {
+                console.log('[pagesAPI.getPages] Found array in responseData.data');
+                return responseData.data;
+            }
+            // 2b. Handles if pages.php wrapped the array in a 'pages' field like { pages: [...] }
+            if (responseData.pages && Array.isArray(responseData.pages)) {
+                console.log('[pagesAPI.getPages] Found array in responseData.pages');
+                return responseData.pages;
+            }
+
+            // 3. Generic keysToTry loop as a further fallback
+            const keysToTry = ['items', 'results']; // 'data' and 'pages' already checked
             for (const key of keysToTry) {
                 if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
+                    console.log(`[pagesAPI.getPages] Found array in responseData.${key}`);
                     return responseData[key];
                 }
             }
         }
 
+        // 4. Warning and fallback
         console.warn('[pagesAPI.getPages] Response was not an array and no known data key was found. Response:', responseData);
-        return []; // Return empty array as a fallback
+        return []; 
     },
 
     /**
