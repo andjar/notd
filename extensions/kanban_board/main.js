@@ -56,7 +56,7 @@ export async function initializeKanban() {
 
         if (kanbanRootElement) {
             kanbanRootElement.innerHTML = ''; // Clear "Loading..." message
-            // notesForCurrentPage should be a function that returns the notes array from state
+            // notesForCurrentPage is an array that holds the notes from the state
             displayKanbanBoard(kanbanRootElement, notesForCurrentPage); 
         }
 

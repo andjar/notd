@@ -6,6 +6,29 @@ if (!class_exists('PropertyUtils')) {
     class PropertyUtils {
         private $pdo;
 
+        public static function getActiveExtensionDetails() {
+            if (!defined('ACTIVE_EXTENSIONS')) {
+                return [];
+            }
+
+            $extensionDetails = [];
+            foreach (ACTIVE_EXTENSIONS as $extensionFolderName) {
+                $configPath = __DIR__ . '/../../extensions/' . $extensionFolderName . '/config.json';
+                if (file_exists($configPath) && is_readable($configPath)) {
+                    $configContent = file_get_contents($configPath);
+                    $decodedConfig = json_decode($configContent);
+
+                    if ($decodedConfig && isset($decodedConfig->featherIcon)) {
+                        $extensionDetails[] = [
+                            'name' => $extensionFolderName,
+                            'featherIcon' => $decodedConfig->featherIcon
+                        ];
+                    }
+                }
+            }
+            return $extensionDetails;
+        }
+
         public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
     }

@@ -3319,3 +3319,26 @@ a[href^="https://"]:visited {
     margin-right: 2.3em;
     margin-top: .8em;
 }
+
+/* Extension Icons in Sidebar */
+#extension-icons-container {
+    display: flex; /* Arrange icons in a row */
+    flex-wrap: wrap; /* Allow icons to wrap if space is limited */
+    justify-content: center; /* Center icons if they don't fill the space */
+    gap: var(--ls-space-3, 12px); /* Space between icons, with fallback */
+    padding: var(--ls-space-3, 12px) 0; /* Padding top/bottom */
+    margin-top: var(--ls-space-3, 12px); /* Margin above the container */
+    border-top: 1px solid var(--ls-secondary-border-color, #eee); /* Separator line */
+}
+
+.sidebar-extension-icon {
+    width: var(--ls-font-size-xl, 20px); /* Feather icon size, with fallback */
+    height: var(--ls-font-size-xl, 20px); /* Feather icon size, with fallback */
+    color: var(--ls-secondary-text-color, #555); /* Icon color, with fallback */
+    cursor: pointer; /* Indicate they might be clickable in the future */
+    transition: color var(--ls-transition-fast, 0.15s ease); /* Smooth color transition on hover */
+}
+
+.sidebar-extension-icon:hover {
+    color: var(--ls-primary-text-color, #333); /* Darken icon on hover */
+}

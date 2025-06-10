@@ -105,6 +105,54 @@ export const sidebarState = {
                     favoritesContainer.innerHTML = 'Error loading favorites.';
                 }
             }
+        },
+        async renderExtensionIcons() {
+            const apiUrl = 'api/v1/extensions.php'; // Ensure this path is correct from your web root
+            const iconsContainer = document.getElementById('extension-icons-container');
+
+            if (!iconsContainer) {
+                console.error('Extension icons container (extension-icons-container) not found.');
+                return;
+            }
+            iconsContainer.innerHTML = ''; // Clear existing icons
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data.success && Array.isArray(data.extensions)) {
+                    if (data.extensions.length === 0) {
+                        // iconsContainer.textContent = 'No active extensions.'; // Optional: display message
+                        return; // Nothing to render
+                    }
+
+                    data.extensions.forEach(extension => {
+                        const iconEl = document.createElement('i'); // Using <i> as is common for icon fonts/SVG icons
+                        iconEl.setAttribute('data-feather', extension.featherIcon);
+                        iconEl.setAttribute('title', extension.name); // Tooltip for accessibility
+                        iconEl.classList.add('sidebar-extension-icon'); // For common styling
+                        // Example: Add click listener if needed
+                        // iconEl.addEventListener('click', () => {
+                        //     console.log(`Clicked extension icon: ${extension.name}`);
+                        //     // Potentially open the extension interface or trigger an action
+                        // });
+                        iconsContainer.appendChild(iconEl);
+                    });
+
+                    if (data.extensions.length > 0 && typeof feather !== 'undefined') {
+                        feather.replace(); // Render Feather icons
+                    }
+                } else {
+                    console.error('Failed to load extension icons or data format is incorrect:', data);
+                    // iconsContainer.textContent = 'Error loading extensions.'; // Optional: display error
+                }
+            } catch (error) {
+                console.error('Error fetching or rendering extension icons:', error);
+                // iconsContainer.textContent = 'Error loading extensions.'; // Optional: display error
+            }
         }
     },
     init() {
@@ -129,7 +177,8 @@ export const sidebarState = {
             this.right.updateButtonVisuals();
             this.right.button.addEventListener('click', () => this.right.toggle());
             if (this.right.element) { // Ensure right sidebar exists
-                this.right.renderFavorites(); // Call the new method
+                this.right.renderFavorites(); 
+                this.right.renderExtensionIcons(); // Call the new method for extensions
             }
         }
     }
