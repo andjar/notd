@@ -1187,7 +1187,7 @@ textarea:focus {
 }
 
 /* Page title and properties gear icon */
-.page-title-container {
+.page-title {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1203,17 +1203,15 @@ textarea:focus {
     padding-top: var(--ls-space-4);
 }
 
-/*
-#current-page-title {
+#page-title {
     font-family: var(--ls-header-font-family);
     font-size: var(--ls-page-title-size);
     font-weight: var(--ls-font-weight-semibold);
     color: var(--ls-primary-text-color);
     line-height: 1.2;
-    border-bottom: 1px solid var(--ls-secondary-border-color); /* Softened border * /
+    border-bottom: 1px solid var(--ls-secondary-border-color);
     padding-bottom: var(--ls-space-2);
 }
-*/
 
 .page-title-gear {
     color: var(--ls-secondary-text-color);

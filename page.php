@@ -169,12 +169,13 @@ if (!$page) {
 
         <!-- Main Content -->
         <div id="main-content" class="main-content">
-            <div id="page-title"></div>
-            <div id="page-properties"></div>
-            <div id="breadcrumbs-container">
-                <!-- Breadcrumb navigation will be populated by JavaScript -->
+        <div class="page-title-container">
+        <div id="page-title">
+                <!-- Page title and namespace breadcrumbs will be populated by JavaScript -->
             </div>
+            <div id="page-properties"></div>
             <div id="note-focus-breadcrumbs-container"></div>
+            </div>
             <div id="notes-container" class="outliner">
                 <!-- Notes will be rendered here -->
             </div>
