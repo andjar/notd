@@ -17,35 +17,25 @@ class PropertyParser {
             $line = trim($line);
             if (empty($line)) continue;
 
-            // New regex: /^\{?([^:]+):(:{1,2})?(.+?)\}?$/
-            // This regex aims to capture:
-            // 1. Optional braces: \{? and \}?
-            // 2. Key: ([^:]+)
-            // 3. Separator: :(:{1,2})?  (first colon is mandatory, then optionally one or two more)
-            //    - Group 2 will capture the optional colons (:, ::)
-            // 4. Value: (.+?)
-            if (preg_match('/^\{?([^:]+):(:{1,2})?(.+?)\}?$/', $line, $matches)) {
+            // Updated regex to reliably capture key, separator, and value.
+            // It correctly distinguishes between ':', '::', and ':::' separators.
+            if (preg_match('/^\{?([^:]+)(:{1,3})(.+?)\}?$/', $line, $matches)) {
                 $key = trim($matches[1]);
-                $separator_extra_colons = isset($matches[2]) ? $matches[2] : ''; // :, ::, or empty
+                $separator = $matches[2];
                 $value = trim($matches[3]);
 
                 // Skip empty keys
                 if (empty($key)) continue;
 
                 $is_internal = false;
-                // Legacy internal properties might need a different check if they exist.
-                // For now, only ::: makes a property internal.
-                // Or if it's a legacy internal property (e.g. starts with _)
+                // Property is internal if key starts with '_'
                 if (strpos($key, '_') === 0) { // Example for legacy internal
                     $is_internal = true;
                 }
 
-                if ($separator_extra_colons === '::') { // {key:::value}
+                // Property is also internal if ':::' separator is used.
+                if ($separator === ':::') { // {key:::value}
                     $is_internal = true;
-                } else if ($separator_extra_colons === ':') { // {key::value}
-                    // This is new normal, is_internal remains false unless key starts with _
-                } else { // {key:value} or key:value (legacy)
-                    // This is legacy normal, is_internal remains false unless key starts with _
                 }
                 
                 $parsedProperties[] = [
