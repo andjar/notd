@@ -346,19 +346,35 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
                 if ($note) {
                     $currentContent = $note['content'] ?: ''; // Handle null content
                     
-                    // Determine property format
+                    // Determine property format from the saved property data
                     $propertyName = $savedProperty['name'];
                     $propertyValue = $savedProperty['value'];
                     $isInternal = (bool)$savedProperty['internal'];
                     
+                    // Construct the new property string. Always prepend with a newline for consistency.
                     $propertyString = "\n{" . $propertyName . ($isInternal ? ':::' : '::') . $propertyValue . "}";
                     
-                    // Append to content
-                    $newContent = $currentContent . $propertyString;
+                    // Escape property name for use in regex.
+                    $escapedName = preg_quote($propertyName, '/');
+                    // Regex to find an existing property string, matching either ::: or :: separators.
+                    // The 's' modifier allows '.' to match newlines, in case property values contain them.
+                    $pattern = "/\n?\{" . $escapedName . "(?:::|::).*?\}/s";
                     
-                    // Save updated note content
-                    $updateNoteStmt = $pdo->prepare("UPDATE Notes SET content = ? WHERE id = ?");
-                    $updateNoteStmt->execute([$newContent, $entityId]);
+                    $count = 0;
+                    // Try to replace the first occurrence of the property.
+                    $newContent = preg_replace($pattern, $propertyString, $currentContent, 1, $count);
+                    
+                    // If the property was not found and replaced, append the new property string.
+                    if ($count === 0) {
+                        // Use rtrim to avoid piling up newlines if content already ends with one.
+                        $newContent = rtrim($currentContent) . $propertyString;
+                    }
+                    
+                    // Only execute DB update if the content has actually changed to avoid unnecessary writes.
+                    if ($newContent !== $currentContent) {
+                        $updateNoteStmt = $pdo->prepare("UPDATE Notes SET content = ? WHERE id = ?");
+                        $updateNoteStmt->execute([$newContent, $entityId]);
+                    }
                 } else {
                     // This case should ideally not happen if checkEntityExists passed earlier
                     // but as a safeguard, we can log it.
