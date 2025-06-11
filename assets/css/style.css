@@ -1203,15 +1203,17 @@ textarea:focus {
     padding-top: var(--ls-space-4);
 }
 
+/*
 #current-page-title {
     font-family: var(--ls-header-font-family);
     font-size: var(--ls-page-title-size);
     font-weight: var(--ls-font-weight-semibold);
     color: var(--ls-primary-text-color);
     line-height: 1.2;
-    border-bottom: 1px solid var(--ls-secondary-border-color); /* Softened border */
+    border-bottom: 1px solid var(--ls-secondary-border-color); /* Softened border * /
     padding-bottom: var(--ls-space-2);
 }
+*/
 
 .page-title-gear {
     color: var(--ls-secondary-text-color);
@@ -3346,22 +3348,33 @@ a[href^="https://"]:visited {
 
 /* Styles for Namespace Breadcrumbs */
 #breadcrumbs-container {
-    margin-bottom: var(--ls-space-4, 16px); /* Use existing variable with fallback */
-    padding: var(--ls-space-2, 8px);
-    font-size: var(--ls-font-size-sm, 0.875rem);
+    font-family: var(--ls-header-font-family);
+    font-size: var(--ls-page-title-size);
+    font-weight: var(--ls-font-weight-semibold);
+    color: var(--ls-primary-text-color);
+    line-height: 1.2;
+    border-bottom: 1px solid var(--ls-secondary-border-color);
+    padding-top: var(--ls-space-2);
+    padding-bottom: var(--ls-space-2);
+    padding-left: 0;
+    padding-right: 0;
+    margin-bottom: var(--ls-space-4, 16px);
     display: flex; /* Managed by JS, but good default */
     align-items: center;
     flex-wrap: wrap; /* Allow breadcrumbs to wrap on smaller screens */
-    gap: var(--ls-space-1, 4px); /* Gap between items */
-    /* border-bottom: 1px solid var(--ls-secondary-border-color, #eee); */ /* Optional: light border */
+    gap: var(--ls-space-2); /* Gap between items, increased */
 }
 
 .namespace-breadcrumb {
     text-decoration: none;
-    color: var(--ls-link-text-color, var(--color-accent, #007bff)); /* Use existing link color or accent */
-    padding: var(--ls-space-1, 4px) var(--ls-space-2, 8px);
+    color: var(--ls-link-text-color); /* Use existing link color or accent */
+    padding: 0 var(--ls-space-1); /* Minimal padding */
     border-radius: var(--ls-border-radius-low, 4px);
-    transition: background-color var(--ls-transition-fast, 150ms ease);
+    transition: background-color var(--ls-transition-fast, 150ms ease), text-decoration var(--ls-transition-fast, 150ms ease);
+    /* Ensure font properties inherit */
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
 }
 
 .namespace-breadcrumb:hover {
@@ -3370,6 +3383,50 @@ a[href^="https://"]:visited {
 }
 
 /* Separators are text nodes ' / ', spacing is handled by gap in container and padding on links */
+/* Text nodes within #breadcrumbs-container will inherit font styles from it. */
+
+/* Styles for Note Focus Breadcrumbs */
+#note-focus-breadcrumbs-container {
+    margin-bottom: var(--ls-space-3);
+    padding: var(--ls-space-1) 0;
+    font-size: var(--ls-font-size-sm);
+    display: none; /* JS will change to flex when active */
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--ls-space-1);
+    color: var(--ls-secondary-text-color); /* Default text color for separators etc. */
+    /* Ensure it does not have a prominent background or border like the main page header */
+}
+
+#note-focus-breadcrumbs-container a {
+    color: var(--ls-link-text-color);
+    text-decoration: none;
+    padding: var(--ls-space-1); /* Consistent small padding */
+    border-radius: var(--ls-border-radius-low);
+    transition: background-color var(--ls-transition-fast), text-decoration var(--ls-transition-fast);
+}
+
+#note-focus-breadcrumbs-container a:hover {
+    background-color: var(--ls-tertiary-background-color);
+    text-decoration: underline;
+}
+
+/* For the current (non-linked) item in note-focus breadcrumbs, if it's wrapped in a span or similar */
+#note-focus-breadcrumbs-container .breadcrumb-current {
+    color: var(--ls-primary-text-color);
+    font-weight: var(--ls-font-weight-semibold);
+    padding: var(--ls-space-1);
+}
+
+/* Styling for separators like '>' if they are text nodes.
+   The JS creates text nodes like ' > '. The gap property on the container
+   will handle spacing around them. The color will be inherited from
+   #note-focus-breadcrumbs-container (which we set to secondary text color). */
+#note-focus-breadcrumbs-container > span:not(.breadcrumb-current) { /* Target potential separator spans if JS wraps them */
+    /* This rule might not be strictly necessary if separators are text nodes, as they'll inherit
+       the container's color. Included for completeness if JS behavior changes. */
+    color: var(--ls-secondary-text-color);
+}
 
 /* Styles for Child Pages Section */
 #child-pages-container {

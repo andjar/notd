@@ -524,7 +524,7 @@ function getNoteAncestors(noteId, allNotesOnPage) {
  * @param {string} currentPageName - The name of the current page.
  */
 function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
-    if (!domRefs.breadcrumbsContainer) { console.warn('Breadcrumbs container not found in DOM.'); return; }
+    if (!domRefs.noteFocusBreadcrumbsContainer) { console.warn('Note-focus breadcrumbs container not found in DOM.'); return; }
     if (!currentPageName) { console.warn('renderBreadcrumbs called without currentPageName.'); currentPageName = 'Page'; } // Basic fallback
 
     let breadcrumbLinksHtml = `<a href="#" onclick="ui.showAllNotesAndLoadPage('${currentPageName}'); return false;">${currentPageName.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a>`;
@@ -548,7 +548,7 @@ function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
             <i data-feather="settings" class="page-title-gear" id="page-properties-gear" style="cursor: pointer;"></i>
         </div>
     `;
-    domRefs.breadcrumbsContainer.innerHTML = breadcrumbHTML;
+    domRefs.noteFocusBreadcrumbsContainer.innerHTML = breadcrumbHTML;
     if (typeof feather !== 'undefined' && feather.replace) {
         feather.replace();
     }

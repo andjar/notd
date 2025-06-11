@@ -174,6 +174,7 @@ if (!$page) {
             <div id="breadcrumbs-container">
                 <!-- Breadcrumb navigation will be populated by JavaScript -->
             </div>
+            <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner">
                 <!-- Notes will be rendered here -->
             </div>

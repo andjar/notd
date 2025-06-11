@@ -17,6 +17,7 @@ export const domRefs = {
     searchResults: document.getElementById('search-results'),
     backlinksContainer: document.getElementById('backlinks-container'),
     breadcrumbsContainer: document.getElementById('breadcrumbs-container'),
+    noteFocusBreadcrumbsContainer: document.getElementById('note-focus-breadcrumbs-container'),
     pagePropertiesGear: document.getElementById('page-properties-gear'),
     pagePropertiesModal: document.getElementById('page-properties-modal'),
     pagePropertiesModalClose: document.getElementById('page-properties-modal-close'),
