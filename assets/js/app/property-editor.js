@@ -60,37 +60,78 @@ export function displayPageProperties(properties) {
         return;
     }
     pagePropertiesList.innerHTML = '';
-    if (!properties || Object.keys(properties).length === 0) {
-        pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
-        // Still set up the encryption listener even if no properties exist
-        setupPagePropertiesModalListeners();
-        return;
+    
+    const showInternal = window.APP_CONFIG && window.APP_CONFIG.SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE !== false; // Default to true if undefined
+
+    let propertiesExistToDisplay = false;
+
+    if (properties && Object.keys(properties).length > 0) {
+        Object.entries(properties).forEach(([key, propertyInstancesArray]) => {
+            // propertyInstancesArray is expected to be like [{value: 'v1', internal: 0}, {value: 'v2', internal: 1}]
+            if (Array.isArray(propertyInstancesArray)) {
+                propertyInstancesArray.forEach((instance, index) => {
+                    if (instance.internal && !showInternal) {
+                        return; // Skip this internal property instance
+                    }
+                    propertiesExistToDisplay = true;
+                    const propItem = document.createElement('div');
+                    propItem.className = 'page-property-item';
+                    if (instance.internal) {
+                        propItem.classList.add('page-property-internal');
+                    }
+
+                    propItem.innerHTML = `
+                        <span class="page-property-key" contenteditable="true" data-original-key="${key}" data-is-array="true" data-array-index="${index}">${key}</span>
+                        <span class="page-property-separator">:</span>
+                        <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${instance.value}" value="${instance.value}" />
+                        <button class="page-property-delete" data-property="${key}" data-array-index="${index}" title="Delete this ${key} value">×</button>
+                    `;
+                    pagePropertiesList.appendChild(propItem);
+                });
+            } else {
+                // This else block handles cases where propertyInstancesArray is not an array.
+                // Assuming it might be a single instance object {value: ..., internal: ...}
+                // This structure is not what the current API (after DataManager) provides, but handling defensively.
+                const instance = propertyInstancesArray; // Treat it as a single instance
+                if (typeof instance === 'object' && instance !== null && instance.hasOwnProperty('value') && instance.hasOwnProperty('internal')) {
+                    if (instance.internal && !showInternal) {
+                        return; // Skip this internal property instance
+                    }
+                    propertiesExistToDisplay = true;
+                    const propItem = document.createElement('div');
+                    propItem.className = 'page-property-item';
+                    if (instance.internal) {
+                        propItem.classList.add('page-property-internal');
+                    }
+                    propItem.innerHTML = `
+                        <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
+                        <span class="page-property-separator">:</span>
+                        <input type="text" class="page-property-value" data-property="${key}" data-original-value="${instance.value}" value="${instance.value}" />
+                        <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
+                    `;
+                    pagePropertiesList.appendChild(propItem);
+                } else if (typeof instance !== 'object') { // Simple value, assume not internal
+                    propertiesExistToDisplay = true;
+                    const propItem = document.createElement('div');
+                    propItem.className = 'page-property-item'; // No internal class for simple values
+                    propItem.innerHTML = `
+                        <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
+                        <span class="page-property-separator">:</span>
+                        <input type="text" class="page-property-value" data-property="${key}" data-original-value="${instance || ''}" value="${instance || ''}" />
+                        <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
+                    `;
+                    pagePropertiesList.appendChild(propItem);
+                }
+            }
+        });
     }
-    Object.entries(properties).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-            value.forEach((singleValue, index) => {
-                const propItem = document.createElement('div');
-                propItem.className = 'page-property-item';
-                propItem.innerHTML = `
-                    <span class="page-property-key" contenteditable="true" data-original-key="${key}" data-is-array="true" data-array-index="${index}">${key}</span>
-                    <span class="page-property-separator">:</span>
-                    <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${singleValue.value}" value="${singleValue.value}" />
-                    <button class="page-property-delete" data-property="${key}" data-array-index="${index}" title="Delete this ${key} value">×</button>
-                `;
-                pagePropertiesList.appendChild(propItem);
-            });
-        } else {
-            const propItem = document.createElement('div');
-            propItem.className = 'page-property-item';
-            propItem.innerHTML = `
-                <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
-                <span class="page-property-separator">:</span>
-                <input type="text" class="page-property-value" data-property="${key}" data-original-value="${(typeof value === 'object' && value !== null && value.hasOwnProperty('value')) ? value.value : (value || '')}" value="${(typeof value === 'object' && value !== null && value.hasOwnProperty('value')) ? value.value : (value || '')}" />
-                <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
-            `;
-            pagePropertiesList.appendChild(propItem);
-        }
-    });
+
+    if (!propertiesExistToDisplay) {
+        pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties to display (or all are hidden).</p>';
+    }
+    
+    // Listeners should be set up regardless of whether properties were found, for "Add Property" button etc.
+    setupPagePropertiesModalListeners(); // Original position for this was inside the initial if/else
 
     const existingListener = pagePropertiesList._propertyEventListener;
     if (existingListener) {

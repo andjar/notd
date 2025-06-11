@@ -336,6 +336,37 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
                 $value,
                 $explicitInternal 
             );
+
+            if ($entityType === 'note') {
+                // Fetch note content
+                $stmtNote = $pdo->prepare("SELECT content FROM Notes WHERE id = ?");
+                $stmtNote->execute([$entityId]);
+                $note = $stmtNote->fetch(PDO::FETCH_ASSOC);
+
+                if ($note) {
+                    $currentContent = $note['content'] ?: ''; // Handle null content
+                    
+                    // Determine property format
+                    $propertyName = $savedProperty['name'];
+                    $propertyValue = $savedProperty['value'];
+                    $isInternal = (bool)$savedProperty['internal'];
+                    
+                    $propertyString = "\n{" . $propertyName . ($isInternal ? ':::' : '::') . $propertyValue . "}";
+                    
+                    // Append to content
+                    $newContent = $currentContent . $propertyString;
+                    
+                    // Save updated note content
+                    $updateNoteStmt = $pdo->prepare("UPDATE Notes SET content = ? WHERE id = ?");
+                    $updateNoteStmt->execute([$newContent, $entityId]);
+                } else {
+                    // This case should ideally not happen if checkEntityExists passed earlier
+                    // but as a safeguard, we can log it.
+                    error_log("Note with ID {$entityId} not found when trying to append property to content.");
+                    // Optionally, throw an exception to rollback if this is critical
+                    // throw new Exception("Note not found, cannot append property to content.");
+                }
+            }
             
             $pdo->commit();
             
