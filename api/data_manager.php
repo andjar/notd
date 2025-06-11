@@ -9,54 +9,33 @@ class DataManager {
         $this->pdo = $pdo;
     }
 
-    // Placeholder for _formatProperties helper method
+    // Formats properties according to the API specification:
+    // {"property_name": [{"value": "...", "internal": 0/1}, ...]}
     private function _formatProperties($propertiesResult, $includeInternal = false) {
         $formattedProperties = [];
         if (empty($propertiesResult)) {
             return $formattedProperties;
         }
 
-        // Group properties by name first
-        $groupedByName = [];
         foreach ($propertiesResult as $prop) {
-            $groupedByName[$prop['name']][] = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
-        }
-
-        foreach ($groupedByName as $name => $values) {
-            if (count($values) === 1) {
-                // If only one property value
-                if (!$includeInternal && $values[0]['internal'] == 0) {
-                    // If not including internal and the property is not internal, simplify to value
-                    $formattedProperties[$name] = $values[0]['value'];
-                } else {
-                    // Otherwise, keep as an object to show internal flag or if it's an internal property
-                    $formattedProperties[$name] = $values[0];
-                }
-            } else {
-                // For multiple values (lists)
-                if (!$includeInternal) {
-                    // Filter out internal properties if not included
-                    $filteredValues = array_filter($values, function($value) {
-                        return $value['internal'] == 0;
-                    });
-                    // If all were internal and filtered out, this property might become empty or just not be set.
-                    // If after filtering, only one non-internal item remains, simplify it.
-                    if (count($filteredValues) === 1) {
-                         $singleValue = array_values($filteredValues)[0]; // Get the single item
-                         $formattedProperties[$name] = $singleValue['value'];
-                    } elseif (count($filteredValues) > 1) {
-                        // If multiple non-internal items, return array of values
-                        $formattedProperties[$name] = array_map(function($v) { return $v['value']; }, $filteredValues);
-                    } else {
-                        // If all values were internal and includeInternal is false, the property is effectively empty or not shown
-                        // Depending on desired behavior, one might choose to add an empty array or skip the property.
-                        // For now, let's skip it if all are internal and not included.
-                    }
-                } else {
-                    // If including internal, return all values as an array of objects
-                    $formattedProperties[$name] = $values;
-                }
+            $isInternal = (int)$prop['internal'];
+            
+            // If we are not including internal properties, and this one is internal, skip it.
+            if (!$includeInternal && $isInternal == 1) {
+                continue;
             }
+
+            $propName = $prop['name'];
+            $propValue = $prop['value'];
+
+            if (!isset($formattedProperties[$propName])) {
+                $formattedProperties[$propName] = [];
+            }
+            
+            $formattedProperties[$propName][] = [
+                'value' => $propValue,
+                'internal' => $isInternal
+            ];
         }
         return $formattedProperties;
     }
@@ -124,28 +103,62 @@ class DataManager {
         return $note;
     }
 
-    public function getNotesByPageId($pageId, $includeInternal = false) {
+    public function getNotesByPageId($pageId, $includeInternal = false, $pageNumber = 1, $perPage = null) {
+        $params = [':pageId' => $pageId];
+        $countSql = "SELECT COUNT(*) FROM Notes WHERE page_id = :pageId";
+        if (!$includeInternal) {
+            $countSql .= " AND internal = 0";
+        }
+
         $notesSql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes WHERE Notes.page_id = :pageId";
         if (!$includeInternal) {
-            $notesSql .= " AND Notes.internal = 0"; // Added Notes. prefix for clarity
+            $notesSql .= " AND Notes.internal = 0";
         }
-        $notesSql .= " ORDER BY Notes.order_index ASC"; // Added Notes. prefix for clarity
+        $notesSql .= " ORDER BY Notes.order_index ASC";
+
+        $paginationResult = null;
+
+        if ($perPage !== null && $perPage > 0) {
+            $totalNotesStmt = $this->pdo->prepare($countSql);
+            $totalNotesStmt->execute([':pageId' => $pageId]); // Assuming internal filtering is part of count query
+            $totalItems = (int)$totalNotesStmt->fetchColumn();
+
+            $perPage = max(1, (int)$perPage);
+            $pageNumber = max(1, (int)$pageNumber);
+            $offset = ($pageNumber - 1) * $perPage;
+            $totalPages = (int)ceil($totalItems / $perPage);
+            
+            $notesSql .= " LIMIT :limit OFFSET :offset";
+            $params[':limit'] = $perPage;
+            $params[':offset'] = $offset;
+            
+            $paginationResult = [
+                'total_items' => $totalItems,
+                'per_page' => $perPage,
+                'current_page' => $pageNumber,
+                'total_pages' => $totalPages,
+            ];
+        }
         
-        error_log("[DEBUG] getNotesByPageId called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
-        error_log("[DEBUG] SQL query: " . $notesSql);
+        error_log("[DEBUG] getNotesByPageId called for pageId: {$pageId}, includeInternal: " . ($includeInternal ? 'true' : 'false') . ", page: {$pageNumber}, perPage: " . ($perPage ?? 'all'));
+        error_log("[DEBUG] SQL query: " . $notesSql . " with params: " . json_encode($params));
         
         $stmt = $this->pdo->prepare($notesSql);
+        // Bind parameters dynamically based on what's included
         $stmt->bindParam(':pageId', $pageId, PDO::PARAM_INT);
-        $stmt->execute();
+        if (strpos($notesSql, ':limit') !== false) {
+            $stmt->bindParam(':limit', $perPage, PDO::PARAM_INT);
+        }
+        if (strpos($notesSql, ':offset') !== false) {
+            $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        }
+        $stmt->execute(); // Execute without passing params array directly, as they are bound
         $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         error_log("[DEBUG] Found " . count($notes) . " notes for pageId: " . $pageId);
-        if (!empty($notes)) {
-            error_log("[DEBUG] First note: " . json_encode($notes[0]));
-        }
         
         if (empty($notes)) {
-            return [];
+            return ['notes' => [], 'pagination' => $paginationResult];
         }
 
         $noteIds = array_column($notes, 'id');
@@ -195,28 +208,26 @@ class DataManager {
         return $page;
     }
 
-    public function getPageWithNotes($pageId, $includeInternal = false) {
-        error_log("[DEBUG] getPageWithNotes called for pageId: " . $pageId);
+    public function getPageWithNotes($pageId, $includeInternal = false, $notesPageNumber = 1, $notesPerPage = null) {
+        error_log("[DEBUG] getPageWithNotes called for pageId: {$pageId}, includeInternal: " . ($includeInternal ? 'true' : 'false') . ", notesPage: {$notesPageNumber}, notesPerPage: " . ($notesPerPage ?? 'all'));
         
         $pageDetails = $this->getPageDetailsById($pageId, $includeInternal);
         error_log("[DEBUG] getPageDetailsById result: " . json_encode($pageDetails));
 
         if (!$pageDetails) {
-            error_log("[DEBUG] Page not found by getPageDetailsById for ID: " . $pageId . ". Returning null from getPageWithNotes."); // Updated log
-            return null; // Added this line
+            error_log("[DEBUG] Page not found by getPageDetailsById for ID: " . $pageId . ". Returning null from getPageWithNotes.");
+            return null;
         }
         
-        // If $pageDetails was null, the function now exits above.
-        // The original code continued here:
-        // error_log("[DEBUG] Page not found for ID: " . $pageId); // This log might be confusing if pageDetails is null and we proceed.
-        // We should ensure this part is only reached if $pageDetails is valid.
-
-        $notes = $this->getNotesByPageId($pageId, $includeInternal);
-        error_log("[DEBUG] getNotesByPageId result: " . json_encode($notes));
+        $notesResult = $this->getNotesByPageId($pageId, $includeInternal, $notesPageNumber, $notesPerPage);
+        error_log("[DEBUG] getNotesByPageId result: " . json_encode($notesResult));
         
         return [
             'page' => $pageDetails,
-            'notes' => $notes
+            'notes_data' => [ // New structure
+                'notes' => $notesResult['notes'],
+                'pagination' => $notesResult['pagination']
+            ]
         ];
     }
 

@@ -123,42 +123,81 @@ class AttachmentManager {
 
     public function handleRequest() {
         $method = $_SERVER['REQUEST_METHOD'];
+        $input = [];
 
-        // Handle method overriding for DELETE via POST (e.g., for phpdesktop)
-        if ($method === 'POST' && isset($_POST['_method']) && strtoupper($_POST['_method']) === 'DELETE') {
-            $method = 'DELETE';
+        // For POST requests, determine if it's an upload or a delete action based on Content-Type and payload
+        if ($method === 'POST') {
+            if (isset($_SERVER['CONTENT_TYPE']) && strpos(strtolower($_SERVER['CONTENT_TYPE']), 'application/json') !== false) {
+                $input = json_decode(file_get_contents('php://input'), true);
+                if (isset($input['action']) && $input['action'] === 'delete') {
+                    $this->handleDeleteRequest($input); // Pass parsed JSON input
+                    return;
+                }
+                 // If action is not 'delete', or not present, it might be an upload attempt with wrong Content-Type,
+                 // or another JSON based POST action if we add more later.
+                 // For now, if it's not 'delete', let it fall through to be handled as an upload,
+                 // which will likely fail if 'multipart/form-data' is not used.
+                 // Or, explicitly error out if JSON content type but no valid action:
+                 // else {
+                 //    ApiResponse::error('Invalid action for POST with application/json', 400);
+                 //    return;
+                 // }
+            }
+            // Default POST action is upload (handlePostRequest will deal with multipart/form-data)
+            $this->handlePostRequest();
+            return;
         }
 
+        // Handle method overriding for DELETE via POST (e.g., for phpdesktop using _method)
+        // This is less common if we strictly use action: "delete" for POST.
+        // Consider if this specific override is still needed or if action based is sufficient.
+        // For now, keeping it but it means handleDeleteRequest needs to check $_POST as well.
+        if ($method === 'POST' && isset($_POST['_method']) && strtoupper($_POST['_method']) === 'DELETE') {
+             // This case is tricky. If _method is used, the body might be form-urlencoded.
+             // The spec pushes for JSON body for actions.
+             // For simplicity, this example will assume if _method=DELETE, id is in $_POST or $_GET.
+            $this->handleDeleteRequest($_REQUEST); // $_REQUEST contains $_GET and $_POST
+            return;
+        }
+        
         switch ($method) {
-            case 'POST':
-                $this->handlePostRequest();
-                break;
+            // POST is handled above
             case 'GET':
                 $this->handleGetRequest();
                 break;
-            case 'DELETE':
-                $this->handleDeleteRequest();
+            case 'DELETE': // Direct DELETE request
+                $this->handleDeleteRequest($_GET); // Pass $_GET as source for ID
                 break;
             default:
                 ApiResponse::error('Method Not Allowed', 405);
         }
     }
 
-    private function handlePostRequest() {
-        error_log("=== POST METHOD PROCESSING ===");
+    private function handlePostRequest() { // This is now explicitly for UPLOAD
+        error_log("=== POST METHOD PROCESSING (UPLOAD) ===");
+
+        // Check if it's a multipart/form-data request, essential for file uploads
+        if (!isset($_SERVER['CONTENT_TYPE']) || strpos(strtolower($_SERVER['CONTENT_TYPE']), 'multipart/form-data') === false) {
+            // If 'action: "delete"' was intended but sent with wrong content type, this will catch it too.
+            // However, the primary check for 'action: "delete"' with JSON is now in handleRequest.
+            ob_end_clean();
+            ApiResponse::error('Invalid request for upload. Content-Type must be multipart/form-data.', 415);
+            return;
+        }
         
+        // Standard $_POST validation for note_id if it's part of multipart form
         $validationRulesPOST = ['note_id' => 'required|isPositiveInteger'];
         $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
         if (!empty($errorsPOST)) {
             ob_end_clean();
-            ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
+            ApiResponse::error('Invalid input for note ID with upload.', 400, $errorsPOST);
             return;
         }
         $note_id = (int)$_POST['note_id'];
 
         if (!isset($_FILES['attachmentFile'])) {
             ob_end_clean();
-            ApiResponse::error('attachmentFile is required.', 400);
+            ApiResponse::error('attachmentFile is required for upload.', 400);
             return;
         }
         $file = $_FILES['attachmentFile'];
@@ -249,13 +288,56 @@ class AttachmentManager {
     }
 
     private function handleGetRequest() {
-        if (isset($_GET['note_id'])) {
+        if (isset($_GET['id']) && !isset($_GET['note_id'])) {
+            $this->handleGetById();
+        } elseif (isset($_GET['note_id'])) {
             $this->handleGetByNoteId();
         } else {
             $this->handleGetAll();
         }
     }
 
+    private function handleGetById() {
+        if (!isset($_GET['id']) || !filter_var($_GET['id'], FILTER_VALIDATE_INT) || (int)$_GET['id'] <= 0) {
+            ob_end_clean(); // Clean buffer before error response
+            ApiResponse::error("Valid attachment ID is required.", 400);
+            return;
+        }
+        $id = (int)$_GET['id'];
+
+        try {
+            // Fetch attachment details from the database
+            // Using column aliases to match the desired output structure ('name', 'path', 'type', 'size')
+            $stmt = $this->pdo->prepare(
+                "SELECT id, note_id, name, path, type, size, created_at 
+                 FROM Attachments 
+                 WHERE id = ?"
+            );
+            $stmt->execute([$id]);
+            $attachment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($attachment) {
+                // Construct the full URL for file access
+                $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path'];
+                
+                // Ensure numeric fields are actual numbers if necessary (PDO usually handles this)
+                $attachment['id'] = (int)$attachment['id'];
+                $attachment['note_id'] = (int)$attachment['note_id'];
+                $attachment['size'] = (int)$attachment['size'];
+
+                ApiResponse::success($attachment);
+                ob_end_flush();
+            } else {
+                ob_end_clean();
+                ApiResponse::error("Attachment not found.", 404);
+            }
+        } catch (PDOException $e) {
+            ob_end_clean();
+            // Log error: error_log("Database error in handleGetById: " . $e->getMessage());
+            ApiResponse::error("Database error while fetching attachment.", 500);
+        }
+    }
+    
     private function handleGetByNoteId() {
         $note_id = (int)$_GET['note_id'];
         try {
@@ -358,17 +440,31 @@ class AttachmentManager {
         }
     }
 
-    private function handleDeleteRequest() {
-        $id_to_validate = $_GET['id'] ?? ($input['id'] ?? null);
+    private function handleDeleteRequest($dataSource = []) { // Accepts a data source for the ID
+        error_log("=== DELETE METHOD PROCESSING ===");
+        $attachment_id = null;
 
+        if (isset($dataSource['action']) && $dataSource['action'] === 'delete') { // From POST JSON body
+            $attachment_id = $dataSource['id'] ?? null;
+        } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') { // From DELETE request (likely ID in query string)
+            $attachment_id = $dataSource['id'] ?? null; // dataSource here would be $_GET
+        } else if (isset($dataSource['_method']) && strtoupper($dataSource['_method']) === 'DELETE') { // From POST _method override
+             $attachment_id = $dataSource['id'] ?? null; // dataSource here would be $_REQUEST
+        }
+        else {
+            // Fallback or error if ID source is unclear / this method is called incorrectly
+            // This specific check might be redundant if handleRequest routes correctly.
+            $attachment_id = $dataSource['id'] ?? $_GET['id'] ?? null;
+        }
+        
         $validationRules = ['id' => 'required|isPositiveInteger'];
-        $errors = Validator::validate(['id' => $id_to_validate], $validationRules); 
+        $errors = Validator::validate(['id' => $attachment_id], $validationRules); 
         if (!empty($errors)) {
             ob_end_clean();
-            ApiResponse::error('Invalid attachment ID.', 400, $errors);
+            ApiResponse::error('A valid attachment ID is required for deletion.', 400, $errors);
             return;
         }
-        $attachment_id = (int)$id_to_validate;
+        $attachment_id = (int)$attachment_id;
 
         try {
             $this->pdo->beginTransaction();

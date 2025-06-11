@@ -50,24 +50,30 @@ The Attachments API is responsible for managing file attachments associated with
 #### POST `api/v1/attachments.php` (Delete Attachment)
 
 - **Headers**:
-    - `Content-Type: application/x-www-form-urlencoded` or `application/json`
-- **Body (form-data or JSON)**:
+    - `Content-Type: application/json`
+- **JSON Payload**:
     - `action` (required, string): Must be `"delete"`.
     - `id` (required, integer): The ID of the attachment to delete.
+    ```json
+    {
+        "action": "delete",
+        "id": 123
+    }
+    ```
 
 #### GET `api/v1/attachments.php`
 
 This endpoint has two modes of operation:
 
-1.  **Retrieve a specific attachment by its ID**:
+1.  **Retrieve JSON metadata for a specific attachment by its ID**:
     -   **URL Parameters**:
-        -   `id` (required): The ID of the attachment to retrieve.
-        -   `disposition` (optional, string): `download` (forces download) or `inline` (attempts to display in browser, default).
-    -   *Note: This mode is triggered if an `id` parameter is provided.*
+        -   `id` (required): The ID of the attachment for which to retrieve metadata.
+    -   *Note: This mode is triggered if an `id` parameter is provided (and `note_id` is not, to differentiate from listing attachments for a note).*
+    -   The actual file content should be accessed via the `url` provided in the response. The `disposition` parameter is not used by this metadata endpoint.
 
 2.  **List attachments (with filtering and pagination)**:
     -   **URL Parameters**:
-        -   `note_id` (optional): If provided, lists attachments only for this specific note.
+        -   `note_id` (optional): If provided, lists attachments only for this specific note. If `id` is also provided, `note_id` takes precedence for listing.
         -   `page` (optional, integer): The page number for pagination. Defaults to `1`.
         -   `per_page` (optional, integer): The number of attachments to return per page. Defaults to `10`, max `100`.
         -   `sort_by` (optional, string): Field to sort by. Allowed: `id`, `name`, `path`, `type`, `size`, `created_at`. Defaults to `created_at`.
@@ -94,16 +100,31 @@ This endpoint has two modes of operation:
             "filesize": 102400,
             "filetype": "image/jpeg",
             "storage_key": "attachments/note_456/example.jpg", // Renamed from s3_key for generality
-            "url": "/api/v1/attachments.php?id=123", // URL to retrieve/view
+            "url": "http://localhost/api/v1/attachments.php?id=123", // This URL used to point to the API for file serving. Now it's a direct link.
             "created_at": "YYYY-MM-DD HH:MM:SS"
         }
     }
     ```
-- **GET `api/v1/attachments.php` (Retrieve specific attachment - disposition=inline or no disposition)**:
-    - The raw file content is returned with the appropriate `Content-Type` header.
-- **GET `api/v1/attachments.php` (Retrieve specific attachment - disposition=download)**:
-    - The raw file content is returned with `Content-Disposition: attachment; filename="example.jpg"` and appropriate `Content-Type`.
-- **GET `api/v1/attachments.php` (List attachments)**:
+- **GET `api/v1/attachments.php?id={attachment_id}` (Retrieve JSON metadata for a specific attachment)**:
+    *Status Code: 200 OK*
+    ```json
+    {
+        "status": "success",
+        "data": {
+            "id": 123,
+            "note_id": 456,
+            "name": "example.jpg",
+            "path": "2023/10/unique_example.jpg", // Relative path from the 'uploads' directory
+            "type": "image/jpeg",
+            "size": 102400, // in bytes
+            "created_at": "YYYY-MM-DD HH:MM:SS",
+            "url": "http://localhost/uploads/2023/10/unique_example.jpg" // Full URL to access/download the actual file
+        }
+    }
+    ```
+    *Note: To download the actual file, the client should use the `url` provided in this response.*
+
+- **GET `api/v1/attachments.php` (List attachments, e.g., by `note_id`)**:
     *Status Code: 200 OK*
     ```json
     {
@@ -113,10 +134,11 @@ This endpoint has two modes of operation:
                 "id": 1,
                 "note_id": 5, // Included if filtering by note_id or always
                 "name": "document.pdf",
+                "path": "2023/11/another_document.pdf", // Relative path
                 "type": "application/pdf",
                 "size": 123456, // in bytes
                 "created_at": "YYYY-MM-DD HH:MM:SS",
-                "url": "/api/v1/attachments.php?id=1"
+                "url": "http://localhost/uploads/2023/11/another_document.pdf" // Full URL
             }
             // ... more attachments
         ],
@@ -302,6 +324,98 @@ Manages notes, content, and properties. Supports create, retrieve, update, delet
     *General structure as defined in Attachments API.*
     *Specific messages: "Note not found", "Page not found", "Invalid input for X".*
 
+### POST `api/v1/notes.php` (Batch Operations)
+
+Allows multiple create, update, or delete operations on notes within a single request. Operations are processed sequentially, and the server may wrap them in a transaction for atomicity.
+
+- **Headers**: `Content-Type: application/json`
+- **JSON Payload**:
+    - `action` (required, string): Must be `"batch"`.
+    - `operations` (required, array): An array of operation objects. Each object must contain:
+        - `type` (required, string): The type of operation: `"create"`, `"update"`, or `"delete"`.
+        - `payload` (required, object): The parameters for the specific operation type.
+            - **For `type: "create"`**:
+                - `page_id` (required, integer): Page ID for the new note.
+                - `content` (optional, string): Note content.
+                - `parent_note_id` (optional, integer|null): Parent note ID.
+                - `order_index` (optional, integer): Display order.
+                - `collapsed` (optional, integer): `0` or `1`.
+                - `properties_explicit` (optional, object): Explicit properties.
+                - `client_temp_id` (optional, string): A client-generated temporary ID. If provided, this ID can be used to reference this new note in subsequent `update` or `delete` operations within the same batch request. The response will map this `client_temp_id` to the actual `id` assigned upon creation.
+            - **For `type: "update"`**:
+                - `id` (required, integer|string): ID of the note to update. This can be an existing note's integer ID or a `client_temp_id` of a note created in a previous step of this batch.
+                - `content` (optional, string): New content.
+                - `page_id` (optional, integer): Move note.
+                - `parent_note_id` (optional, integer|null): Change parent.
+                - `order_index` (optional, integer): Change order.
+                - `collapsed` (optional, integer): Change collapsed state.
+                - `properties_explicit` (optional, object): Update properties.
+            - **For `type: "delete"`**:
+                - `id` (required, integer|string): ID of the note to delete. Can be an existing note's integer ID or a `client_temp_id`.
+
+#### Success Response (Batch Operations)
+
+*Status Code: 200 OK* (or 207 Multi-Status if operations have mixed results, but 200 OK with detailed results array is also common)
+```json
+{
+    "status": "success", // Indicates the batch request itself was accepted and processed. Individual operations might have failed.
+    "message": "Batch operations processed.",
+    "results": [
+        {
+            "type": "create",
+            "status": "success",
+            "client_temp_id": "client-temp-123", // Included if provided in the request
+            "data": { /* newly created note object, including its actual 'id' */ }
+        },
+        {
+            "type": "update",
+            "status": "success",
+            "data": { /* updated note object */ }
+        },
+        {
+            "type": "delete",
+            "status": "success",
+            "data": {
+                "deleted_note_id": 456
+            }
+        },
+        {
+            "type": "create",
+            "status": "error",
+            "client_temp_id": "client-temp-456",
+            "error": "Invalid page_id.",
+            "details": { "payload": { /* original payload for this operation */ } }
+        }
+    ]
+}
+```
+- **`client_temp_id` Handling**: If a `client_temp_id` is provided for a "create" operation, the corresponding result object in the `results` array will include this `client_temp_id` along with the actual `id` of the created note. This allows the client to map its temporary ID to the permanent server-assigned ID. Subsequent operations in the *same batch request* can then use this `client_temp_id` in the `id` field for "update" or "delete" operations, and the server will resolve it to the newly created note's ID.
+
+#### Error Responses (Batch Operations)
+
+- **Invalid Batch Structure**: If the overall batch request is malformed (e.g., missing `action: "batch"` or `operations` array).
+    *Status Code: 400 Bad Request*
+    ```json
+    {
+        "status": "error",
+        "message": "Invalid batch request structure. 'action' must be 'batch' and 'operations' array is required.",
+        "details": {}
+    }
+    ```
+- **Transaction Failure**: If the batch operations are designed to be atomic and a failure in one operation causes a rollback of all operations.
+    *Status Code: 500 Internal Server Error* (or 409 Conflict if appropriate)
+    ```json
+    {
+        "status": "error",
+        "message": "Batch transaction failed. All operations have been rolled back.",
+        "details": {
+            "failed_operation_index": 2, // Optional: index of the operation that caused the failure
+            "reason": "Specific error from the failing operation"
+        }
+    }
+    ```
+- Individual operation errors are reported within the `results` array as shown in the success response example.
+
 ---
 
 ## Pages API (`api/v1/pages.php`)
@@ -322,12 +436,14 @@ Manages pages, which act as containers for notes.
 - **URL Parameters**:
     - `id` (optional, integer): ID of the page.
     - `name` (optional, string): Name of the page.
-    - `exclude_journal` (optional, `1`): If set, excludes journal pages.
-    - `follow_aliases` (optional, `0` or `1`): Default `1`.
-    - `include_details` (optional, `1`): If `1`, notes within page(s) are returned.
+    - `exclude_journal` (optional, `1`): If set, excludes journal pages from list view.
+    - `follow_aliases` (optional, `0` or `1`): Default `1` (retrieve the aliased page).
+    - `include_details` (optional, `1`): If `1`, notes within the page are returned.
+        - `notes_page` (optional, integer, requires `include_details=1`): Page number for notes list. Defaults to `1`.
+        - `notes_per_page` (optional, integer, requires `include_details=1`): Number of notes per page. Defaults to `20`. Set to `0` or `"all"` to retrieve all notes for the page (no pagination for notes).
     - `include_internal` (optional, boolean): If `true`, internal properties included. Defaults to `false`.
-    - `page` (optional, integer): Page number for list. Defaults to `1`.
-    - `per_page` (optional, integer): Items per page for list. Defaults to `10`.
+    - `page` (optional, integer): Page number for page list (if not getting by `id` or `name`). Defaults to `1`.
+    - `per_page` (optional, integer): Items per page for page list. Defaults to `10`.
     - `sort_by` (optional, string): Field to sort by (e.g., `name`, `updated_at`). Default `name`.
     - `sort_order` (optional, string): `asc` or `desc`. Default `asc`.
 
@@ -374,9 +490,20 @@ Manages pages, which act as containers for notes.
             "updated_at": "YYYY-MM-DD HH:MM:SS",
             "properties": {
                 "type": [{"value": "project", "internal": 0}]
+            },
+            // If include_details=1, notes_data object would be here:
+            "notes_data": { 
+                "notes": [ 
+                    { /* note object 1, with its own 'properties' object */ },
+                    { /* note object 2, with its own 'properties' object */ }
+                ],
+                "pagination": { // This is pagination for the notes list
+                    "total_items": 50,
+                    "per_page": 20,
+                    "current_page": 1,
+                    "total_pages": 3
+                } // This pagination object will be null if notes_per_page was 0/'all' or if not applicable.
             }
-            // If include_details=1, notes array & pagination would be here:
-            // "notes_data": { "notes": [ { ...note... } ], "pagination": { ... } }
         }
     }
     ```

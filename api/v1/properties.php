@@ -151,19 +151,10 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             } elseif ($entityType === 'page') {
                 $properties = $dataManager->getPageProperties($entityId, $includeInternal);
             }
-
-            // Standardize property format
-            $standardizedProperties = [];
-            foreach ($properties as $name => $values) {
-                if (!is_array($values)) {
-                    $values = [$values];
-                }
-                $standardizedProperties[$name] = array_map(function($value) {
-                    return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
-                }, $values);
-            }
             
-            ApiResponse::success($standardizedProperties);
+            // Properties are now correctly formatted by DataManager methods (getNoteProperties, getPageProperties)
+            // which use the updated _formatProperties.
+            ApiResponse::success($properties);
             
         } catch (Exception $e) {
             ApiResponse::error('Server error: ' . $e->getMessage(), 500);
@@ -339,16 +330,36 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             
             $pdo->commit();
             
-            // Standardize the response format
-            $response = [
-                'property' => [
-                    'name' => $savedProperty['name'],
-                    'value' => $savedProperty['value'],
-                    'internal' => (int)$savedProperty['internal']
-                ]
-            ];
+            // After successful update/add, fetch all current values for this property name
+            // to return in the specified format.
+            // We need a DataManager instance here.
+            // This assumes get_db_connection() can be called again or $pdo is still valid.
+            // Ideally, DataManager instance would be available if this script was structured as a class.
+            // For now, creating one locally for this operation.
+            $dataManager = new DataManager($pdo); 
+            $currentProperties = [];
+            if ($entityType === 'note') {
+                // DataManager's getNoteProperties fetches all properties for a note.
+                // We need to filter for the specific property name.
+                $allPropsForNote = $dataManager->getNoteProperties($entityId, true); // true to include internal if it was set
+                if (isset($allPropsForNote[$savedProperty['name']])) {
+                    $currentProperties = $allPropsForNote[$savedProperty['name']];
+                }
+            } elseif ($entityType === 'page') {
+                $allPropsForPage = $dataManager->getPageProperties($entityId, true);
+                if (isset($allPropsForPage[$savedProperty['name']])) {
+                    $currentProperties = $allPropsForPage[$savedProperty['name']];
+                }
+            }
             
-            ApiResponse::success($response);
+            // $currentProperties should now be an array of {"value": ..., "internal": ...} objects
+            // as returned by the new _formatProperties method.
+
+            ApiResponse::success([
+                'message' => 'Property set successfully.', // Added success message
+                'name' => $savedProperty['name'],
+                'values' => $currentProperties // This now holds the array of value objects
+            ]);
             
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {

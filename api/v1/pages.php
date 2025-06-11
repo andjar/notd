@@ -114,36 +114,57 @@ if (!class_exists('PageManager')) {
         }
         
         $pageId = (int)$_GET['id'];
-        $pageData = $include_details ? 
-            $this->dataManager->getPageWithNotes($pageId, $include_internal) :
-            $this->dataManager->getPageDetailsById($pageId, $include_internal);
+        $pageResponseData = null;
 
-        if ($pageData) {
-            $pageToResolve = $include_details ? $pageData['page'] : $pageData;
+        if ($include_details) {
+            // Retrieve notes pagination parameters
+            $notesPage = isset($_GET['notes_page']) ? (int)$_GET['notes_page'] : 1;
+            // Default notes_per_page to null (fetch all) if not specified, or a value like 20 if always paginated.
+            // For this implementation, let's default to a value if include_details=1, e.g., 20.
+            // If notes_per_page is explicitly set to 0 or 'all', then fetch all.
+            $notesPerPage = isset($_GET['notes_per_page']) ? (int)$_GET['notes_per_page'] : 20; // Default to 20
+            if (isset($_GET['notes_per_page']) && ($_GET['notes_per_page'] === '0' || strtolower($_GET['notes_per_page']) === 'all')) {
+                $notesPerPage = null; // Signal to fetch all notes
+            }
+
+
+            $pageResponseData = $this->dataManager->getPageWithNotes($pageId, $include_internal, $notesPage, $notesPerPage);
+        } else {
+            $pageResponseData = $this->dataManager->getPageDetailsById($pageId, $include_internal);
+        }
+
+        if ($pageResponseData) {
+            $currentPageData = $pageResponseData; // Use a temporary variable for alias resolution
+            if ($include_details && isset($currentPageData['page'])) {
+                $pageToResolve = $currentPageData['page'];
+            } else if (!$include_details) {
+                $pageToResolve = $currentPageData;
+            } else {
+                 $pageToResolve = null; // Should not happen if pageResponseData is valid
+            }
             
-            if ($followAliases && !empty($pageToResolve['alias'])) {
-                $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
+            // Alias resolution logic
+            if ($followAliases && $pageToResolve && !empty($pageToResolve['alias'])) {
+                $stmt = $this->pdo->prepare("SELECT id FROM Pages WHERE LOWER(name) = LOWER(?)");
                 $stmt->execute([$pageToResolve['alias']]);
-                $aliasedPageInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+                $aliasedPageIdInfo = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                if ($aliasedPageInfo) {
-                    $pageData = $include_details ?
-                        $this->dataManager->getPageWithNotes($aliasedPageInfo['id'], $include_internal) :
-                        $this->dataManager->getPageDetailsById($aliasedPageInfo['id'], $include_internal);
+                if ($aliasedPageIdInfo) {
+                    // Fetch the aliased page data using the same logic, including notes pagination if details are included
+                    if ($include_details) {
+                        $notesPage = isset($_GET['notes_page']) ? (int)$_GET['notes_page'] : 1;
+                        $notesPerPage = isset($_GET['notes_per_page']) ? (int)$_GET['notes_per_page'] : 20;
+                         if (isset($_GET['notes_per_page']) && ($_GET['notes_per_page'] === '0' || strtolower($_GET['notes_per_page']) === 'all')) {
+                            $notesPerPage = null; 
+                        }
+                        $pageResponseData = $this->dataManager->getPageWithNotes($aliasedPageIdInfo['id'], $include_internal, $notesPage, $notesPerPage);
+                    } else {
+                        $pageResponseData = $this->dataManager->getPageDetailsById($aliasedPageIdInfo['id'], $include_internal);
+                    }
                 }
             }
-
-            // Ensure consistent response format
-            if ($include_details) {
-                // For detailed view, wrap in data object to match list format
-                ApiResponse::success([
-                    'data' => $pageData,
-                    'pagination' => null // No pagination for single item
-                ]);
-            } else {
-                // For basic view, return the page directly
-                ApiResponse::success($pageData);
-            }
+            
+            ApiResponse::success($pageResponseData);
         } else {
             ApiResponse::error('Page not found', 404);
         }
@@ -165,77 +186,28 @@ if (!class_exists('PageManager')) {
             $page = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($page) {
-                $page['properties'] = $this->dataManager->getPageProperties($page['id'], $include_internal);
+                // getPageDetailsById will fetch and format properties correctly.
+                $pageDetails = $this->dataManager->getPageDetailsById($page['id'], $include_internal);
+
+                if ($followAliases && $pageDetails && !empty($pageDetails['alias'])) {
+                    $stmtAlias = $this->pdo->prepare("SELECT id FROM Pages WHERE LOWER(name) = LOWER(?)");
+                    $stmtAlias->execute([$pageDetails['alias']]);
+                    $aliasedPageIdInfo = $stmtAlias->fetch(PDO::FETCH_ASSOC);
+                    if ($aliasedPageIdInfo) {
+                        // Fetch the full details of the aliased page
+                        $pageDetails = $this->dataManager->getPageDetailsById($aliasedPageIdInfo['id'], $include_internal);
+                    }
+                }
                 
-                if ($followAliases && !empty($page['alias'])) {
-                    $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                    $stmt->execute([$page['alias']]);
-                    $aliasedPageInfo = $stmt->fetch(PDO::FETCH_ASSOC);
-                    if ($aliasedPageInfo) {
-                        $aliasedPageInfo['properties'] = $this->dataManager->getPageProperties($aliasedPageInfo['id'], $include_internal);
-                        $page = $aliasedPageInfo;
-                    }
+                if($pageDetails) {
+                    ApiResponse::success($pageDetails);
+                } else {
+                    // This case might occur if the original page was found but its alias target wasn't,
+                    // or if getPageDetailsById somehow fails after an initial find.
+                    ApiResponse::error('Page (or its alias) not found or processed correctly.', 404);
                 }
-                ApiResponse::success($page);
             } else {
-                // Page not found, try to create it
-                try {
-                    $this->pdo->beginTransaction();
-
-                    // Insert the new page
-                    $insertStmt = $this->pdo->prepare("INSERT INTO Pages (name, alias, updated_at) VALUES (?, NULL, CURRENT_TIMESTAMP)");
-                    $insertStmt->execute([$pageName]);
-                    $pageId = $this->pdo->lastInsertId();
-
-                    // If it's a journal page, add the journal property
-                    if ($this->isJournalPage($pageName)) {
-                        $this->addJournalProperty($pageId);
-                    }
-
-                    // Fetch the newly created page
-                    $selectStmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
-                    $selectStmt->execute([$pageId]);
-                    $newPage = $selectStmt->fetch(PDO::FETCH_ASSOC);
-                    
-                    if ($newPage) {
-                        $newPage['properties'] = $this->dataManager->getPageProperties($newPage['id'], $include_internal);
-                    }
-
-                    $this->pdo->commit();
-                    ApiResponse::success($newPage, 201); // 201 Created
-                } catch (PDOException $e) {
-                    if ($this->pdo->inTransaction()) {
-                        $this->pdo->rollBack();
-                    }
-                    // Check for unique constraint violation, which might happen in a race condition
-                    // If so, try to fetch the page again as it might have been created by another request.
-                    if ($e->getCode() == 23000 || str_contains(strtolower($e->getMessage()), 'unique constraint failed')) {
-                        error_log("Unique constraint violation during page creation attempt for: " . $pageName . ". Attempting to re-fetch.");
-                        $retryStmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                        $retryStmt->execute([$pageName]);
-                        $existingPage = $retryStmt->fetch(PDO::FETCH_ASSOC);
-                        if ($existingPage) {
-                            $existingPage['properties'] = $this->dataManager->getPageProperties($existingPage['id'], $include_internal);
-                             if ($this->isJournalPage($pageName)) { // Ensure journal property if it was a journal page
-                                $stmt_check_prop = $this->pdo->prepare("
-                                    SELECT 1 FROM Properties 
-                                    WHERE page_id = ? 
-                                    AND name = 'type' 
-                                    AND value = 'journal'
-                                ");
-                                $stmt_check_prop->execute([$existingPage['id']]);
-                                if (!$stmt_check_prop->fetch()) {
-                                    $this->addJournalProperty($existingPage['id']);
-                                    // Re-fetch properties if a new one was added
-                                    $existingPage['properties'] = $this->dataManager->getPageProperties($existingPage['id'], $include_internal);
-                                }
-                            }
-                            ApiResponse::success($existingPage);
-                            return;
-                        }
-                    }
-                    ApiResponse::error('Failed to create page: ' . $e->getMessage(), 500, ['details' => $e->getMessage()]);
-                }
+                ApiResponse::error('Page not found by name.', 404);
             }
         } catch (PDOException $e) {
             ApiResponse::error('Database error.', 500, ['details' => $e->getMessage()]);

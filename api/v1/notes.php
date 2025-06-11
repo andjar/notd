@@ -605,19 +605,7 @@ if ($method === 'GET') {
             $note = $dataManager->getNoteById($noteId, $includeInternal);
             
             if ($note) {
-                // Standardize property structure
-                if (isset($note['properties'])) {
-                    $standardizedProps = [];
-                    foreach ($note['properties'] as $name => $values) {
-                        if (!is_array($values)) {
-                            $values = [$values];
-                        }
-                        $standardizedProps[$name] = array_map(function($value) {
-                            return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
-                        }, $values);
-                    }
-                    $note['properties'] = $standardizedProps;
-                }
+                // Properties are now correctly formatted by DataManager::getNoteById
                 ApiResponse::success($note);
             } else {
                 ApiResponse::error('Note not found or is internal', 404);
@@ -635,24 +623,15 @@ if ($method === 'GET') {
             
             $pageData = $dataManager->getPageWithNotes($pageId, $includeInternal);
 
-            if ($pageData) {
-                // Standardize property structure for all notes
-                foreach ($pageData['notes'] as &$note) {
-                    if (isset($note['properties'])) {
-                        $standardizedProps = [];
-                        foreach ($note['properties'] as $name => $values) {
-                            if (!is_array($values)) {
-                                $values = [$values];
-                            }
-                            $standardizedProps[$name] = array_map(function($value) {
-                                return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
-                            }, $values);
-                        }
-                        $note['properties'] = $standardizedProps;
-                    }
-                }
+            if ($pageData && isset($pageData['notes'])) { // pageData itself from getPageWithNotes includes 'page' and 'notes'
+                // Properties for notes are now correctly formatted by DataManager::getNotesByPageId
+                // The $pageData['page']['properties'] are also formatted by DataManager::getPageProperties
+                // The API spec for this endpoint implies returning only the notes array.
                 ApiResponse::success($pageData['notes']);
-            } else {
+            } else if ($pageData && !isset($pageData['notes'])) { // Should not happen if getPageWithNotes is consistent
+                 ApiResponse::error('Notes data is missing for the page', 500);
+            }
+            else {
                 ApiResponse::error('Page not found', 404);
             }
         } else {
@@ -691,26 +670,16 @@ if ($method === 'GET') {
                 $propStmt->execute($noteIds);
                 $properties = $propStmt->fetchAll(PDO::FETCH_ASSOC);
 
-                // Group properties by note_id
-                $noteProperties = [];
-                foreach ($properties as $prop) {
-                    $noteId = $prop['note_id'];
-                    if (!isset($noteProperties[$noteId])) {
-                        $noteProperties[$noteId] = [];
-                    }
-                    if (!isset($noteProperties[$noteId][$prop['name']])) {
-                        $noteProperties[$noteId][$prop['name']] = [];
-                    }
-                    $noteProperties[$noteId][$prop['name']][] = [
-                        'value' => $prop['value'],
-                        'internal' => (int)$prop['internal']
-                    ];
-                }
+                // $properties is now formatted by DataManager::getPropertiesForNoteIds
+                // as $formattedPropertiesByNoteId[$noteId] = $this->_formatProperties($props, $includeInternal);
+                // So it's already in the correct structure per note.
+                $formattedNoteProperties = $dataManager->getPropertiesForNoteIds($noteIds, $includeInternal);
 
                 // Attach properties to notes
                 foreach ($notes as &$note) {
-                    $note['properties'] = $noteProperties[$note['id']] ?? [];
+                    $note['properties'] = $formattedNoteProperties[$note['id']] ?? [];
                 }
+                 unset($note); // break the reference
             }
 
             // Calculate pagination metadata
