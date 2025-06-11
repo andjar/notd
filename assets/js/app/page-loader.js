@@ -438,6 +438,48 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
     setCurrentPageId(pageData.id);
     setNotesForCurrentPage(pageData.notes || []); // Ensure notes state is set before any rendering
 
+    // Breadcrumb generation
+    const breadcrumbsContainer = document.querySelector('#breadcrumbs-container');
+    if (breadcrumbsContainer) {
+        breadcrumbsContainer.innerHTML = ''; // Clear existing breadcrumbs
+        const pageName = pageData.name;
+
+        if (pageName && pageName.includes('/')) {
+            const parts = pageName.split('/');
+            let currentNamespacePath = '';
+            for (let i = 0; i < parts.length - 1; i++) {
+                const part = parts[i];
+                if (currentNamespacePath !== '') {
+                    currentNamespacePath += '/';
+                }
+                currentNamespacePath += part;
+
+                const link = document.createElement('a');
+                link.href = `?page=${encodeURIComponent(currentNamespacePath)}`;
+                link.textContent = part;
+                link.classList.add('namespace-breadcrumb'); // For styling
+                // Add click handler to load page, preventing full page reload if not already handled by global listeners
+                link.addEventListener('click', function(event) {
+                    event.preventDefault(); // Prevent full page reload
+                    loadPage(currentNamespacePath); // Call your existing loadPage function
+                });
+                breadcrumbsContainer.appendChild(link);
+
+                const separator = document.createTextNode(' / ');
+                breadcrumbsContainer.appendChild(separator);
+            }
+            // Add the current page name (non-linked)
+            const pageNameText = document.createTextNode(parts[parts.length - 1]);
+            breadcrumbsContainer.appendChild(pageNameText);
+        } else if (pageName) {
+            // For top-level pages, display just the page name as text
+            const pageNameText = document.createTextNode(pageName);
+            breadcrumbsContainer.appendChild(pageNameText);
+        }
+    } else {
+        console.warn('#breadcrumbs-container not found in the DOM.');
+    }
+
     if (updateHistory) {
         const newUrl = new URL(window.location);
         newUrl.searchParams.set('page', pageData.name);
@@ -457,7 +499,115 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
         currentPageEncryptionKey = null;
         decryptionPassword = null;
         await _renderPageContent(pageData, pageProperties, focusFirstNote, isNewPage);
+        // Display child pages if the current page acts as a namespace
+        try {
+            // pagesAPI.getPages is designed to always return an array of page objects.
+            const pagesArray = await pagesAPI.getPages({ excludeJournal: true, per_page: 500, include_details: false });
+            
+            // We now expect pagesArray to be a valid array (even if empty).
+            // The displayChildPages function already handles an empty array correctly.
+            await displayChildPages(pageData.name, pagesArray);
+
+        } catch (error) {
+            console.error('Error fetching or processing pages for child page display:', error);
+            // Optionally, clear or hide the child pages container in case of error
+            const childPagesContainer = document.getElementById('child-pages-container');
+            if (childPagesContainer) {
+                // Clear it or provide a user-friendly error message
+                childPagesContainer.innerHTML = '<p>Error loading pages for this namespace.</p>';
+            }
+        }
     }
+}
+
+/**
+ * Displays direct child pages for a given parent page name.
+ * @param {string} currentPageName - The name of the current page (potential parent).
+ * @param {Array<Object>} pagesArray - Array of page objects. Each object is expected to have a 'name' property.
+ */
+async function displayChildPages(currentPageName, pagesArray) {
+    if (!Array.isArray(pagesArray)) {
+        console.error('displayChildPages: pagesArray is not an array. Received:', pagesArray);
+        // Ensure container is cleared if it exists and invalid data was passed
+        const childPagesContainerOnError = document.getElementById('child-pages-container');
+        if (childPagesContainerOnError) {
+            childPagesContainerOnError.innerHTML = '';
+        }
+        return;
+    }
+
+    const directChildren = pagesArray.filter(page => {
+        if (!page || typeof page.name !== 'string') return false;
+        // Check if the page name starts with currentPageName + "/"
+        if (page.name.startsWith(currentPageName + '/')) {
+            // Get the part of the name after "currentPageName/"
+            const childPart = page.name.substring((currentPageName + '/').length);
+            // Ensure it's a direct child (no further slashes in childPart)
+            return childPart && !childPart.includes('/');
+        }
+        return false;
+    });
+
+    let childPagesContainer = document.getElementById('child-pages-container');
+
+    // If no children, ensure container is empty or removed, then return
+    if (directChildren.length === 0) {
+        if (childPagesContainer) {
+            childPagesContainer.innerHTML = ''; // Clear if exists
+            // Optionally remove it: childPagesContainer.remove();
+        }
+        return;
+    }
+
+    // If container doesn't exist, create and append it
+    if (!childPagesContainer) {
+        childPagesContainer = document.createElement('div');
+        childPagesContainer.id = 'child-pages-container';
+        // Append it after notes container or similar logical place
+        const mainContent = document.getElementById('main-content'); // Assuming main-content div exists
+        const notesContainerElement = document.getElementById('notes-container'); // notesContainer is a JS var, use ID
+        const addRootNoteBtn = document.getElementById('add-root-note-btn');
+        
+        let referenceNode = addRootNoteBtn || notesContainerElement; // Prefer to insert after add button or notes
+
+        if (mainContent && referenceNode && referenceNode.parentNode === mainContent) {
+             // Insert after the referenceNode
+            mainContent.insertBefore(childPagesContainer, referenceNode.nextSibling);
+        } else if (mainContent) { // Fallback: append to main-content if specific anchor not found
+            mainContent.appendChild(childPagesContainer);
+        } else {
+            console.warn('Could not find #main-content or suitable anchor to append #child-pages-container.');
+            // As a last resort, append to document.body, or handle error appropriately
+            document.body.appendChild(childPagesContainer); 
+        }
+    }
+
+    childPagesContainer.innerHTML = ''; // Clear previous content
+
+    const heading = document.createElement('h3'); // Or h2, h4 as appropriate
+    heading.textContent = 'Pages in this namespace:';
+    childPagesContainer.appendChild(heading);
+
+    const listElement = document.createElement('ul'); // Using a list for better structure
+    listElement.classList.add('child-page-list');
+    directChildren.forEach(childPage => {
+        const listItem = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = `?page=${encodeURIComponent(childPage.name)}`;
+        // Display only the short name (part after the last '/')
+        const shortName = childPage.name.substring(childPage.name.lastIndexOf('/') + 1);
+        link.textContent = shortName;
+        link.classList.add('child-page-link');
+        link.dataset.pageName = childPage.name; // Store full name for handler
+
+        link.addEventListener('click', function(event) {
+            event.preventDefault();
+            loadPage(childPage.name); // Use the full childPage.name
+        });
+        listItem.appendChild(link);
+        listElement.appendChild(listItem);
+    });
+    childPagesContainer.appendChild(listElement);
 }
 
 

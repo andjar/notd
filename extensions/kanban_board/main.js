@@ -1,6 +1,6 @@
-import { notesAPI, pagesAPI, queryAPI } from '../assets/js/api_client.js'; // Corrected path and added pagesAPI
+import { notesAPI, pagesAPI, queryAPI } from '../../assets/js/api_client.js'; // Corrected path and added pagesAPI
 import { displayKanbanBoard } from './ui.js'; // Corrected path assuming ui.js is in the same directory
-import { setNotesForCurrentPage, notesForCurrentPage } from '../assets/js/app/state.js'; // Corrected path
+import { setNotesForCurrentPage, notesForCurrentPage } from '../../assets/js/app/state.js'; // Corrected path
 
 export async function initializeKanban() {
     const kanbanRootElement = document.getElementById('kanban-root');
@@ -30,9 +30,18 @@ export async function initializeKanban() {
         console.log('Attempting to fetch all notes for Kanban board...');
         let allNotes = [];
         try {
-            // Fetch notes using queryAPI
-            console.log('Fetching task notes using queryAPI...');
-            allNotes = await queryAPI.queryNotes({ query: 'type:task', include_properties: true });
+            // Fetch notes using queryAPI with correct SQL for Kanban statuses
+            console.log('Fetching task notes using queryAPI with SQL join on Properties...');
+            const KANBAN_STATUSES = ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING'];
+            const statusList = KANBAN_STATUSES.map(s => `'${s}'`).join(', ');
+            const sql = `
+                SELECT DISTINCT N.id
+                FROM Notes N
+                JOIN Properties P ON N.id = P.note_id
+                WHERE P.name = 'status'
+                AND P.value IN (${statusList})
+            `;
+            allNotes = await queryAPI.queryNotes(sql, { include_properties: true, per_page: 1000 });
 
             if (!allNotes || allNotes.length === 0) {
                 console.warn('No task notes found. Kanban board might be empty.');
@@ -47,8 +56,8 @@ export async function initializeKanban() {
 
         if (kanbanRootElement) {
             kanbanRootElement.innerHTML = ''; // Clear "Loading..." message
-            // notesForCurrentPage should be a function that returns the notes array from state
-            displayKanbanBoard(kanbanRootElement, notesForCurrentPage()); 
+            // notesForCurrentPage is an array that holds the notes from the state
+            displayKanbanBoard(kanbanRootElement, notesForCurrentPage); 
         }
 
     } catch (error) {

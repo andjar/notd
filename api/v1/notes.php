@@ -669,11 +669,14 @@ if ($method === 'GET') {
             $totalCount = $pdo->query($countSql)->fetchColumn();
 
             // Get paginated notes
-            $sql = "SELECT * FROM Notes";
+            // MODIFIED SQL query to include has_attachments
+            $sql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes";
             if (!$includeInternal) {
-                $sql .= " WHERE internal = 0";
+                // Ensure the WHERE clause is appended correctly
+                $sql .= " WHERE Notes.internal = 0"; // Also specify Notes.internal for clarity
             }
-            $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            // Append ORDER BY and LIMIT/OFFSET
+            $sql .= " ORDER BY Notes.created_at DESC LIMIT ? OFFSET ?";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$perPage, $offset]);
@@ -877,19 +880,21 @@ if ($method === 'GET') {
             $executeParams[] = (int)$input['collapsed']; // Should be 0 or 1
         }
 
-        if (empty($setClauses)) {
+        if (empty($setClauses) && !isset($input['properties_explicit'])) {
             $pdo->rollBack();
             ApiResponse::error('No updateable fields provided', 400);
             return; // Exit early
         }
 
-        $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
+        if (!empty($setClauses)) {
+            $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
         
-        $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
-        $executeParams[] = $noteId;
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($executeParams);
+            $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
+            $executeParams[] = $noteId;
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($executeParams);
+        }
 
         // --- BEGIN order_index recalculation logic: Step 2 & 3 & 4 (omitted for brevity) ---
         // ... logic for reordering ...

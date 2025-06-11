@@ -7,6 +7,7 @@ if (!defined('APP_BASE_URL')) {
 
 define('ACTIVE_THEME', 'flatly'); // Defines the active theme file (e.g., 'default' for 'default.css')
 define('WEBHOOKS_ENABLED', true); // Option to disable webhooks
+define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
 
 // Error reporting (for development)
 ini_set('display_errors', 1); // Enable error display

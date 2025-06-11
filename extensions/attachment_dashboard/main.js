@@ -93,15 +93,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Assuming success if status is not 'error' and data is present
-            if (!response.data || !response.pagination) {
-                console.error('Invalid API response structure (missing data or pagination):', response);
+            if (!response.data || !response.data.data || !response.data.pagination) {
+                console.error('Invalid API response structure (missing data.data or data.pagination):', response);
                 tableBody.innerHTML = '<tr><td colspan="5">Error: Invalid data format received from server.</td></tr>';
                 updatePaginationForError();
                 return;
             }
             
-            const attachments = response.data;
-            const pagination = response.pagination;
+            const attachments = response.data.data;
+            const pagination = response.data.pagination;
 
             tableBody.innerHTML = ''; // Clear loading or previous error rows
 

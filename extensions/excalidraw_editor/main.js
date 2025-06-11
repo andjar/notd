@@ -1,7 +1,4 @@
-// Import the attachmentsAPI from the global scope (assuming api_client.js is loaded)
-// Note: If api_client.js exports modules, this import would be direct.
-// For now, assuming api_client.js makes attachmentsAPI globally available or on window.
-const attachmentsAPI = window.attachmentsAPI; 
+import { attachmentsAPI } from '../../assets/js/api_client.js';
 
 // Excalidraw AppState and Export functions will be available on window.ExcalidrawLib
 const ExcalidrawLib = window.ExcalidrawLib;

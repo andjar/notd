@@ -161,12 +161,10 @@ const pagesAPI = {
             // 2a. Handles if apiRequest returned { status, data: { pages: [...] } }
             // or if pages.php wrapped the array in a 'data' field like { data: [...] }
             if (responseData.data && Array.isArray(responseData.data)) {
-                console.log('[pagesAPI.getPages] Found array in responseData.data');
                 return responseData.data;
             }
             // 2b. Handles if pages.php wrapped the array in a 'pages' field like { pages: [...] }
             if (responseData.pages && Array.isArray(responseData.pages)) {
-                console.log('[pagesAPI.getPages] Found array in responseData.pages');
                 return responseData.pages;
             }
 
@@ -174,7 +172,6 @@ const pagesAPI = {
             const keysToTry = ['items', 'results']; // 'data' and 'pages' already checked
             for (const key of keysToTry) {
                 if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
-                    console.log(`[pagesAPI.getPages] Found array in responseData.${key}`);
                     return responseData[key];
                 }
             }
@@ -655,14 +652,33 @@ const queryAPI = {
      *                            The original handleSqlQueries was: `const result = await response.json(); if (result.success && result.data)`
      *                            This implies result.data was the array. So this should be fine.
      */
-    queryNotes: (sqlQuery, options = {}) => {
+    queryNotes: async (sqlQuery, options = {}) => {
         const body = {
             sql_query: sqlQuery,
             include_properties: options.include_properties || false,
             page: options.page || 1,
             per_page: options.per_page || 10
         };
-        return apiRequest('query_notes.php', 'POST', body);
+        const responseData = await apiRequest('query_notes.php', 'POST', body);
+
+        // Handle cases where the API returns an object wrapping the array
+        if (Array.isArray(responseData)) {
+            return responseData;
+        }
+
+        if (responseData && typeof responseData === 'object') {
+            // Check for common keys that might hold the array
+            const keysToTry = ['notes', 'data', 'results'];
+            for (const key of keysToTry) {
+                if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
+                    return responseData[key];
+                }
+            }
+        }
+
+        // Fallback for unexpected structures
+        console.warn('[queryAPI.queryNotes] Response was not an array and no known data key was found. Response:', responseData);
+        return [];
     }
 };
 
