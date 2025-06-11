@@ -498,8 +498,10 @@ if (!function_exists('_handleBatchOperations')) {
             }
         }
         
-        try {
-            $pdo->beginTransaction();
+        // Remove try-catch and transaction around the entire batch.
+        // Each operation will implicitly commit if successful, or fail independently.
+        // try {
+        //     $pdo->beginTransaction();
 
             // 1. Process Deletions
             foreach ($deleteOps as $opItem) {
@@ -560,37 +562,26 @@ if (!function_exists('_handleBatchOperations')) {
                 }
             }
 
-            if ($anyOperationFailed) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                ApiResponse::error('Batch operation failed. See details.', 400, [
-                    'details' => ['failed_operations' => $failedOperationsDetails]
-                ]);
-                exit;
-            } else {
-                $pdo->commit();
-                ApiResponse::success([
-                    'message' => 'Batch operations completed successfully.',
-                    'results' => $orderedResults
-                ]);
-                exit;
-            }
-
-        } catch (Exception $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
-            error_log("Batch operation critical error: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
-            
-            // When a general exception occurs, do not include 'results'.
-            ApiResponse::error('An internal server error occurred during batch processing.', 500, [
-                 // 'status' => 'error',
-                 // 'message' => 'An internal server error occurred during batch processing.',
-                'details' => ['general_error' => $e->getMessage()]
+            // The batch operation will now return success even if individual operations fail.
+            // The success/failure of individual operations is in 'results'.
+            ApiResponse::success([
+                'message' => 'Batch operations completed. Check individual results for status.',
+                'results' => $orderedResults
             ]);
-            exit;
-        }
+            exit; // Ensure script terminates after sending response
+
+        // } catch (Exception $e) {
+        //     // This catch block is now for truly unexpected errors outside of individual operation failures
+        //     if ($pdo->inTransaction()) {
+        //         $pdo->rollBack();
+        //     }
+        //     error_log("Batch operation critical error: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
+            
+        //     ApiResponse::error('An internal server error occurred during batch processing.', 500, [
+        //         'details' => ['general_error' => $e->getMessage()]
+        //     ]);
+        //     exit;
+        // }
     }
 }
 
