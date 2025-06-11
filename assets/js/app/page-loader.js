@@ -486,6 +486,29 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
             const pageNameText = document.createTextNode(pageName);
             pageTitleContainer.appendChild(pageNameText);
         }
+
+        // Add the gear icon for page properties
+        const gearIcon = document.createElement('i');
+        gearIcon.dataset.feather = 'settings';
+        gearIcon.className = 'page-title-gear';
+        gearIcon.id = 'page-properties-gear-icon';
+        gearIcon.title = 'Page Properties';
+        pageTitleContainer.appendChild(gearIcon);
+
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+
+        // Event listener to open the properties modal
+        gearIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const modal = document.getElementById('page-properties-modal');
+            if (modal && window.ui && typeof window.ui.openModal === 'function') {
+                window.ui.openModal('page-properties-modal');
+            } else if (modal) {
+                modal.classList.add('active'); // Fallback
+            }
+        });
     } else {
         console.warn('#page-title not found in the DOM.');
     }

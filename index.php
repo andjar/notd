@@ -92,7 +92,7 @@ require_once 'config.php';
         <!-- Main Content -->
         <div id="main-content" class="main-content">
             <div class="page-title-container">
-            <div id="page-title">
+            <div id="page-title" class="page-title">
                 <!-- Page title and namespace breadcrumbs will be populated by JavaScript -->
             </div>
             <div id="page-properties"></div>

@@ -1190,9 +1190,17 @@ textarea:focus {
 .page-title {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: var(--ls-space-2);
-    text-align: center;
+    text-align: left;
+}
+
+.page-title a {
+    color: var(--ls-secondary-text-color);
+}
+
+.page-title a:visited {
+    color: var(--ls-secondary-text-color);
 }
 
 /* Page Header in Main Content (specific, not app-header) */
@@ -1222,7 +1230,7 @@ textarea:focus {
     opacity: 0;
 }
 
-.page-title-container:hover .page-title-gear {
+.page-title:hover .page-title-gear {
     opacity: 1;
 }
 
