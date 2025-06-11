@@ -266,52 +266,52 @@ async function _fetchPageFromNetwork(pageName) {
         pageName = getInitialPage();
     }
 
-    let pageDetails;
-    // isNewPage declaration is removed as client-side creation decision is removed.
-    // The backend now handles page creation if it doesn't exist,
-    // and will return 201 if created, or 200 if existing.
-    // If an actual error occurs (not related to page existence), it will be caught.
+    let pageDetailsForId;
     try {
-        pageDetails = await pagesAPI.getPageByName(pageName);
-        // Optional: If pagesAPI.getPageByName starts returning the full response object
-        // including status, we could determine if it was newly created:
-        // isNewPage = (pageDetails.status === 201); 
-        // For now, we assume pageDetails is just the page data.
+        // First, get basic page details, primarily for the ID.
+        // pagesAPI.getPageByName now returns response.data, which is the page object.
+        pageDetailsForId = await pagesAPI.getPageByName(pageName);
     } catch (error) {
-        // Catch actual errors (network, server errors other than auto-creation path)
-        console.error(`Error fetching page data for ${pageName} via getPageByName:`, error);
-        throw error; // Re-throw the error to be handled by the caller loadPage
+        console.error(`Error fetching initial page details for ${pageName} (to get ID):`, error);
+        throw error; // Re-throw to be handled by loadPage
     }
 
-    if (!pageDetails) {
-        // This check might become less relevant if getPageByName always returns a page 
-        // (created or existing) or throws a critical error that's caught above.
-        // However, keeping it as a safeguard for unexpected scenarios.
-        throw new Error(`Page "${pageName}" could not be fetched or created by the backend.`);
+    if (!pageDetailsForId || !pageDetailsForId.id) {
+        // This handles cases where the page might not exist and auto-creation isn't part of getPageByName,
+        // or if an error occurred that didn't throw but returned invalid data.
+        // The backend's pages.php (for GET by name) should ideally create if not exists.
+        // If it does, pageDetailsForId should always be valid or an error thrown.
+        throw new Error(`Page "${pageName}" could not be found or an ID could not be obtained.`);
     }
 
-    let notesArray;
+    // Now fetch comprehensive page data including notes and potentially more detailed page properties.
+    // notesAPI.getPageData now returns response.data which is { page: {...}, notes: [...] }
+    let fullPageDataFromNotesAPI;
     try {
-        notesArray = await notesAPI.getPageData(pageDetails.id, { include_internal: false });
-        if (!Array.isArray(notesArray)) {
-            console.warn(`Expected an array from notesAPI.getPageData for page ${pageDetails.name}, received:`, notesArray);
-            notesArray = [];
+        fullPageDataFromNotesAPI = await notesAPI.getPageData(pageDetailsForId.id, { include_internal: false });
+        
+        if (!fullPageDataFromNotesAPI || !fullPageDataFromNotesAPI.page || !Array.isArray(fullPageDataFromNotesAPI.notes)) {
+            console.warn(`Expected { page: {...}, notes: [...] } from notesAPI.getPageData for page ID ${pageDetailsForId.id}, received:`, fullPageDataFromNotesAPI);
+            // Fallback or throw error
+            // For now, let's try to construct something usable if parts are missing, or throw
+            if (!fullPageDataFromNotesAPI?.page) throw new Error('Missing page details in getPageData response.');
+            if (!Array.isArray(fullPageDataFromNotesAPI?.notes)) fullPageDataFromNotesAPI.notes = []; // Default to empty notes
         }
     } catch (error) {
-        console.error(`Error fetching notes for page ${pageDetails.name} (ID: ${pageDetails.id}):`, error.message);
-        notesArray = [];
+        console.error(`Error fetching full page data (page & notes) for page ID ${pageDetailsForId.id} (${pageName}):`, error.message);
+        // Decide if to throw, or try to proceed with pageDetailsForId and empty notes
+        throw new Error(`Failed to fetch notes and detailed page data for "${pageName}". ${error.message}`);
     }
 
+    // Combine using the more detailed page information from notesAPI.getPageData if available
     const combinedPageData = {
-        ...pageDetails, // Includes id, name, alias, properties
-        notes: notesArray
-        // isNewPage flag is removed from here.
-        // The _processAndRenderPage function's isNewPage parameter will default to false
-        // or could be adjusted if the API provides creation status.
-        // Critical logic like creating the first note relies on notesForCurrentPage.length === 0,
-        // which remains effective.
+        ...pageDetailsForId, // Start with basic details (especially if notesAPI.page is sparse)
+        ...fullPageDataFromNotesAPI.page, // Override with more detailed page properties from notesAPI if present
+        id: pageDetailsForId.id, // Ensure ID from initial fetch is preserved (should be same)
+        name: pageName, // Ensure original pageName is preserved (especially if resolving aliases)
+        notes: fullPageDataFromNotesAPI.notes
     };
-
+    
     // Cache the newly fetched data
     if (combinedPageData.id && combinedPageData.name) {
         const cacheEntry = {
@@ -819,66 +819,62 @@ async function handleCreateAndFocusFirstNote(pageIdToUse) {
 export async function prefetchRecentPagesData() {
     console.log("Starting pre-fetch for recent pages.");
     try {
-        const allPages = await pagesAPI.getPages({
-            include_details: true, 
-            include_internal: false, 
-            followAliases: true,     
-            excludeJournal: false    
+        // pagesAPI.getPages now returns response.data, which is an array of page objects.
+        // If include_details: true, these objects should be detailed.
+        const allPagesDetailed = await pagesAPI.getPages({
+            include_details: true,
+            include_internal: false, // Usually false for prefetch unless internal props are common
+            followAliases: true,
+            excludeJournal: false // Or true, depending on prefetch strategy for journals
         });
         
-        allPages.sort((a, b) => {
-            // Assuming the structure is { page: { updated_at: ... } }
-            // If updated_at is directly on the outer object, this needs adjustment
-            const dateA = a.page ? new Date(a.page.updated_at) : 0;
-            const dateB = b.page ? new Date(b.page.updated_at) : 0;
+        // Sort by updated_at, assuming it's directly on the page object
+        allPagesDetailed.sort((a, b) => {
+            const dateA = a.updated_at ? new Date(a.updated_at) : 0;
+            const dateB = b.updated_at ? new Date(b.updated_at) : 0;
             return dateB - dateA;
         });
 
-        const recentPagesToPrefetch = allPages.slice(0, MAX_PREFETCH_PAGES); 
+        const recentPagesToPrefetch = allPagesDetailed.slice(0, MAX_PREFETCH_PAGES);
 
-        for (const pageWithNotes of recentPagesToPrefetch) { // Renamed 'page' to 'pageWithNotes' for clarity
-            const actualPage = pageWithNotes.page; // Extract the actual page object
-            if (!actualPage) {
-                console.warn('Page object within wrapper is missing during pre-fetch. Skipping.', pageWithNotes);
+        for (const detailedPage of recentPagesToPrefetch) {
+            if (!detailedPage || !detailedPage.name || !detailedPage.id) {
+                console.warn('Detailed page object for pre-fetch is missing id or name. Skipping.', detailedPage);
                 continue;
             }
 
-            if (!hasPageCache(actualPage.name) ||
-                (Date.now() - (getPageCache(actualPage.name)?.timestamp || 0) > CACHE_MAX_AGE_MS)) {
+            if (!hasPageCache(detailedPage.name) ||
+                (Date.now() - (getPageCache(detailedPage.name)?.timestamp || 0) > CACHE_MAX_AGE_MS)) {
                 
-                console.log(`Pre-fetching data for page: ${actualPage.name}`);
+                console.log(`Pre-fetching data for page: ${detailedPage.name}`);
                 try {
-                    if (!actualPage.id || !actualPage.name) {
-                        console.warn(`Actual page object for pre-fetch is missing id or name. Skipping.`, actualPage);
-                        continue;
-                    }
-                    
-                    // notes are at pageWithNotes.notes, properties are at actualPage.properties (or pageWithNotes.page.properties)
-                    const notes = pageWithNotes.notes || []; 
-                    const properties = actualPage.properties || {}; 
+                    // The detailedPage object itself should contain all necessary info
+                    // including notes and properties, as per `include_details: true`.
+                    const notes = detailedPage.notes || [];
+                    const properties = detailedPage.properties || {};
 
-                    setPageCache(actualPage.name, {
-                        id: actualPage.id,
-                        name: actualPage.name, 
-                        alias: actualPage.alias, 
-                        notes: notes,      
-                        properties: properties, 
+                    setPageCache(detailedPage.name, {
+                        id: detailedPage.id,
+                        name: detailedPage.name,
+                        alias: detailedPage.alias, // Assuming alias is part of the detailedPage object
+                        notes: notes,
+                        properties: properties,
                         timestamp: Date.now()
                     });
-                    console.log(`Successfully pre-fetched and cached data for page: ${actualPage.name}`);
+                    console.log(`Successfully pre-fetched and cached data for page: ${detailedPage.name}`);
                 } catch (error) {
-                    console.error(`Error pre-fetching data for page ${actualPage.name}:`, error);
-                    if (hasPageCache(actualPage.name)) {
-                        deletePageCache(actualPage.name);
-                    }
+                    console.error(`Error processing pre-fetched data for page ${detailedPage.name}:`, error);
+                    // Don't delete cache if processing fails, might be transient error with the object itself.
+                    // Only delete if the fetch itself failed, which is handled by the outer catch.
                 }
             } else {
-                console.log(`Page ${actualPage.name} is already in cache and recent.`);
+                console.log(`Page ${detailedPage.name} is already in cache and recent.`);
             }
         }
         console.log("Pre-fetching for recent pages completed.");
     } catch (error) {
         console.error('Error fetching page list for pre-fetching:', error);
+        // If the initial fetch of allPagesDetailed fails, no individual pages would be processed or cached.
     }
 }
 

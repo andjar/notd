@@ -109,7 +109,9 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         // OR { "status": "success", "message": "..." } (e.g. Attachment delete)
         // The function should return the content of the "data" field.
         // If "data" field is not present (like in attachment delete), it will return undefined, which is fine.
-        return data.data;
+        // CHANGE: Return the entire data object as per new spec.
+        // The caller will be responsible for extracting the relevant part (e.g., data.data, data.results).
+        return data;
 
     } catch (error) {
         console.error('[apiRequest] Error details:', { endpoint, method, error: error.message, stack: error.stack });
@@ -149,37 +151,14 @@ const pagesAPI = {
         if (options.sort_order) params.append('sort_order', options.sort_order);
         
         const queryString = params.toString();
-        const responseData = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
-
-        // 1. Direct array check (ideal case per spec and apiRequest returning data.data)
-        if (Array.isArray(responseData)) {
-            return responseData;
+        const response = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
+        // apiRequest now returns the full response object {status, data, ...}
+        // We expect data to be an array of pages.
+        if (response && response.data && Array.isArray(response.data)) {
+            return response.data;
         }
-
-        // 2. Object checks for common deviations or nested structures
-        if (responseData && typeof responseData === 'object') {
-            // 2a. Handles if apiRequest returned { status, data: { pages: [...] } }
-            // or if pages.php wrapped the array in a 'data' field like { data: [...] }
-            if (responseData.data && Array.isArray(responseData.data)) {
-                return responseData.data;
-            }
-            // 2b. Handles if pages.php wrapped the array in a 'pages' field like { pages: [...] }
-            if (responseData.pages && Array.isArray(responseData.pages)) {
-                return responseData.pages;
-            }
-
-            // 3. Generic keysToTry loop as a further fallback
-            const keysToTry = ['items', 'results']; // 'data' and 'pages' already checked
-            for (const key of keysToTry) {
-                if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
-                    return responseData[key];
-                }
-            }
-        }
-
-        // 4. Warning and fallback
-        console.warn('[pagesAPI.getPages] Response was not an array and no known data key was found. Response:', responseData);
-        return []; 
+        console.warn('[pagesAPI.getPages] Response data was not an array as expected. Response:', response);
+        return []; // Fallback to empty array if data is not as expected
     },
 
     /**
@@ -191,13 +170,14 @@ const pagesAPI = {
      * @param {boolean} [options.include_internal=false] - Whether to include internal properties (if include_details is true).
      * @returns {Promise<Object>} Page object (potentially detailed if include_details is true).
      */
-    getPageById: (id, options = {}) => {
+    getPageById: async (id, options = {}) => {
         const params = new URLSearchParams({ id: id.toString() });
         if (options.followAliases === false) params.append('follow_aliases', '0');
         if (options.include_details) params.append('include_details', '1');
         if (options.include_internal) params.append('include_internal', '1'); // Server expects '1' for true
         
-        return apiRequest(`pages.php?${params.toString()}`);
+        const response = await apiRequest(`pages.php?${params.toString()}`);
+        return response.data; // Assuming the page object is in response.data
     },
 
     /**
@@ -209,13 +189,14 @@ const pagesAPI = {
      * @param {boolean} [options.include_internal=false] - Whether to include internal properties (if include_details is true).
      * @returns {Promise<Object>} Page object (potentially detailed if include_details is true).
      */
-    getPageByName: (name, options = {}) => {
+    getPageByName: async (name, options = {}) => {
         const params = new URLSearchParams({ name });
         if (options.followAliases === false) params.append('follow_aliases', '0');
         if (options.include_details) params.append('include_details', '1');
         if (options.include_internal) params.append('include_internal', '1'); // Server expects '1' for true
 
-        return apiRequest(`pages.php?${params.toString()}`);
+        const response = await apiRequest(`pages.php?${params.toString()}`);
+        return response.data; // Assuming the page object is in response.data
     },
 
     /**
@@ -231,9 +212,10 @@ const pagesAPI = {
             return Promise.reject(new Error('Page name must be a non-empty string.'));
         }
         // apiRequest handles JSON.stringify for the body { name: pageName }
-        // and returns a promise that resolves with the parsed JSON response data (data.data)
+        // and returns a promise that resolves with the parsed JSON response object.
         // or rejects with an error.
-        return apiRequest('pages.php', 'POST', { name: pageName });
+        const response = await apiRequest('pages.php', 'POST', { action: "create", name: pageName });
+        return response.data; // Assuming the created page object is in response.data
     },
 
     /**
@@ -242,7 +224,7 @@ const pagesAPI = {
      * @param {{name?: string, alias?: string, properties_explicit?: {}}} pageData - Updated page data
      * @returns {Promise<Object>} Updated page object
      */
-    updatePage: (id, pageData) => {
+    updatePage: async (id, pageData) => {
         const body = {
             action: 'update',
             id: id,
@@ -254,20 +236,23 @@ const pagesAPI = {
                 delete body[key];
             }
         });
-        return apiRequest('pages.php', 'POST', body);
+        const response = await apiRequest('pages.php', 'POST', body);
+        return response.data; // Assuming the updated page object is in response.data
     },
 
     /**
      * Delete a page
      * @param {number} id - Page ID
-     * @returns {Promise<Object>} Delete confirmation
+     * @returns {Promise<Object>} Delete confirmation (entire response object)
      */
-    deletePage: (id) => {
+    deletePage: async (id) => {
         const body = {
             action: 'delete',
             id: id
         };
-        return apiRequest('pages.php', 'POST', body);
+        // For delete, the response might be {status: "success", message: "..."}
+        // Returning the whole response object as per task instructions.
+        return await apiRequest('pages.php', 'POST', body);
     }
 };
 
@@ -284,7 +269,7 @@ const notesAPI = {
      * @returns {Promise<{page: Object, notes: Array<Object>}>} Object containing page details and an array of notes with their properties.
      * Expected structure: { page: { ...page_details, properties: { ...page_properties } }, notes: [ { ...note_details, properties: { ...note_properties } }, ... ] }
      */
-    getPageData: (pageId, options = {}) => {
+    getPageData: async (pageId, options = {}) => {
         const params = new URLSearchParams();
         params.append('page_id', pageId.toString());
         if (options.include_internal) {
@@ -296,7 +281,8 @@ const notesAPI = {
         if (options.sort_by) params.append('sort_by', options.sort_by); // e.g., 'created_at', 'order_index'
         if (options.sort_order) params.append('sort_order', options.sort_order); // 'asc' or 'desc'
         
-        return apiRequest(`notes.php?${params.toString()}`);
+        const response = await apiRequest(`notes.php?${params.toString()}`);
+        return response.data; // Assuming the page data object is in response.data
     },
 
     /**
@@ -306,13 +292,14 @@ const notesAPI = {
      * @param {boolean} [options.include_internal=false] - Whether to include internal properties.
      * @returns {Promise<{id: number, content: string, page_id: number, created_at: string, updated_at: string, properties: Object}>}
      */
-    getNote: (noteId, options = {}) => {
+    getNote: async (noteId, options = {}) => {
         const params = new URLSearchParams();
         params.append('id', noteId.toString());
         if (options.include_internal) {
             params.append('include_internal', '1');
         }
-        return apiRequest(`notes.php?${params.toString()}`);
+        const response = await apiRequest(`notes.php?${params.toString()}`);
+        return response.data; // Assuming the note object is in response.data
     },
 
     /**
@@ -320,7 +307,14 @@ const notesAPI = {
      * @param {{page_id: number, content: string, parent_note_id?: number|null}} noteData - Note data
      * @returns {Promise<{id: number, content: string, page_id: number, parent_note_id: number|null, created_at: string, updated_at: string}>}
      */
-    createNote: (noteData) => apiRequest('notes.php', 'POST', noteData),
+    createNote: async (noteData) => {
+        const body = {
+            action: "create", // Add action: "create"
+            ...noteData
+        };
+        const response = await apiRequest('notes.php', 'POST', body);
+        return response.data; // Assuming the created note object is in response.data
+    },
 
     /**
      * Update a note
@@ -333,10 +327,10 @@ const notesAPI = {
      * @param {Object} [noteUpdateData.properties_explicit] - Explicit properties to set.
      * @returns {Promise<Object>} The updated note object. The structure matches the getNote response.
      */
-    updateNote: (noteId, noteUpdateData) => {
+    updateNote: async (noteId, noteUpdateData) => {
         const body = {
-            _method: 'PUT', // Add this line
-            action: 'update', // This might be redundant if _method is PUT, but backend might use it
+            // _method: 'PUT', // Remove this line
+            action: 'update',
             id: noteId,
             ...noteUpdateData
         };
@@ -346,20 +340,23 @@ const notesAPI = {
                 delete body[key];
             }
         });
-        return apiRequest('notes.php', 'POST', body);
+        const response = await apiRequest('notes.php', 'POST', body);
+        return response.data; // Assuming the updated note object is in response.data
     },
 
     /**
      * Delete a note
      * @param {number} noteId - Note ID
-     * @returns {Promise<null>}
+     * @returns {Promise<Object>} Delete confirmation (entire response object)
      */
-    deleteNote: (noteId) => {
+    deleteNote: async (noteId) => {
         const body = {
             action: 'delete',
             id: noteId
         };
-        return apiRequest('notes.php', 'POST', body);
+        // For delete, the response might be {status: "success", message: "..."}
+        // Returning the whole response object as per task instructions.
+        return await apiRequest('notes.php', 'POST', body);
     },
 
         /**
@@ -368,23 +365,22 @@ const notesAPI = {
      * @returns {Promise<Array<Object>>} A promise that resolves to the array of individual operation results.
      * @throws {Error} If the batch operation fails or the response structure is unexpected.
      */
-        batchUpdateNotes: async (operations) => { // Make it async to await apiRequest
+        batchUpdateNotes: async (operations) => {
             const body = {
                 action: 'batch',
                 operations: operations
             };
-            // apiRequest returns the content of the top-level 'data' field from the JSON response.
-            // For batch, this should be an object like { results: [...] }
-            const responseData = await apiRequest('notes.php', 'POST', body);
+            // apiRequest now returns the full response object: { status, results, ... }
+            const response = await apiRequest('notes.php', 'POST', body);
     
             // Now, specifically extract the 'results' array and perform validation here.
-            if (responseData && Array.isArray(responseData.results)) {
-                // Optionally, you could even validate each item in responseData.results here
+            if (response && Array.isArray(response.results)) {
+                // Optionally, you could even validate each item in response.results here
                 // to ensure it has 'type', 'status', etc., before returning.
-                return responseData.results; // Return ONLY the array of results
+                return response.results; // Return ONLY the array of results
             } else {
                 // If the structure is not what's expected for a successful batch response.
-                console.error('batchUpdateNotes: Invalid response structure. Expected "responseData.results" to be an array.', responseData);
+                console.error('batchUpdateNotes: Invalid response structure. Expected "response.results" to be an array.', response);
                 throw new Error('Batch update failed: Invalid server response format.');
             }
         }
@@ -403,7 +399,7 @@ const propertiesAPI = {
      * @param {boolean} [options.include_internal=false] - Whether to include internal properties.
      * @returns {Promise<Object>} Properties object. Structure may vary based on include_internal.
      */
-    getProperties: (entityType, entityId, options = {}) => {
+    getProperties: async (entityType, entityId, options = {}) => {
         const params = new URLSearchParams({
             entity_type: entityType,
             entity_id: entityId.toString()
@@ -411,7 +407,8 @@ const propertiesAPI = {
         if (options.include_internal) {
             params.append('include_internal', '1');
         }
-        return apiRequest(`properties.php?${params.toString()}`);
+        const response = await apiRequest(`properties.php?${params.toString()}`);
+        return response.data; // Assuming the properties object is in response.data
     },
 
     /**
@@ -424,23 +421,32 @@ const propertiesAPI = {
      * @param {0|1} [propertyData.internal] - Optional. Explicitly set internal status (0 or 1). If undefined, backend determines automatically.
      * @returns {Promise<Object>} The created or updated property object.
      */
-    setProperty: (propertyData) => apiRequest('properties.php', 'POST', propertyData),
+    setProperty: async (propertyData) => {
+        const body = {
+            action: "set", // Add action: "set"
+            ...propertyData
+        };
+        const response = await apiRequest('properties.php', 'POST', body);
+        return response.data; // Assuming the property object is in response.data
+    },
 
     /**
      * Delete a property
      * @param {string} entityType - Entity type ('note' or 'page')
      * @param {number} entityId - Entity ID
      * @param {string} propertyName - Property name
-     * @returns {Promise<null>}
+     * @returns {Promise<Object>} Delete confirmation (entire response object)
      */
-    deleteProperty: (entityType, entityId, propertyName) => {
+    deleteProperty: async (entityType, entityId, propertyName) => {
         const deleteData = {
             action: 'delete',
             entity_type: entityType,
             entity_id: entityId,
             name: propertyName
         };
-        return apiRequest('properties.php', 'POST', deleteData);
+        // For delete, the response might be {status: "success", message: "..."}
+        // Returning the whole response object as per task instructions.
+        return await apiRequest('properties.php', 'POST', deleteData);
     }
 };
 
@@ -460,7 +466,7 @@ const attachmentsAPI = {
      * @param {string} [params.filter_by_type] - Filter by type (exact match)
      * @returns {Promise<{attachments: Array, pagination: Object}>} Object containing attachments array and pagination info
      */
-    getAllAttachments: (params = {}) => {
+    getAllAttachments: async (params = {}) => {
         const queryParams = new URLSearchParams();
         
         // Add all provided parameters
@@ -470,7 +476,8 @@ const attachmentsAPI = {
             }
         });
         
-        return apiRequest(`attachments.php?${queryParams.toString()}`);
+        const response = await apiRequest(`attachments.php?${queryParams.toString()}`);
+        return response.data; // Assuming {attachments, pagination} is in response.data
     },
 
     /**
@@ -478,7 +485,7 @@ const attachmentsAPI = {
      * @param {number} noteId - Note ID
      * @returns {Promise<Array>} Array of attachment objects
      */
-    getNoteAttachments: (noteId, options = {}) => {
+    getNoteAttachments: async (noteId, options = {}) => {
         const params = new URLSearchParams();
         params.append('note_id', noteId.toString());
 
@@ -491,7 +498,8 @@ const attachmentsAPI = {
         if (options.filter_by_type) params.append('filter_by_type', options.filter_by_type);
         
         const queryString = params.toString();
-        return apiRequest(`attachments.php?${queryString}`);
+        const response = await apiRequest(`attachments.php?${queryString}`);
+        return response.data; // Assuming the array of attachments is in response.data
     },
 
     /**
@@ -499,21 +507,26 @@ const attachmentsAPI = {
      * @param {FormData} formData - FormData object containing note_id and attachmentFile
      * @returns {Promise<Object>} Created attachment object
      */
-    uploadAttachment: (formData) => {
-        return apiRequest('attachments.php', 'POST', formData);
+    uploadAttachment: async (formData) => {
+        const response = await apiRequest('attachments.php', 'POST', formData);
+        // Upload response might be { status: "success", message: "...", data: { ... } }
+        // We return data as per convention for create/update.
+        return response.data; 
     },
 
     /**
      * Delete an attachment
      * @param {number} attachmentId - Attachment ID
-     * @returns {Promise<Object>} Delete confirmation
+     * @returns {Promise<Object>} Delete confirmation (entire response object)
      */
-    deleteAttachment: (attachmentId) => {
+    deleteAttachment: async (attachmentId) => {
         const body = {
             action: 'delete',
             id: attachmentId
         };
-        return apiRequest('attachments.php', 'POST', body);
+        // For delete, the response might be {status: "success", message: "..."}
+        // Returning the whole response object as per task instructions.
+        return await apiRequest('attachments.php', 'POST', body);
     }
 };
 
@@ -527,12 +540,13 @@ const searchAPI = {
      * @param {string} query - Search query
      * @returns {Promise<Array<{note_id: number, content: string, page_id: number, page_name: string, content_snippet: string}>>}
      */
-    search: (query, options = {}) => {
+    search: async (query, options = {}) => {
         const params = new URLSearchParams();
         params.append('q', query); // query is already URI encoded by URLSearchParams
         if (options.page) params.append('page', options.page.toString());
         if (options.per_page) params.append('per_page', options.per_page.toString());
-        return apiRequest(`search.php?${params.toString()}`);
+        const response = await apiRequest(`search.php?${params.toString()}`);
+        return response.data; // Assuming the array of search results is in response.data
     },
 
     /**
@@ -540,28 +554,19 @@ const searchAPI = {
      * @param {string} pageName - Page name
      * @returns {Promise<Array<{note_id: number, content: string, page_id: number, source_page_name: string, content_snippet: string}>>}
      */
-    getBacklinks: async (pageName, options = {}) => { // Added async
+    getBacklinks: async (pageName, options = {}) => {
         const params = new URLSearchParams();
         params.append('backlinks_for_page_name', pageName); // pageName is already URI encoded
         if (options.page) params.append('page', options.page.toString());
         if (options.per_page) params.append('per_page', options.per_page.toString());
-        const responseData = await apiRequest(`search.php?${params.toString()}`); // Added await and stored in responseData
-
-        if (Array.isArray(responseData)) {
-            return responseData;
+        const response = await apiRequest(`search.php?${params.toString()}`);
+        // apiRequest returns the full response object {status, data, ...}
+        // We expect data to be an array of backlinks.
+        if (response && response.data && Array.isArray(response.data)) {
+            return response.data;
         }
-
-        if (responseData && typeof responseData === 'object') {
-            const keysToTry = ['backlinks', 'items', 'results', 'data'];
-            for (const key of keysToTry) {
-                if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
-                    return responseData[key];
-                }
-            }
-        }
-
-        console.warn('[searchAPI.getBacklinks] Response was not an array and no known data key was found. Response:', responseData);
-        return []; // Return empty array as a fallback
+        console.warn('[searchAPI.getBacklinks] Response data was not an array as expected. Response:', response);
+        return []; // Fallback to empty array if data is not as expected
     },
 
     /**
@@ -569,12 +574,13 @@ const searchAPI = {
      * @param {'todo'|'done'} status - Task status
      * @returns {Promise<Array<{note_id: number, content: string, page_id: number, page_name: string, content_snippet: string, properties: Object}>>}
      */
-    getTasks: (status, options = {}) => {
+    getTasks: async (status, options = {}) => {
         const params = new URLSearchParams();
         params.append('tasks', status);
         if (options.page) params.append('page', options.page.toString());
         if (options.per_page) params.append('per_page', options.per_page.toString());
-        return apiRequest(`search.php?${params.toString()}`);
+        const response = await apiRequest(`search.php?${params.toString()}`);
+        return response.data; // Assuming the array of tasks is in response.data
     }
 };
 
@@ -588,34 +594,44 @@ const templatesAPI = {
      * @param {string} type - Template type ('note' or 'page')
      * @returns {Promise<Array<{name: string, content: string}>>} Array of template objects.
      */
-    getTemplates: (type, options = {}) => {
+    getTemplates: async (type, options = {}) => {
         const params = new URLSearchParams();
         params.append('type', type);
         if (options.page) params.append('page', options.page.toString());
         if (options.per_page) params.append('per_page', options.per_page.toString());
-        return apiRequest(`templates.php?${params.toString()}`);
+        const response = await apiRequest(`templates.php?${params.toString()}`);
+        return response.data; // Assuming the array of templates is in response.data
     },
 
     /**
      * Create a new template
      * @param {{type: string, name: string, content: string}} templateData - Template data
-     * @returns {Promise<Object>} Creation confirmation
+     * @returns {Promise<Object>} Creation confirmation or created template object
      */
-    createTemplate: (templateData) => apiRequest('templates.php', 'POST', templateData),
+    createTemplate: async (templateData) => {
+        const body = {
+            action: "create", // Add action: "create"
+            ...templateData
+        };
+        const response = await apiRequest('templates.php', 'POST', body);
+        return response.data; // Assuming the created template/confirmation is in response.data
+    },
 
     /**
      * Delete a template
      * @param {string} type - Template type ('note' or 'page')
      * @param {string} name - Template name
-     * @returns {Promise<Object>} Deletion confirmation
+     * @returns {Promise<Object>} Deletion confirmation (entire response object)
      */
-    deleteTemplate: (type, name) => {
+    deleteTemplate: async (type, name) => {
         const body = {
             action: 'delete',
             type: type,
             name: name
         };
-        return apiRequest('templates.php', 'POST', body);
+        // For delete, the response might be {status: "success", message: "..."}
+        // Returning the whole response object as per task instructions.
+        return await apiRequest('templates.php', 'POST', body);
     }
 };
 
@@ -659,25 +675,29 @@ const queryAPI = {
             page: options.page || 1,
             per_page: options.per_page || 10
         };
-        const responseData = await apiRequest('query_notes.php', 'POST', body);
+        // apiRequest returns the full response object, e.g., {status, data: [...notes...], pagination: {...}}
+        const response = await apiRequest('query_notes.php', 'POST', body);
 
-        // Handle cases where the API returns an object wrapping the array
-        if (Array.isArray(responseData)) {
-            return responseData;
+        // We expect the array of notes to be in response.data
+        if (response && response.data && Array.isArray(response.data)) {
+            return response.data;
         }
-
-        if (responseData && typeof responseData === 'object') {
-            // Check for common keys that might hold the array
-            const keysToTry = ['notes', 'data', 'results'];
+        
+        // Fallback for unexpected structures, though response.data should ideally be the array.
+        // This part could be removed if API guarantees response.data is the array.
+        if (response && typeof response === 'object') { 
+            // This case handles if the API directly returns { status: "success", results: [...] } and results is the array.
+            // Or if the notes are directly in a 'notes' property of the main response.
+            const keysToTry = ['notes', 'results']; 
             for (const key of keysToTry) {
-                if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
-                    return responseData[key];
+                if (response.hasOwnProperty(key) && Array.isArray(response[key])) {
+                    console.warn(`[queryAPI.queryNotes] Notes found in response.${key} instead of response.data.${key}`);
+                    return response[key];
                 }
             }
         }
 
-        // Fallback for unexpected structures
-        console.warn('[queryAPI.queryNotes] Response was not an array and no known data key was found. Response:', responseData);
+        console.warn('[queryAPI.queryNotes] Response data was not an array as expected in response.data. Response:', response);
         return [];
     }
 };

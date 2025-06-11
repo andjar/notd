@@ -188,12 +188,13 @@ const debouncedSearch = debounce(async (query) => {
     }
     
     try {
-        const response = await searchAPI.search(query);
-        if (response && Array.isArray(response.results)) {
-            displaySearchResults(response.results);
+        // searchAPI.search now returns response.data which IS the array of results.
+        const resultsArray = await searchAPI.search(query);
+        if (resultsArray && Array.isArray(resultsArray)) {
+            displaySearchResults(resultsArray);
         } else {
-            console.warn('Search API returned unexpected format:', response);
-            displaySearchResults([]);
+            console.warn('Search API returned unexpected format or no results:', resultsArray);
+            displaySearchResults([]); // Pass empty array if not valid
         }
     } catch (error) {
         console.error('Search error:', error);
@@ -789,10 +790,18 @@ notesContainer.addEventListener('drop', async (e) => {
             // Refresh the note to show new attachments
             const pageIdToUse = currentPageId; // From imported state
             if (!pageIdToUse) return; // Should not happen if note exists
-            const freshNotes = await notesAPI.getNotesForPage(pageIdToUse);
-            setNotesForCurrentPage(freshNotes);
+            
+            // notesAPI.getPageData returns an object like { page: {...}, notes: [...] }
+            const pageDataResult = await notesAPI.getPageData(pageIdToUse);
+            if (pageDataResult && pageDataResult.notes) {
+                setNotesForCurrentPage(pageDataResult.notes);
+            } else {
+                console.warn("Failed to get fresh notes after attachment upload or data format unexpected.");
+                // Potentially setNotesForCurrentPage([]) or trigger a full page reload as a fallback.
+                // For now, state might be stale if this path is hit.
+            }
 
-            ui.displayNotes(notesForCurrentPage, pageIdToUse);
+            ui.displayNotes(notesForCurrentPage, pageIdToUse); // notesForCurrentPage is updated by setNotesForCurrentPage
 
             const focusedNoteId = currentFocusedNoteId; // From imported state
             if (focusedNoteId) {

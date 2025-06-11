@@ -66,29 +66,58 @@ export function displayPageProperties(properties) {
         setupPagePropertiesModalListeners();
         return;
     }
-    Object.entries(properties).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-            value.forEach((singleValue, index) => {
+    Object.entries(properties).forEach(([key, propValueArray]) => {
+        // API now guarantees propValueArray is an array of objects: [{value: "val1", internal: 0}, ...]
+        if (Array.isArray(propValueArray)) {
+            propValueArray.forEach((item, index) => {
+                // Skip rendering if the property item is internal
+                if (item.internal) {
+                    return; 
+                }
+
                 const propItem = document.createElement('div');
                 propItem.className = 'page-property-item';
+                // Note: data-original-value and value should use item.value
                 propItem.innerHTML = `
                     <span class="page-property-key" contenteditable="true" data-original-key="${key}" data-is-array="true" data-array-index="${index}">${key}</span>
                     <span class="page-property-separator">:</span>
-                    <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${singleValue.value}" value="${singleValue.value}" />
+                    <input type="text" class="page-property-value" data-property="${key}" data-array-index="${index}" data-original-value="${item.value}" value="${item.value}" />
                     <button class="page-property-delete" data-property="${key}" data-array-index="${index}" title="Delete this ${key} value">×</button>
                 `;
                 pagePropertiesList.appendChild(propItem);
             });
         } else {
-            const propItem = document.createElement('div');
-            propItem.className = 'page-property-item';
-            propItem.innerHTML = `
-                <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
-                <span class="page-property-separator">:</span>
-                <input type="text" class="page-property-value" data-property="${key}" data-original-value="${(typeof value === 'object' && value !== null && value.hasOwnProperty('value')) ? value.value : (value || '')}" value="${(typeof value === 'object' && value !== null && value.hasOwnProperty('value')) ? value.value : (value || '')}" />
-                <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
-            `;
-            pagePropertiesList.appendChild(propItem);
+            // This else block should ideally not be reached if API is consistent.
+            // If it can be reached for non-array single values, it should also check for an 'internal' flag.
+            console.warn(`[displayPageProperties] Property "${key}" is not an array as expected by new API spec:`, propValueArray);
+            // Fallback for non-array (legacy or unexpected structure)
+            // Assuming propValueArray might be a single object {value: ..., internal: ...} or just a value
+            let valToRender = '';
+            let originalVal = '';
+            let isInternal = false;
+
+            if (typeof propValueArray === 'object' && propValueArray !== null && propValueArray.hasOwnProperty('value')) {
+                valToRender = propValueArray.value;
+                originalVal = propValueArray.value;
+                if (propValueArray.hasOwnProperty('internal') && propValueArray.internal) {
+                    isInternal = true;
+                }
+            } else if (typeof propValueArray !== 'object') { // Simple value
+                valToRender = propValueArray || '';
+                originalVal = propValueArray || '';
+            }
+
+            if (!isInternal) { // Only render if not internal
+                const propItem = document.createElement('div');
+                propItem.className = 'page-property-item';
+                propItem.innerHTML = `
+                    <span class="page-property-key" contenteditable="true" data-original-key="${key}">${key}</span>
+                    <span class="page-property-separator">:</span>
+                    <input type="text" class="page-property-value" data-property="${key}" data-original-value="${originalVal}" value="${valToRender}" />
+                    <button class="page-property-delete" data-property="${key}" title="Delete ${key} property">×</button>
+                `;
+                pagePropertiesList.appendChild(propItem);
+            }
         }
     });
 
@@ -253,11 +282,22 @@ export function displayPageProperties(properties) {
 export async function renamePropertyKey(oldKey, newKey) {
     if (!currentPageId) return;
     try {
-        const properties = await propertiesAPI.getProperties('page', currentPageId);
-        const value = properties[oldKey];
-        if (value === undefined) { console.warn(`Property ${oldKey} not found for renaming`); return; }
+        const properties = await propertiesAPI.getProperties('page', currentPageId); // Gets new structure
+        const propValueArray = properties[oldKey]; // This is an array of {value, internal} objects
+        if (propValueArray === undefined) { console.warn(`Property ${oldKey} not found for renaming`); return; }
+        
         await propertiesAPI.deleteProperty('page', currentPageId, oldKey);
-        await propertiesAPI.setProperty({ entity_type: 'page', entity_id: currentPageId, name: newKey, value: value });
+        // Re-add each value under the new key, preserving internal status
+        for (const item of propValueArray) {
+            await propertiesAPI.setProperty({ 
+                entity_type: 'page', 
+                entity_id: currentPageId, 
+                name: newKey, 
+                value: item.value, // Pass the actual value
+                internal: item.internal // Preserve internal flag
+            });
+        }
+        
         const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
         displayPageProperties(updatedProperties); // Assumes this function is available in this module
         if (ui.domRefs.pagePropertiesContainer && typeof ui.renderPageInlineProperties === 'function') {
@@ -276,12 +316,20 @@ export async function renamePropertyKey(oldKey, newKey) {
 export async function renameArrayPropertyKey(oldKey, newKey, arrayIndex) { // arrayIndex was missing
     if (!currentPageId) return;
     try {
-        const properties = await propertiesAPI.getProperties('page', currentPageId);
-        const values = properties[oldKey];
-        if (!Array.isArray(values)) { console.warn(`Property ${oldKey} is not an array for renaming`); return; }
+        const properties = await propertiesAPI.getProperties('page', currentPageId); // Gets new structure
+        const propValueArray = properties[oldKey]; // This is an array of {value, internal} objects
+        if (!Array.isArray(propValueArray)) { console.warn(`Property ${oldKey} is not an array for renaming`); return; }
+        
         await propertiesAPI.deleteProperty('page', currentPageId, oldKey);
-        for (const value of values) {
-            await propertiesAPI.setProperty({ entity_type: 'page', entity_id: currentPageId, name: newKey, value: value });
+        // Re-add each value under the new key, preserving internal status
+        for (const item of propValueArray) {
+            await propertiesAPI.setProperty({ 
+                entity_type: 'page', 
+                entity_id: currentPageId, 
+                name: newKey, 
+                value: item.value, // Pass the actual value
+                internal: item.internal // Preserve internal flag
+            });
         }
         const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
         displayPageProperties(updatedProperties);
@@ -301,13 +349,22 @@ export async function renameArrayPropertyKey(oldKey, newKey, arrayIndex) { // ar
 export async function updateArrayPropertyValue(key, arrayIndex, newValue) {
     if (!currentPageId) return;
     try {
-        const properties = await propertiesAPI.getProperties('page', currentPageId);
-        const values = properties[key];
-        if (!Array.isArray(values) || arrayIndex >= values.length) { console.warn(`Invalid array property update: ${key}[${arrayIndex}]`); return; }
+        const properties = await propertiesAPI.getProperties('page', currentPageId); // Gets new structure
+        const propValueArray = properties[key]; // This is an array of {value, internal} objects
+        if (!Array.isArray(propValueArray) || arrayIndex >= propValueArray.length) { console.warn(`Invalid array property update: ${key}[${arrayIndex}]`); return; }
+        
         await propertiesAPI.deleteProperty('page', currentPageId, key);
-        for (let i = 0; i < values.length; i++) {
-            const value = i === arrayIndex ? newValue : values[i];
-            await propertiesAPI.setProperty({ entity_type: 'page', entity_id: currentPageId, name: key, value: value });
+        for (let i = 0; i < propValueArray.length; i++) {
+            const valueToSet = i === arrayIndex ? newValue : propValueArray[i].value;
+            // Preserve internal status of existing items, new/updated item is assumed non-internal by default from modal
+            const internalFlag = i === arrayIndex ? 0 : (propValueArray[i].internal || 0); 
+            await propertiesAPI.setProperty({ 
+                entity_type: 'page', 
+                entity_id: currentPageId, 
+                name: key, 
+                value: valueToSet,
+                internal: internalFlag
+            });
         }
         const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
         displayPageProperties(updatedProperties);
@@ -327,13 +384,20 @@ export async function updateArrayPropertyValue(key, arrayIndex, newValue) {
 export async function deleteArrayPropertyValue(key, arrayIndex) {
     if (!currentPageId) return;
     try {
-        const properties = await propertiesAPI.getProperties('page', currentPageId);
-        const values = properties[key];
-        if (!Array.isArray(values) || arrayIndex >= values.length) { console.warn(`Invalid array property deletion: ${key}[${arrayIndex}]`); return; }
+        const properties = await propertiesAPI.getProperties('page', currentPageId); // Gets new structure
+        const propValueArray = properties[key]; // This is an array of {value, internal} objects
+        if (!Array.isArray(propValueArray) || arrayIndex >= propValueArray.length) { console.warn(`Invalid array property deletion: ${key}[${arrayIndex}]`); return; }
+        
         await propertiesAPI.deleteProperty('page', currentPageId, key);
-        const remainingValues = values.filter((_, i) => i !== arrayIndex);
-        for (const value of remainingValues) {
-            await propertiesAPI.setProperty({ entity_type: 'page', entity_id: currentPageId, name: key, value: value });
+        const remainingItems = propValueArray.filter((_, i) => i !== arrayIndex);
+        for (const item of remainingItems) {
+            await propertiesAPI.setProperty({ 
+                entity_type: 'page', 
+                entity_id: currentPageId, 
+                name: key, 
+                value: item.value, // Pass the actual value
+                internal: item.internal // Preserve internal flag
+            });
         }
         const updatedProperties = await propertiesAPI.getProperties('page', currentPageId);
         displayPageProperties(updatedProperties);

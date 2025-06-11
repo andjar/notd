@@ -467,26 +467,44 @@ function renderPageInlineProperties(properties, targetContainer) {
     let hasVisibleProperties = false;
     const fragment = document.createDocumentFragment();
 
-    Object.entries(properties).forEach(([key, value]) => {
-        hasVisibleProperties = true;
-        const processValue = (val) => {
-            const propItem = document.createElement('span');
-            propItem.className = 'property-inline'; 
-            if (key.toLowerCase() === 'favorite' && String(val).toLowerCase() === 'true') {
-                propItem.innerHTML = `<span class="property-favorite">⭐</span>`;
-                fragment.appendChild(propItem); return;
-            }
-            if (key.startsWith('tag::')) {
-                const tagName = key.substring(5); 
-                propItem.innerHTML = `<span class="property-key">#${tagName}</span>`;
-                propItem.classList.add('property-tag'); 
-            } else {
-                const displayValue = String(val).trim();
-                propItem.innerHTML = `<span class="property-key">${key}:</span> <span class="property-value">${displayValue}</span>`;
-            }
-            fragment.appendChild(propItem);
-        };
-        if (Array.isArray(value)) { value.forEach(v => processValue(v)); } else { processValue(value); }
+    Object.entries(properties).forEach(([key, propValueArray]) => {
+        // API now guarantees propValueArray is an array of objects: [{value: "val1", internal: 0}, ...]
+        const valuesToRender = [];
+
+        if (Array.isArray(propValueArray)) {
+            propValueArray.forEach(item => {
+                if (item && typeof item === 'object' && item.hasOwnProperty('value') && item.hasOwnProperty('internal')) {
+                    if (!item.internal) { // Only render if not internal
+                        valuesToRender.push(item.value);
+                    }
+                } else {
+                    console.warn(`[renderPageInlineProperties] Unexpected item structure for property "${key}":`, item);
+                }
+            });
+        } else {
+            console.warn(`[renderPageInlineProperties] Property "${key}" is not an array as expected:`, propValueArray);
+        }
+
+        if (valuesToRender.length > 0) {
+            hasVisibleProperties = true;
+            valuesToRender.forEach(val => {
+                const propItem = document.createElement('span');
+                propItem.className = 'property-inline';
+                propItem.dataset.propertyName = key; // Add data attribute for key
+                propItem.dataset.propertyValue = String(val); // Add data attribute for value
+
+                if (key.toLowerCase() === 'favorite' && String(val).toLowerCase() === 'true') {
+                    propItem.innerHTML = `<span class="property-favorite">⭐</span>`;
+                } else if (key.toLowerCase() === 'tags' || key.toLowerCase() === 'tag' || key.startsWith('tag::')) {
+                    const displayTagName = String(val).startsWith('#') ? String(val).substring(1) : String(val);
+                    propItem.innerHTML = `<span class="property-key">#</span><span class="property-value">${displayTagName}</span>`;
+                    propItem.classList.add('property-tag');
+                } else {
+                    propItem.innerHTML = `<span class="property-key">${key}:</span> <span class="property-value">${String(val)}</span>`;
+                }
+                fragment.appendChild(propItem);
+            });
+        }
     });
 
     if (hasVisibleProperties) {
