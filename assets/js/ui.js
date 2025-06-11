@@ -545,10 +545,11 @@ function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
     const breadcrumbHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <span>${breadcrumbLinksHtml}</span>
-            <i data-feather="settings" class="page-title-gear" id="page-properties-gear" style="cursor: pointer;"></i>
+            <i data-feather="settings" class="page-title-gear" style="cursor: pointer;"></i>
         </div>
     `;
     domRefs.noteFocusBreadcrumbsContainer.innerHTML = breadcrumbHTML;
+    domRefs.noteFocusBreadcrumbsContainer.style.display = 'flex';
     if (typeof feather !== 'undefined' && feather.replace) {
         feather.replace();
     }
@@ -629,7 +630,10 @@ function focusOnNote(noteId) {
         renderBreadcrumbs(noteId, window.notesForCurrentPage, window.currentPageName);
     } else {
         console.warn("Cannot render breadcrumbs: notesForCurrentPage or currentPageName is missing.");
-        if (domRefs.breadcrumbsContainer) domRefs.breadcrumbsContainer.innerHTML = '';
+        if (domRefs.noteFocusBreadcrumbsContainer) {
+            domRefs.noteFocusBreadcrumbsContainer.innerHTML = '';
+            domRefs.noteFocusBreadcrumbsContainer.style.display = 'none';
+        }
     }
 }
 
@@ -647,7 +651,10 @@ function showAllNotes() {
     notesContainer.classList.remove('has-focused-notes');
     const showAllBtn = notesContainer.querySelector('.show-all-notes-btn');
     if (showAllBtn) { showAllBtn.remove(); }
-    if (domRefs.breadcrumbsContainer) { domRefs.breadcrumbsContainer.innerHTML = ''; }
+    if (domRefs.noteFocusBreadcrumbsContainer) {
+        domRefs.noteFocusBreadcrumbsContainer.innerHTML = '';
+        domRefs.noteFocusBreadcrumbsContainer.style.display = 'none';
+    }
 }
 
 function getNestingLevel(noteElement) {
