@@ -6,13 +6,37 @@ import { parseAndRenderContent } from '../../assets/js/ui/note-renderer.js'; // 
 
 // Define Kanban Columns
 const KANBAN_COLUMNS = [
-    { id: 'todo', title: 'Todo', statusMatcher: 'todo' },
-    { id: 'doing', title: 'Doing', statusMatcher: 'doing' },
-    { id: 'done', title: 'Done', statusMatcher: 'done' },
-    { id: 'someday', title: 'Someday', statusMatcher: 'someday' },
-    { id: 'waiting', title: 'Waiting', statusMatcher: 'waiting' },
+    { id: 'todo', title: 'Todo', statusMatcher: 'TODO' },
+    { id: 'doing', title: 'Doing', statusMatcher: 'DOING' },
+    { id: 'done', title: 'Done', statusMatcher: 'DONE' },
+    { id: 'someday', title: 'Someday', statusMatcher: 'SOMEDAY' },
+    { id: 'waiting', title: 'Waiting', statusMatcher: 'WAITING' },
     // { id: 'archived', title: 'Archived', statusMatcher: ['CANCELLED', 'NLR'] } // For later
 ];
+
+/**
+ * Extracts and normalizes the status from a note object.
+ * @param {object} note - The note object.
+ * @returns {string} - The uppercase status string (e.g., 'TODO', 'DOING').
+ */
+function getNoteStatus(note) {
+    let status = 'TODO'; // Default status
+    if (note.properties && note.properties.status) {
+        let rawStatus = '';
+        if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
+            rawStatus = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || '');
+        } else if (typeof note.properties.status === 'string') {
+            rawStatus = note.properties.status;
+        } else if (note.properties.status.value && typeof note.properties.status.value === 'string') {
+            rawStatus = note.properties.status.value;
+        }
+
+        if (rawStatus) {
+            status = rawStatus.toUpperCase();
+        }
+    }
+    return status;
+}
 
 /**
  * Creates a basic DOM element for a Kanban card.
@@ -25,22 +49,7 @@ function createKanbanCard(note) {
     cardElement.setAttribute('draggable', 'true');
     cardElement.dataset.noteId = note.id;
 
-    let currentStatus = 'todo'; // Default status
-    if (note.properties && note.properties.status) {
-        let rawStatus = '';
-        if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
-            // Assuming the status value is directly in the array or in a 'value' property of an object in the array
-            rawStatus = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || '');
-        } else if (typeof note.properties.status === 'string') { 
-            rawStatus = note.properties.status;
-        } else if (note.properties.status.value && typeof note.properties.status.value === 'string') { // Handle single object with value property
-            rawStatus = note.properties.status.value;
-        }
-
-        if (rawStatus) {
-            currentStatus = rawStatus.toLowerCase();
-        }
-    }
+    const currentStatus = getNoteStatus(note);
     cardElement.dataset.currentStatus = currentStatus;
     
     // Render complex content if necessary, for now, just text.
@@ -92,20 +101,7 @@ export function displayKanbanBoard(containerElement, notes) {
 
     // Process notes and distribute them into columns
     notes.forEach(note => {
-        let status = 'TODO'; // Default status
-        if (note.properties && note.properties.status) {
-            let rawStatus = '';
-            if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
-                rawStatus = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || '');
-            } else if (typeof note.properties.status === 'string') {
-                rawStatus = note.properties.status;
-            } else if (note.properties.status.value && typeof note.properties.status.value === 'string') {
-                 rawStatus = note.properties.status.value;
-            }
-            if (rawStatus) {
-                status = rawStatus.toLowerCase();
-            }
-        }
+        const status = getNoteStatus(note);
 
         const targetColumnEl = containerElement.querySelector(`.kanban-column[data-status-matcher="${status}"] .kanban-column-cards`);
         if (targetColumnEl) {
@@ -113,12 +109,12 @@ export function displayKanbanBoard(containerElement, notes) {
             targetColumnEl.appendChild(cardEl);
         } else {
             // Fallback: if status is not recognized, put in the first column ('todo')
-            const fallbackColumnEl = containerElement.querySelector(`.kanban-column[data-status-matcher="todo"] .kanban-column-cards`);
+            const fallbackColumnEl = containerElement.querySelector(`.kanban-column[data-status-matcher="TODO"] .kanban-column-cards`);
             if (fallbackColumnEl) {
                 console.warn(`[Kanban] No column found for status: '${status}' for note ID ${note.id}. Placing in 'todo'.`);
                 const cardEl = createKanbanCard(note);
                 // Optionally, update the card's dataset.currentStatus to 'todo' if you want the card to reflect this fallback
-                // cardEl.dataset.currentStatus = 'todo'; // This might be confusing if the actual property is different
+                // cardEl.dataset.currentStatus = 'TODO'; // This might be confusing if the actual property is different
                 fallbackColumnEl.appendChild(cardEl);
             } else {
                  console.error(`[Kanban] No column found for status: ${status} and fallback 'todo' column also not found for note ID ${note.id}`);
