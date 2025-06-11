@@ -32,8 +32,17 @@ export async function initializeKanban() {
         try {
             // Fetch notes using queryAPI with correct SQL for Kanban statuses
             console.log('Fetching task notes using queryAPI with SQL join on Properties...');
-            const KANBAN_STATUSES = ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING'];
-            const statusList = KANBAN_STATUSES.map(s => `'${s}'`).join(', ');
+            
+            // Dynamically get KANBAN_STATUSES from global config
+            let currentKanbanStatuses = [];
+            if (window.configuredKanbanStates && Array.isArray(window.configuredKanbanStates) && window.configuredKanbanStates.length > 0) {
+                currentKanbanStatuses = window.configuredKanbanStates;
+            } else {
+                console.warn('[Kanban Main] window.configuredKanbanStates not found or empty. Using default statuses (TODO, DOING, DONE) for query.');
+                currentKanbanStatuses = ['TODO', 'DOING', 'DONE'];
+            }
+            const statusList = currentKanbanStatuses.map(s => `'${s.toUpperCase()}'`).join(', ');
+            
             const sql = `
                 SELECT DISTINCT N.id
                 FROM Notes N

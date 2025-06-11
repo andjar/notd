@@ -4,15 +4,28 @@ import { notesAPI } from '../../assets/js/api_client.js';
 import { parseAndRenderContent } from '../../assets/js/ui/note-renderer.js'; // For rendering card content, if needed
 // Sortable is loaded globally via script tag, no need to import
 
-// Define Kanban Columns
-const KANBAN_COLUMNS = [
+// Dynamically generate KANBAN_COLUMNS from configured states
+let KANBAN_COLUMNS = [];
+const DEFAULT_FALLBACK_COLUMNS = [
     { id: 'todo', title: 'Todo', statusMatcher: 'TODO' },
     { id: 'doing', title: 'Doing', statusMatcher: 'DOING' },
-    { id: 'done', title: 'Done', statusMatcher: 'DONE' },
-    { id: 'someday', title: 'Someday', statusMatcher: 'SOMEDAY' },
-    { id: 'waiting', title: 'Waiting', statusMatcher: 'WAITING' },
-    // { id: 'archived', title: 'Archived', statusMatcher: ['CANCELLED', 'NLR'] } // For later
+    { id: 'done', title: 'Done', statusMatcher: 'DONE' }
 ];
+
+if (window.configuredKanbanStates && Array.isArray(window.configuredKanbanStates) && window.configuredKanbanStates.length > 0) {
+    KANBAN_COLUMNS = window.configuredKanbanStates.map(state => ({
+        id: state.toLowerCase(),
+        title: state.charAt(0).toUpperCase() + state.slice(1).toLowerCase(),
+        statusMatcher: state.toUpperCase()
+    }));
+} else {
+    console.warn('[Kanban UI] window.configuredKanbanStates not found or empty. Using default columns (Todo, Doing, Done).');
+    KANBAN_COLUMNS = DEFAULT_FALLBACK_COLUMNS;
+}
+
+const FALLBACK_STATUS = KANBAN_COLUMNS.length > 0 ? KANBAN_COLUMNS[0].statusMatcher : 'TODO';
+const FALLBACK_COLUMN_ID = KANBAN_COLUMNS.length > 0 ? KANBAN_COLUMNS[0].id : 'todo';
+
 
 /**
  * Extracts and normalizes the status from a note object.
@@ -20,7 +33,7 @@ const KANBAN_COLUMNS = [
  * @returns {string} - The uppercase status string (e.g., 'TODO', 'DOING').
  */
 function getNoteStatus(note) {
-    let status = 'TODO'; // Default status
+    let status = FALLBACK_STATUS; // Default status from configured states or 'TODO'
     if (note.properties && note.properties.status) {
         let rawStatus = '';
         if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
@@ -108,16 +121,17 @@ export function displayKanbanBoard(containerElement, notes) {
             const cardEl = createKanbanCard(note); // Pass the whole note
             targetColumnEl.appendChild(cardEl);
         } else {
-            // Fallback: if status is not recognized, put in the first column ('todo')
-            const fallbackColumnEl = containerElement.querySelector(`.kanban-column[data-status-matcher="TODO"] .kanban-column-cards`);
+            // Fallback: if status is not recognized, put in the first configured column
+            const fallbackColumnSelector = `.kanban-column[data-status-matcher="${FALLBACK_STATUS}"] .kanban-column-cards`;
+            const fallbackColumnEl = containerElement.querySelector(fallbackColumnSelector);
             if (fallbackColumnEl) {
-                console.warn(`[Kanban] No column found for status: '${status}' for note ID ${note.id}. Placing in 'todo'.`);
+                console.warn(`[Kanban] No column found for status: '${status}' for note ID ${note.id}. Placing in '${FALLBACK_COLUMN_ID}'.`);
                 const cardEl = createKanbanCard(note);
-                // Optionally, update the card's dataset.currentStatus to 'todo' if you want the card to reflect this fallback
-                // cardEl.dataset.currentStatus = 'TODO'; // This might be confusing if the actual property is different
+                // Optionally, update the card's dataset.currentStatus to the fallback status if you want the card to reflect this
+                // cardEl.dataset.currentStatus = FALLBACK_STATUS; 
                 fallbackColumnEl.appendChild(cardEl);
             } else {
-                 console.error(`[Kanban] No column found for status: ${status} and fallback 'todo' column also not found for note ID ${note.id}`);
+                 console.error(`[Kanban] No column found for status: ${status} and fallback '${FALLBACK_COLUMN_ID}' column also not found for note ID ${note.id}`);
             }
         }
     });
@@ -162,7 +176,12 @@ export function displayKanbanBoard(containerElement, notes) {
                 
                 // New: Check for and update status prefix in note content
                 let newContent = note.content;
-                const statusKeywords = ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING'];
+                // Dynamically generate statusKeywords from KANBAN_COLUMNS
+                const statusKeywords = KANBAN_COLUMNS.map(col => col.statusMatcher.toUpperCase());
+                if (statusKeywords.length === 0) { // Fallback if KANBAN_COLUMNS is somehow empty
+                    statusKeywords.push('TODO', 'DOING', 'DONE'); 
+                    console.warn('[Kanban UI] statusKeywords was empty during Sortable onEnd, using default TODO, DOING, DONE.');
+                }
                 const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
                 const match = note.content.match(statusRegex);
         

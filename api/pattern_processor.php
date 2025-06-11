@@ -139,7 +139,15 @@ class PatternProcessor {
         );
         
         // Task status patterns: TODO, DONE, CANCELLED, DOING, SOMEDAY, WAITING, NLR at start of line
-        $this->registerHandler('task_status', '/^(TODO|DONE|CANCELLED|DOING|SOMEDAY|WAITING|NLR)\s+(.*)$/m', 
+        // Dynamically generate the regex for task status patterns
+        if (defined('TASK_STATES') && is_array(TASK_STATES) && !empty(TASK_STATES)) {
+            $taskStatusPattern = '/^(' . implode('|', TASK_STATES) . ')\s+(.*)$/m';
+        } else {
+            // Fallback to a default pattern if TASK_STATES is not defined or empty
+            error_log("[PATTERN_PROCESSOR_WARNING] TASK_STATES not defined or empty. Using default task status pattern.");
+            $taskStatusPattern = '/^(TODO)\s+(.*)$/m';
+        }
+        $this->registerHandler('task_status', $taskStatusPattern, 
             [$this, 'handleTaskStatus'], 
             ['priority' => 5]
         );

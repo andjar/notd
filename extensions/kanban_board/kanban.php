@@ -30,6 +30,10 @@ require_once '../../config.php';
         </main>
     </div>
 
+    <script>
+      window.configuredKanbanStates = <?php echo defined('KANBAN_TASK_STATES') ? json_encode(KANBAN_TASK_STATES) : json_encode(['TODO', 'DOING', 'DONE']); ?>;
+    </script>
+
     <!-- SCRIPTS -->
     <!-- Libraries -->
     <script src="../../assets/libs/feather.min.js"></script>
