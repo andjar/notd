@@ -59,8 +59,7 @@ CREATE TABLE IF NOT EXISTS Properties (
     CHECK (
         (note_id IS NOT NULL AND page_id IS NULL) OR
         (note_id IS NULL AND page_id IS NOT NULL)
-    ),
-    UNIQUE (page_id, name)
+    )
 );
 
 -- Indexes for performance
