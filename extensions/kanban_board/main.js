@@ -32,7 +32,7 @@ export async function initializeKanban() {
         try {
             // Fetch notes using queryAPI with correct SQL for Kanban statuses
             console.log('Fetching task notes using queryAPI with SQL join on Properties...');
-            const KANBAN_STATUSES = ['todo', 'doing', 'done', 'someday', 'waiting'];
+            const KANBAN_STATUSES = ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING'];
             const statusList = KANBAN_STATUSES.map(s => `'${s}'`).join(', ');
             const sql = `
                 SELECT DISTINCT N.id
