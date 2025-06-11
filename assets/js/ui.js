@@ -474,7 +474,8 @@ function renderPageInlineProperties(properties, targetContainer) {
         if (Array.isArray(propValueArray)) {
             propValueArray.forEach(item => {
                 if (item && typeof item === 'object' && item.hasOwnProperty('value') && item.hasOwnProperty('internal')) {
-                    if (!item.internal) { // Only render if not internal
+                    const shouldRenderInternal = window.RENDER_INTERNAL_PROPERTIES === true;
+                    if (!item.internal || shouldRenderInternal) { // Respect RENDER_INTERNAL_PROPERTIES flag
                         valuesToRender.push(item.value);
                     }
                 } else {
