@@ -18,11 +18,11 @@ class PropertyParser {
             if (empty($line)) continue;
 
             // Updated regex to reliably capture key, separator, and value.
-            // It correctly distinguishes between ':', '::', and ':::' separators.
-            if (preg_match('/^\{?([^:]+)(:{1,3})(.+?)\}?$/', $line, $matches)) {
-                $key = trim($matches[1]);
-                $separator = $matches[2];
-                $value = trim($matches[3]);
+            // It correctly distinguishes between '::' and ':::' separators, and enforces matching braces.
+            if (preg_match('/^(\{)?([^:]+)(:{2,3})(.+?)(?(1)\})$/', $line, $matches)) {
+                $key = trim($matches[2]);
+                $separator = $matches[3];
+                $value = trim($matches[4]);
 
                 // Skip empty keys
                 if (empty($key)) continue;
