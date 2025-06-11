@@ -27,13 +27,18 @@ function createKanbanCard(note) {
 
     let currentStatus = 'todo'; // Default status
     if (note.properties && note.properties.status) {
+        let rawStatus = '';
         if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
             // Assuming the status value is directly in the array or in a 'value' property of an object in the array
-            currentStatus = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || 'todo');
+            rawStatus = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || '');
         } else if (typeof note.properties.status === 'string') { 
-            currentStatus = note.properties.status;
+            rawStatus = note.properties.status;
         } else if (note.properties.status.value && typeof note.properties.status.value === 'string') { // Handle single object with value property
-            currentStatus = note.properties.status.value;
+            rawStatus = note.properties.status.value;
+        }
+
+        if (rawStatus) {
+            currentStatus = rawStatus.toLowerCase();
         }
     }
     cardElement.dataset.currentStatus = currentStatus;
@@ -89,12 +94,16 @@ export function displayKanbanBoard(containerElement, notes) {
     notes.forEach(note => {
         let status = 'todo'; // Default status
         if (note.properties && note.properties.status) {
+            let rawStatus = '';
             if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
                 status = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || 'todo');
             } else if (typeof note.properties.status === 'string') {
                 status = note.properties.status;
             } else if (note.properties.status.value && typeof note.properties.status.value === 'string') {
                  status = note.properties.status.value;
+            }
+            if (rawStatus) {
+                status = rawStatus.toLowerCase();
             }
         }
 
@@ -155,6 +164,18 @@ export function displayKanbanBoard(containerElement, notes) {
                     return;
                 }
                 
+                // New: Check for and update status prefix in note content
+                let newContent = note.content;
+                const statusKeywords = ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING'];
+                const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
+                const match = note.content.match(statusRegex);
+        
+                if (match) {
+                    const newStatusUpper = newStatus.toUpperCase();
+                    // Replace prefix and keep the rest of the content
+                    newContent = newStatusUpper + ": " + note.content.substring(match[0].length);
+                }
+                
                 console.log(`Updating note ${noteId}: from status '${oldStatus}' to '${newStatus}'.`);
 
                 try {
@@ -170,6 +191,11 @@ export function displayKanbanBoard(containerElement, notes) {
                             status: newStatus 
                         }
                     };
+
+                    if (newContent !== note.content) {
+                        updatePayload.content = newContent;
+                    }
+
                     await notesAPI.updateNote(parseInt(noteId), updatePayload);
                     
                     // Update local note object
@@ -177,6 +203,10 @@ export function displayKanbanBoard(containerElement, notes) {
                         note.properties = {};
                     }
                     note.properties.status = newStatus; 
+                    if (newContent !== note.content) {
+                        note.content = newContent;
+                        itemEl.innerHTML = newContent; // Update card content visually
+                    }
                     notesById.set(String(noteId), note); // Update the map entry
 
                     // Update card's dataset for future drags

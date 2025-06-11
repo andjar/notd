@@ -880,19 +880,21 @@ if ($method === 'GET') {
             $executeParams[] = (int)$input['collapsed']; // Should be 0 or 1
         }
 
-        if (empty($setClauses)) {
+        if (empty($setClauses) && !isset($input['properties_explicit'])) {
             $pdo->rollBack();
             ApiResponse::error('No updateable fields provided', 400);
             return; // Exit early
         }
 
-        $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
+        if (!empty($setClauses)) {
+            $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
         
-        $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
-        $executeParams[] = $noteId;
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($executeParams);
+            $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
+            $executeParams[] = $noteId;
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($executeParams);
+        }
 
         // --- BEGIN order_index recalculation logic: Step 2 & 3 & 4 (omitted for brevity) ---
         // ... logic for reordering ...
