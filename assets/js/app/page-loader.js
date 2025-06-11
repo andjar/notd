@@ -449,9 +449,9 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
     // so it will default to false. This is acceptable as its primary use was logging.
 
     // Breadcrumb generation
-    const breadcrumbsContainer = document.querySelector('#breadcrumbs-container');
-    if (breadcrumbsContainer) {
-        breadcrumbsContainer.innerHTML = ''; // Clear existing breadcrumbs
+    const pageTitleContainer = document.querySelector('#page-title');
+    if (pageTitleContainer) {
+        pageTitleContainer.innerHTML = ''; // Clear existing title
         const pageName = pageData.name;
 
         if (pageName && pageName.includes('/')) {
@@ -473,21 +473,36 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
                     event.preventDefault(); // Prevent full page reload
                     loadPage(currentNamespacePath); // Call your existing loadPage function
                 });
-                breadcrumbsContainer.appendChild(link);
+                pageTitleContainer.appendChild(link);
 
                 const separator = document.createTextNode(' / ');
-                breadcrumbsContainer.appendChild(separator);
+                pageTitleContainer.appendChild(separator);
             }
             // Add the current page name (non-linked)
             const pageNameText = document.createTextNode(parts[parts.length - 1]);
-            breadcrumbsContainer.appendChild(pageNameText);
+            pageTitleContainer.appendChild(pageNameText);
         } else if (pageName) {
             // For top-level pages, display just the page name as text
             const pageNameText = document.createTextNode(pageName);
-            breadcrumbsContainer.appendChild(pageNameText);
+            pageTitleContainer.appendChild(pageNameText);
         }
+
+        // Add the gear icon for page properties
+        const gearIcon = document.createElement('i');
+        gearIcon.dataset.feather = 'settings';
+        gearIcon.className = 'page-title-gear';
+        gearIcon.id = 'page-properties-gear';
+        gearIcon.title = 'Page Properties';
+        pageTitleContainer.appendChild(gearIcon);
+
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+
+        // The event listener for the gear icon is handled by initPagePropertiesModal in ui.js,
+        // so the redundant listener has been removed from here.
     } else {
-        console.warn('#breadcrumbs-container not found in the DOM.');
+        console.warn('#page-title not found in the DOM.');
     }
 
     if (updateHistory) {

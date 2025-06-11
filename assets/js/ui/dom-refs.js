@@ -6,7 +6,6 @@
 
 export const domRefs = {
     notesContainer: document.getElementById('notes-container'),
-    currentPageTitleEl: document.getElementById('current-page-title'),
     pagePropertiesContainer: document.getElementById('page-properties'),
     pageListContainer: document.getElementById('page-list'),
     addRootNoteBtn: document.getElementById('add-root-note-btn'),
@@ -17,7 +16,8 @@ export const domRefs = {
     globalSearchInput: document.getElementById('global-search-input'),
     searchResults: document.getElementById('search-results'),
     backlinksContainer: document.getElementById('backlinks-container'),
-    breadcrumbsContainer: document.getElementById('breadcrumbs-container'),
+    pageTitleContainer: document.getElementById('page-title'),
+    noteFocusBreadcrumbsContainer: document.getElementById('note-focus-breadcrumbs-container'),
     pagePropertiesGear: document.getElementById('page-properties-gear'),
     pagePropertiesModal: document.getElementById('page-properties-modal'),
     pagePropertiesModalClose: document.getElementById('page-properties-modal-close'),

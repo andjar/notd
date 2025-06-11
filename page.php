@@ -169,17 +169,12 @@ if (!$page) {
 
         <!-- Main Content -->
         <div id="main-content" class="main-content">
-            <div class="page-header">
-                <div id="current-page-title-container" class="page-title-container">
-                    <h1 id="current-page-title">Loading...</h1>
-                    <i data-feather="settings" class="page-title-gear" id="page-properties-gear" data-preserve-id="true"></i>
-                </div>
+        <div class="page-title-container">
+        <div id="page-title" class="page-title">
+                <!-- Page title and namespace breadcrumbs will be populated by JavaScript -->
             </div>
-
-            <div id="page-title"></div>
             <div id="page-properties"></div>
-            <div id="breadcrumbs-container">
-                <!-- Breadcrumb navigation will be populated by JavaScript -->
+            <div id="note-focus-breadcrumbs-container"></div>
             </div>
             <div id="notes-container" class="outliner">
                 <!-- Notes will be rendered here -->
