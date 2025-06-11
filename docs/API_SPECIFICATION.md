@@ -17,6 +17,7 @@ This document provides a detailed specification for the API endpoints, revised t
 - [Attachments API (`api/v1/attachments.php`)](#attachments-api)
 - [Notes API (`api/v1/notes.php`)](#notes-api)
 - [Pages API (`api/v1/pages.php`)](#pages-api)
+- [Append to Page API (`api/v1/append_to_page.php`)](#append-to-page-api)
 - [Properties API (`api/v1/properties.php`)](#properties-api)
 - [Property Definitions API (`api/v1/property_definitions.php`)](#property-definitions-api)
 - [Search API (`api/v1/search.php`)](#search-api)
@@ -423,6 +424,145 @@ Manages pages, which act as containers for notes.
 #### Error Responses
     *General structure. Specific messages: "Page not found", "Page name already exists" (on update if name conflict), "Invalid input".*
 
+---
+
+## Append to Page API (`api/v1/append_to_page.php`)
+
+### Main Objective
+
+Appends one or more notes to a specified page. If the page does not exist, it is created automatically. This endpoint simplifies the process of adding content to pages, especially when the page's existence is not predetermined.
+
+### Supported HTTP Methods & Endpoints
+
+- **POST `api/v1/append_to_page.php`**: Creates/retrieves a page and appends notes to it.
+
+### Request Parameters
+
+#### POST `api/v1/append_to_page.php`
+
+- **Headers**: `Content-Type: application/json`
+- **JSON Payload**:
+    - `page_name` (required, string): The name of the page to which notes will be appended. If a page with this name does not exist, it will be created.
+    - `notes` (required, string|array):
+        - If a **string**, it's treated as the content for a single note to be appended.
+        - If an **array**, it must be an array of note objects. Each note object can have the following fields:
+            - `content` (required, string): The content of the note. Properties can be embedded (e.g., `key::value`).
+            - `client_temp_id` (optional, string): A temporary client-side ID for this note. Useful if other notes in the same request need to reference this note as a parent before its actual database ID is known.
+            - `parent_note_id` (optional, string|integer|null):
+                - If a **string**, it's treated as a `client_temp_id` of another note in the current request to establish a parent-child relationship.
+                - If an **integer**, it's treated as the database ID of an existing note to be the parent.
+                - If `null` or omitted, the note is a top-level note on the page.
+            - `order_index` (optional, integer): The display order of the note among its siblings. Defaults to `0`.
+            - `collapsed` (optional, integer|boolean): `0` or `false` for not collapsed (default), `1` or `true` for collapsed.
+
+### Response Structure
+
+#### Success Response
+
+- *Status Code: 200 OK*
+  ```json
+  {
+      "status": "success",
+      "message": "Page created/retrieved and notes appended successfully.",
+      "page": {
+          "id": 123,
+          "name": "Example Page Name",
+          "alias": null,
+          "updated_at": "YYYY-MM-DD HH:MM:SS",
+          "created_at": "YYYY-MM-DD HH:MM:SS",
+          "active": 1,
+          "properties": {
+              // Example: "type": [{"value": "journal", "internal": 0}] if it's a journal page
+          }
+      },
+      "appended_notes": [
+          {
+              "id": 789,
+              "page_id": 123,
+              "parent_note_id": null, // or the ID of the parent note if nested
+              "content": "This is the first note's content.\nmy_property::my_value",
+              "order_index": 0,
+              "collapsed": 0,
+              "internal": 0, // Note's own internal flag
+              "active": 1,
+              "created_at": "YYYY-MM-DD HH:MM:SS",
+              "updated_at": "YYYY-MM-DD HH:MM:SS",
+              "has_attachments": 0, // Assuming this field from notes.php is included
+              "properties": {
+                  "my_property": [{"value": "my_value", "internal": 0}]
+              }
+          }
+          // ... more appended note objects
+      ]
+  }
+  ```
+
+#### Error Responses
+
+- *Status Code: 400 Bad Request*
+  ```json
+  {
+      "status": "error",
+      "message": "page_name is required and must be a non-empty string.",
+      "details": null 
+  }
+  ```
+  ```json
+  {
+      "status": "error",
+      "message": "notes field is required.",
+      "details": null
+  }
+  ```
+  ```json
+  {
+      "status": "error",
+      "message": "notes field must be a string or an array of note objects.",
+      "details": null
+  }
+  ```
+  ```json
+  {
+      "status": "error",
+      "message": "Each item in notes array must be an object (associative array). Error at index 0.",
+      "details": null
+  }
+  ```
+  ```json
+  {
+      "status": "error",
+      "message": "Note item at index 0 ('temp-1') must have a 'content' field of type string.",
+      "details": null
+  }
+  ```
+  *(Other validation error messages for `parent_note_id`, `order_index`, `collapsed`, `client_temp_id` as implemented)*
+
+- *Status Code: 405 Method Not Allowed*
+  ```json
+  {
+      "status": "error",
+      "message": "Method not allowed. Only POST is supported.",
+      "details": null
+  }
+  ```
+
+- *Status Code: 500 Internal Server Error*
+  ```json
+  {
+      "status": "error",
+      "message": "An error occurred: Specific error message from the server.",
+      "details": {
+          // "trace": "..." // Trace might be included depending on server configuration
+      }
+  }
+  ```
+  ```json
+  {
+      "status": "error",
+      "message": "Failed to create page.", // Or "Failed to create note entry."
+      "details": null
+  }
+  ```
 ---
 
 ## Properties API (`api/v1/properties.php`)
