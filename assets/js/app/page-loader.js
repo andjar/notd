@@ -267,27 +267,27 @@ async function _fetchPageFromNetwork(pageName) {
     }
 
     let pageDetails;
-    let isNewPage = false;
+    // isNewPage declaration is removed as client-side creation decision is removed.
+    // The backend now handles page creation if it doesn't exist,
+    // and will return 201 if created, or 200 if existing.
+    // If an actual error occurs (not related to page existence), it will be caught.
     try {
         pageDetails = await pagesAPI.getPageByName(pageName);
+        // Optional: If pagesAPI.getPageByName starts returning the full response object
+        // including status, we could determine if it was newly created:
+        // isNewPage = (pageDetails.status === 201); 
+        // For now, we assume pageDetails is just the page data.
     } catch (error) {
-        if (error.message === 'Page not found') {
-            console.log(`Page ${pageName} not found, attempting to create it...`); // Modified log message
-            try {
-                pageDetails = await pagesAPI.createPage(pageName);
-                isNewPage = true; // Mark that this page was just created
-                console.log(`Successfully created page ${pageName}`); // Modified log message
-            } catch (createError) {
-                console.error(`Failed to create page ${pageName}:`, createError); // Modified log message
-                throw new Error(`Failed to create page: ${createError.message}`); // Modified error
-            }
-        } else {
-            throw error;
-        }
+        // Catch actual errors (network, server errors other than auto-creation path)
+        console.error(`Error fetching page data for ${pageName} via getPageByName:`, error);
+        throw error; // Re-throw the error to be handled by the caller loadPage
     }
 
     if (!pageDetails) {
-        throw new Error(`Page "${pageName}" not found and could not be created.`);
+        // This check might become less relevant if getPageByName always returns a page 
+        // (created or existing) or throws a critical error that's caught above.
+        // However, keeping it as a safeguard for unexpected scenarios.
+        throw new Error(`Page "${pageName}" could not be fetched or created by the backend.`);
     }
 
     let notesArray;
@@ -304,8 +304,12 @@ async function _fetchPageFromNetwork(pageName) {
 
     const combinedPageData = {
         ...pageDetails, // Includes id, name, alias, properties
-        notes: notesArray,
-        isNewPage: isNewPage // Add the isNewPage flag
+        notes: notesArray
+        // isNewPage flag is removed from here.
+        // The _processAndRenderPage function's isNewPage parameter will default to false
+        // or could be adjusted if the API provides creation status.
+        // Critical logic like creating the first note relies on notesForCurrentPage.length === 0,
+        // which remains effective.
     };
 
     // Cache the newly fetched data
@@ -331,7 +335,7 @@ async function _fetchPageFromNetwork(pageName) {
  * @param {boolean} focusFirstNote - Whether to focus the first note.
  * @param {boolean} [isNewPage=false] - Whether the page was just created.
  */
-async function _renderPageContent(pageData, pageProperties, focusFirstNote, isNewPage = false) {
+async function _renderPageContent(pageData, pageProperties, focusFirstNote, isNewPage = false) { // isNewPage param still here, will default to false
     // Update UI titles (already done in _processAndRenderPage for history state)
     // window.ui.updatePageTitle(pageData.name); // Redundant if called in _processAndRenderPage
     // if (window.ui.calendarWidget) window.ui.calendarWidget.setCurrentPage(pageData.name); // Redundant
@@ -355,8 +359,10 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote, isNe
     }
     
     // Handle creation of first note if page is new (and empty) or just empty
+    // The `isNewPage` check here was mostly for logging. The core logic `notesForCurrentPage.length === 0`
+    // correctly determines if a first note should be created.
     if (notesForCurrentPage.length === 0 && pageData.id) {
-        console.log(`[_renderPageContent] Page ${isNewPage ? 'is new and' : ''} empty, creating first note.`);
+        console.log(`[_renderPageContent] Page is empty (isNewPage status from client: ${isNewPage}), creating first note.`);
         await handleCreateAndFocusFirstNote(pageData.id);
     }
 }
@@ -409,6 +415,8 @@ async function _promptForDecryptionAndRender(pageData, pageProperties, focusFirs
                 decryptionPassword = enteredPassword;
                 passwordPromptContainer.remove();
                 // Call _renderPageContent to render the (now decryptable) page
+                // pageData.isNewPage is no longer set by _fetchPageFromNetwork, will be undefined or false.
+                // This is fine as _renderPageContent's isNewPage param defaults to false.
                 await _renderPageContent(pageData, pageProperties, focusFirstNote, pageData.isNewPage);
             } else {
                 errorMessageElement.textContent = 'Incorrect password.';
@@ -437,6 +445,8 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
     setCurrentPageName(pageData.name);
     setCurrentPageId(pageData.id);
     setNotesForCurrentPage(pageData.notes || []); // Ensure notes state is set before any rendering
+    // The isNewPage parameter for _processAndRenderPage is removed from the call in loadPage,
+    // so it will default to false. This is acceptable as its primary use was logging.
 
     // Breadcrumb generation
     const breadcrumbsContainer = document.querySelector('#breadcrumbs-container');
@@ -648,6 +658,9 @@ export async function loadPage(pageNameParam, focusFirstNote = false, updateHist
         }
         
         if (pageData) {
+            // pageData.isNewPage is no longer set by _fetchPageFromNetwork.
+            // The third argument to _processAndRenderPage (isNewPage) will be undefined here,
+            // and will default to false within _processAndRenderPage. This is acceptable.
             await _processAndRenderPage(pageData, updateHistory, focusFirstNote, pageData.isNewPage);
         } else {
             // This case should ideally be caught by errors in _fetchPageFromNetwork

@@ -178,7 +178,64 @@ if (!class_exists('PageManager')) {
                 }
                 ApiResponse::success($page);
             } else {
-                ApiResponse::error('Page not found', 404);
+                // Page not found, try to create it
+                try {
+                    $this->pdo->beginTransaction();
+
+                    // Insert the new page
+                    $insertStmt = $this->pdo->prepare("INSERT INTO Pages (name, alias, updated_at) VALUES (?, NULL, CURRENT_TIMESTAMP)");
+                    $insertStmt->execute([$pageName]);
+                    $pageId = $this->pdo->lastInsertId();
+
+                    // If it's a journal page, add the journal property
+                    if ($this->isJournalPage($pageName)) {
+                        $this->addJournalProperty($pageId);
+                    }
+
+                    // Fetch the newly created page
+                    $selectStmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
+                    $selectStmt->execute([$pageId]);
+                    $newPage = $selectStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($newPage) {
+                        $newPage['properties'] = $this->dataManager->getPageProperties($newPage['id'], $include_internal);
+                    }
+
+                    $this->pdo->commit();
+                    ApiResponse::success($newPage, 201); // 201 Created
+                } catch (PDOException $e) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+                    // Check for unique constraint violation, which might happen in a race condition
+                    // If so, try to fetch the page again as it might have been created by another request.
+                    if ($e->getCode() == 23000 || str_contains(strtolower($e->getMessage()), 'unique constraint failed')) {
+                        error_log("Unique constraint violation during page creation attempt for: " . $pageName . ". Attempting to re-fetch.");
+                        $retryStmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
+                        $retryStmt->execute([$pageName]);
+                        $existingPage = $retryStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($existingPage) {
+                            $existingPage['properties'] = $this->dataManager->getPageProperties($existingPage['id'], $include_internal);
+                             if ($this->isJournalPage($pageName)) { // Ensure journal property if it was a journal page
+                                $stmt_check_prop = $this->pdo->prepare("
+                                    SELECT 1 FROM Properties 
+                                    WHERE page_id = ? 
+                                    AND name = 'type' 
+                                    AND value = 'journal'
+                                ");
+                                $stmt_check_prop->execute([$existingPage['id']]);
+                                if (!$stmt_check_prop->fetch()) {
+                                    $this->addJournalProperty($existingPage['id']);
+                                    // Re-fetch properties if a new one was added
+                                    $existingPage['properties'] = $this->dataManager->getPageProperties($existingPage['id'], $include_internal);
+                                }
+                            }
+                            ApiResponse::success($existingPage);
+                            return;
+                        }
+                    }
+                    ApiResponse::error('Failed to create page: ' . $e->getMessage(), 500, ['details' => $e->getMessage()]);
+                }
             }
         } catch (PDOException $e) {
             ApiResponse::error('Database error.', 500, ['details' => $e->getMessage()]);
