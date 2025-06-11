@@ -70,8 +70,8 @@ export function displayPageProperties(properties) {
         // API now guarantees propValueArray is an array of objects: [{value: "val1", internal: 0}, ...]
         if (Array.isArray(propValueArray)) {
             propValueArray.forEach((item, index) => {
-                // Skip rendering if the property item is internal
-                if (item.internal) {
+                // Skip rendering internal items if INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE is false
+                if (item.internal && (typeof window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE !== 'undefined' && !window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE)) {
                     return; 
                 }
 
@@ -107,7 +107,8 @@ export function displayPageProperties(properties) {
                 originalVal = propValueArray || '';
             }
 
-            if (!isInternal) { // Only render if not internal
+            // Only render if not (internal AND hide_in_edit_mode is true)
+            if (!(isInternal && (typeof window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE !== 'undefined' && !window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE))) {
                 const propItem = document.createElement('div');
                 propItem.className = 'page-property-item';
                 propItem.innerHTML = `

@@ -10,6 +10,14 @@ define('WEBHOOKS_ENABLED', true); // Option to disable webhooks
 define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
 define('TASK_STATES', ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING']);
 
+// Configuration for internal properties
+if (!defined('RENDER_INTERNAL_PROPERTIES')) {
+    define('RENDER_INTERNAL_PROPERTIES', true); // Set to true to render internal properties in view mode, false to hide
+}
+if (!defined('INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE')) {
+    define('INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE', true); // Set to true to show internal properties in edit mode, false to hide
+}
+
 // Error reporting (for development)
 ini_set('display_errors', 1); // Enable error display
 ini_set('display_startup_errors', 1); // Enable startup error display

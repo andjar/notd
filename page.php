@@ -130,6 +130,11 @@ if (!$page) {
         // Pass initial page data to JavaScript
         window.initialPageData = <?php echo json_encode($page); ?>;
     </script>
+    <script>
+        // Expose PHP configuration to JavaScript
+        window.RENDER_INTERNAL_PROPERTIES = <?php echo defined('RENDER_INTERNAL_PROPERTIES') && RENDER_INTERNAL_PROPERTIES ? 'true' : 'false'; ?>;
+        window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE = <?php echo defined('INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE') && INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE ? 'true' : 'false'; ?>;
+    </script>
 </head>
 <body>
     <div class="app-container">

@@ -329,6 +329,43 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             );
             
             $pdo->commit();
+
+            // If the entity is a note, append the property to its content
+            if ($entityType === 'note') {
+                try {
+                    // Fetch the note's current content
+                    $stmt = $pdo->prepare("SELECT content FROM Notes WHERE id = ?");
+                    $stmt->execute([$entityId]);
+                    $noteRow = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $currentContent = $noteRow ? $noteRow['content'] : '';
+
+                    // Construct the property string
+                    // $savedProperty contains ['name', 'value', 'internal']
+                    $propertyString = $savedProperty['name'] . 
+                                      ($savedProperty['internal'] ? ':::' : '::') . 
+                                      $savedProperty['value'];
+
+                    // Append the property string to the content
+                    // Ensure it's on a new line, and add a trailing newline
+                    $newContent = rtrim($currentContent);
+                    if (!empty($currentContent)) { // Add a newline only if there's existing content
+                        $newContent .= "\n";
+                    }
+                    $newContent .= $propertyString . "\n";
+
+                    // Save the updated note content
+                    // This is done after the main property transaction is committed.
+                    // If this fails, the property is in the DB but not in the content,
+                    // which property_parser.php should eventually reconcile.
+                    $updateNoteStmt = $pdo->prepare("UPDATE Notes SET content = ? WHERE id = ?");
+                    $updateNoteStmt->execute([$newContent, $entityId]);
+
+                } catch (Exception $noteUpdateException) {
+                    // Log the error, but don't let it fail the main property API response,
+                    // as the property itself was successfully saved.
+                    error_log("Error appending property to note content for note ID {$entityId}: " . $noteUpdateException->getMessage());
+                }
+            }
             
             // After successful update/add, fetch all current values for this property name
             // to return in the specified format.

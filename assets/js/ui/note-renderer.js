@@ -286,8 +286,19 @@ function renderNote(note, nestingLevel = 0) {
 function switchToEditMode(contentEl) {
     if (contentEl.classList.contains('edit-mode')) return;
 
-    // Use dataset.rawContent, which should now be plaintext
-    let textToEdit = contentEl.dataset.rawContent || '';
+    // Store the current rawContent (truth source) to rawContentOriginal before any modification for editing.
+    // This ensures that hidden internal properties are preserved.
+    contentEl.dataset.rawContentOriginal = contentEl.dataset.rawContent || '';
+    
+    let textToDisplayInEditor = contentEl.dataset.rawContentOriginal; // Start with the full original content
+
+    // If internal properties should be hidden in edit mode, filter them out for display
+    if (typeof window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE !== 'undefined' && !window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE) {
+        textToDisplayInEditor = textToDisplayInEditor.split('\n')
+                                     .filter(line => !/^\s*\{[^:]+:::[^}]+\}\s*$/.test(line))
+                                     .join('\n');
+    }
+
     const noteId = contentEl.dataset.noteId;
     let suggestionBoxVisible = false;
 
@@ -295,9 +306,12 @@ function switchToEditMode(contentEl) {
     contentEl.classList.add('edit-mode');
     contentEl.contentEditable = true;
     contentEl.style.whiteSpace = 'pre-wrap';
-    contentEl.innerHTML = '';
-    contentEl.textContent = textToEdit;
+    contentEl.innerHTML = ''; // Clear any rendered HTML
+    contentEl.textContent = textToDisplayInEditor; // Set the potentially filtered text for editing
     contentEl.focus();
+
+    // dataset.rawContent is NOT changed here. It still holds the true full content.
+    // dataset.rawContentOriginal holds the state at the beginning of the edit.
 
     // Helper function for inserting link and updating state
     const insertSelectedPageLink = (selectedPageName) => {
@@ -604,41 +618,66 @@ function normalizeNewlines(str) {
 function switchToRenderedMode(contentEl) {
     const noteEl = contentEl.closest('.note-item');
     if (noteEl && noteEl.dataset.noteId && !noteEl.dataset.noteId.startsWith('temp-')) {
-        // It's important that saveNoteImmediately is available in this scope.
-        // Assuming it's imported or globally available.
-        // console.log('[DEBUG switchToRenderedMode] Calling saveNoteImmediately for noteId:', noteEl.dataset.noteId);
-        saveNoteImmediately(noteEl);
+        // saveNoteImmediately will use contentEl.dataset.rawContent, which needs to be updated first.
+        // This call to saveNoteImmediately is being moved after rawContent is finalized.
     }
     if (contentEl.classList.contains('rendered-mode')) return;
 
-    const rawTextValue = getRawTextWithNewlines(contentEl);
-    const newContent = normalizeNewlines(rawTextValue);
+    let finalContentToSaveAndRender;
+    const currentEditorText = getRawTextWithNewlines(contentEl); // Text from the visible editor (potentially filtered)
+
+    // Check if internal properties were hidden during edit mode
+    if (typeof window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE !== 'undefined' && 
+        !window.INTERNAL_PROPERTIES_VISIBLE_IN_EDIT_MODE &&
+        typeof contentEl.dataset.rawContentOriginal === 'string') { // Check if original was stored
+
+        const originalFullContent = contentEl.dataset.rawContentOriginal;
+        const internalPropertyLines = originalFullContent.split('\n')
+                                         .filter(line => /^\s*\{[^:]+:::[^}]+\}\s*$/.test(line));
+        
+        // Get non-internal lines from the current editor text.
+        // Also, remove any attempt to re-add internal properties manually if they were hidden.
+        const editorLines = currentEditorText.split('\n')
+                                .filter(line => !/^\s*\{[^:]+:::[^}]+\}\s*$/.test(line));
+        
+        finalContentToSaveAndRender = editorLines.concat(internalPropertyLines).join('\n');
+    } else {
+        // Internal properties were visible, or no original to merge from, so editor text is the source of truth.
+        finalContentToSaveAndRender = currentEditorText;
+    }
     
-    contentEl.dataset.rawContent = newContent;
+    finalContentToSaveAndRender = normalizeNewlines(finalContentToSaveAndRender);
+
+    // Crucial: Update dataset.rawContent with the true, merged, and normalized content
+    contentEl.dataset.rawContent = finalContentToSaveAndRender;
+    
+    // Clean up the temporary dataset entry
+    if (typeof contentEl.dataset.rawContentOriginal === 'string') {
+        delete contentEl.dataset.rawContentOriginal;
+    }
+
+    // Now that dataset.rawContent is finalized, call saveNoteImmediately
+    if (noteEl && noteEl.dataset.noteId && !noteEl.dataset.noteId.startsWith('temp-')) {
+        saveNoteImmediately(noteEl); // Uses the updated contentEl.dataset.rawContent
+    }
     
     contentEl.classList.remove('edit-mode');
     contentEl.classList.add('rendered-mode');
     contentEl.contentEditable = false;
-    contentEl.style.whiteSpace = '';
+    contentEl.style.whiteSpace = ''; // Reset white-space for rendered mode
 
-    // Ensure suggestions are hidden when switching to rendered mode
-    hideSuggestions();
-    // suggestionBoxVisible = false; // This variable is local to switchToEditMode
+    hideSuggestions(); // Ensure suggestions are hidden
 
-    if (newContent.trim()) {
-        const tempDiv = document.createElement('div');
-        tempDiv.textContent = newContent;
-        const decodedContent = tempDiv.textContent;
-        contentEl.innerHTML = parseAndRenderContent(decodedContent);
+    if (finalContentToSaveAndRender.trim()) {
+        // No need for tempDiv and decode, parseAndRenderContent handles content directly.
+        // It also handles potential decryption.
+        contentEl.innerHTML = parseAndRenderContent(finalContentToSaveAndRender);
     } else {
         contentEl.innerHTML = '';
     }
 
-    // Call handleTransclusions here
-    handleTransclusions();
-    // Ensure suggestion box is hidden if it was somehow left open
-    // This is a fallback, should be handled by blur or selection.
-    hideSuggestions();
+    handleTransclusions(); // Call after content is rendered
+    hideSuggestions(); // Fallback ensure hidden
 }
 
 /**
@@ -750,16 +789,31 @@ function parseAndRenderContent(rawContent) {
             </div>
         `;
     } else {
-        // Handle inline properties first
-        html = html.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
+        // Handle inline properties first: {key::value} or {key:::value}
+        // Regex: \{             // literal {
+        //        ([^:]+)        // capture group 1: key (anything not a colon)
+        //        :              // literal :
+        //        (:|::)         // capture group 2: separator (either : for ::, or :: for :::)
+        //        ([^}]+)        // capture group 3: value (anything not a })
+        //        \}             // literal }
+        html = html.replace(/\{([^:]+):(:|::)([^}]+)\}/g, (match, key, separator, value) => {
             const trimmedKey = key.trim();
             const trimmedValue = value.trim();
+            // If separator is '::', it means original was ':::' (internal)
+            // If separator is ':', it means original was '::' (standard)
+            const isInternal = separator === '::'; 
+
+            if (isInternal && (typeof window.RENDER_INTERNAL_PROPERTIES !== 'undefined' && !window.RENDER_INTERNAL_PROPERTIES)) {
+                return ''; // Don't render internal properties if config says to hide
+            }
+
+            // Proceed with existing rendering logic for visible properties
             if (trimmedKey.toLowerCase() === 'tag') {
-                return `<span class="property-inline property-tag"><span class="property-key">#</span><span class="property-value">${trimmedValue}</span></span>`;
+                return `<span class="property-inline property-tag ${isInternal ? 'internal-property' : ''}"><span class="property-key">#</span><span class="property-value">${trimmedValue}</span></span>`;
             } else if (trimmedKey.toLowerCase() === 'alias') {
-                return `<span class="property-inline alias-property"><span class="property-key">Alias</span><span class="property-value">${trimmedValue}</span></span>`;
+                return `<span class="property-inline alias-property ${isInternal ? 'internal-property' : ''}"><span class="property-key">Alias</span><span class="property-value">${trimmedValue}</span></span>`;
             } else {
-                return `<span class="property-inline"><span class="property-key">${trimmedKey}</span><span class="property-value">${trimmedValue}</span></span>`;
+                return `<span class="property-inline ${isInternal ? 'internal-property' : ''}"><span class="property-key">${trimmedKey}</span><span class="property-value">${trimmedValue}</span></span>`;
             }
         });
 
@@ -930,37 +984,46 @@ function renderProperties(container, properties) {
 
         if (Array.isArray(propValue)) {
             propValue.forEach(item => {
-                if (item && typeof item === 'object' && !item.internal) {
-                    valuesToRender.push(item.value);
-                } else if (typeof item !== 'object') { 
-                    // If backend sometimes sends array of simple values (e.g. for non-internal tags)
-                    valuesToRender.push(item);
+                if (item && typeof item === 'object') {
+                    // item is {value: "...", internal: true/false}
+                    if (item.internal && (typeof window.RENDER_INTERNAL_PROPERTIES !== 'undefined' && !window.RENDER_INTERNAL_PROPERTIES)) {
+                        // Skip this internal item because config says to hide
+                    } else {
+                        // Add class if internal and rendered
+                        valuesToRender.push({value: item.value, isInternal: item.internal});
+                    }
+                } else if (typeof item !== 'object') {
+                    // Fallback: simple value, assume not internal or config allows
+                    valuesToRender.push({value: item, isInternal: false});
                 }
             });
-        } else if (propValue && typeof propValue === 'object' && !propValue.internal) {
-            // Handle cases where backend might send a single object for a single-value property
-            valuesToRender.push(propValue.value);
-        } else if (typeof propValue !== 'object') {
-            // Handle cases where backend might send a simple value directly
-             valuesToRender.push(propValue);
+        } else if (propValue && typeof propValue === 'object') { // Single property object
+            if (propValue.internal && (typeof window.RENDER_INTERNAL_PROPERTIES !== 'undefined' && !window.RENDER_INTERNAL_PROPERTIES)) {
+                // Skip
+            } else {
+                valuesToRender.push({value: propValue.value, isInternal: propValue.internal});
+            }
+        } else if (typeof propValue !== 'object') { // Simple value directly
+             valuesToRender.push({value: propValue, isInternal: false});
         }
 
         if (valuesToRender.length > 0) {
-            if (name.toLowerCase() === 'favorite' && valuesToRender.some(v => String(v).toLowerCase() === 'true')) {
+            // Note: valuesToRender now contains objects like {value: "...", isInternal: bool}
+            if (name.toLowerCase() === 'favorite' && valuesToRender.some(v => String(v.value).toLowerCase() === 'true' && (!v.isInternal || window.RENDER_INTERNAL_PROPERTIES))) {
+                // Favorite is special, usually not marked internal, but check anyway.
                 htmlToSet += `<span class="property-item favorite"><span class="property-favorite">⭐</span></span>`;
-            } else if (name.startsWith('tag::') || name.toLowerCase() === 'tags' || name.toLowerCase() === 'tag') { // accept 'tags' or 'tag' as well
-                const tagName = name.startsWith('tag::') ? name.substring(5) : (valuesToRender.length === 1 ? valuesToRender[0] : name); // Use value if single, else key
-                valuesToRender.forEach(val => {
-                     htmlToSet += `<span class="property-item tag">
+            } else if (name.startsWith('tag::') || name.toLowerCase() === 'tags' || name.toLowerCase() === 'tag') {
+                valuesToRender.forEach(propItem => { // propItem is {value, isInternal}
+                     htmlToSet += `<span class="property-item tag ${propItem.isInternal ? 'internal-property' : ''}">
                         <span class="property-key">#</span>
-                        <span class="property-value">${val}</span>
+                        <span class="property-value">${propItem.value}</span>
                     </span>`;
                 });
             } else {
-                valuesToRender.forEach(val => {
-                    htmlToSet += `<span class="property-item">
+                valuesToRender.forEach(propItem => { // propItem is {value, isInternal}
+                    htmlToSet += `<span class="property-item ${propItem.isInternal ? 'internal-property' : ''}">
                         <span class="property-key">${name}</span>
-                        <span class="property-value">${val}</span>
+                        <span class="property-value">${propItem.value}</span>
                     </span>`;
                 });
             }
