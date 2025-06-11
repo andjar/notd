@@ -12,15 +12,69 @@ let suggestionStyleSheet = null; // To hold our dedicated stylesheet object
  * Should be called during application initialization.
  */
 async function fetchAllPages() {
+  let allFetchedPageObjects = []; // Store full page objects first
+  let currentPage = 1;
+  const perPage = 100; // Request 100 items per page (max allowed by API)
+  let totalPages = 1; // Initialize totalPages to 1
+
   try {
-    const pages = await pagesAPI.getPages({ excludeJournal: true, followAliases: true });
-    if (pages && Array.isArray(pages)) {
-      allPagesForSuggestions = pages.map(page => page.name);
-      console.log('Page names fetched and cached for suggestions:', allPagesForSuggestions.length);
+    console.log(`[fetchAllPages] Starting fetch. Initial page: ${currentPage}, perPage: ${perPage}`);
+    
+    do {
+      // Pass the current page and per_page to pagesAPI.getPages
+      const response = await pagesAPI.getPages({ 
+        excludeJournal: true, 
+        followAliases: true, 
+        page: currentPage, 
+        per_page: perPage 
+      });
+
+      // Check if response and response.pages are valid
+      if (response && Array.isArray(response.pages)) {
+        if (response.pages.length > 0) {
+          allFetchedPageObjects = allFetchedPageObjects.concat(response.pages);
+          console.log(`[fetchAllPages] Fetched page ${currentPage}. Pages in this batch: ${response.pages.length}. Total fetched so far: ${allFetchedPageObjects.length}`);
+        }
+        // No specific console log if response.pages is empty, covered by later checks or logs.
+        
+        // Update totalPages from pagination info, if available
+        if (response.pagination && response.pagination.total_pages) {
+          totalPages = response.pagination.total_pages;
+        } else {
+          // If no pagination info but we got some pages in the first call, assume it's a single page response
+          // If we got no pages and no pagination, totalPages remains 1, loop will terminate.
+          // This also handles the case where total_pages might be 0 from the API.
+          totalPages = currentPage; 
+        }
+        
+        // Break if current page is greater or equal to total pages.
+        // Also break if no pages were returned in this batch AND it's not the first page (to prevent infinite loop on faulty API) 
+        // OR if totalPages from API was 0.
+        if (currentPage >= totalPages || totalPages === 0) {
+          if (currentPage >= totalPages && totalPages > 0) {
+            console.log(`[fetchAllPages] All pages fetched or current page ${currentPage} reached total pages ${totalPages}.`);
+          } else if (totalPages === 0) {
+            console.log(`[fetchAllPages] API reported 0 total pages. Nothing to fetch.`);
+          }
+          break; 
+        }
+        currentPage++;
+      } else {
+        // If response or response.pages is invalid (e.g., null, not an array)
+        console.warn(`[fetchAllPages] Invalid response or no 'pages' array for page ${currentPage}. Response:`, response);
+        break; 
+      }
+    } while (currentPage <= totalPages && totalPages > 0); // Added totalPages > 0 to prevent loop if API says 0 total pages
+
+    if (allFetchedPageObjects.length > 0) {
+      // Map to names only after all page objects are fetched
+      allPagesForSuggestions = allFetchedPageObjects.map(page => page.name);
+      console.log('Page names fetched and cached for suggestions:', allPagesForSuggestions.length, 'pages from', totalPages, 'API pages.');
     } else {
       allPagesForSuggestions = [];
-      console.warn('fetchAllPages received unexpected data:', pages);
+      console.warn('fetchAllPages resulted in an empty list of suggestions. Total objects fetched:', allFetchedPageObjects.length);
     }
+
   } catch (error) {
     console.error('Error fetching page names for suggestions:', error);
     allPagesForSuggestions = []; // Ensure it's an empty array on error

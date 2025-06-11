@@ -14,6 +14,8 @@ import {
     currentPageName
 } from './state.js';
 
+const MAX_LINKED_PAGES_TO_PREFETCH = MAX_PREFETCH_PAGES;
+
 window.currentPageEncryptionKey = null;
 window.decryptionPassword = null;
 
@@ -526,8 +528,8 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
         await _renderPageContent(pageData, pageProperties, focusFirstNote, isNewPage);
         // Display child pages if the current page acts as a namespace
         try {
-            // pagesAPI.getPages is designed to always return an array of page objects.
-            const pagesArray = await pagesAPI.getPages({ excludeJournal: true, per_page: 500, include_details: false });
+            // pagesAPI.getPages returns an object like { pages: [...], pagination: ... }.
+            const { pages: pagesArray } = await pagesAPI.getPages({ excludeJournal: true, per_page: 500, include_details: false });
             
             // We now expect pagesArray to be a valid array (even if empty).
             // The displayChildPages function already handles an empty array correctly.
@@ -542,6 +544,9 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
                 childPagesContainer.innerHTML = '<p>Error loading pages for this namespace.</p>';
             }
         }
+               
+        // Call prefetch for linked pages here, after main page content is processed and rendered
+        prefetchLinkedPagesData().catch(err => console.error("[PrefetchLinked] Background prefetch failed:", err));
     }
 }
 
@@ -827,6 +832,85 @@ async function handleCreateAndFocusFirstNote(pageIdToUse) {
 }
 
 
+export async function prefetchLinkedPagesData() {
+    if (!currentPageId || !notesForCurrentPage || notesForCurrentPage.length === 0) {
+        console.log("[PrefetchLinked] No current page or notes to scan for links.");
+        return;
+    }
+
+    console.log(`[PrefetchLinked] Starting pre-fetch for links on page: ${currentPageName}`);
+    const linkedPageNames = new Set();
+    const pageLinkRegex = /\[\[([^\]]+)\]\]/g; // Regex to find [[Page Name]]
+
+    notesForCurrentPage.forEach(note => {
+        if (note.content) {
+            let match;
+            while ((match = pageLinkRegex.exec(note.content)) !== null) {
+                const pageName = match[1].trim();
+                // Normalize potential alias: [[Actual Name|Display Text]]
+                const parts = pageName.split('|');
+                const actualPageName = parts[0].trim();
+                if (actualPageName) {
+                    linkedPageNames.add(actualPageName);
+                }
+            }
+        }
+    });
+
+    if (linkedPageNames.size === 0) {
+        console.log("[PrefetchLinked] No unique page links found in current page notes.");
+        return;
+    }
+
+    let prefetchCounter = 0;
+    for (const pageName of linkedPageNames) {
+        if (prefetchCounter >= MAX_LINKED_PAGES_TO_PREFETCH) {
+            console.log(`[PrefetchLinked] Reached max linked pages to prefetch (${MAX_LINKED_PAGES_TO_PREFETCH}).`);
+            break;
+        }
+
+        if (pageName === currentPageName) continue; // Don't prefetch current page
+
+        if (hasPageCache(pageName) && (Date.now() - getPageCache(pageName).timestamp < CACHE_MAX_AGE_MS)) {
+            console.log(`[PrefetchLinked] Page ${pageName} is already in cache and recent. Skipping.`);
+            continue;
+        }
+
+        console.log(`[PrefetchLinked] Pre-fetching data for linked page: ${pageName}`);
+        try {
+            const pageDetails = await pagesAPI.getPageByName(pageName);
+            if (!pageDetails || !pageDetails.id) {
+                console.warn(`[PrefetchLinked] Could not get details for page: ${pageName}. Skipping.`);
+                continue;
+            }
+
+            let notesArray = await notesAPI.getPageData(pageDetails.id, { include_internal: false });
+            if (!Array.isArray(notesArray)) {
+                console.warn(`[PrefetchLinked] Expected an array from notesAPI.getPageData for page ${pageDetails.name}, received:`, notesArray);
+                notesArray = [];
+            }
+
+            setPageCache(pageName, {
+                id: pageDetails.id,
+                name: pageDetails.name,
+                alias: pageDetails.alias,
+                notes: notesArray,
+                properties: pageDetails.properties || {},
+                timestamp: Date.now()
+            });
+            console.log(`[PrefetchLinked] Successfully pre-fetched and cached data for linked page: ${pageName}`);
+            prefetchCounter++;
+
+        } catch (error) {
+            console.error(`[PrefetchLinked] Error pre-fetching data for linked page ${pageName}:`, error);
+            if (hasPageCache(pageName)) {
+                 deletePageCache(pageName);
+            }
+        }
+    }
+    console.log("[PrefetchLinked] Pre-fetching for linked pages completed.");
+}
+
 /**
  * Pre-fetches data for recently updated pages to improve perceived performance.
  * Caches page details, notes, and properties.
@@ -834,7 +918,7 @@ async function handleCreateAndFocusFirstNote(pageIdToUse) {
 export async function prefetchRecentPagesData() {
     console.log("Starting pre-fetch for recent pages.");
     try {
-        const allPages = await pagesAPI.getPages({
+        const { pages: allPages } = await pagesAPI.getPages({
             include_details: true, 
             include_internal: false, 
             followAliases: true,     
@@ -908,7 +992,7 @@ export async function fetchAndDisplayPages(activePageName) {
         return;
     }
     try {
-        const pages = await pagesAPI.getPages();
+        const { pages } = await pagesAPI.getPages();
         window.ui.updatePageList(pages, activePageName || currentPageName);
     } catch (error) {
         console.error('Error fetching pages:', error);

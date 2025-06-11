@@ -135,7 +135,7 @@ const pagesAPI = {
      * @param {boolean} [options.include_internal=false] - Whether to include internal properties and notes (if include_details is true)
      * @returns {Promise<Array>} Array of page objects (potentially detailed if include_details is true)
      */
-    getPages: async (options = {}) => { // Added async
+    getPages: async (options = {}) => { // Added async keyword
         const params = new URLSearchParams();
         if (options.excludeJournal) params.append('exclude_journal', '1');
         if (options.followAliases === false) params.append('follow_aliases', '0'); // Note: API spec default is 1 (true)
@@ -149,37 +149,30 @@ const pagesAPI = {
         if (options.sort_order) params.append('sort_order', options.sort_order);
         
         const queryString = params.toString();
-        const responseData = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
+        try {
+            // apiRequest returns the content of the "data" field from the API response.
+            // For pages.php, this is an object: { data: [...pages...], pagination: {...} }
+            const apiResponsePayload = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
 
-        // 1. Direct array check (ideal case per spec and apiRequest returning data.data)
-        if (Array.isArray(responseData)) {
-            return responseData;
+            // Check if apiResponsePayload itself is the expected structure { data: [...], pagination: ... }
+            if (apiResponsePayload && Array.isArray(apiResponsePayload.data) && typeof apiResponsePayload.pagination === 'object' && apiResponsePayload.pagination !== null) {
+                return { pages: apiResponsePayload.data, pagination: apiResponsePayload.pagination };
+            } else if (Array.isArray(apiResponsePayload)) {
+                // This case handles if apiRequest returned a direct array of pages.
+                // This might happen if apiRequest changes or if a different endpoint (not pages.php) is called.
+                // For robustness, we assume no pagination info in this scenario.
+                console.warn('[pagesAPI.getPages] API response was a direct array. Assuming no pagination info.');
+                return { pages: apiResponsePayload, pagination: null };
+            } else {
+                // Fallback for other unexpected structures or if apiResponsePayload is null/undefined
+                console.warn('[pagesAPI.getPages] Response was not in the expected {data: [...], pagination: {...}} format or was empty. Response:', apiResponsePayload);
+                return { pages: [], pagination: null };
+            }
+        } catch (error) {
+            console.error('[pagesAPI.getPages] Error fetching pages:', error);
+            // Ensure a consistent return type in case of error
+            return { pages: [], pagination: null };
         }
-
-        // 2. Object checks for common deviations or nested structures
-        if (responseData && typeof responseData === 'object') {
-            // 2a. Handles if apiRequest returned { status, data: { pages: [...] } }
-            // or if pages.php wrapped the array in a 'data' field like { data: [...] }
-            if (responseData.data && Array.isArray(responseData.data)) {
-                return responseData.data;
-            }
-            // 2b. Handles if pages.php wrapped the array in a 'pages' field like { pages: [...] }
-            if (responseData.pages && Array.isArray(responseData.pages)) {
-                return responseData.pages;
-            }
-
-            // 3. Generic keysToTry loop as a further fallback
-            const keysToTry = ['items', 'results']; // 'data' and 'pages' already checked
-            for (const key of keysToTry) {
-                if (responseData.hasOwnProperty(key) && Array.isArray(responseData[key])) {
-                    return responseData[key];
-                }
-            }
-        }
-
-        // 4. Warning and fallback
-        console.warn('[pagesAPI.getPages] Response was not an array and no known data key was found. Response:', responseData);
-        return []; 
     },
 
     /**
