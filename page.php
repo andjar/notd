@@ -125,7 +125,7 @@ if (!$page) {
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/icons.css">
-    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="assets/libs/feather.min.js"></script>
     <script>
         // Pass initial page data to JavaScript
         window.initialPageData = <?php echo json_encode($page); ?>;
@@ -214,7 +214,7 @@ if (!$page) {
                     <div class="extensions-section">
                         <h4>Extensions</h4>
                         <div id="extension-icons-container">
-                            <!-- Backlinks will be populated by JavaScript -->
+                            <!-- Extension icons will be populated by JavaScript -->
                         </div>
                     </div>
                 </div>

@@ -13,7 +13,7 @@ if (!class_exists('PropertyUtils')) {
 
             $extensionDetails = [];
             foreach (ACTIVE_EXTENSIONS as $extensionFolderName) {
-                $configPath = __DIR__ . '/../../extensions/' . $extensionFolderName . '/config.json';
+                $configPath = __DIR__ . '/../extensions/' . $extensionFolderName . '/config.json';
                 if (file_exists($configPath) && is_readable($configPath)) {
                     $configContent = file_get_contents($configPath);
                     $decodedConfig = json_decode($configContent);

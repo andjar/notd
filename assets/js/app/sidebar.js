@@ -108,7 +108,7 @@ export const sidebarState = {
         },
         async renderExtensionIcons() {
             const apiUrl = 'api/v1/extensions.php'; // Ensure this path is correct from your web root
-            const iconsContainer = document.getElementById('extension-icons-container');
+            const iconsContainer = ui.domRefs.extensionIconsContainer;
 
             if (!iconsContainer) {
                 console.error('Extension icons container (extension-icons-container) not found.');
@@ -130,21 +130,18 @@ export const sidebarState = {
                     }
 
                     data.extensions.forEach(extension => {
+                        const linkEl = document.createElement('a');
+                        linkEl.href = `extensions/${extension.name}/index.php`; // Link to the extension's entry point
+                        linkEl.title = extension.name; // Tooltip for accessibility
+
                         const iconEl = document.createElement('i'); // Using <i> as is common for icon fonts/SVG icons
                         iconEl.setAttribute('data-feather', extension.featherIcon);
-                        iconEl.setAttribute('title', extension.name); // Tooltip for accessibility
                         iconEl.classList.add('sidebar-extension-icon'); // For common styling
-                        // Example: Add click listener if needed
-                        // iconEl.addEventListener('click', () => {
-                        //     console.log(`Clicked extension icon: ${extension.name}`);
-                        //     // Potentially open the extension interface or trigger an action
-                        // });
-                        iconsContainer.appendChild(iconEl);
+                        
+                        linkEl.appendChild(iconEl);
+                        iconsContainer.appendChild(linkEl);
                     });
 
-                    if (data.extensions.length > 0 && typeof feather !== 'undefined') {
-                        feather.replace(); // Render Feather icons
-                    }
                 } else {
                     console.error('Failed to load extension icons or data format is incorrect:', data);
                     // iconsContainer.textContent = 'Error loading extensions.'; // Optional: display error
@@ -155,7 +152,7 @@ export const sidebarState = {
             }
         }
     },
-    init() {
+    async init() {
         // Initialize left sidebar
         this.left.element = ui.domRefs.leftSidebar;
         this.left.button = ui.domRefs.toggleLeftSidebarBtn;
@@ -177,8 +174,10 @@ export const sidebarState = {
             this.right.updateButtonVisuals();
             this.right.button.addEventListener('click', () => this.right.toggle());
             if (this.right.element) { // Ensure right sidebar exists
-                this.right.renderFavorites(); 
-                this.right.renderExtensionIcons(); // Call the new method for extensions
+                await Promise.all([this.right.renderFavorites(), this.right.renderExtensionIcons()]);
+            }
+            if (typeof feather !== 'undefined') {
+                feather.replace();
             }
         }
     }

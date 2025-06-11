@@ -501,39 +501,12 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote, is
         await _renderPageContent(pageData, pageProperties, focusFirstNote, isNewPage);
         // Display child pages if the current page acts as a namespace
         try {
-            // The pagesAPI.getPages() response structure is an array of objects, 
-            // each with a 'page' property containing the actual page details like 'name'.
-            const allPagesResponse = await pagesAPI.getPages({ excludeJournal: true, per_page: 500, include_details: false });
-            // We need to ensure allPagesData is an array of page objects, not the raw response.
-            // Based on prefetchRecentPagesData, the structure is often { page: {...}, notes: [...] }
-            // or just an array of page objects { id: ..., name: ..., ... } if include_details: false.
-            // Let's assume getPages returns an array of page objects directly or within a 'pages' property of the response.
-            // For now, let's assume it's an array of objects like { name: 'pageName', ... }
-            // If it's { page: {name: 'pageName'} }, the mapping will be needed.
-            // The API client pagesAPI.getPages() is expected to return an array of page objects,
-            // often within a .data property for JSON API standard responses.
-            let pagesArray = [];
-            if (allPagesResponse && Array.isArray(allPagesResponse.data)) {
-                pagesArray = allPagesResponse.data;
-            } else if (Array.isArray(allPagesResponse)) {
-                // Fallback if the API directly returns an array
-                console.warn('pagesAPI.getPages response is directly an array, expected response.data structure.');
-                pagesArray = allPagesResponse;
-            } else {
-                console.warn('Could not retrieve a valid list of pages for displaying child pages. Response:', allPagesResponse);
-            }
+            // pagesAPI.getPages is designed to always return an array of page objects.
+            const pagesArray = await pagesAPI.getPages({ excludeJournal: true, per_page: 500, include_details: false });
             
-            if (pagesArray.length > 0 || (allPagesResponse && (Array.isArray(allPagesResponse.data) || Array.isArray(allPagesResponse)) ) ) {
-                 // Only call displayChildPages if we have an array (even if empty, to clear previous list)
-                await displayChildPages(pageData.name, pagesArray);
-            } else {
-                // If response was invalid and pagesArray remains empty, ensure container is cleared.
-                const childContainer = document.getElementById('child-pages-container');
-                if (childContainer) {
-                    childContainer.innerHTML = ''; // Clear it or show specific message
-                    // console.log('Child pages container cleared due to invalid or empty page list response.');
-                }
-            }
+            // We now expect pagesArray to be a valid array (even if empty).
+            // The displayChildPages function already handles an empty array correctly.
+            await displayChildPages(pageData.name, pagesArray);
 
         } catch (error) {
             console.error('Error fetching or processing pages for child page display:', error);

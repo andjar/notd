@@ -139,7 +139,7 @@ require_once 'config.php';
                     <div class="extensions-section">
                         <h4>Extensions</h4>
                         <div id="extension-icons-container">
-                            <!-- Backlinks will be populated by JavaScript -->
+                            <!-- Extension icons will be populated by JavaScript -->
                         </div>
                     </div>
                 </div>
