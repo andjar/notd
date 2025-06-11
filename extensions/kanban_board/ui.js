@@ -92,15 +92,15 @@ export function displayKanbanBoard(containerElement, notes) {
 
     // Process notes and distribute them into columns
     notes.forEach(note => {
-        let status = 'todo'; // Default status
+        let status = 'TODO'; // Default status
         if (note.properties && note.properties.status) {
             let rawStatus = '';
             if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
-                status = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || 'todo');
+                rawStatus = typeof note.properties.status[0] === 'string' ? note.properties.status[0] : (note.properties.status[0].value || '');
             } else if (typeof note.properties.status === 'string') {
-                status = note.properties.status;
+                rawStatus = note.properties.status;
             } else if (note.properties.status.value && typeof note.properties.status.value === 'string') {
-                 status = note.properties.status.value;
+                 rawStatus = note.properties.status.value;
             }
             if (rawStatus) {
                 status = rawStatus.toLowerCase();
