@@ -3342,3 +3342,76 @@ a[href^="https://"]:visited {
 .sidebar-extension-icon:hover {
     color: var(--ls-primary-text-color, #333); /* Darken icon on hover */
 }
+
+
+/* Styles for Namespace Breadcrumbs */
+#breadcrumbs-container {
+    margin-bottom: var(--ls-space-4, 16px); /* Use existing variable with fallback */
+    padding: var(--ls-space-2, 8px);
+    font-size: var(--ls-font-size-sm, 0.875rem);
+    display: flex; /* Managed by JS, but good default */
+    align-items: center;
+    flex-wrap: wrap; /* Allow breadcrumbs to wrap on smaller screens */
+    gap: var(--ls-space-1, 4px); /* Gap between items */
+    /* border-bottom: 1px solid var(--ls-secondary-border-color, #eee); */ /* Optional: light border */
+}
+
+.namespace-breadcrumb {
+    text-decoration: none;
+    color: var(--ls-link-text-color, var(--color-accent, #007bff)); /* Use existing link color or accent */
+    padding: var(--ls-space-1, 4px) var(--ls-space-2, 8px);
+    border-radius: var(--ls-border-radius-low, 4px);
+    transition: background-color var(--ls-transition-fast, 150ms ease);
+}
+
+.namespace-breadcrumb:hover {
+    background-color: var(--ls-tertiary-background-color, #f0f0f0); /* Use existing hover color */
+    text-decoration: underline;
+}
+
+/* Separators are text nodes ' / ', spacing is handled by gap in container and padding on links */
+
+/* Styles for Child Pages Section */
+#child-pages-container {
+    margin-top: var(--ls-space-6, 24px);
+    padding: var(--ls-space-4, 16px);
+    border-top: 1px solid var(--ls-secondary-border-color, #eee); /* Light top border for separation */
+    border-radius: var(--ls-border-radius-medium, 8px);
+    background-color: var(--ls-secondary-background-color, #f9f9f9); /* Subtle background */
+}
+
+#child-pages-container h3 { /* Assuming h3 is used as per JS generation */
+    margin-bottom: var(--ls-space-3, 12px);
+    font-size: var(--ls-font-size-lg, 1.125rem); /* Consistent heading size */
+    color: var(--ls-primary-text-color);
+    border-bottom: none; /* Override default h3 border if not desired here */
+}
+
+ul.child-page-list { /* Class added in JS to the ul */
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0; /* Reset default ul margins */
+}
+
+ul.child-page-list li {
+    margin-bottom: var(--ls-space-2, 8px); /* Spacing between child page links */
+}
+
+ul.child-page-list li:last-child {
+    margin-bottom: 0;
+}
+
+.child-page-link {
+    text-decoration: none;
+    color: var(--ls-link-text-color, var(--color-accent, #007bff));
+    padding: var(--ls-space-1, 4px) var(--ls-space-1, 4px); /* Minimal padding */
+    border-radius: var(--ls-border-radius-low, 4px);
+    transition: background-color var(--ls-transition-fast, 150ms ease), color var(--ls-transition-fast, 150ms ease);
+    display: inline-block; /* Allows padding and better interaction */
+}
+
+.child-page-link:hover {
+    background-color: var(--ls-tertiary-background-color, #f0f0f0);
+    color: var(--ls-link-text-hover-color, var(--color-accent-dark, #0056b3));
+    text-decoration: underline;
+}
