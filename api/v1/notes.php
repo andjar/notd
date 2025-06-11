@@ -669,11 +669,14 @@ if ($method === 'GET') {
             $totalCount = $pdo->query($countSql)->fetchColumn();
 
             // Get paginated notes
-            $sql = "SELECT * FROM Notes";
+            // MODIFIED SQL query to include has_attachments
+            $sql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes";
             if (!$includeInternal) {
-                $sql .= " WHERE internal = 0";
+                // Ensure the WHERE clause is appended correctly
+                $sql .= " WHERE Notes.internal = 0"; // Also specify Notes.internal for clarity
             }
-            $sql .= " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            // Append ORDER BY and LIMIT/OFFSET
+            $sql .= " ORDER BY Notes.created_at DESC LIMIT ? OFFSET ?";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$perPage, $offset]);

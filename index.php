@@ -135,6 +135,13 @@ require_once 'config.php';
                             <!-- Backlinks will be populated by JavaScript -->
                         </div>
                     </div>
+
+                    <div class="extensions-section">
+                        <h4>Extensions</h4>
+                        <div id="extension-icons-container">
+                            <!-- Backlinks will be populated by JavaScript -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
