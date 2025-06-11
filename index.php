@@ -91,13 +91,6 @@ require_once 'config.php';
 
         <!-- Main Content -->
         <div id="main-content" class="main-content">
-            <div class="page-header">
-                <div id="current-page-title-container" class="page-title-container">
-                    <h1 id="current-page-title">Journal</h1>
-                    <i data-feather="settings" class="page-title-gear" id="page-properties-gear"></i>
-                </div>
-            </div>
-
             <div id="page-title"></div>
             <div id="page-properties"></div>
             <div id="breadcrumbs-container">

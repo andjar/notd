@@ -39,7 +39,6 @@ import {
  * @param {string} name - Page name
  */
 function updatePageTitle(name) {
-    domRefs.currentPageTitleEl.textContent = name;
     document.title = `${name} - notd`;
 }
 
@@ -526,19 +525,33 @@ function getNoteAncestors(noteId, allNotesOnPage) {
  */
 function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
     if (!domRefs.breadcrumbsContainer) { console.warn('Breadcrumbs container not found in DOM.'); return; }
-    if (!focusedNoteId || !allNotesOnPage || allNotesOnPage.length === 0) { domRefs.breadcrumbsContainer.innerHTML = ''; return; }
-    const focusedNote = allNotesOnPage.find(n => String(n.id) === String(focusedNoteId));
-    if (!focusedNote) { domRefs.breadcrumbsContainer.innerHTML = ''; return; }
+    if (!currentPageName) { console.warn('renderBreadcrumbs called without currentPageName.'); currentPageName = 'Page'; } // Basic fallback
 
-    const ancestors = getNoteAncestors(focusedNoteId, allNotesOnPage);
-    let html = `<a href="#" onclick="ui.showAllNotesAndLoadPage('${currentPageName}'); return false;">${currentPageName}</a>`;
-    ancestors.forEach(ancestor => {
-        const noteName = (ancestor.content ? (ancestor.content.split('\n')[0].substring(0, 30) + (ancestor.content.length > 30 ? '...' : '')) : `Note ${ancestor.id}`).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        html += ` &gt; <a href="#" onclick="ui.focusOnNote('${ancestor.id}'); return false;">${noteName}</a>`;
-    });
-    const focusedNoteName = (focusedNote.content ? (focusedNote.content.split('\n')[0].substring(0, 30) + (focusedNote.content.length > 30 ? '...' : '')) : `Note ${focusedNote.id}`).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    html += ` &gt; <span class="breadcrumb-current">${focusedNoteName}</span>`;
-    domRefs.breadcrumbsContainer.innerHTML = html;
+    let breadcrumbLinksHtml = `<a href="#" onclick="ui.showAllNotesAndLoadPage('${currentPageName}'); return false;">${currentPageName.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</a>`;
+
+    if (focusedNoteId && allNotesOnPage && allNotesOnPage.length > 0) {
+        const focusedNote = allNotesOnPage.find(n => String(n.id) === String(focusedNoteId));
+        if (focusedNote) {
+            const ancestors = getNoteAncestors(focusedNoteId, allNotesOnPage);
+            ancestors.forEach(ancestor => {
+                const noteName = (ancestor.content ? (ancestor.content.split('\n')[0].substring(0, 30) + (ancestor.content.length > 30 ? '...' : '')) : `Note ${ancestor.id}`).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                breadcrumbLinksHtml += ` &gt; <a href="#" onclick="ui.focusOnNote('${ancestor.id}'); return false;">${noteName}</a>`;
+            });
+            const focusedNoteName = (focusedNote.content ? (focusedNote.content.split('\n')[0].substring(0, 30) + (focusedNote.content.length > 30 ? '...' : '')) : `Note ${focusedNote.id}`).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            breadcrumbLinksHtml += ` &gt; <span class="breadcrumb-current">${focusedNoteName}</span>`;
+        }
+    }
+
+    const breadcrumbHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>${breadcrumbLinksHtml}</span>
+            <i data-feather="settings" class="page-title-gear" id="page-properties-gear" style="cursor: pointer;"></i>
+        </div>
+    `;
+    domRefs.breadcrumbsContainer.innerHTML = breadcrumbHTML;
+    if (typeof feather !== 'undefined' && feather.replace) {
+        feather.replace();
+    }
 }
 
 // Helper function to be called by breadcrumb page link
