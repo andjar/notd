@@ -15,6 +15,12 @@ require_once 'config.php';
     <?php require_once 'assets/css/theme_loader.php'; ?>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/icons.css">
+    <script>
+        window.APP_CONFIG = {
+            RENDER_INTERNAL_PROPERTIES: <?php echo RENDER_INTERNAL_PROPERTIES ? 'true' : 'false'; ?>,
+            SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE: <?php echo SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE ? 'true' : 'false'; ?>
+        };
+    </script>
 </head>
 <body>
     <div id="splash-screen">

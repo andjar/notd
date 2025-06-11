@@ -751,15 +751,35 @@ function parseAndRenderContent(rawContent) {
         `;
     } else {
         // Handle inline properties first
-        html = html.replace(/\{([^:]+)::([^}]+)\}/g, (match, key, value) => {
+        // Regex: /\{([^:]+):(:{1,2})([^}]+)\}/g
+        // matches[1]: key
+        // matches[2]: additional colons (":" for "::", "::" for ":::")
+        // matches[3]: value
+        html = html.replace(/\{([^:]+):(:{1,2})([^}]+)\}/g, (match, key, additionalColons, value) => {
             const trimmedKey = key.trim();
             const trimmedValue = value.trim();
-            if (trimmedKey.toLowerCase() === 'tag') {
-                return `<span class="property-inline property-tag"><span class="property-key">#</span><span class="property-value">${trimmedValue}</span></span>`;
-            } else if (trimmedKey.toLowerCase() === 'alias') {
-                return `<span class="property-inline alias-property"><span class="property-key">Alias</span><span class="property-value">${trimmedValue}</span></span>`;
+            const isInternal = additionalColons === '::'; // True if original was {key:::value}
+
+            if (isInternal && (!window.APP_CONFIG || window.APP_CONFIG.RENDER_INTERNAL_PROPERTIES === false)) {
+                return ''; // Omit internal property if RENDER_INTERNAL_PROPERTIES is false
+            }
+
+            let propertyClass = 'property-inline';
+            let separator = isInternal ? ':::' : '::';
+            
+            if (isInternal) {
+                propertyClass += ' property-internal';
             } else {
-                return `<span class="property-inline"><span class="property-key">${trimmedKey}</span><span class="property-value">${trimmedValue}</span></span>`;
+                propertyClass += ' property-normal'; // Explicitly class normal properties
+            }
+
+            if (trimmedKey.toLowerCase() === 'tag') {
+                // Tags are typically not marked internal this way, but if they were:
+                return `<span class="${propertyClass} property-tag"><span class="property-key">#</span><span class="property-value">${trimmedValue}</span></span>`;
+            } else if (trimmedKey.toLowerCase() === 'alias') {
+                 return `<span class="${propertyClass} alias-property"><span class="property-key">Alias</span><span class="property-separator">${separator}</span><span class="property-value">${trimmedValue}</span></span>`;
+            } else {
+                return `<span class="${propertyClass}"><span class="property-key">${trimmedKey}</span><span class="property-separator">${separator}</span><span class="property-value">${trimmedValue}</span></span>`;
             }
         });
 
@@ -923,48 +943,51 @@ function renderProperties(container, properties) {
     }
 
     let htmlToSet = '';
-    Object.entries(properties).forEach(([name, propValue]) => {
-        // propValue is expected to be an array of {value: ..., internal: ...} objects
-        // or a single {value: ..., internal: ...} object if simplified by backend (less likely per prompt)
-        const valuesToRender = [];
+    Object.entries(properties).forEach(([name, propValueEntries]) => {
+        // Ensure propValueEntries is always an array for consistent processing
+        const entries = Array.isArray(propValueEntries) ? propValueEntries : [propValueEntries];
 
-        if (Array.isArray(propValue)) {
-            propValue.forEach(item => {
-                if (item && typeof item === 'object' && !item.internal) {
-                    valuesToRender.push(item.value);
-                } else if (typeof item !== 'object') { 
-                    // If backend sometimes sends array of simple values (e.g. for non-internal tags)
-                    valuesToRender.push(item);
-                }
-            });
-        } else if (propValue && typeof propValue === 'object' && !propValue.internal) {
-            // Handle cases where backend might send a single object for a single-value property
-            valuesToRender.push(propValue.value);
-        } else if (typeof propValue !== 'object') {
-            // Handle cases where backend might send a simple value directly
-             valuesToRender.push(propValue);
-        }
+        entries.forEach(item => {
+            // Each item is expected to be an object like {value: "...", internal: true/false}
+            // or a simple value for older/non-internal properties if structure varies.
+            let valueToRender;
+            let isItemInternal = false;
 
-        if (valuesToRender.length > 0) {
-            if (name.toLowerCase() === 'favorite' && valuesToRender.some(v => String(v).toLowerCase() === 'true')) {
-                htmlToSet += `<span class="property-item favorite"><span class="property-favorite">⭐</span></span>`;
-            } else if (name.startsWith('tag::') || name.toLowerCase() === 'tags' || name.toLowerCase() === 'tag') { // accept 'tags' or 'tag' as well
-                const tagName = name.startsWith('tag::') ? name.substring(5) : (valuesToRender.length === 1 ? valuesToRender[0] : name); // Use value if single, else key
-                valuesToRender.forEach(val => {
-                     htmlToSet += `<span class="property-item tag">
-                        <span class="property-key">#</span>
-                        <span class="property-value">${val}</span>
-                    </span>`;
-                });
+            if (item && typeof item === 'object' && item.hasOwnProperty('value') && item.hasOwnProperty('internal')) {
+                valueToRender = item.value;
+                isItemInternal = item.internal;
+            } else if (typeof item !== 'object') { // Legacy: simple value, assume not internal
+                valueToRender = item;
+                isItemInternal = false; // Default for simple values
             } else {
-                valuesToRender.forEach(val => {
-                    htmlToSet += `<span class="property-item">
-                        <span class="property-key">${name}</span>
-                        <span class="property-value">${val}</span>
-                    </span>`;
-                });
+                return; // Skip malformed items
             }
-        }
+
+            if (isItemInternal && (!window.APP_CONFIG || window.APP_CONFIG.RENDER_INTERNAL_PROPERTIES === false)) {
+                return; // Skip this internal item based on config
+            }
+
+            let itemClass = "property-item";
+            if (isItemInternal) {
+                itemClass += " property-item-internal";
+            } else {
+                itemClass += " property-item-normal";
+            }
+
+            if (name.toLowerCase() === 'favorite' && String(valueToRender).toLowerCase() === 'true') {
+                htmlToSet += `<span class="${itemClass} favorite"><span class="property-favorite">⭐</span></span>`;
+            } else if (name.startsWith('tag::') || name.toLowerCase() === 'tags' || name.toLowerCase() === 'tag') {
+                htmlToSet += `<span class="${itemClass} tag">
+                    <span class="property-key">#</span>
+                    <span class="property-value">${valueToRender}</span>
+                </span>`;
+            } else {
+                htmlToSet += `<span class="${itemClass}">
+                    <span class="property-key">${name}</span>
+                    <span class="property-value">${valueToRender}</span>
+                </span>`;
+            }
+        });
     });
 
     if (htmlToSet) {
