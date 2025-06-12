@@ -2,19 +2,42 @@
 
 import { apiRequest } from '../api_client.js';
 
+const domRefs = {}; // To store DOM references for the calendar widget
+
 let currentPageName = null;
 let currentDisplayDate = new Date();
 
-const toYYYYMMDD = (date) => date.toISOString().split('T')[0];
+/**
+ * Converts a Date object to a 'YYYY-MM-DD' string.
+ * @param {Date} date - The date to convert.
+ * @returns {string} The formatted date string.
+ */
+function toYYYYMMDD(date) {
+    return date.toISOString().split('T')[0];
+}
 
-function createDayElement(day, formattedDate, isToday, pageForThisDate, isCurrentPageDate) {
-    // ... (This function is correct, no changes needed)
+/**
+ * Initializes DOM references for the calendar widget.
+ */
+function initializeDomRefs() {
+    domRefs.calendarWidget = document.getElementById('calendar-widget');
+    domRefs.monthYearDisplay = document.getElementById('current-month-year');
+    domRefs.prevMonthBtn = document.getElementById('prev-month-btn');
+    domRefs.nextMonthBtn = document.getElementById('next-month-btn');
+    domRefs.calendarDaysGrid = document.getElementById('calendar-days-grid');
+}
+
+/**
+ * Creates a single day element for the calendar.
+ */
+function createDayElement(day, isEmpty, isToday = false, pageForThisDate = null, isCurrentPageDate = false) {
     const div = document.createElement('div');
     div.className = 'calendar-day';
-    if (!day) {
+    if (isEmpty) {
         div.classList.add('empty');
     } else {
         div.textContent = day;
+        const formattedDate = toYYYYMMDD(new Date(currentDisplayDate.getFullYear(), currentDisplayDate.getMonth(), day));
         div.dataset.date = formattedDate;
 
         if (isToday) div.classList.add('today');
@@ -30,32 +53,27 @@ function createDayElement(day, formattedDate, isToday, pageForThisDate, isCurren
     return div;
 }
 
-async function render() {
-    const calendarEl = document.getElementById('calendar-widget');
-    if (!calendarEl) return;
+async function fetchAndRenderCalendar() {
+    if (!domRefs.monthYearDisplay || !domRefs.calendarDaysGrid) return;
     
-    const monthDisplay = calendarEl.querySelector('.month-year-display');
-    const daysGrid = calendarEl.querySelector('.calendar-days');
-    
-    if(!monthDisplay || !daysGrid) return;
-    
-    monthDisplay.textContent = currentDisplayDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    daysGrid.innerHTML = '';
+    domRefs.monthYearDisplay.textContent = currentDisplayDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    domRefs.calendarDaysGrid.innerHTML = '<div>Loading...</div>';
 
     const year = currentDisplayDate.getFullYear();
-    const month = currentDisplayDate.getMonth();
+    const month = currentDisplayDate.getMonth(); // 0-indexed
 
     try {
-        // **FIX**: Correctly handle the paginated response.
         const response = await apiRequest('pages.php?per_page=5000'); // Fetch a large number to get all relevant pages
         const allPages = response?.data || [];
+        
+        domRefs.calendarDaysGrid.innerHTML = ''; // Clear loading message
         
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         let startDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
 
         for (let i = 0; i < startDayOfWeek; i++) {
-            daysGrid.appendChild(createDayElement('', ''));
+            domRefs.calendarDaysGrid.appendChild(createDayElement('', true));
         }
 
         for (let day = 1; day <= lastDay.getDate(); day++) {
@@ -66,46 +84,57 @@ async function render() {
             const isToday = formattedDate === toYYYYMMDD(new Date());
             const isCurrentPageDate = currentPageName === pageForThisDate?.name;
 
-            daysGrid.appendChild(
-                createDayElement(day, formattedDate, isToday, pageForThisDate, isCurrentPageDate)
+            domRefs.calendarDaysGrid.appendChild(
+                createDayElement(day, false, isToday, pageForThisDate, isCurrentPageDate)
             );
         }
     } catch (error) {
         console.error('Error fetching pages for calendar:', error);
-        daysGrid.innerHTML = '<tr><td colspan="7">Error loading calendar data.</td></tr>';
+        if (domRefs.calendarDaysGrid) domRefs.calendarDaysGrid.innerHTML = '<div>Error loading.</div>';
     }
 }
 
-
 function setupEventListeners() {
-    document.getElementById('prev-month-btn')?.addEventListener('click', () => {
+    if (!domRefs.calendarWidget) initializeDomRefs();
+    if (!domRefs.prevMonthBtn) return;
+
+    domRefs.prevMonthBtn.addEventListener('click', () => {
         currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
-        render();
+        fetchAndRenderCalendar();
     });
 
-    document.getElementById('next-month-btn')?.addEventListener('click', () => {
+    domRefs.nextMonthBtn.addEventListener('click', () => {
         currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
-        render();
+        fetchAndRenderCalendar();
     });
 
-    document.getElementById('calendar-days-grid')?.addEventListener('click', (e) => {
+    domRefs.calendarDaysGrid.addEventListener('click', async (e) => {
         const dayEl = e.target.closest('.calendar-day:not(.empty)');
         if (!dayEl) return;
-        
-        const pageNameToLoad = dayEl.dataset.pageName || dayEl.dataset.date;
-        if (pageNameToLoad && window.loadPage) {
+
+        let pageNameToLoad = dayEl.dataset.pageName;
+
+        if (pageNameToLoad) {
             window.loadPage(pageNameToLoad);
+        } else if (dayEl.dataset.date) {
+            // Day has no page, so create it
+            const dateToCreate = dayEl.dataset.date;
+            const created = await window.createPageWithContent(dateToCreate, '{type::journal}');
+            if (!created) {
+                alert(`Could not create journal page for ${dateToCreate}.`);
+            }
         }
     });
 }
 
 export const calendarWidget = {
     init() {
+        initializeDomRefs();
         setupEventListeners();
-        render();
+        fetchAndRenderCalendar();
     },
     setCurrentPage(pageName) {
         currentPageName = pageName;
-        render(); // Re-render to update highlights
+        fetchAndRenderCalendar();
     }
 };

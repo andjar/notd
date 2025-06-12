@@ -30,7 +30,11 @@
     text-align: center;
     font-weight: bold;
     color: var(--ls-secondary-text-color);
-    margin-bottom: var(--ls-space-1);
+    padding-bottom: var(--ls-space-1);
+}
+
+.calendar-weekdays > span {
+    padding: 0 var(--ls-space-1);
 }
 
 .calendar-days {

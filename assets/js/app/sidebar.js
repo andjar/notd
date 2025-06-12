@@ -12,6 +12,7 @@ export const sidebarState = {
         toggle() {
             this.isCollapsed = !this.isCollapsed;
             localStorage.setItem('leftSidebarCollapsed', this.isCollapsed);
+            this.element.classList.toggle('collapsed', this.isCollapsed);
             document.body.classList.toggle('left-sidebar-collapsed', this.isCollapsed);
             this.updateButtonVisuals();
         },
@@ -30,6 +31,7 @@ export const sidebarState = {
         toggle() {
             this.isCollapsed = !this.isCollapsed;
             localStorage.setItem('rightSidebarCollapsed', this.isCollapsed);
+            this.element.classList.toggle('collapsed', this.isCollapsed);
             document.body.classList.toggle('right-sidebar-collapsed', this.isCollapsed);
             this.updateButtonVisuals();
         },

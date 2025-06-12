@@ -73,12 +73,17 @@ try {
     switch ($method) {
         case 'GET':
             if (isset($_GET['name'])) {
-                $page = $dataManager->getPageByName($_GET['name']);
-                if ($page) {
-                    ApiResponse::success($page);
-                } else {
-                    ApiResponse::error('Page not found', 404);
+                $pageName = $_GET['name'];
+                $page = $dataManager->getPageByName($pageName);
+                if (!$page) {
+                    // Page does not exist, so create it.
+                    $pdo->beginTransaction();
+                    $stmt = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (:name, :content)");
+                    $stmt->execute([':name' => $pageName, ':content' => null]);
+                    $pdo->commit();
+                    $page = $dataManager->getPageByName($pageName); // Re-fetch the newly created page
                 }
+                ApiResponse::success($page, 200);
             } elseif (isset($_GET['id'])) {
                 $page = $dataManager->getPageById((int)$_GET['id']);
                 if ($page) {

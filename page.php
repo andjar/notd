@@ -86,7 +86,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     <div class="app-header">
                         <a href="/" id="app-title" class="app-title">notd</a>
                     </div>
-                    <div class="sidebar-section calendar-section">
+                    <div class="sidebar-section">
                         <div id="calendar-widget" class="calendar-widget">
                             <div class="calendar-header">
                                 <button id="prev-month-btn" class="arrow-btn"><i data-feather="chevron-left"></i></button>
