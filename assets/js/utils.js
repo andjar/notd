@@ -179,3 +179,71 @@ export function safeAddEventListener(element, event, handler, elementName) {
     }
     element.addEventListener(event, handler);
 }
+
+/**
+ * Inserts text at the current cursor position in a contentEditable element.
+ * @param {string} text - The text to insert.
+ * @param {number} [cursorOffset=0] - The offset from the end of the inserted text where the cursor should be placed.
+ * @returns {boolean} True if text was inserted, false otherwise.
+ */
+export function insertTextAtCursor(text, cursorOffset = 0) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+
+    const range = selection.getRangeAt(0);
+    range.deleteContents(); // Delete any selected content
+
+    const textNode = document.createTextNode(text);
+    range.insertNode(textNode);
+
+    // Set cursor position after insertion
+    const newRange = document.createRange();
+    newRange.setStart(textNode, text.length - cursorOffset);
+    newRange.setEnd(textNode, text.length - cursorOffset);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+    
+    return true;
+}
+
+/**
+ * Handles auto-closing of brackets/parentheses/braces.
+ * @param {Event} e - The keyboard event.
+ * @returns {boolean} True if a bracket was auto-closed, false otherwise.
+ */
+export function handleAutocloseBrackets(e) {
+    let handled = false;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return false;
+    const range = selection.getRangeAt(0);
+    const editor = e.target; // contentEditable div
+
+    const keyActionMap = { '[': '[]', '{': '{}', '(': '()' };
+
+    if (keyActionMap[e.key]) {
+        const textToInsert = keyActionMap[e.key];
+        let cursorOffset = 1;
+
+        e.preventDefault();
+        insertTextAtCursor(textToInsert, cursorOffset);
+        handled = true;
+    }
+
+    if (handled) {
+        // Dispatch an input event so note-renderer's listeners (like for page link suggestions) are triggered
+        editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+    }
+    return handled;
+}
+
+/**
+ * Placeholder for handling shortcut expansions.
+ * @param {Event} e - The keyboard event.
+ * @param {HTMLElement} contentDiv - The contentEditable div.
+ * @returns {Promise<boolean>} True if a shortcut was expanded, false otherwise.
+ */
+export async function handleShortcutExpansion(e, contentDiv) {
+    // TODO: Implement actual shortcut expansion logic here.
+    // For now, this is a placeholder.
+    return false;
+}

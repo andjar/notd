@@ -15,7 +15,7 @@ import {
 
 import { calculateOrderIndex } from './order-index-service.js';
 import { notesAPI } from '../api_client.js';
-import { debounce } from '../utils.js';
+import { debounce, handleAutocloseBrackets, handleShortcutExpansion } from '../utils.js';
 import { ui } from '../ui.js';
 
 const notesContainer = document.querySelector('#notes-container');
@@ -322,27 +322,43 @@ export async function handleNoteKeyDown(e) {
     if (!e.target.matches('.note-content')) return;
     const noteItem = e.target.closest('.note-item');
     if (!noteItem) return;
+
     const noteId = noteItem.dataset.noteId;
     const contentDiv = e.target;
     const noteData = getNoteDataById(noteId);
-    
-    if (String(noteId).startsWith('temp-')) {
-        if (['Enter', 'Tab', 'Backspace'].includes(e.key)) e.preventDefault();
-        return;
-    }
-    if (!noteData) {
-        if (['Enter', 'Tab', 'Backspace'].includes(e.key)) e.preventDefault();
-        return;
+
+    // Handle shortcuts and auto-close brackets first if in edit mode
+    if (contentDiv.classList.contains('edit-mode')) {
+        if (await handleShortcutExpansion(e, contentDiv)) return;
+        if (handleAutocloseBrackets(e)) return;
     }
 
+    // --- Pre-action checks for structural changes ---
+    const structuralKeys = ['Enter', 'Tab', 'Backspace'];
+    if (structuralKeys.includes(e.key) && !e.shiftKey) { // Shift+Key usually has different meaning
+        if (String(noteId).startsWith('temp-')) {
+            console.warn(`Structural action (${e.key}) blocked on temp note ID: ${noteId}`);
+            e.preventDefault(); return;
+        }
+        if (!noteData) {
+            console.warn(`Note data not found for ID: ${noteId}. Key: ${e.key}. Blocking structural change.`);
+            e.preventDefault(); return;
+        }
+    }
+    // Allow Enter on rendered mode to switch to edit mode (handled in handleEnterKey)
+    // Allow arrow keys even if noteData is somehow missing (for navigation)
+
     switch (e.key) {
-        case 'Enter': await handleEnterKey(e, noteItem, noteData, contentDiv); break;
-        case 'Tab': await handleTabKey(e, noteItem, noteData, contentDiv); break;
+        case 'Enter':     await handleEnterKey(e, noteItem, noteData, contentDiv); break;
+        case 'Tab':       await handleTabKey(e, noteItem, noteData, contentDiv); break;
         case 'Backspace': await handleBackspaceKey(e, noteItem, noteData, contentDiv); break;
         case 'ArrowUp':
         case 'ArrowDown':
-            if (contentDiv.classList.contains('edit-mode')) handleArrowKey(e, contentDiv);
+            if (contentDiv.classList.contains('edit-mode')) { // Only navigate if in edit mode
+                 handleArrowKey(e, contentDiv);
+            }
             break;
+        // Default: allow native behavior for other keys (typing, etc.)
     }
 }
 
