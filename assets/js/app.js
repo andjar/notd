@@ -4,10 +4,8 @@
  * @module app
  */
 
-// Core state management
-import {
-    currentPageId
-} from './app/state.js';
+// Core state management - not directly used here but good to see imports
+import { currentPageId } from './app/state.js';
 
 // Page management
 import { loadPage } from './app/page-loader.js';
@@ -44,15 +42,11 @@ import {
 import { initializeApp } from './app/app-init.js';
 
 // --- Global Function Exposure ---
-// Expose ONLY the necessary functions to be called from inline HTML event handlers.
-// The core property modification functions are now inside property-editor.js and are handled by its internal listeners.
 window.displayPageProperties = displayPagePropertiesFromEditor;
-
 
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
 
-// Verify critical DOM elements
 if (!notesContainer) {
     console.error('Critical DOM element missing: notesContainer. App cannot function.');
 }
@@ -60,30 +54,31 @@ if (!notesContainer) {
 // Add root note button
 safeAddEventListener(addRootNoteBtn, 'click', handleAddRootNote, 'addRootNoteBtn');
 
-// Note-level event delegation for keyboard, clicks, and input
+// **FIXED**: This is where note-level event listeners should be attached.
 if (notesContainer) {
+    // Keydown for structural changes (Enter, Tab, Backspace) and navigation (Arrows)
     notesContainer.addEventListener('keydown', handleNoteKeyDown);
 
+    // Click handler for task checkboxes
     notesContainer.addEventListener('click', (e) => {
         if (e.target.matches('.task-checkbox')) {
             handleTaskCheckboxClick(e);
         }
     });
 
-    safeAddEventListener(notesContainer, 'input', (e) => {
+    // Input handler for debounced saving of content
+    notesContainer.addEventListener('input', (e) => {
         if (e.target.matches('.note-content.edit-mode')) {
             const noteItem = e.target.closest('.note-item');
             if (noteItem) {
                 const contentDiv = e.target;
                 const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
-                const normalizedContent = ui.normalizeNewlines(rawTextValue);
-                contentDiv.dataset.rawContent = normalizedContent;
+                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
                 debouncedSaveNote(noteItem);
             }
         }
-    }, 'notesContainerInput');
+    });
 }
-
 
 // --- Drag and Drop for File Uploads ---
 if (notesContainer) {
@@ -141,7 +136,6 @@ if (notesContainer) {
     });
 }
 
-
 // --- Application Startup ---
 document.addEventListener('DOMContentLoaded', async () => {
     if (typeof ui === 'undefined' || !notesContainer) {
@@ -153,6 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await initializeApp();
         initPropertyEditor(); // Initialize listeners for the property modal
+        ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
     } catch (error) {
         console.error('Failed to initialize application:', error);
         document.body.innerHTML = `<h1>Application Initialization Failed</h1><p>${error.message}</p><p>Check the console for more details.</p>`;

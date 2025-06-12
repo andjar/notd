@@ -63,16 +63,25 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         if (typeof optimisticDOMUpdater === 'function') optimisticDOMUpdater();
         const batchResponse = await notesAPI.batchUpdateNotes(operations);
         let allSubOperationsSucceeded = true;
-        batchResponse.forEach(opResult => {
-            if (opResult.status === 'error') {
-                allSubOperationsSucceeded = false;
-                console.error(`[${userActionName} BATCH] Server reported sub-operation error:`, opResult);
-            } else if (opResult.type === 'create' && opResult.client_temp_id) {
-                _finalizeNewNote(opResult.client_temp_id, opResult.note);
-            } else if (opResult.type === 'update' && opResult.note) {
-                updateNoteInCurrentPage(opResult.note);
-            }
-        });
+        
+        // **FIXED**: The API client now returns the object containing the results array.
+        // We must iterate over `batchResponse.results`.
+        if (batchResponse && Array.isArray(batchResponse.results)) {
+            batchResponse.results.forEach(opResult => {
+                if (opResult.status === 'error') {
+                    allSubOperationsSucceeded = false;
+                    console.error(`[${userActionName} BATCH] Server reported sub-operation error:`, opResult);
+                } else if (opResult.type === 'create' && opResult.client_temp_id) {
+                    _finalizeNewNote(opResult.client_temp_id, opResult.note);
+                } else if (opResult.type === 'update' && opResult.note) {
+                    updateNoteInCurrentPage(opResult.note);
+                }
+            });
+        } else {
+            allSubOperationsSucceeded = false;
+            console.error(`[${userActionName} BATCH] Invalid response structure from server:`, batchResponse);
+        }
+
         if (!allSubOperationsSucceeded) throw new Error(`One or more sub-operations in '${userActionName}' failed.`);
         success = true;
         ui.updateSaveStatusIndicator('saved');
@@ -90,33 +99,32 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
 
 async function _saveNoteToServer(noteId, rawContent) {
     if (String(noteId).startsWith('temp-')) return null;
-    ui.updateSaveStatusIndicator('pending');
-    try {
-        let contentToSave = rawContent;
-        if (window.currentPageEncryptionKey && window.decryptionPassword) {
-            contentToSave = sjcl.encrypt(window.decryptionPassword, rawContent);
-        }
-        
-        const operations = [{
-            type: 'update',
-            payload: { id: noteId, page_id: currentPageId, content: contentToSave }
-        }];
-
-        const response = await notesAPI.batchUpdateNotes(operations);
-        const result = response[0];
-
-        if (result?.status === 'success' && result.note) {
-            updateNoteInCurrentPage(result.note);
-            ui.updateSaveStatusIndicator('saved');
-            return result.note;
-        } else {
-            throw new Error(result?.message || 'Failed to save note via batch update.');
-        }
-    } catch (error) {
-        console.error(`_saveNoteToServer: Error updating note ${noteId}. Error:`, error);
-        ui.updateSaveStatusIndicator('error');
-        return null;
+    
+    // Prepare the content for saving, including encryption if applicable
+    let contentToSave = rawContent;
+    if (window.currentPageEncryptionKey && window.decryptionPassword) {
+        contentToSave = sjcl.encrypt(window.decryptionPassword, rawContent);
     }
+
+    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+
+    const operations = [{
+        type: 'update',
+        payload: {
+            id: noteId,
+            page_id: currentPageId, // Ensure page_id is sent for context if needed by backend
+            content: contentToSave
+        }
+    }];
+
+    // Using executeBatchOperations for consistency and error handling
+    const success = await executeBatchOperations(originalNotesState, operations, () => {
+        // Optimistic DOM update for content is handled elsewhere (e.g., when typing stops)
+        // This save operation only ensures the data is sent to the server.
+        // updateNoteInCurrentPage is called by executeBatchOperations on success via opResult.note
+    }, "Save Note Content");
+
+    return success ? getNoteDataById(noteId) : null;
 }
 
 export async function saveNoteImmediately(noteEl) {
@@ -154,13 +162,12 @@ export async function handleAddRootNote() {
     addNoteToCurrentPage(optimisticNewNote);
     
     const operations = [{ type: 'create', payload: { page_id: currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
-    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, page_id: currentPageId, order_index: upd.newOrderIndex } }));
+    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    operations.forEach(op => {
-        if (op.type === 'update') {
-            const note = getNoteDataById(op.payload.id);
-            if(note) note.order_index = op.payload.order_index;
-        }
+    // Optimistically update local state for siblings
+    siblingUpdates.forEach(upd => {
+        const note = getNoteDataById(upd.id);
+        if(note) note.order_index = upd.newOrderIndex;
     });
 
     const optimisticDOMUpdater = () => {
@@ -181,8 +188,8 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     const clientTempId = `temp-E-${Date.now()}`;
     const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
 
-    const siblings = notesForCurrentPage.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? ''));
-    const currentNoteIndexInSiblings = siblings.sort((a, b) => a.order_index - b.order_index).findIndex(n => String(n.id) === String(noteData.id));
+    const siblings = notesForCurrentPage.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a, b) => a.order_index - b.order_index);
+    const currentNoteIndexInSiblings = siblings.findIndex(n => String(n.id) === String(noteData.id));
     const nextSibling = siblings[currentNoteIndexInSiblings + 1];
 
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, noteData.parent_note_id, String(noteData.id), nextSibling?.id || null);
@@ -191,13 +198,12 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     addNoteToCurrentPage(optimisticNewNote);
 
     const operations = [{ type: 'create', payload: { page_id: currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
-    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, page_id: currentPageId, order_index: upd.newOrderIndex } }));
+    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    operations.forEach(op => {
-        if (op.type === 'update') {
-            const note = getNoteDataById(op.payload.id);
-            if (note) note.order_index = op.payload.order_index;
-        }
+    // Optimistically update local state for siblings
+    siblingUpdates.forEach(op => {
+        const note = getNoteDataById(op.id);
+        if (note) note.order_index = op.newOrderIndex;
     });
 
     const optimisticDOMUpdater = () => {
@@ -218,17 +224,17 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
 
     const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
     let operations = [];
+    let newParentId = null;
 
     if (e.shiftKey) { // Outdent
         if (!noteData.parent_note_id) return;
         const oldParentNote = getNoteDataById(noteData.parent_note_id);
         if (!oldParentNote) return;
+        newParentId = oldParentNote.parent_note_id;
 
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, oldParentNote.parent_note_id, String(oldParentNote.id), null);
+        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, newParentId, String(oldParentNote.id), null);
         
-        noteData.parent_note_id = oldParentNote.parent_note_id;
-        noteData.order_index = targetOrderIndex;
-        operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex } });
+        operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
 
     } else { // Indent
@@ -237,15 +243,25 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
         if (currentNoteIndexInSiblings < 1) return;
         
         const newParentNote = siblings[currentNoteIndexInSiblings - 1];
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, String(newParentNote.id), null, null);
+        newParentId = String(newParentNote.id);
+        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, newParentId, null, null);
 
-        noteData.parent_note_id = String(newParentNote.id);
-        noteData.order_index = targetOrderIndex;
-        operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex } });
+        operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     }
+    
+    // **FIXED**: Perform optimistic state updates before calling the batch operation
+    const noteToMove = getNoteDataById(noteData.id);
+    if(noteToMove) noteToMove.parent_note_id = newParentId;
+    operations.forEach(op => {
+        if (op.type === 'update') {
+            const note = getNoteDataById(op.payload.id);
+            if(note) note.order_index = op.payload.order_index;
+        }
+    });
 
     const optimisticDOMUpdater = () => {
+        // Since this is a structural change, a full re-render is the safest approach.
         ui.displayNotes(notesForCurrentPage, currentPageId);
         const newNoteItem = getNoteElementById(noteData.id);
         if (newNoteItem) {

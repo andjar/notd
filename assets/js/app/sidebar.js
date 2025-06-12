@@ -47,17 +47,16 @@ export const sidebarState = {
             favoritesContainer.innerHTML = 'Loading favorites...';
     
             try {
-                // CORRECTED: Destructure the 'pages' array from the response object.
+                // **FIXED**: Destructure the `pages` array from the response object.
                 const { pages } = await pagesAPI.getPages({ include_details: true });
 
-                // This check is now valid because 'pages' is the array.
-                if (!pages || !Array.isArray(pages)) {
+                if (!Array.isArray(pages)) {
                     favoritesContainer.innerHTML = 'Could not load favorites.';
                     console.error('Failed to fetch pages or invalid response:', pages);
                     return;
                 }
     
-                // CORRECTED: Filter based on the new property structure.
+                // **FIXED**: Filter based on the new property structure from the API Spec.
                 // A page is a favorite if it has a 'favorite' property array where at least one entry's value is 'true'.
                 const favoritePages = pages.filter(
                     page => page.properties?.favorite?.some(prop => String(prop.value).toLowerCase() === 'true')
@@ -81,9 +80,14 @@ export const sidebarState = {
     
                 pagesToDisplay.forEach(page => {
                     const link = document.createElement('a');
-                    link.href = `page.php?page=${encodeURIComponent(page.name)}`; // Use page name for consistency
+                    link.href = `?page=${encodeURIComponent(page.name)}`; // Use page name for consistency
                     link.textContent = page.name;
                     link.classList.add('favorite-page-link');
+                    // Add click handler to use SPA navigation
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        window.loadPage(page.name);
+                    });
                     favoritesContainer.appendChild(link);
                 });
     
@@ -95,9 +99,13 @@ export const sidebarState = {
                         favoritesContainer.innerHTML = '';
                         favoritePages.forEach(page => {
                             const link = document.createElement('a');
-                            link.href = `page.php?page=${encodeURIComponent(page.name)}`;
+                            link.href = `?page=${encodeURIComponent(page.name)}`;
                             link.textContent = page.name;
                             link.classList.add('favorite-page-link');
+                            link.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                window.loadPage(page.name);
+                            });
                             favoritesContainer.appendChild(link);
                         });
                     }, { once: true });
@@ -122,13 +130,14 @@ export const sidebarState = {
             iconsContainer.innerHTML = '';
 
             try {
+                // Using fetch directly as this is a simple GET with no complex handling
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
 
-                // CORRECTED: Check for the new API response format.
+                // **FIXED**: Check for the new API response format from the spec.
                 if (data.status === 'success' && data.data && Array.isArray(data.data.extensions)) {
                     if (data.data.extensions.length === 0) {
                         return; // Nothing to render
@@ -138,6 +147,7 @@ export const sidebarState = {
                         const linkEl = document.createElement('a');
                         linkEl.href = `extensions/${extension.name}/index.php`;
                         linkEl.title = extension.name;
+                        linkEl.target = "_blank"; // Open extensions in a new tab
 
                         const iconEl = document.createElement('i');
                         iconEl.setAttribute('data-feather', extension.featherIcon);

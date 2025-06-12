@@ -25,12 +25,15 @@ function rebuildContentWithProperties(originalContent, properties) {
     let cleanContent = (originalContent || '').replace(/\{([^:}]+):(:{2,})([^}]+)\}\n?/g, '').trim();
     let propertiesString = '';
     for (const [key, instances] of Object.entries(properties)) {
+        if (!instances) continue;
         for (const instance of instances) {
             const colons = instance.internal ? ':::' : '::';
             propertiesString += `{${key}${colons}${instance.value}}\n`;
         }
     }
-    return (cleanContent ? cleanContent + '\n\n' : '') + propertiesString.trim();
+    // Only add a newline if there's content AND properties.
+    const separator = (cleanContent && propertiesString) ? '\n\n' : '';
+    return cleanContent + separator + propertiesString.trim();
 }
 
 async function _updatePageContent(newContent) {
@@ -38,6 +41,7 @@ async function _updatePageContent(newContent) {
         ui.updateSaveStatusIndicator('pending');
         const updatedPage = await pagesAPI.updatePage(currentPageId, { content: newContent });
         pageContentForModal = updatedPage.content || '';
+        // The properties are now derived from the returned content, so we pass the new properties to the UI.
         displayPageProperties(updatedPage.properties || {});
         ui.renderPageInlineProperties(updatedPage.properties || {}, ui.domRefs.pagePropertiesContainer);
         ui.updateSaveStatusIndicator('saved');
@@ -97,30 +101,9 @@ async function renamePropertyKey(oldKey, index, newKey) {
     await _updatePageContent(newContent);
 }
 
-async function renameArrayPropertyKey(oldKey, newKey) {
-    const properties = parsePropertiesFromContent(pageContentForModal);
-    if (properties[oldKey]) {
-        if (!properties[newKey]) {
-            properties[newKey] = [];
-        }
-        properties[newKey].push(...properties[oldKey]);
-        delete properties[oldKey];
-    }
-    const newContent = rebuildContentWithProperties(pageContentForModal, properties);
-    await _updatePageContent(newContent);
-}
-
-async function updateArrayPropertyValue(key, arrayIndex, newValue) {
-    await updatePageProperty(key, arrayIndex, newValue);
-}
-
-async function deleteArrayPropertyValue(key, arrayIndex) {
-    await deletePageProperty(key, arrayIndex);
-}
-
 // --- UI Rendering and Event Handling ---
 
-async function displayPageProperties(properties) {
+export async function displayPageProperties(properties) {
     try {
         const pageData = await pagesAPI.getPageById(currentPageId);
         pageContentForModal = pageData.content || '';
@@ -137,6 +120,7 @@ async function displayPageProperties(properties) {
     let hasVisibleProperties = false;
     
     Object.entries(properties).forEach(([key, instances]) => {
+        if (!Array.isArray(instances)) return;
         instances.forEach((instance, index) => {
             hasVisibleProperties = true;
             const propItem = document.createElement('div');
@@ -196,7 +180,7 @@ const propertyModalListener = async (e) => {
     }
 };
 
-function initPropertyEditor() {
+export function initPropertyEditor() {
     const list = ui.domRefs.pagePropertiesList;
     const addBtn = ui.domRefs.addPagePropertyBtn;
     if (list) {
@@ -204,7 +188,7 @@ function initPropertyEditor() {
         list.addEventListener('change', propertyModalListener, true);
         list.addEventListener('click', propertyModalListener);
         list.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && e.target.matches('.page-property-key, .page-property-value')) {
                 e.preventDefault();
                 e.target.blur();
             }
@@ -214,16 +198,3 @@ function initPropertyEditor() {
         addBtn.addEventListener('click', propertyModalListener);
     }
 }
-
-// CORRECTED: Export all necessary functions.
-export {
-    displayPageProperties,
-    addPageProperty,
-    updatePageProperty,
-    deletePageProperty,
-    renamePropertyKey,
-    renameArrayPropertyKey,
-    updateArrayPropertyValue,
-    deleteArrayPropertyValue,
-    initPropertyEditor
-};

@@ -68,6 +68,8 @@ const debouncedSearch = debounce(async (query) => {
     
     try {
         const response = await searchAPI.search(query);
+        // The search API returns the full object { results: [...], pagination: ... } inside the `data` key.
+        // The apiRequest client returns this object.
         if (response && Array.isArray(response.results)) {
             displaySearchResults(response.results);
         } else {
@@ -97,7 +99,7 @@ async function openSearchOrCreatePageModal() {
         return;
     }
     try {
-        // CORRECTED: Destructure the 'pages' array from the response object.
+        // **FIXED**: Destructure the `pages` array from the response object.
         const { pages } = await pagesAPI.getPages({ excludeJournal: true });
         allPagesForSearch = pages || [];
     } catch (error) {
