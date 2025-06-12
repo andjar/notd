@@ -265,7 +265,7 @@ if (!function_exists('_updateNoteInBatch')) {
             // Check if note is encrypted. If so, properties from content are not parsed or synced.
             $isEncrypted = false;
             // We need to check active properties here
-            $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 AND active = 1 LIMIT 1");
+            $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND colon_count = 3 AND active = 1 LIMIT 1");
             $encryptedStmt->execute([':note_id' => $noteId]);
             $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
             if ($encryptedProp && $encryptedProp['value'] === 'true') {
@@ -895,9 +895,8 @@ if ($method === 'GET') {
         $contentForSync = isset($input['content']) ? $input['content'] : $existingNote['content'];
         
         // Check if note is encrypted. If so, properties from content are not parsed or synced.
-        // This check should ideally be inside PropertyParser or a service, but for now, keeping it here.
         $isEncrypted = false;
-        $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 AND active = 1 LIMIT 1");
+        $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND colon_count = 3 AND active = 1 LIMIT 1");
         $encryptedStmt->execute([':note_id' => $noteId]);
         $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
         if ($encryptedProp && $encryptedProp['value'] === 'true') {
