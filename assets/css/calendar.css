@@ -85,14 +85,26 @@
 }
 
 .calendar-day.current-page {
-    box-shadow: var(--ls-calendar-current-page-glow, 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3));
+    box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7)); /* Enhanced glow */
     border-color: var(--ls-accent-8);
+    text-shadow: 0 0 5px var(--ls-accent-9); /* Text glow */
+    animation: pulse-glow 2s infinite alternate; /* Pulsing animation */
 }
 
 .calendar-day.today.current-page {
     background-color: var(--ls-calendar-today-bg, var(--ls-accent-10));
     color: var(--ls-calendar-today-text, #ffffff);
-    box-shadow: var(--ls-calendar-current-page-glow, 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3));
+    box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7)); /* Enhanced glow for today's current page */
+    animation: pulse-glow 2s infinite alternate; /* Pulsing animation */
+}
+
+@keyframes pulse-glow {
+    from {
+        box-shadow: var(--ls-calendar-current-page-glow, 0 0 8px 0px hsl(var(--ls-accent-10-hsl) / 0.3));
+    }
+    to {
+        box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7));
+    }
 }
 
 .arrow-btn {

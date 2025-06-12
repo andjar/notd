@@ -72,8 +72,7 @@ if (notesContainer) {
             const noteItem = e.target.closest('.note-item');
             if (noteItem) {
                 const contentDiv = e.target;
-                const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
-                contentDiv.dataset.rawContent = ui.normalizeNewlines(rawTextValue);
+                contentDiv.dataset.rawContent = ui.normalizeNewlines(ui.getRawTextWithNewlines(contentDiv));
                 debouncedSaveNote(noteItem);
             }
         }

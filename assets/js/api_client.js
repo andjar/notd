@@ -55,7 +55,7 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
 
         const data = await response.json();
 
-        if (typeof data === 'string' && data.includes('<br />')) {
+        if (data && data.status === 'error' && data.message && data.message.includes('PHP Error:')) {
             console.error('PHP Error in response:', data);
             throw new Error('Server error: PHP error in response');
         }
@@ -66,7 +66,6 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
                 errorMessage += ` Details: ${JSON.stringify(data.details)}`;
             }
             console.error('API Error (data.status === "error"):', errorMessage);
-            console.error('Full error response data:', JSON.stringify(data, null, 2));
             throw new Error(errorMessage);
         }
 
@@ -75,8 +74,7 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
             if (typeof errorMessage === 'object') {
                 errorMessage = JSON.stringify(errorMessage);
             }
-            console.error(`API Error HTTP (${response.status}):`, errorMessage);
-            console.error('Full error response data:', JSON.stringify(data, null, 2));
+            console.error('API Error (HTTP status not OK):', errorMessage);
             throw new Error(errorMessage);
         }
         
@@ -85,11 +83,7 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         return data.data;
 
     } catch (error) {
-        console.error('[apiRequest] Error details:', { endpoint, method, error: error.message, stack: error.stack });
-        if (error instanceof SyntaxError) {
-            console.error('Failed to parse API response:', error);
-            throw new Error('Invalid API response format: ' + error.message);
-        }
+        console.error('[apiRequest] Request failed:', error);
         throw error;
     }
 }

@@ -202,8 +202,8 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     
     // Optimistically update local state for siblings
     siblingUpdates.forEach(op => {
-        const note = getNoteDataById(op.id);
-        if (note) note.order_index = op.newOrderIndex;
+        const note = getNoteDataById(op.payload.id);
+        if (note) note.order_index = op.payload.order_index;
     });
 
     const optimisticDOMUpdater = () => {
