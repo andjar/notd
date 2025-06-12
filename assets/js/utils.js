@@ -151,7 +151,6 @@ function parseContentForDisplay(content) {
 // but ensure ES6 exports are primary for consistency in this project.
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        debounce, // This will now export the already ES6-exported function
         generateTempId,
         uuidv4,
         escapeHTML,
@@ -234,16 +233,4 @@ export function handleAutocloseBrackets(e) {
         editor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
     }
     return handled;
-}
-
-/**
- * Placeholder for handling shortcut expansions.
- * @param {Event} e - The keyboard event.
- * @param {HTMLElement} contentDiv - The contentEditable div.
- * @returns {Promise<boolean>} True if a shortcut was expanded, false otherwise.
- */
-export async function handleShortcutExpansion(e, contentDiv) {
-    // TODO: Implement actual shortcut expansion logic here.
-    // For now, this is a placeholder.
-    return false;
 }

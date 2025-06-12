@@ -15,7 +15,7 @@ import {
 
 import { calculateOrderIndex } from './order-index-service.js';
 import { notesAPI } from '../api_client.js';
-import { debounce, handleAutocloseBrackets, handleShortcutExpansion } from '../utils.js';
+import { debounce, handleAutocloseBrackets, insertTextAtCursor } from '../utils.js';
 import { ui } from '../ui.js';
 
 const notesContainer = document.querySelector('#notes-container');
@@ -405,4 +405,48 @@ export async function handleTaskCheckboxClick(e) {
             contentDiv.innerHTML = ui.parseAndRenderContent(currentRawContent);
         }
     }
+}
+
+/**
+ * Handles shortcut expansions (e.g., :tag: -> {tag::}).
+ * @param {Event} e - The keyboard event.
+ * @param {HTMLElement} contentDiv - The content-editable div.
+ * @returns {Promise<boolean>} True if a shortcut was handled, false otherwise.
+ */
+async function handleShortcutExpansion(e, contentDiv) {
+    if (e.key !== ' ') return false;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+    const range = selection.getRangeAt(0);
+    const cursorPos = range.startOffset;
+    const textNode = range.startContainer;
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE || cursorPos < 2) return false;
+
+    const textContent = textNode.textContent;
+    const precedingText2Chars = textContent.substring(cursorPos - 2, cursorPos);
+    let shortcutHandled = false;
+    let replacementText = '';
+    let cursorOffsetAfterReplace = 0;
+
+    if (precedingText2Chars === ':t') { replacementText = '{tag::}'; cursorOffsetAfterReplace = 6; }
+    else if (precedingText2Chars === ':d') { const today = new Date().toISOString().slice(0, 10); replacementText = `{date::${today}}`; cursorOffsetAfterReplace = replacementText.length; }
+    else if (precedingText2Chars === ':r') { const now = new Date().toISOString(); replacementText = `{timestamp::${now}}`; cursorOffsetAfterReplace = replacementText.length; }
+    else if (precedingText2Chars === ':k') { replacementText = '{keyword::}'; cursorOffsetAfterReplace = 10; }
+
+    if (replacementText) {
+        e.preventDefault();
+        insertTextAtCursor(replacementText, replacementText.length - cursorOffsetAfterReplace);
+        shortcutHandled = true;
+    }
+
+    if (shortcutHandled) {
+        const noteItemForShortcut = contentDiv.closest('.note-item');
+        if (noteItemForShortcut) {
+            const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
+            contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue);
+            debouncedSaveNote(noteItemForShortcut); // Save after shortcut expansion
+        }
+        return true;
+    }
+    return false;
 }
