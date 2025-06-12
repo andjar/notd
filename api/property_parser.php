@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config.php'; // Ensure config is loaded for APPEND_ONLY_PROPERTIES
+require_once __DIR__ . '/../config.php'; // Ensure config is loaded for PROPERTY_BEHAVIORS_BY_COLON_COUNT
 require_once 'db_connect.php';
 require_once 'response_utils.php';
 
