@@ -148,7 +148,7 @@ class DataManager {
         }
         return $page;
     }
-
+    
     /**
      * Retrieves page details by ID, optionally including notes.
      */

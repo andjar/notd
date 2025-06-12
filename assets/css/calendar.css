@@ -125,4 +125,12 @@
     stroke: var(--ls-primary-text-color);
     width: 20px; /* Adjust size as needed */
     height: 20px; /* Adjust size as needed */
-} 
+}
+
+/* Theme specific overrides for light/dark mode if necessary */
+/* Example:
+.theme-dark .calendar-day.today {
+    background-color: var(--ls-accent-8);
+    color: var(--ls-light-text-color);
+}
+*/ 
