@@ -19,13 +19,12 @@ define('WEBHOOKS_ENABLED', true); // Master switch to enable or disable all webh
 define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
 define('TASK_STATES', ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING', 'CANCELLED']); // Allowed task states for the task status parser.
 
-define('TASK_STATE_WEIGHTS', [
-    'TODO' => 4,
-    'DOING' => 4,
-    'DONE' => 4,
-    'SOMEDAY' => 4,
-    'WAITING' => 4,
-    'CANCELLED' => 4
+define('SPECIAL_STATE_WEIGHTS', [
+    'SQL' => 3,
+    'TASK' => 4,
+    'DONE_AT' => 3,
+    'TRANSCLUSION' => 3,
+    'LINK' => 3
 ]);
 
 // --- Property System Configuration ---
@@ -47,7 +46,7 @@ define('PROPERTY_WEIGHTS', [
         'label' => 'Internal',
         'description' => 'Properties for internal logic, hidden by default.',
         'update_behavior' => 'replace', // Replace the value on update.
-        'visible_in_view_mode' => true,  // Changed from false to true
+        'visible_in_view_mode' => false,  // Changed from false to true
         'visible_in_edit_mode' => true    // Frontend should SHOW this in editable views.
     ],
     // System/Log Property (e.g., {key::::value})

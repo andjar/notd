@@ -92,6 +92,7 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
 // --- Note Saving Logic ---
 async function _saveNoteToServer(noteId, rawContent) {
     if (String(noteId).startsWith('temp-')) return null;
+    if (!getNoteDataById(noteId)) return null;
     
     let contentToSave = rawContent;
     if (window.decryptionPassword) {
@@ -123,6 +124,7 @@ export async function saveNoteImmediately(noteEl) {
 export const debouncedSaveNote = debounce(async (noteEl) => {
     const noteId = noteEl.dataset.noteId;
     if (String(noteId).startsWith('temp-')) return;
+    if (!getNoteDataById(noteId)) return;
     const contentDiv = noteEl.querySelector('.note-content');
     if (!contentDiv) return;
     
