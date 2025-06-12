@@ -66,7 +66,13 @@ function updatePageTitle(pageName) {
     gearIcon.className = 'page-title-gear';
     gearIcon.title = 'Page Properties';
     domRefs.pageTitleContainer.appendChild(gearIcon);
-    if (typeof feather !== 'undefined') feather.replace();
+    if (typeof feather !== 'undefined') {
+        try {
+            feather.replace();
+        } catch (error) {
+            console.warn("Feather icons could not be rendered in page title:", error);
+        }
+    }
 }
 
 /**

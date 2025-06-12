@@ -325,17 +325,25 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
         }
         
         if (!pageData) {
+            console.log('[page-loader] Attempting to show loading message. notesContainer:', ui.domRefs.notesContainer);
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
             pageData = await _fetchPageFromNetwork(pageName);
         }
         
         await _processAndRenderPage(pageData, updateHistory, focusFirstNote);
     } catch (error) {
+        console.error('[page-loader] Error object received:', error);
         console.error(`Error loading page ${pageName}:`, error);
         setCurrentPageName(`Error: ${pageName}`);
         setCurrentPageId(null);
         ui.updatePageTitle(currentPageName);
-        if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
+        console.log('[page-loader] Attempting to display error message. notesContainer:', ui.domRefs.notesContainer);
+        try {
+            if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
+        } catch (innerError) {
+            console.error("Failed to display specific error message:", innerError);
+            if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = "<p>An error occurred while loading the page.</p>";
+        }
     } finally {
         window.blockPageLoad = false;
     }
