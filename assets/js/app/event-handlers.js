@@ -42,4 +42,14 @@ export function initGlobalEventListeners() {
             }
         }
     });
+
+    // Handle clicks on internal page links (e.g., in backlinks, child pages, page title breadcrumbs, sidebar)
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a[data-page-name]');
+        if (link) {
+            e.preventDefault();
+            const pageName = link.dataset.pageName;
+            loadPage(pageName);
+        }
+    });
 }
