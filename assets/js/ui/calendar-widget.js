@@ -1,6 +1,6 @@
 // assets/js/ui/calendar-widget.js
 
-import { apiRequest } from '../api_client.js';
+import { apiRequest, pagesAPI } from '../api_client.js';
 
 const domRefs = {}; // To store DOM references for the calendar widget
 
@@ -102,8 +102,8 @@ async function fetchCalendarData() {
     }
 
     try {
-        const response = await apiRequest('pages.php?per_page=5000');
-        calendarPagesCache = response?.data || [];
+        const response = await pagesAPI.getPages({ per_page: 5000 });
+        calendarPagesCache = response?.pages || [];
         isDataInitialized = true;
         renderCalendar(); // Render with the newly fetched data
     } catch (error) {

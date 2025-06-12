@@ -54,7 +54,11 @@ if ($method === 'GET') {
             $count_stmt->execute([$term]);
             $total = (int)$count_stmt->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, P.name as page_name, snippet(Notes_fts, 2, '<mark>', '</mark>', '...', 64) as content_snippet FROM Notes N JOIN Pages P ON N.page_id = P.id JOIN Notes_fts FTS ON N.id = FTS.rowid WHERE Notes_fts MATCH ? ORDER BY rank LIMIT ? OFFSET ?");
+            $stmt = $pdo->prepare(
+                "SELECT N.id as note_id, N.content, N.page_id, P.name as page_name, " .
+                "snippet(Notes_fts, '<mark>', '</mark>', '...', -1, 64) as content_snippet " .
+                "FROM Notes N JOIN Pages P ON N.page_id = P.id JOIN Notes_fts FTS ON N.id = FTS.rowid WHERE Notes_fts MATCH ? ORDER BY N.updated_at DESC LIMIT ? OFFSET ?"
+            );
             $stmt->execute([$term, $per_page, $offset]);
             $results = $stmt->fetchAll();
 

@@ -130,22 +130,18 @@ CREATE INDEX IF NOT EXISTS idx_webhook_events_webhook_id ON WebhookEvents(webhoo
 
 -- FTS5 Virtual Table for Full-Text Search on Notes
 -- This table is a shadow of the Notes table, indexed for fast searching.
-CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts5(
-    content,
-    content='Notes', 
-    content_rowid='id'
+CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts4(
+    content
 );
 
 -- Triggers to keep the FTS table in sync with the Notes table
 CREATE TRIGGER IF NOT EXISTS Notes_after_insert AFTER INSERT ON Notes BEGIN
   INSERT INTO Notes_fts(rowid, content) VALUES (new.id, new.content);
 END;
-
 CREATE TRIGGER IF NOT EXISTS Notes_after_delete AFTER DELETE ON Notes BEGIN
-  INSERT INTO Notes_fts(Notes_fts, rowid, content) VALUES ('delete', old.id, old.content);
+  DELETE FROM Notes_fts WHERE docid=old.id;
 END;
-
 CREATE TRIGGER IF NOT EXISTS Notes_after_update AFTER UPDATE ON Notes BEGIN
-  INSERT INTO Notes_fts(Notes_fts, rowid, content) VALUES ('delete', old.id, old.content);
+  DELETE FROM Notes_fts WHERE docid=old.id;
   INSERT INTO Notes_fts(rowid, content) VALUES (new.id, new.content);
 END;
