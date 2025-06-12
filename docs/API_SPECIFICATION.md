@@ -1,5 +1,3 @@
-Of course. Here is the complete, revised `API_SPECIFICATION.md` file with detailed examples for all endpoints, adhering to the GET/POST-only constraint. It has been updated for consistency, clarity, and completeness based on the provided PHP files.
-
 ---
 
 # API Specification (v1)
@@ -8,17 +6,17 @@ This document provides a detailed specification for the API endpoints, revised t
 
 **Key Design Principles:**
 *   **API Versioning:** All endpoints are prefixed with `/api/v1/`.
-*   **GET/POST Only:** Operations typically using PUT or DELETE are handled via POST requests, using an `_method` parameter in the request body (for form-like requests) or as a top-level key in JSON payloads.
-*   **Idempotent GETs:** GET requests are strictly for data retrieval and have no side effects.
-*   **Universal Pagination:** All list-returning endpoints support `page` and `per_page` parameters and include a consistent pagination object in the response.
+*   **GET/POST Only:** Write operations (create, update, delete) are handled via POST requests, using an `_method` override key in the JSON payload.
+*   **Content as Single Source of Truth:** Properties for notes and pages are derived directly from their respective `content` fields. The `Properties` database table serves as a queryable index of this content.
+*   **Universal Pagination:** All list-returning endpoints support `page` and `per_page` and include a consistent pagination object.
 *   **Response Standardization:**
     *   Unified success/error reporting using `status: "success"` or `status: "error"`.
     *   Successful responses wrap their payload in a `data` key.
-*   **Consistent Property Structure:** Property objects within responses are consistently structured as ` "property_name": [{"value": "...", "internal": 0/1}]`.
 
 ## Table of Contents
 
 - [General Concepts](#general-concepts)
+  - [Content-Driven Properties](#content-driven-properties)
   - [Pagination](#pagination)
   - [Error Responses](#error-responses)
 - [Endpoints](#endpoints)
@@ -29,13 +27,66 @@ This document provides a detailed specification for the API endpoints, revised t
   - [Pages (`/api/v1/pages.php`)](#pages-apiv1pagesphp)
   - [Append to Page (`/api/v1/append_to_page.php`)](#append-to-page-apiv1append_to_pagephp)
   - [Properties (`/api/v1/properties.php`)](#properties-apiv1propertiesphp)
-  - [Property Definitions (`/api/v1/property_definitions.php`)](#property-definitions-apiv1property_definitionsphp)
-  - [Query Notes (`/api/v1/query_notes.php`)](#query-notes-apiv1query_notesphp)
   - [Search (`/api/v1/search.php`)](#search-apiv1searchphp)
+  - [Query Notes (`/api/v1/query_notes.php`)](#query-notes-apiv1query_notesphp)
   - [Templates (`/api/v1/templates.php`)](#templates-apiv1templatesphp)
   - [Webhooks (`/api/v1/webhooks.php`)](#webhooks-apiv1webhooksphp)
 
+---
+
 ## General Concepts
+
+### Content-Driven Properties
+
+The `Properties` table is no longer directly managed. Instead, it is an index populated by parsing the `content` of a Note or Page. This is the new core of the system.
+
+#### Syntax
+
+Properties are defined within content using a key, a variable number of colons (`:`), and a value, optionally enclosed in curly braces `{}`. The number of colons determines the property's `weight`.
+
+*   `key::value` or `{key::value}` -> **Weight 2** (Default, public property)
+*   `key:::value` or `{key:::value}` -> **Weight 3** (Internal property)
+*   `key::::value` or `{key::::value}` -> **Weight 4** (System property, e.g., for logging)
+
+#### Configuration (`config.php`)
+
+The behavior of properties based on their weight is defined in `config.php` and interpreted by the **frontend**. The API's role is simply to parse and return the properties with their weight.
+
+**Example `config.php` structure:**
+```php
+define('PROPERTY_WEIGHTS', [
+    2 => [
+        'label' => 'Public',
+        'update_behavior' => 'replace', // 'replace' or 'append'
+        'visible_in_view_mode' => true,
+        'visible_in_edit_mode' => true
+    ],
+    3 => [
+        'label' => 'Internal',
+        'update_behavior' => 'replace',
+        'visible_in_view_mode' => false,
+        'visible_in_edit_mode' => true
+    ],
+    4 => [
+        'label' => 'System Log',
+        'update_behavior' => 'append',
+        'visible_in_view_mode' => false,
+        'visible_in_edit_mode' => false
+    ]
+]);
+```
+
+#### Backend Logic
+
+When a Note or Page is created or updated via the API:
+1.  The backend receives the new `content`.
+2.  It parses all property strings from the content.
+3.  For each parsed property, it intelligently updates the `Properties` table:
+    *   It compares the parsed properties with what's currently in the `Properties` table for that entity.
+    *   If a property's weight is configured with `update_behavior: 'replace'`, it finds and updates the existing row for that property name or inserts a new one if it doesn't exist.
+    *   If a property's weight is configured with `update_behavior: 'append'`, it **always inserts a new row**, creating a history of values.
+    *   Properties that existed in the table but are no longer in the content are deleted (unless their weight config specifies they should be preserved).
+4.  This logic ensures timestamps (`created_at`, `updated_at`) in the `Properties` table are meaningful.
 
 ### Pagination
 
@@ -51,9 +102,7 @@ The response for a paginated list will include a `pagination` object:
     "total_items": 150,
     "per_page": 20,
     "current_page": 2,
-    "total_pages": 8,
-    "has_next_page": true,
-    "has_prev_page": true
+    "total_pages": 8
 }
 ```
 
@@ -70,6 +119,8 @@ Errors are returned with an appropriate `4xx` or `5xx` status code and a consist
     }
 }
 ```
+
+---
 
 ## Endpoints
 
@@ -111,6 +162,7 @@ Retrieves details about currently active extensions.
     ```
 
 ### Attachments (`/api/v1/attachments.php`)
+
 Manages file attachments for notes.
 
 #### **`POST /api/v1/attachments.php` (Upload)**
@@ -124,12 +176,12 @@ Manages file attachments for notes.
         "status": "success",
         "data": {
             "id": 101,
-            "note_id": "42",
+            "note_id": 42,
             "name": "my-document.pdf",
             "path": "2023/10/uniqueid_my-document.pdf",
             "type": "application/pdf",
-            "created_at": "2023-10-27 10:30:00",
-            "size": null
+            "size": 123456,
+            "created_at": "2023-10-27 10:30:00"
         }
     }
     ```
@@ -173,38 +225,14 @@ Manages file attachments for notes.
         ]
     }
     ```
-*   **Example (List All, Paginated)**: `GET /api/v1/attachments.php?page=1&per_page=10`
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "data": [
-                {
-                    "id": 101,
-                    "name": "my-document.pdf",
-                    "path": "2023/10/uniqueid_my-document.pdf",
-                    "type": "application/pdf",
-                    "size": 123456,
-                    "created_at": "2023-10-27 10:30:00",
-                    "url": "http://localhost/uploads/2023/10/uniqueid_my-document.pdf"
-                }
-            ],
-            "pagination": {
-                "total_items": 1,
-                "per_page": 10,
-                "current_page": 1,
-                "total_pages": 1
-            }
-        }
-    }
-    ```
+---
 
 ### Notes (`/api/v1/notes.php`)
-Manages notes, their content, and their hierarchy.
+
+Manages notes and their content. All property modifications are now done by updating the note's `content` field.
 
 #### **`POST /api/v1/notes.php` (Batch Operations)**
-*   **Description**: Create, update, and delete multiple notes in a single atomic request. This is the primary way to modify notes.
+*   **Description**: Create, update, and delete multiple notes in a single atomic request. This is the **primary method** for all write operations on notes.
 *   **Request**: `application/json`
     ```json
     {
@@ -215,23 +243,14 @@ Manages notes, their content, and their hierarchy.
           "payload": {
             "client_temp_id": "temp-note-1",
             "page_id": 1,
-            "content": "This is the parent note."
-          }
-        },
-        {
-          "type": "create",
-          "payload": {
-            "client_temp_id": "temp-note-2",
-            "page_id": 1,
-            "content": "This is a child note.",
-            "parent_note_id": "temp-note-1"
+            "content": "This is a new task.\n{status::TODO}\n{priority::High}"
           }
         },
         {
           "type": "update",
           "payload": {
-            "id": 55,
-            "content": "Updated content for an existing note."
+            "id": 42,
+            "content": "This is an updated task.\n{status::::DONE}\n{priority::High}"
           }
         },
         {
@@ -253,19 +272,13 @@ Manages notes, their content, and their hierarchy.
                 {
                     "type": "create",
                     "status": "success",
-                    "note": { "id": 101, "content": "This is the parent note.", "...": "..." },
+                    "note": { "id": 101, "content": "This is a new task...", "properties": {"status": [...], "priority": [...]}, "...": "..." },
                     "client_temp_id": "temp-note-1"
-                },
-                {
-                    "type": "create",
-                    "status": "success",
-                    "note": { "id": 102, "parent_note_id": 101, "content": "This is a child note.", "...": "..." },
-                    "client_temp_id": "temp-note-2"
                 },
                 {
                     "type": "update",
                     "status": "success",
-                    "note": { "id": 55, "content": "Updated content for an existing note.", "...": "..." }
+                    "note": { "id": 42, "content": "This is an updated task...", "properties": {"status": [...], "priority": [...]}, "...": "..." }
                 },
                 {
                     "type": "delete",
@@ -278,90 +291,97 @@ Manages notes, their content, and their hierarchy.
     ```
 
 #### **`GET /api/v1/notes.php?id={id}`**
-*   **Description**: Retrieves a single note by its ID.
+*   **Description**: Retrieves a single note, including its properties derived from its content.
 *   **Response (200 OK)**:
     ```json
     {
         "status": "success",
         "data": {
-            "id": 1,
+            "id": 42,
             "page_id": 10,
-            "content": "This is a sample note.\n{status::TODO}",
+            "content": "This is an updated task.\n{status::::DONE}\n{priority::High}",
             "parent_note_id": null,
             "order_index": 0,
             "collapsed": 0,
-            "has_attachments": 1,
             "created_at": "2023-10-27 10:30:00",
             "updated_at": "2023-10-27 10:31:00",
-            "internal": 0,
             "properties": {
-                "status": [{"value": "TODO", "internal": 0}]
+                "status": [
+                    { "value": "TODO", "weight": 2, "created_at": "2023-10-27 10:30:00" },
+                    { "value": "DONE", "weight": 4, "created_at": "2023-10-27 10:31:00" }
+                ],
+                "priority": [
+                    { "value": "High", "weight": 2, "created_at": "2023-10-27 10:30:00" }
+                ]
             }
         }
     }
     ```
 
 #### **`GET /api/v1/notes.php?page_id={id}`**
-*   **Description**: Retrieves all notes for a specific page, ordered by their `order_index`.
+*   **Description**: Retrieves all notes for a specific page.
 *   **Response (200 OK)**:
     ```json
     {
         "status": "success",
         "data": [
             {
-                "id": 1,
-                "page_id": 10,
-                "content": "First note on the page.",
-                "properties": {},
+                "id": 42,
+                "content": "First note...",
+                "properties": { "...": "..." },
                 "...": "..."
             },
             {
-                "id": 2,
-                "page_id": 10,
-                "content": "Second note on the page.",
-                "properties": {},
+                "id": 43,
+                "content": "Second note...",
+                "properties": { "...": "..." },
                 "...": "..."
             }
         ]
     }
     ```
 
+---
+
 ### Pages (`/api/v1/pages.php`)
-Manages pages, which are containers for notes.
+
+Manages pages, which now also have a `content` field to drive their properties.
 
 #### **`POST /api/v1/pages.php` (Create)**
-*   **Description**: Creates a new page. If a page with the given name exists, it returns the existing page.
+*   **Description**: Creates a new page.
 *   **Request**: `application/json`
     ```json
     {
-        "name": "New Project Page",
-        "alias": "proj-new"
+      "name": "New Project Page",
+      "content": "{type::Project}\n{lead:::John Doe}"
     }
     ```
-*   **Response (201 Created or 200 OK)**:
+*   **Response (201 Created)**:
     ```json
     {
         "status": "success",
         "data": {
             "id": 25,
             "name": "New Project Page",
-            "alias": "proj-new",
-            "updated_at": "2023-10-27 10:35:00",
+            "content": "{type::Project}\n{lead:::John Doe}",
             "created_at": "2023-10-27 10:35:00",
-            "active": 1,
-            "properties": {}
+            "updated_at": "2023-10-27 10:35:00",
+            "properties": {
+                "type": [{"value": "Project", "weight": 2, "created_at": "2023-10-27 10:35:00"}],
+                "lead": [{"value": "John Doe", "weight": 3, "created_at": "2023-10-27 10:35:00"}]
+            }
         }
     }
     ```
 
 #### **`POST /api/v1/pages.php` (Update)**
-*   **Description**: Updates a page's name or alias.
+*   **Description**: Updates a page's name or content.
 *   **Request**: `application/json`
     ```json
     {
         "_method": "PUT",
         "id": 25,
-        "name": "Updated Project Page"
+        "content": "{type::Project}\n{lead:::Jane Doe}\n{status::Active}"
     }
     ```
 *   **Response (200 OK)**:
@@ -370,15 +390,16 @@ Manages pages, which are containers for notes.
         "status": "success",
         "data": {
             "id": 25,
-            "name": "Updated Project Page",
-            "alias": "proj-new",
-            "...": "..."
+            "name": "New Project Page",
+            "content": "{type::Project}\n{lead:::Jane Doe}\n{status::Active}",
+            "...": "...",
+            "properties": { "..." : "..." }
         }
     }
     ```
-
+    
 #### **`POST /api/v1/pages.php` (Delete)**
-*   **Description**: Deletes a page and all its associated notes and properties via database cascade.
+*   **Description**: Deletes a page and all its associated notes.
 *   **Request**: `application/json`
     ```json
     {
@@ -396,49 +417,46 @@ Manages pages, which are containers for notes.
     }
     ```
 
-#### **`GET /api/v1/pages.php?name={name}`**
-*   **Description**: Retrieves a page by its name. If the page doesn't exist, it is created and returned.
-*   **Response (200 OK or 201 Created)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "id": 26,
-            "name": "2023-10-27",
-            "alias": null,
-            "properties": {
-                "type": [{"value": "journal", "internal": 0}]
-            },
-            "...": "..."
-        }
-    }
-    ```
-
-#### **`GET /api/v1/pages.php` (List All)**
-*   **Description**: Retrieves a paginated list of all pages.
-*   **Example**: `GET /api/v1/pages.php?page=1&per_page=10&exclude_journal=1`
+#### **`GET /api/v1/pages.php?id={id}`**
+*   **Description**: Retrieves a single page by its ID.
 *   **Response (200 OK)**:
     ```json
     {
         "status": "success",
         "data": {
-            "data": [
-                {
-                    "id": 2,
-                    "name": "Project Alpha",
-                    "...": "..."
-                }
-            ],
-            "pagination": {
-                "current_page": 1,
-                "per_page": 10,
-                "total_pages": 1,
-                "total_items": 1,
-                "...": "..."
+            "id": 25,
+            "name": "New Project Page",
+            "content": "{type::Project}\n{lead:::Jane Doe}\n{status::Active}",
+            "created_at": "2023-10-27 10:35:00",
+            "updated_at": "2023-10-27 10:40:00",
+            "properties": {
+                "type": [{"value": "Project", "weight": 2, "created_at": "2023-10-27 10:35:00"}],
+                "lead": [{"value": "Jane Doe", "weight": 3, "created_at": "2023-10-27 10:40:00"}],
+                "status": [{"value": "Active", "weight": 2, "created_at": "2023-10-27 10:40:00"}]
             }
         }
     }
     ```
+
+#### **`GET /api/v1/pages.php` (List)**
+*   **Description**: Retrieves a paginated list of pages.
+*   **Response (200 OK)**:
+    ```json
+    {
+        "status": "success",
+        "data": [
+            {
+                "id": 25,
+                "name": "New Project Page",
+                "content": "...",
+                "properties": { "...": "..." }
+            }
+        ],
+        "pagination": { "total_items": 1, "...": "..." }
+    }
+    ```
+
+---
 
 ### Append to Page (`/api/v1/append_to_page.php`)
 A utility endpoint to quickly add notes to a page, creating the page if it doesn't exist.
@@ -452,11 +470,11 @@ A utility endpoint to quickly add notes to a page, creating the page if it doesn
       "notes": [
         {
           "client_temp_id": "topic-1",
-          "content": "Discussion Topic 1: Budget",
+          "content": "Discussion Topic 1: Budget {priority::High}",
           "order_index": 0
         },
         {
-          "content": "Action Item: Follow up with finance.",
+          "content": "Action Item: Follow up with finance. {status::TODO}",
           "parent_note_id": "topic-1",
           "order_index": 0
         }
@@ -472,20 +490,24 @@ A utility endpoint to quickly add notes to a page, creating the page if it doesn
             "page": {
                 "id": 27,
                 "name": "Meeting Notes 2023-10-27",
+                "content": null,
+                "properties": {},
                 "...": "..."
             },
             "appended_notes": [
                 {
                     "id": 103,
                     "page_id": 27,
-                    "content": "Discussion Topic 1: Budget",
+                    "content": "Discussion Topic 1: Budget {priority::High}",
+                    "properties": { "priority": [{"value": "High", "weight": 2, "...":"..."}] },
                     "...": "..."
                 },
                 {
                     "id": 104,
                     "page_id": 27,
                     "parent_note_id": 103,
-                    "content": "Action Item: Follow up with finance.",
+                    "content": "Action Item: Follow up with finance. {status::TODO}",
+                    "properties": { "status": [{"value": "TODO", "weight": 2, "...":"..."}] },
                     "...": "..."
                 }
             ]
@@ -493,155 +515,39 @@ A utility endpoint to quickly add notes to a page, creating the page if it doesn
     }
     ```
 
+---
+
 ### Properties (`/api/v1/properties.php`)
-Manages metadata properties for notes and pages.
 
-#### **`POST /api/v1/properties.php` (Set)**
-*   **Description**: Creates or updates a property for a given entity.
-*   **Request**: `application/json`
-    ```json
-    {
-        "entity_type": "note",
-        "entity_id": 42,
-        "name": "priority",
-        "value": "High"
-    }
-    ```
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "property": {
-                "name": "priority",
-                "value": "High",
-                "internal": 0
-            }
-        }
-    }
-    ```
-
-#### **`POST /api/v1/properties.php` (Delete)**
-*   **Description**: Deletes all values for a given property name from an entity.
-*   **Request**: `application/json`
-    ```json
-    {
-        "action": "delete",
-        "entity_type": "note",
-        "entity_id": 42,
-        "name": "priority"
-    }
-    ```
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": null
-    }
-    ```
+This endpoint is now **read-only**. It provides a way to query the `Properties` table index directly, which can be useful for advanced filtering or finding all entities with a specific property value, without needing to perform a full-text search.
 
 #### **`GET /api/v1/properties.php`**
-*   **Description**: Retrieves all properties for a given entity.
-*   **Example**: `GET /api/v1/properties.php?entity_type=note&entity_id=42&include_internal=1`
+*   **Description**: Retrieves all indexed properties for a specific entity.
+*   **Example Call**: `GET /api/v1/properties.php?entity_type=note&entity_id=42`
 *   **Response (200 OK)**:
     ```json
     {
         "status": "success",
         "data": {
-            "priority": [{"value": "High", "internal": 0}],
-            "status": [{"value": "TODO", "internal": 0}],
-            "_last_processed": [{"value": "2023-10-27 10:40:00", "internal": 1}]
-        }
-    }
-    ```
-
-### Property Definitions (`/api/v1/property_definitions.php`)
-Manages the schema and behavior of properties.
-
-#### **`POST /api/v1/property_definitions.php` (Create/Update)**
-*   **Description**: Defines or updates a property's behavior (e.g., making it internal).
-*   **Request**: `application/json`
-    ```json
-    {
-        "name": "secret_key",
-        "internal": 1,
-        "description": "A secret key for integration, should not be displayed.",
-        "auto_apply": 1
-    }
-    ```
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "message": "Property definition saved and applied to 0 existing properties"
-        }
-    }
-    ```
-
-#### **`GET /api/v1/property_definitions.php`**
-*   **Description**: Retrieves a list of all defined properties.
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": [
-            {
-                "id": 1,
-                "name": "internal",
-                "internal": 1,
-                "description": "Properties that control note/page visibility",
-                "auto_apply": 1,
-                "...": "..."
-            }
-        ]
-    }
-    ```
-
-### Query Notes (`/api/v1/query_notes.php`)
-Executes safe, predefined SQL queries to find notes.
-
-#### **`POST /api/v1/query_notes.php`**
-*   **Description**: Fetches notes that match a specific, secure SQL query pattern.
-*   **Request**: `application/json`
-    ```json
-    {
-      "sql_query": "SELECT DISTINCT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'status' AND P.value = 'TODO'",
-      "include_properties": true,
-      "page": 1,
-      "per_page": 5
-    }
-    ```
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "data": [
-                {
-                    "id": 42,
-                    "content": "This is a task that needs to be done. {status::TODO}",
-                    "properties": {
-                        "status": [{"value": "TODO", "internal": 0}]
-                    },
-                    "...": "..."
-                }
+            "status": [
+                { "id": 201, "value": "TODO", "weight": 2, "created_at": "2023-10-27 10:30:00" },
+                { "id": 205, "value": "DONE", "weight": 4, "created_at": "2023-10-27 10:31:00" }
             ],
-            "pagination": {
-                "current_page": 1,
-                "per_page": 5,
-                "total_count": 1,
-                "total_pages": 1
-            }
+            "priority": [
+                { "id": 202, "value": "High", "weight": 2, "created_at": "2023-10-27 10:30:00" }
+            ]
         }
     }
     ```
+
+---
 
 ### Search (`/api/v1/search.php`)
-Provides full-text, backlink, and task search capabilities.
+
+Provides powerful search capabilities. This is unchanged as it already queries the `Notes` content and `Properties` index.
 
 #### **`GET /api/v1/search.php?q={term}`**
-*   **Description**: Performs a full-text search across note content and page names.
+*   **Description**: Performs a full-text search across note/page content.
 *   **Response (200 OK)**:
     ```json
     {
@@ -653,7 +559,8 @@ Provides full-text, backlink, and task search capabilities.
                     "content": "The full content of the note mentioning the search term.",
                     "page_id": 10,
                     "page_name": "Project Alpha",
-                    "content_snippet": "... with the search <mark>term</mark> highlighted ..."
+                    "content_snippet": "... with the search <mark>term</mark> highlighted ...",
+                    "properties": { "...": "..." }
                 }
             ],
             "pagination": { "total": 1, "page": 1, "per_page": 20, "total_pages": 1 }
@@ -661,55 +568,42 @@ Provides full-text, backlink, and task search capabilities.
     }
     ```
 
-#### **`GET /api/v1/search.php?backlinks_for_page_name={name}`**
-*   **Description**: Finds all notes that link to the specified page name.
+---
+
+### Query Notes (`/api/v1/query_notes.php`)
+
+Executes safe, predefined SQL queries against the indexed `Properties` table to find notes. This becomes even more powerful for historical queries.
+
+#### **`POST /api/v1/query_notes.php`**
+*   **Description**: Fetches notes that match a specific, secure SQL query pattern.
+*   **Request**: `application/json`
+    ```json
+    {
+      "sql_query": "SELECT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'status' AND P.value = 'DONE' AND P.created_at > '2023-10-27'",
+      "page": 1,
+      "per_page": 10
+    }
+    ```
 *   **Response (200 OK)**:
     ```json
     {
         "status": "success",
-        "data": {
-            "results": [
-                {
-                    "note_id": 15,
-                    "content": "See details in [[Project Alpha]] for more info.",
-                    "page_id": 12,
-                    "source_page_name": "Meeting Summary",
-                    "content_snippet": "See details in <mark>[[Project Alpha]]</mark> for more info."
-                }
-            ],
-            "pagination": { "total": 1, "page": 1, "per_page": 20, "total_pages": 1 }
-        }
+        "data": [
+            {
+                "id": 42,
+                "content": "This is an updated task.\n{status::::DONE}\n{priority::High}",
+                "properties": { "...": "..." },
+                "...": "..."
+            }
+        ],
+        "pagination": { "current_page": 1, "...": "..." }
     }
     ```
 
-#### **`GET /api/v1/search.php?tasks={status}`**
-*   **Description**: Finds all notes with a task status of `todo` or `done`.
-*   **Example**: `GET /api/v1/search.php?tasks=todo`
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "results": [
-                {
-                    "note_id": 42,
-                    "content": "TODO Finalize the report",
-                    "page_id": 10,
-                    "page_name": "Project Alpha",
-                    "property_name": "status",
-                    "property_value": "TODO",
-                    "content_snippet": "<mark>TODO</mark> Finalize the report",
-                    "properties": {
-                        "status": [{"value": "TODO", "internal": 0}]
-                    }
-                }
-            ],
-            "pagination": { "total": 1, "page": 1, "per_page": 20, "total_pages": 1 }
-        }
-    }
-    ```
+---
 
 ### Templates (`/api/v1/templates.php`)
+
 Manages reusable templates for creating notes and pages.
 
 #### **`POST /api/v1/templates.php` (Create)**
@@ -717,6 +611,7 @@ Manages reusable templates for creating notes and pages.
 *   **Request**: `application/json`
     ```json
     {
+        "_method": "POST",
         "type": "note",
         "name": "daily-review",
         "content": "## Daily Review\n\n### What went well?\n\n- \n\n### What could be improved?\n\n- "
@@ -747,8 +642,10 @@ Manages reusable templates for creating notes and pages.
     }
     ```
 
+---
+
 ### Webhooks (`/api/v1/webhooks.php`)
-Manages webhook subscriptions for event notifications. To maintain consistency, all modification actions are done via `POST` with a URL query parameter `action`.
+Manages webhook subscriptions for event notifications.
 
 #### **`POST /api/v1/webhooks.php` (Create)**
 *   **Description**: Registers a new webhook.
@@ -813,7 +710,7 @@ Manages webhook subscriptions for event notifications. To maintain consistency, 
     }
     ```
 
-#### **`GET /api/v1/webhooks.php`**
+#### **`GET /api/v1/webhooks.php` (List)**
 *   **Description**: Lists all configured webhooks.
 *   **Response (200 OK)**:
     ```json
