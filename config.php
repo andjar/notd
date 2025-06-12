@@ -19,6 +19,15 @@ define('WEBHOOKS_ENABLED', true); // Master switch to enable or disable all webh
 define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
 define('TASK_STATES', ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING', 'CANCELLED']); // Allowed task states for the task status parser.
 
+define('TASK_STATE_WEIGHTS', [
+    'TODO' => 4,
+    'DOING' => 4,
+    'DONE' => 4,
+    'SOMEDAY' => 4,
+    'WAITING' => 4,
+    'CANCELLED' => 4
+]);
+
 // --- Property System Configuration ---
 // This array defines the behavior of properties based on their 'weight', which
 // is determined by the number of colons used in the property syntax.

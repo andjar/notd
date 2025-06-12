@@ -3,10 +3,10 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../data_manager.php';
-require_once __DIR__ . '/../property_parser.php';
+require_once __DIR__ . '/../pattern_processor.php';
 require_once __DIR__ . '/../validator_utils.php';
-require_once __DIR__ . '/../property_auto_internal.php';
-require_once __DIR__ . '/properties.php'; // For _updateOrAddPropertyAndDispatchTriggers
+require_once __DIR__ . '/../property_auto_internal.php'; // Still needed for determinePropertyInternalStatus for response
+// require_once __DIR__ . '/properties.php'; // _updateOrAddPropertyAndDispatchTriggers is removed
 
 // New "Smart Property Indexer"
 // This function is the single source of truth for processing properties from content.
@@ -21,41 +21,62 @@ if (!function_exists('_indexPropertiesFromContent')) {
             }
         }
 
-        // 1. Clear existing 'replaceable' properties.
-        $deleteSql = "DELETE FROM Properties WHERE {$entityType}_id = ? AND weight < 4";
-        $stmtDelete = $pdo->prepare($deleteSql);
-        $stmtDelete->execute([$entityId]);
+        // Instantiate the pattern processor
+        $patternProcessor = getPatternProcessor();
 
-        // 2. Parse new properties from content.
-        $propertyParser = new PropertyParser($pdo);
-        $parsedProperties = $propertyParser->parsePropertiesFromContent($content);
+        // Process the content to extract properties
+        // Pass $pdo in context for handlers that might need it directly.
+        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
+        $parsedProperties = $processedData['properties']; // These are the properties extracted by handlers
 
-        // 3. Save all parsed properties and check for the 'internal' flag.
-        $finalPropertiesForResponse = [];
-        $hasInternalTrue = false;
-
-        foreach ($parsedProperties as $prop) {
-            $name = $prop['name'];
-            $value = (string)$prop['value'];
-            $isInternal = determinePropertyInternalStatus($name, $value);
-
-            _updateOrAddPropertyAndDispatchTriggers($pdo, $entityType, $entityId, $name, $value, $isInternal, false);
-
-            if (strtolower($name) === 'internal' && strtolower($value) === 'true') {
-                $hasInternalTrue = true;
-            }
-
-            if (!isset($finalPropertiesForResponse[$name])) $finalPropertiesForResponse[$name] = [];
-            $finalPropertiesForResponse[$name][] = ['value' => $value, 'internal' => (int)$isInternal];
+        // Save all extracted/generated properties using the processor's save method.
+        // This method handles deleting old 'replaceable' properties and inserting/updating new ones,
+        // as well as dispatching property triggers.
+        if (!empty($parsedProperties)) {
+            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
+        } else {
+            // If no properties are parsed, PatternProcessor.saveProperties should ideally handle
+            // clearing any existing replaceable properties.
+            // For now, we rely on its implementation.
         }
-
-        // 4. Update the note's 'internal' flag.
+        
+        // Logic to update the Notes.internal flag (if $entityType === 'note')
+        $hasInternalTrue = false;
         if ($entityType === 'note') {
-             try {
+            if (!empty($parsedProperties)) {
+                foreach ($parsedProperties as $prop) {
+                    // Note: 'internal' status for the flag comes from the name/value,
+                    // not necessarily prop['internal'] which is about DB storage visibility.
+                    if (isset($prop['name']) && strtolower($prop['name']) === 'internal' &&
+                        isset($prop['value']) && strtolower((string)$prop['value']) === 'true') {
+                        $hasInternalTrue = true;
+                        break;
+                    }
+                }
+            }
+            try {
                 $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
                 $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
             } catch (PDOException $e) {
-                error_log("Could not update Notes.internal flag in append_to_page.php. Error: " . $e->getMessage());
+                error_log("Could not update Notes.internal flag in append_to_page.php for note {$entityId}. Error: " . $e->getMessage());
+            }
+        }
+
+        // Adapt the return value for the API response
+        $finalPropertiesForResponse = [];
+        if (!empty($parsedProperties)) {
+            foreach ($parsedProperties as $prop) {
+                $name = $prop['name'];
+                $value = (string)($prop['value'] ?? ''); // Ensure value is a string
+
+                // Determine internal status for response using the existing utility function.
+                // This is for the client's information, distinct from how 'internal' property for the flag is checked.
+                $isInternalForResponse = determinePropertyInternalStatus($name, $value);
+
+                if (!isset($finalPropertiesForResponse[$name])) {
+                    $finalPropertiesForResponse[$name] = [];
+                }
+                $finalPropertiesForResponse[$name][] = ['value' => $value, 'internal' => (int)$isInternalForResponse];
             }
         }
         

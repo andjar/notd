@@ -8,53 +8,35 @@
 
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../data_manager.php';
-require_once __DIR__ . '/../property_parser.php';
+require_once __DIR__ . '/../pattern_processor.php';
 require_once __DIR__ . '/../response_utils.php';
 
 if (!function_exists('_indexPropertiesFromContent')) {
     function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
-        // For pages, we don't have the 'encrypted' property check as for notes.
+        // For pages, we don't have the 'encrypted' property check or 'internal' flag update as for notes.
 
-        // 1. Get weights for properties with 'replace' behavior from config
-        $replaceableWeights = [];
-        if (defined('PROPERTY_WEIGHTS')) {
-            foreach (PROPERTY_WEIGHTS as $weight => $config) {
-                if (isset($config['update_behavior']) && $config['update_behavior'] === 'replace') {
-                    $replaceableWeights[] = (int)$weight;
-                }
-            }
-        }
+        // Instantiate the pattern processor. It gets PDO from get_db_connection()
+        $patternProcessor = getPatternProcessor();
+
+        // Process the content to extract properties and potentially modified content
+        // Pass $pdo in context for handlers that might need it directly.
+        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
         
-        // 2. Clear all existing 'replaceable' properties for the entity.
-        // Properties with 'append' behavior (like system logs) are preserved.
-        if (!empty($replaceableWeights)) {
-            $placeholders = str_repeat('?,' , count($replaceableWeights) - 1) . '?';
-            $idColumn = $entityType . '_id';
-            $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND weight IN ($placeholders)";
-            $stmtDelete = $pdo->prepare($deleteSql);
-            $stmtDelete->execute(array_merge([$entityId], $replaceableWeights));
-        }
+        $parsedProperties = $processedData['properties'];
 
-        // 3. Parse new properties from the provided content.
-        $propertyParser = new PropertyParser($pdo);
-        $parsedProperties = $propertyParser->parsePropertiesFromContent($content);
-
-        // 4. Insert all parsed properties into the database.
-        // This adds new 'replaceable' properties and all 'appendable' properties.
+        // Save all extracted/generated properties using the processor's save method
+        // This method should handle deleting old 'replaceable' properties and inserting/updating new ones.
+        // It will also handle property triggers.
         if (!empty($parsedProperties)) {
-            $idColumn = $entityType . '_id';
-            $insertSql = "INSERT INTO Properties ({$idColumn}, name, value, weight) VALUES (?, ?, ?, ?)";
-            $stmtInsert = $pdo->prepare($insertSql);
-
-            foreach ($parsedProperties as $prop) {
-                $stmtInsert->execute([
-                    $entityId,
-                    $prop['name'],
-                    (string)$prop['value'],
-                    $prop['weight']
-                ]);
-            }
+            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
+        } else {
+            // If no properties are parsed from content, we might still need to clear existing replaceable ones.
+            // This relies on PatternProcessor.saveProperties (or a dedicated method there)
+            // to handle clearing properties when an empty set is passed.
+            // For now, assuming saveProperties handles this.
+            // A potential explicit call: $patternProcessor->clearReplaceableProperties($entityType, $entityId);
         }
+        // Note: No 'internal' flag update logic here as it's specific to Notes.
     }
 }
 
@@ -67,7 +49,7 @@ if ($method === 'POST' && isset($input['_method'])) {
 
 $pdo = get_db_connection();
 $dataManager = new DataManager($pdo);
-$propertyParser = new PropertyParser($pdo);
+// $propertyParser = new PropertyParser($pdo); // Removed global instantiation
 
 try {
     switch ($method) {

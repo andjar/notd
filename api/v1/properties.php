@@ -1,8 +1,8 @@
 <?php
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
-// The 'Writer' logic is now handled by PropertyParser and called from note/page update endpoints.
-// require_once __DIR__ . '/../property_parser.php'; 
+// The 'Writer' logic is now handled by PatternProcessor and called from note/page update endpoints.
+// (property_parser.php was removed)
 require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../validator_utils.php';

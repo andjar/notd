@@ -1,7 +1,6 @@
 <?php
 // Unified Pattern Processing System
 require_once 'db_connect.php';
-// require_once 'property_triggers.php'; // Old trigger system replaced
 require_once 'property_trigger_service.php'; // New trigger service
 
 /**
@@ -127,7 +126,7 @@ class PatternProcessor {
      */
     private function registerDefaultHandlers() {
         // Property patterns: {key::value}
-        $this->registerHandler('properties', '/\{([^:}]+)::([^}]+)\}/', 
+        $this->registerHandler('properties', '/\{([a-zA-Z0-9_\.-]+)(:{2,})([^}]+)\}/m', 
             [$this, 'handleProperties'], 
             ['priority' => 10]
         );
@@ -173,32 +172,41 @@ class PatternProcessor {
      * Handler for property patterns {key::value}
      */
     public function handleProperties($matches, $content, $entityType, $entityId, $context, $pdo) {
-        error_log("[PATTERN_PROCESSOR_DEBUG] Processing property matches: " . json_encode($matches));
+        error_log("[PATTERN_PROCESSOR_DEBUG] Processing property matches with new regex: " . json_encode($matches));
         
-        // Use an associative array to only keep the last value for each property name
+        // Use an associative array to only keep the last value (and its weight) for each property name
         $propertiesByName = [];
         
         foreach ($matches as $match) {
+            // $match[0] is the full matched string e.g. "{key::value}" or "{key:::value}"
+            // $match[1] is the key
+            // $match[2] is the colons (e.g., "::", ":::")
+            // $match[3] is the value
+            
             $propertyName = trim($match[1]);
-            $propertyValue = trim($match[2]);
+            $colons = $match[2];
+            $propertyValue = trim($match[3]);
+            $weight = strlen($colons);
             
-            error_log("[PATTERN_PROCESSOR_DEBUG] Processing property: {$propertyName}::{$propertyValue}");
+            error_log("[PATTERN_PROCESSOR_DEBUG] Processing property: {$propertyName}, Colons: {$colons}, Value: {$propertyValue}, Weight: {$weight}");
             
-            if (!empty($propertyName) && !empty($propertyValue)) {
+            // It's possible $propertyName or $propertyValue could be empty if regex allows, though current one requires them.
+            if (!empty($propertyName)) { // Value can be empty
                 // Store in associative array - later values will overwrite earlier ones
                 $propertiesByName[$propertyName] = [
                     'name' => $propertyName,
                     'value' => $propertyValue,
-                    'type' => 'property',
+                    'weight' => $weight, // Store the calculated weight
+                    'type' => 'property', // Retain type if useful, or simplify
                     'raw_match' => $match[0]
                 ];
                 error_log("[PATTERN_PROCESSOR_DEBUG] Stored property: " . json_encode($propertiesByName[$propertyName]));
             } else {
-                error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty property name or value");
+                error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty property name.");
             }
         }
         
-        // Convert back to indexed array
+        // Convert back to indexed array for the return structure
         $result = ['properties' => array_values($propertiesByName)];
         error_log("[PATTERN_PROCESSOR_DEBUG] Returning properties: " . json_encode($result));
         return $result;
@@ -240,22 +248,22 @@ class PatternProcessor {
      * - NLR: No longer required task
      */
     public function handleTaskStatus($matches, $content, $entityType, $entityId, $context, $pdo) {
+        require_once __DIR__ . '/../config.php'; // Ensure config is loaded for TASK_STATE_WEIGHTS
         $properties = [];
         $allTaskMetadata = []; // Accumulate metadata for all tasks
         
         foreach ($matches as $match) {
             $status = $match[1]; // TODO, DONE, CANCELLED, DOING, SOMEDAY, WAITING, NLR
             $taskContent = trim($match[2]);
-            
-            // Save status as an internal property
+            $weight = defined('TASK_STATE_WEIGHTS') && isset(TASK_STATE_WEIGHTS[$status]) ? TASK_STATE_WEIGHTS[$status] : 3;
+            // Save status as a property with weight
             $properties[] = [
                 'name' => 'status',
                 'value' => $status,
                 'type' => 'task_status',
                 'raw_match' => $match[0],
-                'internal' => 1 // Mark as internal property
+                'weight' => $weight
             ];
-            
             // Add done_at timestamp for DONE tasks
             if ($status === 'DONE') {
                 $properties[] = [
@@ -263,10 +271,9 @@ class PatternProcessor {
                     'value' => date('Y-m-d H:i:s'),
                     'type' => 'timestamp',
                     'raw_match' => $match[0],
-                    'internal' => 1 // Mark as internal property
+                    'weight' => $weight
                 ];
             }
-            
             // Store metadata for each task
             $allTaskMetadata[] = [
                 'status' => $status,
@@ -275,7 +282,6 @@ class PatternProcessor {
                 'done_at' => ($status === 'DONE' ? date('Y-m-d H:i:s') : null)
             ];
         }
-        
         return [
             'properties' => $properties,
             'metadata' => ['tasks' => $allTaskMetadata]
@@ -341,7 +347,6 @@ class PatternProcessor {
      */
     public function saveProperties($properties, $entityType, $entityId) {
         error_log("[PATTERN_PROCESSOR_DEBUG] Saving properties for {$entityType} {$entityId}: " . json_encode($properties));
-        
         // Group properties by name for efficient processing
         $propertiesByName = [];
         foreach ($properties as $property) {
@@ -351,53 +356,38 @@ class PatternProcessor {
             }
             $propertiesByName[$name][] = $property;
         }
-        
         error_log("[PATTERN_PROCESSOR_DEBUG] Grouped properties: " . json_encode($propertiesByName));
-        
         // Process each property group
         foreach ($propertiesByName as $name => $propertyGroup) {
             try {
-                // Determine internal status once per property name
-                $internal = isset($propertyGroup[0]['internal']) ? $propertyGroup[0]['internal'] : 0;
-                error_log("[PATTERN_PROCESSOR_DEBUG] Processing property group '{$name}' with internal={$internal}");
-                
+                // Determine weight once per property name
+                $weight = isset($propertyGroup[0]['weight']) ? $propertyGroup[0]['weight'] : 3;
+                error_log("[PATTERN_PROCESSOR_DEBUG] Processing property group '{$name}' with weight={$weight}");
                 // For status properties, we want to keep history, so use INSERT
                 // For done_at and other properties, use REPLACE to handle both insert and update
                 $isStatusProperty = ($name === 'status');
                 $isDoneAtProperty = ($name === 'done_at');
-                
                 // Set the appropriate ID column based on entity type
                 $idColumn = ($entityType === 'note') ? 'note_id' : 'page_id';
                 $otherIdColumn = ($entityType === 'note') ? 'page_id' : 'note_id';
-                
                 if ($isStatusProperty) {
-                    $sql = "
-                        INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, internal)
-                        VALUES (?, NULL, ?, ?, ?)
-                    ";
+                    $sql = "\n                        INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight)\n                        VALUES (?, NULL, ?, ?, ?)\n                    ";
                 } else {
                     // For 'done_at' and other non-status properties, use REPLACE INTO.
                     // This handles both insert and update, making the explicit delete for 'done_at' unnecessary.
-                    $sql = "
-                        REPLACE INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, internal)
-                        VALUES (?, NULL, ?, ?, ?)
-                    ";
+                    $sql = "\n                        REPLACE INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight)\n                        VALUES (?, NULL, ?, ?, ?)\n                    ";
                 }
-                
                 error_log("[PATTERN_PROCESSOR_DEBUG] Using SQL for property '{$name}': " . trim($sql));
                 $stmt = $this->pdo->prepare($sql);
-                
                 foreach ($propertyGroup as $property) {
                     $params = [
                         $entityId,
                         $property['name'],
                         $property['value'],
-                        $internal
+                        $weight
                     ];
-                    
                     error_log("[PATTERN_PROCESSOR_DEBUG] Executing with params: " . json_encode($params));
                     $stmt->execute($params);
-                    
                     // Dispatch triggers only once per property name
                     if ($property === reset($propertyGroup)) {
                         error_log("[PATTERN_PROCESSOR_DEBUG] Dispatching trigger for {$name}");
@@ -405,7 +395,6 @@ class PatternProcessor {
                         $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
                     }
                 }
-                
             } catch (Exception $e) {
                 error_log("[PATTERN_PROCESSOR_ERROR] Error saving property group '$name' for $entityType $entityId: " . $e->getMessage());
                 error_log("[PATTERN_PROCESSOR_ERROR] Stack trace: " . $e->getTraceAsString());

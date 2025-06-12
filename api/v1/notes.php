@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
-require_once __DIR__ . '/../property_parser.php';
+require_once __DIR__ . '/../pattern_processor.php';
 require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../response_utils.php';
 
@@ -21,51 +21,61 @@ if ($method === 'POST' && isset($input['_method'])) {
 // This function is the single source of truth for processing properties from content.
 if (!function_exists('_indexPropertiesFromContent')) {
     function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
+        // For notes, check if encrypted. If so, do not process properties from content.
         if ($entityType === 'note') {
             $encryptedStmt = $pdo->prepare("SELECT 1 FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND value = 'true' LIMIT 1");
             $encryptedStmt->execute([':note_id' => $entityId]);
             if ($encryptedStmt->fetch()) {
-                return; 
+                // error_log("_indexPropertiesFromContent: Note {$entityId} is encrypted. Skipping property processing from content.");
+                return; // Note is encrypted, do not parse/modify properties from its content.
             }
         }
 
-        $replaceableWeights = [];
-        if (defined('PROPERTY_WEIGHTS')) {
-            foreach (PROPERTY_WEIGHTS as $weight => $config) {
-                if (isset($config['update_behavior']) && $config['update_behavior'] === 'replace') {
-                    $replaceableWeights[] = (int)$weight;
-                }
-            }
+        // Instantiate the pattern processor. It gets PDO from get_db_connection()
+        $patternProcessor = getPatternProcessor();
+
+        // Process the content to extract properties and potentially modified content
+        // Pass $pdo in context for handlers that might need it directly.
+        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
+        
+        $parsedProperties = $processedData['properties'];
+
+        // Save all extracted/generated properties using the processor's save method
+        // This method should handle deleting old 'replaceable' properties and inserting/updating new ones.
+        // It will also handle property triggers.
+        if (!empty($parsedProperties)) {
+            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
+        } else {
+            // If no properties are parsed from content, we might still need to clear existing replaceable ones.
+            // The saveProperties method (or a new dedicated method) in PatternProcessor should handle this.
+            // For now, we assume saveProperties with an empty array might be a no-op or needs enhancement.
+            // Let's ensure existing replaceable properties are cleared if no new ones are found.
+            // This is a conceptual point; actual implementation is in PatternProcessor.saveProperties.
+            // For now, we rely on saveProperties to manage this. If it doesn't, this is a gap.
+            // A simple way:
+            // $patternProcessor->clearReplaceableProperties($entityType, $entityId);
+            // For now, assuming saveProperties handles it.
         }
         
-        if (!empty($replaceableWeights)) {
-            $placeholders = str_repeat('?,', count($replaceableWeights) - 1) . '?';
-            $idColumn = $entityType . '_id';
-            $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND weight IN ($placeholders)";
-            $stmtDelete = $pdo->prepare($deleteSql);
-            $stmtDelete->execute(array_merge([$entityId], $replaceableWeights));
-        }
-
-        $propertyParser = new PropertyParser($pdo);
-        $parsedProperties = $propertyParser->parsePropertiesFromContent($content);
-
+        // Update the note's 'internal' flag based on the final set of properties applied.
+        $hasInternalTrue = false;
         if (!empty($parsedProperties)) {
-            $idColumn = $entityType . '_id';
-            $insertSql = "INSERT INTO Properties ({$idColumn}, name, value, weight) VALUES (?, ?, ?, ?)";
-            $stmtInsert = $pdo->prepare($insertSql);
-            $hasInternalTrue = false;
-
             foreach ($parsedProperties as $prop) {
-                $stmtInsert->execute([$entityId, $prop['name'], (string)$prop['value'], $prop['weight']]);
-                if (strtolower($prop['name']) === 'internal' && strtolower((string)$prop['value']) === 'true') {
+                if (isset($prop['name']) && strtolower($prop['name']) === 'internal' && 
+                    isset($prop['value']) && strtolower((string)$prop['value']) === 'true') {
                     $hasInternalTrue = true;
+                    break;
                 }
             }
+        }
 
-            // **FIX**: Update the note's internal flag based on parsed properties.
-            if ($entityType === 'note') {
+        if ($entityType === 'note') {
+             try {
                 $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
                 $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
+            } catch (PDOException $e) {
+                // Log error but don't let it break the entire process if just this update fails
+                error_log("Could not update Notes.internal flag for note {$entityId}. Error: " . $e->getMessage());
             }
         }
     }

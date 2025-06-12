@@ -1,56 +1,14 @@
 <?php
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db/setup_db.php';
-
-// Helper for creating a NOTE and its properties during setup
-if (!function_exists('_create_note_and_index_properties')) {
-    function _create_note_and_index_properties(PDO $pdo, int $page_id, string $content, int $order_index) {
-        require_once __DIR__ . '/property_parser.php';
-        $stmt_insert_note = $pdo->prepare("INSERT INTO Notes (page_id, content, order_index) VALUES (?, ?, ?)");
-        $stmt_insert_note->execute([$page_id, $content, $order_index]);
-        $noteId = $pdo->lastInsertId();
-        if (!$noteId) throw new Exception("Failed to create note record for welcome note.");
-        $propertyParser = new PropertyParser($pdo);
-        $parsedProperties = $propertyParser->parsePropertiesFromContent($content);
-        if (!empty($parsedProperties)) {
-            $stmt_insert_prop = $pdo->prepare("INSERT INTO Properties (note_id, name, value, weight) VALUES (?, ?, ?, ?)");
-            foreach ($parsedProperties as $prop) {
-                $stmt_insert_prop->execute([$noteId, $prop['name'], (string)$prop['value'], $prop['weight']]);
-            }
-        }
-    }
-}
-
-// --- NEW HELPER ---
-// Helper for creating a PAGE and its properties during setup
-if (!function_exists('_create_page_and_index_properties')) {
-    function _create_page_and_index_properties(PDO $pdo, string $name, ?string $content = null) {
-        require_once __DIR__ . '/property_parser.php';
-        $stmt_create_page = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (?, ?)");
-        $stmt_create_page->execute([$name, $content]);
-        $pageId = $pdo->lastInsertId();
-        if (!$pageId) throw new Exception("Failed to create page record for '$name'.");
-
-        if ($content) {
-            $propertyParser = new PropertyParser($pdo);
-            $parsedProperties = $propertyParser->parsePropertiesFromContent($content);
-            if (!empty($parsedProperties)) {
-                $stmt_insert_prop = $pdo->prepare("INSERT INTO Properties (page_id, name, value, weight) VALUES (?, ?, ?, ?)");
-                foreach ($parsedProperties as $prop) {
-                    $stmt_insert_prop->execute([$pageId, $prop['name'], (string)$prop['value'], $prop['weight']]);
-                }
-            }
-        }
-        return $pageId;
-    }
-}
-
-
 if (!function_exists('log_db_error')) {
     function log_db_error($message, $context = []) {
         error_log(date('Y-m-d H:i:s') . " [DB] " . $message . " " . json_encode($context));
     }
 }
+
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../db/setup_db.php';
+require_once __DIR__ . '/db_helpers.php'; // Moved helpers to separate file
+require_once __DIR__ . '/pattern_processor.php'; // Added PatternProcessor include
 
 function get_db_connection() {
     static $pdo = null;
