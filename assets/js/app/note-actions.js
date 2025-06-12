@@ -11,6 +11,7 @@ import {
     updateNoteInCurrentPage,
     removeNoteFromCurrentPageById,
     setNotesForCurrentPage,
+    getCurrentPagePassword,
 } from './state.js';
 
 import { calculateOrderIndex } from './order-index-service.js';
@@ -89,21 +90,49 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
     return success;
 }
 
+/**
+ * A centralized handler for various note-related actions.
+ * @param {string} action - The action to perform (e.g., 'create', 'focus').
+ * @param {string|null} noteId - The ID of the note to act upon.
+ */
+export async function handleNoteAction(action, noteId) {
+    switch (action) {
+        case 'create':
+            await handleAddRootNote();
+            break;
+        case 'focus':
+            if (noteId) {
+                const noteElement = getNoteElementById(noteId);
+                const contentDiv = noteElement?.querySelector('.note-content');
+                if (contentDiv) {
+                    ui.switchToEditMode(contentDiv);
+                }
+            }
+            break;
+        default:
+            console.warn(`Unknown note action: ${action}`);
+    }
+}
+
 // --- Note Saving Logic ---
 async function _saveNoteToServer(noteId, rawContent) {
     if (String(noteId).startsWith('temp-')) return null;
     if (!getNoteDataById(noteId)) return null;
     
+    const password = getCurrentPagePassword();
     let contentToSave = rawContent;
-    if (window.decryptionPassword) {
-        contentToSave = encrypt(rawContent, window.decryptionPassword);
+    let isEncrypted = false;
+    if (password) {
+        // **FIX**: Corrected argument order for encrypt function. It's (password, plaintext).
+        contentToSave = encrypt(password, rawContent);
+        isEncrypted = true;
     }
     
     const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
 
     const operations = [{
         type: 'update',
-        payload: { id: noteId, content: contentToSave }
+        payload: { id: noteId, content: contentToSave, is_encrypted: isEncrypted }
     }];
 
     const success = await executeBatchOperations(originalNotesState, operations, null, "Save Note Content");
@@ -144,7 +173,16 @@ export async function handleAddRootNote() {
     const optimisticNewNote = { id: clientTempId, page_id: currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
     addNoteToCurrentPage(optimisticNewNote);
     
-    const operations = [{ type: 'create', payload: { page_id: currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const password = getCurrentPagePassword();
+    let contentForServer = '';
+    let isEncrypted = false;
+    if (password) {
+        // **FIX**: Corrected argument order for encrypt function.
+        contentForServer = encrypt(password, '');
+        isEncrypted = true;
+    }
+
+    const operations = [{ type: 'create', payload: { page_id: currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     siblingUpdates.forEach(upd => {
@@ -177,8 +215,17 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     
     const optimisticNewNote = { id: clientTempId, page_id: currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
     addNoteToCurrentPage(optimisticNewNote);
+
+    const password = getCurrentPagePassword();
+    let contentForServer = '';
+    let isEncrypted = false;
+    if (password) {
+        // **FIX**: Corrected argument order for encrypt function.
+        contentForServer = encrypt(password, '');
+        isEncrypted = true;
+    }
     
-    const operations = [{ type: 'create', payload: { page_id: currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const operations = [{ type: 'create', payload: { page_id: currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     siblingUpdates.forEach(op => {

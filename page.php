@@ -165,14 +165,42 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     </div>
 
     <!-- Password Modal for Encrypted Pages -->
-    <div id="password-modal" class="modal-container" style="display: none;">
+    <div id="password-modal" class="generic-modal">
         <div class="modal-content">
-            <h3>Encrypted Page</h3>
+            <div class="generic-modal-header">
+                <h2 class="generic-modal-title">Encrypted Page</h2>
+                <button id="password-modal-close" class="modal-close-x" aria-label="Close">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
             <p>This page is encrypted. Please enter the password to view it.</p>
-            <input type="password" id="password-input" placeholder="Password">
-            <div class="modal-actions">
-                <button id="password-submit">Decrypt</button>
-                <button id="password-cancel">Cancel</button>
+            <input type="password" id="password-input" placeholder="Password" class="full-width-input">
+            <div class="generic-modal-actions">
+                <button id="password-submit" class="button">Decrypt</button>
+                <button id="password-cancel" class="button button-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Encryption Password Modal -->
+    <div id="encryption-password-modal" class="generic-modal">
+        <div class="modal-content">
+            <div class="generic-modal-header">
+                <h2 class="generic-modal-title">Set Encryption Password</h2>
+                <button id="encryption-modal-close" class="modal-close-x" aria-label="Close">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Enter a password to encrypt this page:</p>
+                <input type="password" id="new-encryption-password" class="generic-modal-input-field" placeholder="New Password">
+                <p>Confirm your password:</p>
+                <input type="password" id="confirm-encryption-password" class="generic-modal-input-field" placeholder="Confirm Password">
+                <p id="encryption-password-error" class="error-message" style="display: none;"></p>
+            </div>
+            <div class="generic-modal-actions">
+                <button id="confirm-encryption-btn" class="button primary-button">Encrypt</button>
+                <button id="cancel-encryption-btn" class="button secondary-button">Cancel</button>
             </div>
         </div>
     </div>
@@ -182,13 +210,18 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         <div class="modal-content">
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
-                <button id="page-properties-modal-close" class="modal-close-x" aria-label="Close">
-                    <i data-feather="x"></i>
-                </button>
+                <div class="modal-header-icons">
+                    <button id="page-properties-modal-close" class="modal-close-x" aria-label="Close">
+                        <i data-feather="x"></i>
+                    </button>
+                </div>
             </div>
             <div id="page-properties-list" class="page-properties-list"></div>
             <div class="generic-modal-actions">
-                <button id="add-page-property-btn" class="button">+ Add Property</button>
+                <button id="page-encryption-button" class="button" title="Encrypt Page">
+                    Encrypt
+                </button>
+                <button id="save-page-content-btn" class="button">Save</button>
             </div>
         </div>
     </div>

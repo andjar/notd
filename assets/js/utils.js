@@ -236,42 +236,38 @@ export function handleAutocloseBrackets(e) {
 }
 
 /**
- * Encrypts a string using SJCL with AES-256-CCM.
- * @param {string} text - The plaintext to encrypt.
- * @param {string} password - The password to use for encryption.
- * @returns {string} The encrypted ciphertext as a JSON string.
+ * This file contains utility functions for cryptographic operations,
+ * primarily for encrypting and decrypting note content.
  */
-export function encrypt(text, password) {
-    if (!text || !password) return '';
-    try {
-        const encrypted = sjcl.encrypt(password, text, {
-            ks: 256,
-            ts: 128,
-            mode: 'ccm',
-            iter: 1000
-        });
-        return encrypted; // This is a JSON string
-    } catch (e) {
-        console.error("Encryption failed:", e);
-        return '';
-    }
+
+/**
+ * Encrypts a text string with a password using SJCL.
+ * This function uses PBKDF2 for key derivation.
+ * @param {string} password The password.
+ * @param {string} text The plaintext to encrypt.
+ * @returns {string} The JSON-stringified encrypted data.
+ */
+export function encrypt(password, text) {
+    // sjcl.encrypt handles key derivation (PBKDF2), salt, and IV generation.
+    // The result is a JSON string containing all necessary components.
+    const prp = {
+        iter: 1000, // Iteration count for PBKDF2
+        ks: 256, // Key size
+        ts: 128, // Tag size for GCM
+        mode: 'gcm', // Recommended mode
+        v: 1 // Version
+    };
+    return sjcl.encrypt(password, text, prp);
 }
 
 /**
- * Decrypts a string using SJCL.
- * @param {string} encryptedJson - The encrypted JSON string.
- * @param {string} password - The password to use for decryption.
+ * Decrypts a JSON string encrypted by the encrypt function.
+ * @param {string} password The password.
+ * @param {string} encryptedJson The JSON string from the encrypt function.
  * @returns {string} The decrypted plaintext.
+ * @throws An error if decryption fails (e.g., wrong password).
  */
-export function decrypt(encryptedJson, password) {
-    if (!encryptedJson || !password) return '';
-    try {
-        const decrypted = sjcl.decrypt(password, encryptedJson);
-        return decrypted;
-    } catch (e) {
-        // It's common for this to fail with a wrong password, so we can use console.warn
-        // to avoid flooding the console with errors during normal use.
-        console.warn("Decryption failed. This might be due to a wrong password.");
-        return null; // Return null to indicate failure
-    }
+export function decrypt(password, encryptedJson) {
+    // sjcl.decrypt takes the password and the JSON string and handles the rest.
+    return sjcl.decrypt(password, encryptedJson);
 }

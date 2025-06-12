@@ -1,43 +1,12 @@
-import { currentPageId } from './state.js';
-import { ui } from '../ui.js';
-import { pagesAPI } from '../api_client.js';
+import { currentPageId, setCurrentPagePassword } from './state.js';
+import { ui, hidePagePropertiesModal, promptForEncryptionPassword } from '../ui.js';
+import { pagesAPI, notesAPI } from '../api_client.js';
+import { encrypt } from '../utils.js'; // Import encrypt from utils.js
 
 // Stores the full page content while the modal is open
 let pageContentForModal = '';
 
-function parsePropertiesFromContent(content) {
-    const properties = {};
-    if (!content) return properties;
-    const regex = /\{([^:}]+):(:{2,})([^}]+)\}/g;
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-        const key = match[1].trim();
-        const value = match[3].trim();
-        const weight = match[2].length;
-        if (!properties[key]) {
-            properties[key] = [];
-        }
-        properties[key].push({ value, internal: weight > 2 });
-    }
-    return properties;
-}
-
-function rebuildContentWithProperties(originalContent, properties) {
-    // Remove all old property lines from the content
-    let cleanContent = (originalContent || '').replace(/\{([^:}]+):(:{2,})([^}]+)\}\n?/g, '').trim();
-    let propertiesString = '';
-
-    for (const [key, instances] of Object.entries(properties)) {
-        if (!instances) continue;
-        for (const instance of instances) {
-            const colons = instance.internal ? ':::' : '::';
-            propertiesString += `{${key}${colons}${instance.value}}\n`;
-        }
-    }
-    // Only add a newline if there's content AND properties.
-    const separator = (cleanContent && propertiesString) ? '\n\n' : '';
-    return cleanContent + separator + propertiesString.trim();
-}
+// --- CORE CRUD Functions for Properties ---
 
 async function _updatePageContent(newContent) {
     try {
@@ -48,63 +17,12 @@ async function _updatePageContent(newContent) {
         displayPageProperties(updatedPage.properties || {});
         ui.renderPageInlineProperties(updatedPage.properties || {}, ui.domRefs.pagePropertiesContainer);
         ui.updateSaveStatusIndicator('saved');
+        hidePagePropertiesModal();
     } catch (error) {
         console.error("Failed to update page content:", error);
         alert("Failed to save property changes.");
         ui.updateSaveStatusIndicator('error');
     }
-}
-
-// --- CORE CRUD Functions for Properties ---
-
-async function addPageProperty(key, value, isInternal = false) {
-    const properties = parsePropertiesFromContent(pageContentForModal);
-    if (!properties[key]) {
-        properties[key] = [];
-    }
-    properties[key].push({ value, internal: isInternal });
-    const newContent = rebuildContentWithProperties(pageContentForModal, properties);
-    await _updatePageContent(newContent);
-}
-
-async function deletePageProperty(key, index) {
-    const properties = parsePropertiesFromContent(pageContentForModal);
-    if (properties[key] && properties[key][index] !== undefined) {
-        properties[key].splice(index, 1);
-        if (properties[key].length === 0) {
-            delete properties[key];
-        }
-    }
-    const newContent = rebuildContentWithProperties(pageContentForModal, properties);
-    await _updatePageContent(newContent);
-}
-
-async function updatePageProperty(key, index, newValue) {
-    const properties = parsePropertiesFromContent(pageContentForModal);
-    if (properties[key] && properties[key][index] !== undefined) {
-        properties[key][index].value = newValue;
-    }
-    const newContent = rebuildContentWithProperties(pageContentForModal, properties);
-    await _updatePageContent(newContent);
-}
-
-async function renamePropertyKey(oldKey, index, newKey) {
-    const properties = parsePropertiesFromContent(pageContentForModal);
-    if (properties[oldKey] && properties[oldKey][index] !== undefined) {
-        // Remove the specific instance from the old key
-        const instance = properties[oldKey].splice(index, 1)[0];
-        // If the old key array is now empty, delete it
-        if (properties[oldKey].length === 0) {
-            delete properties[oldKey];
-        }
-        // Add the instance to the new key
-        if (!properties[newKey]) {
-            properties[newKey] = [];
-        }
-        properties[newKey].push(instance);
-    }
-    const newContent = rebuildContentWithProperties(pageContentForModal, properties);
-    await _updatePageContent(newContent);
 }
 
 // --- UI Rendering and Event Handling ---
@@ -123,89 +41,130 @@ export async function displayPageProperties(properties) {
     const pagePropertiesList = ui.domRefs.pagePropertiesList;
     if (!pagePropertiesList) return;
     
-    pagePropertiesList.innerHTML = '';
-    let hasVisibleProperties = false;
-    
-    Object.entries(properties).forEach(([key, instances]) => {
-        if (!Array.isArray(instances)) return;
-        instances.forEach((instance, index) => {
-            hasVisibleProperties = true;
-            const propItem = document.createElement('div');
-            propItem.className = 'page-property-item';
-            propItem.innerHTML = `
-                <span class="page-property-key" contenteditable="true" data-key="${key}" data-index="${index}">${key}</span>
-                <span class="page-property-separator">:</span>
-                <input type="text" class="page-property-value" value="${instance.value}" data-key="${key}" data-index="${index}" />
-                <button class="page-property-delete" data-key="${key}" data-index="${index}" title="Delete this value">×</button>
-            `;
-            pagePropertiesList.appendChild(propItem);
-        });
-    });
+    pagePropertiesList.innerHTML = ''; // Clear existing content
 
-    if (!hasVisibleProperties) {
-        pagePropertiesList.innerHTML = '<p class="no-properties-message">No properties set for this page.</p>';
+    const textarea = document.createElement('textarea');
+    textarea.id = 'page-content-editor';
+    textarea.className = 'full-width-textarea';
+    textarea.value = pageContentForModal;
+    textarea.placeholder = 'Enter page content and properties here...';
+    textarea.rows = 20; // Or adjust as needed
+
+    pagePropertiesList.appendChild(textarea);
+}
+
+async function handleEncryptPage() {
+    let password;
+    try {
+        password = await promptForEncryptionPassword(); // Use the modal to get the password
+    } catch (error) {
+        console.warn(error.message);
+        return; // User cancelled or an error occurred in the modal
+    }
+
+    ui.updateSaveStatusIndicator('pending', 'Encrypting page...');
+
+    // sjcl is available globally via assets/libs/sjcl.js
+    try {
+        // 1. Create the hashed password for the page property
+        const hashedPassword = sjcl.hash.sha256.hash(password);
+        const hashedPasswordHex = sjcl.codec.hex.fromBits(hashedPassword);
+
+        // Add the encrypt property to the content
+        const textarea = document.getElementById('page-content-editor');
+        let currentContent = textarea ? textarea.value : pageContentForModal;
+
+        // Remove any existing {encrypt::...} properties first
+        currentContent = currentContent.replace(/\{encrypt:::(.*?)\}/g, '').trim();
+
+        const encryptProperty = `{encrypt:::${hashedPasswordHex}}`;
+        let newContent = currentContent;
+        if (newContent) {
+            newContent += '\n' + encryptProperty;
+        } else {
+            newContent = encryptProperty;
+        }
+        
+        textarea.value = newContent; // Update the textarea immediately
+
+        // 2. Encrypt all notes for the current page
+        const { notes } = await notesAPI.getPageData(currentPageId);
+        const batchUpdates = notes.map(note => {
+            if (note.is_encrypted) return null; // Already encrypted, skip
+            return {
+                type: 'update', // batch operations need a type
+                payload: {
+                    id: note.id,
+                    content: encrypt(password, note.content),
+                    is_encrypted: 1
+                }
+            };
+        }).filter(Boolean); // Filter out nulls
+
+        if (batchUpdates.length > 0) {
+            // **FIX**: The batchUpdateNotes function expects the array of operations directly.
+            await notesAPI.batchUpdateNotes(batchUpdates);
+        }
+
+        // 3. Save the page content with the new property AND save the password in state
+        await _updatePageContent(newContent);
+        setCurrentPagePassword(password); // Set password in state for the current session
+
+        ui.updateSaveStatusIndicator('saved');
+        alert("Page encryption has been set successfully. The page will require the password when accessed.");
+
+    } catch (e) {
+        console.error("Error during encryption setup:", e);
+        alert("Failed to set up page encryption. Please check console for details.");
+        ui.updateSaveStatusIndicator('error');
     }
 }
 
 const propertyModalListener = async (e) => {
     const target = e.target;
     
-    // Handle rename on blur
-    if (e.type === 'blur' && target.matches('.page-property-key')) {
-        const oldKey = target.dataset.key;
-        const index = parseInt(target.dataset.index, 10);
-        const newKey = target.textContent.trim();
-        if (newKey && newKey !== oldKey) {
-            await renamePropertyKey(oldKey, index, newKey);
-        } else {
-            target.textContent = oldKey; // Revert if empty or unchanged
+    // Handle content update on blur from the textarea
+    if (e.type === 'blur' && target.id === 'page-content-editor') {
+        const newContent = target.value;
+        if (newContent !== pageContentForModal) { // Only save if content has changed
+            await _updatePageContent(newContent);
         }
     }
 
-    // Handle value update on change (e.g., input blur)
-    if (e.type === 'change' && target.matches('.page-property-value')) {
-        const key = target.dataset.key;
-        const index = parseInt(target.dataset.index, 10);
-        const newValue = target.value.trim();
-        await updatePageProperty(key, index, newValue);
-    }
-
-    // Handle delete button click
-    if (e.type === 'click' && target.matches('.page-property-delete')) {
-        const key = target.dataset.key;
-        const index = parseInt(target.dataset.index, 10);
-        if (confirm(`Are you sure you want to delete this value for "${key}"?`)) {
-            await deletePageProperty(key, index);
-        }
-    }
-
-    // Handle Add Property button click
-    if (e.type === 'click' && target.id === 'add-page-property-btn') {
-        const newKey = prompt("Enter new property key:");
-        if (newKey && newKey.trim()) {
-            const newValue = prompt(`Enter value for "${newKey}":`);
-            if (newValue !== null) { // Allow empty string value
-                await addPageProperty(newKey.trim(), newValue.trim());
+    // Handle Save button click
+    if (e.type === 'click' && target.id === 'save-page-content-btn') {
+        const textarea = document.getElementById('page-content-editor');
+        if (textarea) {
+            const newContent = textarea.value;
+            if (newContent !== pageContentForModal) {
+                await _updatePageContent(newContent);
             }
         }
+    }
+
+    // Handle Encrypt button click
+    if (e.type === 'click' && target.id === 'page-encryption-button') {
+        await handleEncryptPage();
     }
 };
 
 export function initPropertyEditor() {
     const list = ui.domRefs.pagePropertiesList;
-    const addBtn = ui.domRefs.addPagePropertyBtn;
+    const saveBtn = document.getElementById('save-page-content-btn'); // Get the new save button
+    const encryptBtn = ui.domRefs.pageEncryptionButton; // Get the encryption button
+
     if (list) {
-        list.addEventListener('blur', propertyModalListener, true);
-        list.addEventListener('change', propertyModalListener, true); // Catches blur on inputs
-        list.addEventListener('click', propertyModalListener);
-        list.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.matches('.page-property-key, .page-property-value')) {
-                e.preventDefault();
-                e.target.blur(); // Trigger blur to save change
+        list.addEventListener('blur', propertyModalListener, true); // Use capture phase for blur on children
+        list.addEventListener('input', (e) => { // Listen for input to enable instant updates or more granular control
+            if (e.target.id === 'page-content-editor') {
+                // Optional: Live update if needed, but blur is sufficient for saving
             }
         });
     }
-    if (addBtn) {
-        addBtn.addEventListener('click', propertyModalListener);
+    if (saveBtn) {
+        saveBtn.addEventListener('click', propertyModalListener);
+    }
+    if (encryptBtn) {
+        encryptBtn.addEventListener('click', propertyModalListener);
     }
 }

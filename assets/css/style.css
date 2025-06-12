@@ -1461,6 +1461,10 @@ textarea:focus {
     transform: scale(1);
 }
 
+#encryption-password-modal {
+    z-index: calc(var(--ls-z-index-modal, 1050) + 1); /* Ensure it's above other modals */
+}
+
 /* Page Properties Modal Specific Styles */
 #page-properties-modal .generic-modal-content {
     min-width: 300px;
@@ -3477,4 +3481,23 @@ ul.child-page-list li:last-child {
     background-color: var(--ls-tertiary-background-color, #f0f0f0);
     color: var(--ls-link-text-hover-color, var(--color-accent-dark, #0056b3));
     text-decoration: underline;
+}
+
+.generic-modal-content {
+    background-color: var(--ls-primary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    padding: var(--ls-space-3); /* Reduced padding */
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: scale(0.95);
+    transition: transform 0.2s ease-in-out;
+    box-shadow: var(--ls-shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1));
+}
+
+.modal-content {
+    background-color: var(--ls-primary-background-color, #ffffff); /* Ensure background is set */
+    border-radius: var(--ls-border-radius-medium);
+    padding: var(--ls-space-3);
 }

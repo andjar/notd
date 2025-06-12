@@ -11,13 +11,18 @@ import {
     MAX_PREFETCH_PAGES,
     currentPageName,
     notesForCurrentPage,
-    currentPageId
+    currentPageId,
+    setCurrentPagePassword,
+    getCurrentPagePassword
 } from './state.js';
 
 import { decrypt } from '../utils.js';
 import { notesAPI, pagesAPI, searchAPI, queryAPI, apiRequest } from '../api_client.js';
 import { handleAddRootNote } from './note-actions.js';
-import { ui } from '../ui.js'; // **FIX**: Import the ui object
+import { ui } from '../ui.js';
+import { parseProperties, parseContent, cleanProperties } from '../utils/content-parser.js';
+import { handleNoteAction } from './note-actions.js';
+import { promptForPagePassword } from '../ui.js';
 
 // --- Restored Utility Functions ---
 export function getPreviousDayPageName(currentDateStr) {
@@ -59,19 +64,15 @@ export async function handleTransclusions() {
 }
 
 async function displayBacklinks(pageName) {
-    console.log('displayBacklinks called for page:', pageName); // Debug log
     if (!ui.domRefs.backlinksContainer) {
-        console.warn('Backlinks container DOM element not found.'); // Debug log
+        console.warn('Backlinks container DOM element not found.');
         return;
     }
     try {
         const response = await searchAPI.getBacklinks(pageName);
-        console.log('Backlinks API response:', response); // Debug log
         const backlinksData = response.results || [];
-        console.log('Processed backlinks data:', backlinksData); // Debug log
         if (backlinksData.length === 0) {
             ui.domRefs.backlinksContainer.innerHTML = '<p>No backlinks found.</p>';
-            console.log('No backlinks found for page:', pageName); // Debug log
             return;
         }
         const html = backlinksData.map(link => `
@@ -81,7 +82,6 @@ async function displayBacklinks(pageName) {
             </div>
         `).join('');
         ui.domRefs.backlinksContainer.innerHTML = html;
-        console.log('Backlinks rendered successfully.'); // Debug log
     } catch (error) {
         console.error("Error fetching backlinks:", error);
         ui.domRefs.backlinksContainer.innerHTML = '<p>Error loading backlinks.</p>';
@@ -107,7 +107,6 @@ async function displayChildPages(namespace) {
                 link.textContent = displayName;
                 link.className = 'child-page-link';
                 link.dataset.pageName = page.name;
-                // **FIX**: Removed onclick, the new global handler will manage this.
                 item.appendChild(link);
                 list.appendChild(item);
             });
@@ -159,22 +158,104 @@ async function handleCreateAndFocusFirstNote() {
 }
 
 async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
-    ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
-    ui.displayNotes(notesForCurrentPage, pageData.id);
-    ui.updateActivePageLink(pageData.name);
+    const pageContentDiv = ui.domRefs.pageContent;
+    const pageTitleDiv = ui.domRefs.pageTitle;
+    const pagePropertiesContainer = ui.domRefs.pagePropertiesContainer;
+
+    if (!pageContentDiv || !pageTitleDiv || !pagePropertiesContainer) return;
+
+    // Set page title
+    pageTitleDiv.textContent = pageData.name;
+
+    // Render properties
+    ui.renderPageInlineProperties(pageProperties, pagePropertiesContainer);
+
+    // Render main content
+    const contentWithoutProperties = cleanProperties(pageData.content);
+    pageContentDiv.innerHTML = parseContent(contentWithoutProperties); // Renders non-note content
+
+    // Render notes
+    if (pageData.notes && pageData.notes.length > 0) {
+        let notesToRender = pageData.notes;
+        const pageEncryptProperty = pageProperties.encrypt && Array.isArray(pageProperties.encrypt) && pageProperties.encrypt.length > 0
+            ? pageProperties.encrypt[0]
+            : null;
+
+        if (pageEncryptProperty) {
+            let password = getCurrentPagePassword();
+            const pageHash = pageEncryptProperty.value;
+
+            if (!password) {
+                try {
+                    password = await promptForPagePassword();
+                    const passwordHash = sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(password));
+
+                    if (passwordHash !== pageHash) {
+                        alert("Wrong password!");
+                        setCurrentPagePassword(null);
+                        pageContentDiv.innerHTML = '<p>Decryption failed: Incorrect password.</p>';
+                        setNotesForCurrentPage([]);
+                        ui.displayNotes([], currentPageId);
+                        return; // Stop rendering
+                    }
+                    setCurrentPagePassword(password);
+                } catch (error) {
+                    console.error("Password prompt cancelled or failed.", error);
+                    pageContentDiv.innerHTML = '<p>Password entry cancelled. Cannot display page.</p>';
+                    setNotesForCurrentPage([]);
+                    ui.displayNotes([], currentPageId);
+                    return; // Stop rendering
+                }
+            }
+
+            const currentPassword = getCurrentPagePassword();
+            const currentPasswordHash = currentPassword ? sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(currentPassword)) : null;
+
+            if (currentPasswordHash !== pageHash) {
+                setCurrentPagePassword(null);
+                pageContentDiv.innerHTML = '<p>Decryption failed: Stored password is incorrect for this page. Please reload.</p>';
+                setNotesForCurrentPage([]);
+                ui.displayNotes([], currentPageId);
+                return;
+            }
+
+            // Decrypt notes
+            try {
+                notesToRender = notesToRender.map(note => {
+                    if (note.is_encrypted) {
+                        return { ...note, content: decrypt(currentPassword, note.content) };
+                    }
+                    return note;
+                });
+            } catch (error) {
+                console.error("Decryption failed for one or more notes:", error);
+                alert("Decryption failed. The password may be incorrect or the data corrupted.");
+                setCurrentPagePassword(null);
+                pageContentDiv.innerHTML = '<p>Decryption failed. Data may be corrupted.</p>';
+                setNotesForCurrentPage([]);
+                ui.displayNotes([], currentPageId);
+                return;
+            }
+        }
+        
+        setNotesForCurrentPage(notesToRender);
+        ui.displayNotes(notesToRender, currentPageId);
+        if (focusFirstNote && pageData.notes[0]) {
+            handleNoteAction('focus', pageData.notes[0].id);
+        }
+    } else {
+        setNotesForCurrentPage([]);
+        ui.displayNotes([], currentPageId); // Clear notes view
+        if (focusFirstNote) {
+            await handleNoteAction('create', null);
+        }
+    }
 
     displayBacklinks(pageData.name);
     displayChildPages(pageData.name);
     handleTransclusions();
     handleSqlQueries();
     
-    if (notesForCurrentPage.length === 0 && pageData.id) {
-        await handleCreateAndFocusFirstNote();
-    } else if (focusFirstNote && ui.domRefs.notesContainer) {
-        const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
-        if (firstNoteContent) ui.switchToEditMode(firstNoteContent);
-    }
-
     prefetchLinkedPagesData();
 }
 
@@ -182,6 +263,7 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
     setCurrentPageName(pageData.name);
     setCurrentPageId(pageData.id);
     setNotesForCurrentPage(pageData.notes || []);
+    setCurrentPagePassword(null); // Reset password for new page
 
     if (updateHistory) {
         const newUrl = new URL(window.location);
@@ -193,37 +275,6 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
     if (ui.calendarWidget && ui.calendarWidget.setCurrentPage) ui.calendarWidget.setCurrentPage(pageData.name);
     
     const pageProperties = pageData.properties || {};
-    const isEncrypted = pageProperties.encrypted?.some(p => String(p.value).toLowerCase() === 'true');
-
-    if (isEncrypted) {
-        if (!window.decryptionPassword) {
-            try {
-                window.decryptionPassword = await ui.promptForPassword();
-            } catch (error) {
-                console.warn(error.message);
-                ui.displayNotes([{ id: 'error', content: 'Decryption cancelled. Cannot display page content.' }], pageData.id);
-                return;
-            }
-        }
-
-        const decryptedNotes = (pageData.notes || []).map(note => {
-            if (note.content) {
-                try {
-                    const decryptedContent = decrypt(note.content, window.decryptionPassword);
-                    if (decryptedContent === null) {
-                        return { ...note, content: '[DECRYPTION FAILED]' };
-                    }
-                    return { ...note, content: decryptedContent };
-                } catch(e) {
-                     return { ...note, content: '[DECRYPTION FAILED]' };
-                }
-            }
-            return note;
-        });
-        setNotesForCurrentPage(decryptedNotes);
-    } else {
-        window.decryptionPassword = null;
-    }
     
     await _renderPageContent(pageData, pageProperties, focusFirstNote);
 }
@@ -246,9 +297,15 @@ async function _fetchPageFromNetwork(pageName) {
         throw new Error(`Could not resolve page data with a valid ID for "${pageName}".`);
     }
 
-    const notesArray = await notesAPI.getPageData(pageDetails.id);
-    const combinedPageData = { ...pageDetails, notes: Array.isArray(notesArray) ? notesArray : [] };
+    const pageDataWithNotes = await notesAPI.getPageData(pageDetails.id);
 
+    // **FIX**: The previous code was incorrectly combining the pageDetails object and the notes array.
+    // The notes array from the API needs to be assigned to the `notes` property of the page data object.
+    const combinedPageData = { ...pageDetails, notes: pageDataWithNotes };
+
+    // This check is now mostly for safety, as `notes` is explicitly assigned above.
+    combinedPageData.notes = Array.isArray(combinedPageData.notes) ? combinedPageData.notes : [];
+    
     setPageCache(pageName, { ...combinedPageData, timestamp: Date.now() });
     return combinedPageData;
 }
@@ -268,7 +325,6 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
         }
         
         if (!pageData) {
-            // **FIX**: Use the imported ui object to access domRefs
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
             pageData = await _fetchPageFromNetwork(pageName);
         }

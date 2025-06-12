@@ -9,6 +9,9 @@ export const CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
 export const MAX_PREFETCH_PAGES = 3;
 export let notesForCurrentPage = [];
 export let currentFocusedNoteId = null;
+export let lastResponse = null;
+export let activeRequests = 0;
+let currentPagePassword = null; // Not exported directly to encourage using setter/getter
 
 // --- Assign to window object (for debugging or specific global needs) ---
 // Initial assignment. Setters will keep these updated.
@@ -20,6 +23,7 @@ window.CACHE_MAX_AGE_MS = CACHE_MAX_AGE_MS; // Constants likely don't need sette
 window.MAX_PREFETCH_PAGES = MAX_PREFETCH_PAGES; // Constants likely don't need setters
 window.notesForCurrentPage = notesForCurrentPage;
 window.currentFocusedNoteId = currentFocusedNoteId;
+window.currentPagePassword = currentPagePassword; // For debugging
 
 // --- Setter Functions ---
 
@@ -36,6 +40,15 @@ export function setCurrentPageName(newName) {
 export function setSaveStatus(newStatus) {
   saveStatus = newStatus;
   window.saveStatus = newStatus;
+}
+
+export function setCurrentPagePassword(newPassword) {
+    currentPagePassword = newPassword;
+    window.currentPagePassword = newPassword;
+}
+
+export function getCurrentPagePassword() {
+    return currentPagePassword;
 }
 
 // For notesForCurrentPage, we might want more granular functions
@@ -76,7 +89,6 @@ export function updateNoteInCurrentPage(updatedNote) {
     }
     // window.notesForCurrentPage will reflect this change.
 }
-
 
 export function setCurrentFocusedNoteId(newNoteId) {
   currentFocusedNoteId = newNoteId;

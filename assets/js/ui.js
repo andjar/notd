@@ -190,6 +190,99 @@ function initPagePropertiesModal() {
 }
 
 /**
+ * Hides the page properties modal.
+ */
+export function hidePagePropertiesModal() {
+    const modal = domRefs.pagePropertiesModal;
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+/**
+ * Shows the encryption password modal and returns a Promise that resolves with the password.
+ * @returns {Promise<string>} A promise that resolves with the entered password, or rejects if cancelled.
+ */
+export function promptForEncryptionPassword() {
+    return new Promise((resolve, reject) => {
+        const modal = domRefs.encryptionPasswordModal;
+        const newPasswordInput = domRefs.newEncryptionPasswordInput;
+        const confirmPasswordInput = domRefs.confirmEncryptionPasswordInput;
+        const errorMessageElement = domRefs.encryptionPasswordError;
+        const confirmBtn = domRefs.confirmEncryptionBtn;
+        const cancelBtn = domRefs.cancelEncryptionBtn;
+        const closeBtn = domRefs.encryptionModalClose;
+
+        if (!modal || !newPasswordInput || !confirmPasswordInput || !errorMessageElement || !confirmBtn || !cancelBtn || !closeBtn) {
+            console.error('Encryption password modal elements not found.');
+            return reject(new Error('Encryption password modal elements missing.'));
+        }
+
+        // Clear previous inputs and errors
+        newPasswordInput.value = '';
+        confirmPasswordInput.value = '';
+        errorMessageElement.textContent = '';
+        errorMessageElement.style.display = 'none';
+
+        modal.classList.add('active');
+        newPasswordInput.focus();
+
+        const cleanup = () => {
+            confirmBtn.removeEventListener('click', handleSubmit);
+            cancelBtn.removeEventListener('click', handleCancel);
+            closeBtn.removeEventListener('click', handleCancel);
+            newPasswordInput.removeEventListener('keydown', handleKeydown);
+            confirmPasswordInput.removeEventListener('keydown', handleKeydown);
+            modal.classList.remove('active');
+        };
+
+        const handleSubmit = () => {
+            const newPassword = newPasswordInput.value;
+            const confirmedPassword = confirmPasswordInput.value;
+
+            if (!newPassword || newPassword.trim() === '') {
+                errorMessageElement.textContent = 'Password cannot be empty.';
+                errorMessageElement.style.display = 'block';
+                return;
+            }
+            if (newPassword !== confirmedPassword) {
+                errorMessageElement.textContent = 'Passwords do not match. Please try again.';
+                errorMessageElement.style.display = 'block';
+                return;
+            }
+
+            cleanup();
+            resolve(newPassword);
+        };
+
+        const handleCancel = () => {
+            cleanup();
+            reject(new Error('Encryption cancelled by user.'));
+        };
+
+        const handleKeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSubmit();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                handleCancel();
+            }
+        };
+
+        confirmBtn.addEventListener('click', handleSubmit);
+        cancelBtn.addEventListener('click', handleCancel);
+        closeBtn.addEventListener('click', handleCancel);
+        newPasswordInput.addEventListener('keydown', handleKeydown);
+        confirmPasswordInput.addEventListener('keydown', handleKeydown);
+
+        modal.addEventListener('click', (e) => { // Close if backdrop is clicked
+            if (e.target === modal) handleCancel();
+        });
+    });
+}
+
+/**
  * Updates the visual save status indicator.
  * @param {string} newStatus - The new status ('saved', 'pending', 'error').
  */
@@ -297,34 +390,37 @@ function getNoteAncestors(noteId, allNotesOnPage) {
 function promptForPassword() {
     return new Promise((resolve, reject) => {
         const modal = domRefs.passwordModal;
-        const input = domRefs.passwordInput;
-        const submit = domRefs.passwordSubmit;
-        const cancel = domRefs.passwordCancel;
+        const passwordInput = domRefs.passwordInput;
+        const submitBtn = domRefs.passwordSubmit;
+        const cancelBtn = domRefs.passwordCancel;
 
-        if (!modal || !input || !submit || !cancel) {
-            return reject(new Error('Password modal elements not found in the DOM.'));
+        if (!modal || !passwordInput || !submitBtn || !cancelBtn) {
+            console.error('Password modal elements not found.');
+            return reject(new Error('Password modal elements missing.'));
         }
 
+        passwordInput.value = ''; // Clear any previous input
+        modal.classList.add('active');
+        passwordInput.focus();
+
         const cleanup = () => {
-            submit.removeEventListener('click', handleSubmit);
-            cancel.removeEventListener('click', handleCancel);
-            input.removeEventListener('keydown', handleKeydown);
-            modal.style.display = 'none';
+            submitBtn.removeEventListener('click', handleSubmit);
+            cancelBtn.removeEventListener('click', handleCancel);
+            passwordInput.removeEventListener('keydown', handleKeydown);
+            modal.classList.remove('active');
         };
 
         const handleSubmit = () => {
-            const password = input.value;
-            if (password) {
-                cleanup();
-                resolve(password);
-            }
+            const password = passwordInput.value;
+            cleanup();
+            resolve(password);
         };
 
         const handleCancel = () => {
             cleanup();
-            reject(new Error('Password entry cancelled.'));
+            reject(new Error('Decryption cancelled by user.'));
         };
-        
+
         const handleKeydown = (e) => {
             if (e.key === 'Enter') {
                 handleSubmit();
@@ -333,13 +429,64 @@ function promptForPassword() {
             }
         };
 
-        input.value = '';
-        submit.addEventListener('click', handleSubmit);
-        cancel.addEventListener('click', handleCancel);
-        input.addEventListener('keydown', handleKeydown);
+        submitBtn.addEventListener('click', handleSubmit);
+        cancelBtn.addEventListener('click', handleCancel);
+        passwordInput.addEventListener('keydown', handleKeydown);
+    });
+}
 
-        modal.style.display = 'flex';
-        input.focus();
+/**
+ * Shows the password modal for encrypted pages and returns a Promise that resolves with the password.
+ * @returns {Promise<string>} A promise that resolves with the entered password, or rejects if cancelled.
+ */
+export function promptForPagePassword() {
+    return new Promise((resolve, reject) => {
+        const modal = domRefs.passwordModal;
+        const passwordInput = domRefs.passwordInput;
+        const submitBtn = domRefs.passwordSubmit;
+        const cancelBtn = domRefs.passwordCancel;
+        const closeBtn = domRefs.passwordModalClose;
+
+        if (!modal || !passwordInput || !submitBtn || !cancelBtn || !closeBtn) {
+            return reject(new Error("Password modal elements not found in the DOM."));
+        }
+        
+        passwordInput.value = '';
+        modal.classList.add('active');
+        passwordInput.focus();
+
+        const submitHandler = () => {
+            cleanup();
+            resolve(passwordInput.value);
+        };
+
+        const cancelHandler = () => {
+            cleanup();
+            reject(new Error("Password entry cancelled."));
+        };
+        
+        const keydownHandler = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitHandler();
+            } else if (e.key === 'Escape') {
+                cancelHandler();
+            }
+        };
+
+        function cleanup() {
+            modal.classList.remove('active');
+            submitBtn.removeEventListener('click', submitHandler);
+            cancelBtn.removeEventListener('click', cancelHandler);
+            closeBtn.removeEventListener('click', cancelHandler);
+            passwordInput.removeEventListener('keydown', keydownHandler);
+            document.removeEventListener('keydown', keydownHandler); // General escape handler
+        }
+
+        submitBtn.addEventListener('click', submitHandler);
+        cancelBtn.addEventListener('click', cancelHandler);
+        closeBtn.addEventListener('click', cancelHandler);
+        passwordInput.addEventListener('keydown', keydownHandler);
     });
 }
 
@@ -372,8 +519,9 @@ export const ui = {
     showAllNotes,
     showAllNotesAndLoadPage,
     getNestingLevel,
-    calendarWidget,
-    promptForPassword
+    getNoteAncestors,
+    promptForPassword,
+    calendarWidget
 };
 
 // Make ui available globally

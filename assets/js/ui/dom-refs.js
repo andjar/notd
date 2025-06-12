@@ -21,7 +21,7 @@ export const domRefs = {
     pagePropertiesModal: document.getElementById('page-properties-modal'),
     pagePropertiesModalClose: document.getElementById('page-properties-modal-close'),
     pagePropertiesList: document.getElementById('page-properties-list'),
-    addPagePropertyBtn: document.getElementById('add-page-property-btn'),
+    pageEncryptionButton: document.getElementById('page-encryption-button'),
     pageSearchModal: document.getElementById('page-search-modal'),
     pageSearchModalInput: document.getElementById('page-search-modal-input'),
     pageSearchModalResults: document.getElementById('page-search-modal-results'),
@@ -31,7 +31,17 @@ export const domRefs = {
     imageViewerModalImg: document.getElementById('image-viewer-modal-img'),
     imageViewerModalClose: document.getElementById('image-viewer-modal-close'),
     passwordModal: document.getElementById('password-modal'),
+    passwordModalClose: document.getElementById('password-modal-close'),
     passwordInput: document.getElementById('password-input'),
     passwordSubmit: document.getElementById('password-submit'),
     passwordCancel: document.getElementById('password-cancel'),
+
+    // Encryption Modal Elements
+    encryptionPasswordModal: document.getElementById('encryption-password-modal'),
+    encryptionModalClose: document.getElementById('encryption-modal-close'),
+    newEncryptionPasswordInput: document.getElementById('new-encryption-password'),
+    confirmEncryptionPasswordInput: document.getElementById('confirm-encryption-password'),
+    encryptionPasswordError: document.getElementById('encryption-password-error'),
+    confirmEncryptionBtn: document.getElementById('confirm-encryption-btn'),
+    cancelEncryptionBtn: document.getElementById('cancel-encryption-btn'),
 };

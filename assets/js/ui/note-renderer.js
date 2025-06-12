@@ -169,7 +169,7 @@ function renderNote(note, nestingLevel = 0) {
 
     // Modified logic for dataset.rawContent initialization
     let effectiveContentForDataset = note.content || '';
-    if (window.decryptionPassword && window.currentPageEncryptionKey && (note.content || '').trim()) {
+    if (window.decryptionPassword && (note.content || '').trim()) {
         try {
             // Check if it's potentially encrypted (SJCL usually produces JSON strings)
             if (note.content.startsWith('{') && note.content.endsWith('}')) {
@@ -186,6 +186,9 @@ function renderNote(note, nestingLevel = 0) {
 
     if (note.content && note.content.trim()) {
         contentEl.innerHTML = parseAndRenderContent(note.content);
+        if (typeof feather !== 'undefined') {
+            feather.replace({ width: '18px', height: '18px' });
+        }
     }
 
     contentWrapperEl.appendChild(contentEl);
@@ -647,7 +650,7 @@ function switchToRenderedMode(contentEl) {
  * @returns {string} HTML string for display
  */
 function parseAndRenderContent(rawContent) {
-    if (window.decryptionPassword && window.currentPageEncryptionKey && rawContent && typeof rawContent === 'string') {
+    if (window.decryptionPassword && rawContent && typeof rawContent === 'string') {
         try {
             // Attempt to parse rawContent as JSON, as SJCL encrypted strings are JSON strings.
             // If it's not JSON, it's likely not an encrypted string or it's corrupted.

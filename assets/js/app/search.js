@@ -1,6 +1,6 @@
 import { pagesAPI, searchAPI } from '../api_client.js';
 import { loadPage, fetchAndDisplayPages } from './page-loader.js';
-import { debounce, safeAddEventListener } from '../utils.js';
+import { debounce, safeAddEventListener, decrypt } from '../utils.js';
 import { ui } from '../ui.js';
 
 // --- Global Search (Sidebar) ---
@@ -21,15 +21,48 @@ function displaySearchResults(results) {
         return;
     }
 
-    const html = results.map(result => `
-        <div class="search-result-item" data-page-name="${result.page_name}">
-            <div class="search-result-title">${result.page_name}</div>
-            <div class="search-result-snippet">${highlightSearchTerms(result.content_snippet, ui.domRefs.globalSearchInput.value)}</div>
-        </div>
-    `).join('');
+    const html = results.map(result => {
+        let snippet = result.content_snippet;
+        let isEncrypted = false;
+
+        // Check if the page has an 'encrypted' property set to 'true'
+        if (result.properties && Array.isArray(result.properties.encrypted)) {
+            isEncrypted = result.properties.encrypted.some(p => String(p.value).toLowerCase() === 'true');
+        }
+
+        if (isEncrypted) {
+            if (window.decryptionPassword) {
+                try {
+                    snippet = decrypt(snippet, window.decryptionPassword);
+                    if (snippet === null) {
+                        snippet = '[DECRYPTION FAILED]';
+                    }
+                } catch (e) {
+                    console.error('Failed to decrypt search result snippet:', e);
+                    snippet = '[DECRYPTION FAILED]';
+                }
+            } else {
+                snippet = '[ENCRYPTED CONTENT - Enter password to view]';
+            }
+        }
+
+        const encryptedIcon = isEncrypted ? '<i data-feather="lock" class="encrypted-icon"></i> ' : '';
+        
+        return `
+            <div class="search-result-item" data-page-name="${result.page_name}">
+                <div class="search-result-title">${encryptedIcon}${result.page_name}</div>
+                <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.globalSearchInput.value)}</div>
+            </div>
+        `;
+    }).join('');
 
     searchResultsEl.innerHTML = html;
     searchResultsEl.classList.add('has-results');
+
+    // Ensure Feather icons are rendered after new HTML is added
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
 
     searchResultsEl.addEventListener('click', (e) => {
         const resultItem = e.target.closest('.search-result-item');
