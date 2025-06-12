@@ -1,6 +1,8 @@
 <?php
-require_once 'db_connect.php';
-require_once 'response_utils.php';
+require_once __DIR__ . '/../config.php'; // Required for PROPERTY_WEIGHTS
+require_once __DIR__ . '/db_connect.php';
+require_once __DIR__ . '/response_utils.php';
+require_once __DIR__ . '/property_trigger_service.php';
 
 class PropertyParser {
     private $pdo;
@@ -9,7 +11,18 @@ class PropertyParser {
         $this->pdo = $pdo;
     }
 
+    /**
+     * Parses property strings from a block of content.
+     * Understands syntax like {key::value}, key:::value, etc.
+     *
+     * @param string|null $content The content to parse.
+     * @return array An array of parsed properties, each with 'name', 'value', and 'weight'.
+     */
     public function parsePropertiesFromContent($content) {
+        if (empty($content)) {
+            return [];
+        }
+
         $parsedProperties = [];
         $lines = explode("\n", $content);
 
@@ -17,31 +30,20 @@ class PropertyParser {
             $line = trim($line);
             if (empty($line)) continue;
 
-            // Updated regex to reliably capture key, separator, and value.
-            // It correctly distinguishes between '::' and ':::' separators, and enforces matching braces.
-            if (preg_match('/^(\{)?([^:]+)(:{2,3})(.+?)(?(1)\})$/', $line, $matches)) {
+            // Regex to capture key, separator (2+ colons), and value, with optional braces.
+            if (preg_match('/^(\{)?([^\s:]+)(:{2,})(.+?)(?(1)\})$/', $line, $matches)) {
                 $key = trim($matches[2]);
                 $separator = $matches[3];
                 $value = trim($matches[4]);
 
-                // Skip empty keys
                 if (empty($key)) continue;
 
-                $is_internal = false;
-                // Property is internal if key starts with '_'
-                if (strpos($key, '_') === 0) { // Example for legacy internal
-                    $is_internal = true;
-                }
+                $weight = strlen($separator);
 
-                // Property is also internal if ':::' separator is used.
-                if ($separator === ':::') { // {key:::value}
-                    $is_internal = true;
-                }
-                
                 $parsedProperties[] = [
                     'name' => $key,
                     'value' => $value,
-                    'is_internal' => $is_internal
+                    'weight' => $weight
                 ];
             }
         }
@@ -49,83 +51,101 @@ class PropertyParser {
         return $parsedProperties;
     }
 
+    /**
+     * The "Smart Indexer". Synchronizes the Properties table for a note
+     * with the properties parsed from its content.
+     *
+     * @param int $noteId The ID of the note to sync.
+     * @param string $content The new content of the note.
+     * @return bool True on success, false on failure.
+     */
     public function syncNotePropertiesFromContent($noteId, $content) {
+        // This logic can be extended for pages as well by parameterizing the entity type and ID.
+        $entityType = 'note';
+        $idColumn = 'note_id';
+        $otherIdColumn = 'page_id';
+
         try {
             $this->pdo->beginTransaction();
             
-            // Get existing properties
-            $stmt = $this->pdo->prepare("SELECT name, value, internal FROM Properties WHERE note_id = ?");
+            $parsedProps = $this->parsePropertiesFromContent($content);
+            
+            $stmt = $this->pdo->prepare("SELECT id, name, value, weight FROM Properties WHERE {$idColumn} = ?");
             $stmt->execute([$noteId]);
-            $existingProperties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $existingProps = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Convert to associative array for easier lookup
-            $existingPropsMap = [];
-            foreach ($existingProperties as $prop) {
-                $existingPropsMap[$prop['name']] = $prop; // Store the whole prop object
+            $parsedPropsMap = [];
+            foreach ($parsedProps as $p) {
+                $parsedPropsMap[$p['name']][] = $p;
             }
-            
-            // Parse properties from content using the updated function
-            $parsedContentProperties = $this->parsePropertiesFromContent($content);
-            
-            $propertiesToAdd = [];
-            $propertiesToUpdate = [];
-            
-            foreach ($parsedContentProperties as $prop) {
-                $name = $prop['name'];
-                $value = $prop['value'];
-                $is_internal = $prop['is_internal'];
-                $internal_db_val = $is_internal ? 1 : 0;
 
-                if (!isset($existingPropsMap[$name])) {
-                    $propertiesToAdd[] = [
-                        'name' => $name, 
-                        'value' => $value, 
-                        'internal' => $internal_db_val
-                    ];
-                } elseif (
-                    $existingPropsMap[$name]['value'] !== $value ||
-                    (int)$existingPropsMap[$name]['internal'] !== $internal_db_val 
-                ) {
-                    $propertiesToUpdate[] = [
-                        'name' => $name, 
-                        'value' => $value, 
-                        'internal' => $internal_db_val
-                    ];
+            $existingPropsMap = [];
+            foreach ($existingProps as $e) {
+                $existingPropsMap[$e['name']][] = $e;
+            }
+
+            // --- Deletion Logic ---
+            // Find properties with 'replace' behavior that are in the DB but not in the new content.
+            $propsToDelete = [];
+            foreach ($existingProps as $eProp) {
+                $behavior = PROPERTY_WEIGHTS[$eProp['weight']]['update_behavior'] ?? 'replace';
+                if ($behavior === 'replace' && !isset($parsedPropsMap[$eProp['name']])) {
+                    $propsToDelete[] = $eProp['id'];
                 }
             }
-            
-            // Add new properties
-            if (!empty($propertiesToAdd)) {
-                $insertStmt = $this->pdo->prepare(
-                    "INSERT INTO Properties (note_id, name, value, internal) VALUES (?, ?, ?, ?)"
-                );
-                foreach ($propertiesToAdd as $prop) {
-                    $insertStmt->execute([$noteId, $prop['name'], $prop['value'], $prop['internal']]);
-                }
+            if (!empty($propsToDelete)) {
+                $deletePlaceholders = rtrim(str_repeat('?,', count($propsToDelete)), ',');
+                $deleteStmt = $this->pdo->prepare("DELETE FROM Properties WHERE id IN ({$deletePlaceholders})");
+                $deleteStmt->execute($propsToDelete);
             }
-            
-            // Update existing properties
-            if (!empty($propertiesToUpdate)) {
-                $updateStmt = $this->pdo->prepare(
-                    "UPDATE Properties SET value = ?, internal = ? WHERE note_id = ? AND name = ?"
-                );
-                foreach ($propertiesToUpdate as $prop) {
-                    $updateStmt->execute([$prop['value'], $prop['internal'], $noteId, $prop['name']]);
+
+            // --- Insert/Update Logic ---
+            $triggerService = new PropertyTriggerService($this->pdo);
+
+            foreach ($parsedProps as $pProp) {
+                $name = $pProp['name'];
+                $value = $pProp['value'];
+                $weight = $pProp['weight'];
+                $behavior = PROPERTY_WEIGHTS[$weight]['update_behavior'] ?? 'replace';
+
+                if ($behavior === 'append') {
+                    // For append, always insert if it's a new value for this property name.
+                    // This prevents re-inserting the same log entry on every save.
+                    $found = false;
+                    if (isset($existingPropsMap[$name])) {
+                        foreach ($existingPropsMap[$name] as $eProp) {
+                            if ($eProp['value'] === $value && (int)$eProp['weight'] === $weight) {
+                                $found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!$found) {
+                        $stmt = $this->pdo->prepare("INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight) VALUES (?, NULL, ?, ?, ?)");
+                        $stmt->execute([$noteId, $name, $value, $weight]);
+                        $triggerService->dispatch($entityType, $noteId, $name, $value);
+                    }
+                } elseif ($behavior === 'replace') {
+                    // For replace, update if exists, otherwise insert.
+                    $updateStmt = $this->pdo->prepare("UPDATE Properties SET value = ?, weight = ? WHERE {$idColumn} = ? AND name = ?");
+                    $updateStmt->execute([$value, $weight, $noteId, $name]);
+
+                    if ($updateStmt->rowCount() === 0) {
+                        $insertStmt = $this->pdo->prepare("INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight) VALUES (?, NULL, ?, ?, ?)");
+                        $insertStmt->execute([$noteId, $name, $value, $weight]);
+                    }
+                    $triggerService->dispatch($entityType, $noteId, $name, $value);
                 }
             }
             
             $this->pdo->commit();
             return true;
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            error_log("Error syncing note properties: " . $e->getMessage());
+            error_log("Error syncing note properties for note ID {$noteId}: " . $e->getMessage());
             return false;
         }
     }
 }
-
-// Initialize and handle the request
-$pdo = get_db_connection();
-$propertyParser = new PropertyParser($pdo); 

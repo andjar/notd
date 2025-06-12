@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/../config.php'; // For PROPERTY_WEIGHTS
 require_once 'response_utils.php';
 
 class DataManager {
@@ -9,7 +10,14 @@ class DataManager {
         $this->pdo = $pdo;
     }
 
-    // Placeholder for _formatProperties helper method
+    /**
+     * Formats raw property results into the structure required by the API spec.
+     * Groups properties by name and handles visibility based on weight configuration.
+     *
+     * @param array $propertiesResult Raw properties from the database (with name, value, weight, created_at).
+     * @param bool $includeInternal If true, includes properties marked as not visible in view mode.
+     * @return array The formatted properties array.
+     */
     private function _formatProperties($propertiesResult, $includeInternal = false) {
         $formattedProperties = [];
         if (empty($propertiesResult)) {
@@ -19,76 +27,58 @@ class DataManager {
         // Group properties by name first
         $groupedByName = [];
         foreach ($propertiesResult as $prop) {
-            $groupedByName[$prop['name']][] = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
-        }
+            // Ensure weight is an integer for array key access
+            $weight = (int)$prop['weight'];
 
-        foreach ($groupedByName as $name => $values) {
-            if (count($values) === 1) {
-                // If only one property value
-                if (!$includeInternal && $values[0]['internal'] == 0) {
-                    // If not including internal and the property is not internal, simplify to value
-                    $formattedProperties[$name] = $values[0]['value'];
-                } else {
-                    // Otherwise, keep as an object to show internal flag or if it's an internal property
-                    $formattedProperties[$name] = $values[0];
-                }
-            } else {
-                // For multiple values (lists)
-                if (!$includeInternal) {
-                    // Filter out internal properties if not included
-                    $filteredValues = array_filter($values, function($value) {
-                        return $value['internal'] == 0;
-                    });
-                    // If all were internal and filtered out, this property might become empty or just not be set.
-                    // If after filtering, only one non-internal item remains, simplify it.
-                    if (count($filteredValues) === 1) {
-                         $singleValue = array_values($filteredValues)[0]; // Get the single item
-                         $formattedProperties[$name] = $singleValue['value'];
-                    } elseif (count($filteredValues) > 1) {
-                        // If multiple non-internal items, return array of values
-                        $formattedProperties[$name] = array_map(function($v) { return $v['value']; }, $filteredValues);
-                    } else {
-                        // If all values were internal and includeInternal is false, the property is effectively empty or not shown
-                        // Depending on desired behavior, one might choose to add an empty array or skip the property.
-                        // For now, let's skip it if all are internal and not included.
-                    }
-                } else {
-                    // If including internal, return all values as an array of objects
-                    $formattedProperties[$name] = $values;
+            // Skip properties that shouldn't be visible, unless explicitly requested
+            if (!$includeInternal) {
+                // Default to true if weight is not defined in config
+                $isVisible = PROPERTY_WEIGHTS[$weight]['visible_in_view_mode'] ?? true;
+                if (!$isVisible) {
+                    continue;
                 }
             }
+            
+            // The API spec requires an array of objects for each property name
+            // to support historical values from 'append' behavior.
+            $groupedByName[$prop['name']][] = [
+                'value' => $prop['value'],
+                'weight' => $weight,
+                'created_at' => $prop['created_at']
+                // 'id' and 'updated_at' could also be included if needed
+            ];
         }
-        return $formattedProperties;
+        
+        return $groupedByName;
     }
 
+    /**
+     * Retrieves and formats all properties for a specific page.
+     *
+     * @param int $pageId The ID of the page.
+     * @param bool $includeInternal If true, includes properties not normally visible in view mode.
+     * @return array The formatted properties.
+     */
     public function getPageProperties($pageId, $includeInternal = false) {
-        error_log("[DEBUG] getPageProperties called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
-        
-        $sql = "SELECT name, value, internal FROM Properties WHERE page_id = :pageId AND note_id IS NULL";
-        if (!$includeInternal) {
-            $sql .= " AND internal = 0";
-        }
-        $sql .= " ORDER BY name"; 
-        error_log("[DEBUG] SQL query: " . $sql);
+        $sql = "SELECT name, value, weight, created_at FROM Properties WHERE page_id = :pageId AND active = 1 ORDER BY created_at ASC";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindParam(':pageId', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $propertiesResult = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("[DEBUG] Raw properties from database: " . json_encode($propertiesResult));
         
-        $formattedProperties = $this->_formatProperties($propertiesResult, $includeInternal);
-        error_log("[DEBUG] Formatted properties: " . json_encode($formattedProperties));
-        
-        return $formattedProperties;
+        return $this->_formatProperties($propertiesResult, $includeInternal);
     }
 
+    /**
+     * Retrieves and formats all properties for a specific note.
+     *
+     * @param int $noteId The ID of the note.
+     * @param bool $includeInternal If true, includes properties not normally visible in view mode.
+     * @return array The formatted properties.
+     */
     public function getNoteProperties($noteId, $includeInternal = false) {
-        $sql = "SELECT name, value, internal FROM Properties WHERE note_id = :noteId";
-        if (!$includeInternal) {
-            $sql .= " AND internal = 0";
-        }
-        $sql .= " ORDER BY name";
+        $sql = "SELECT name, value, weight, created_at FROM Properties WHERE note_id = :noteId AND active = 1 ORDER BY created_at ASC";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindParam(':noteId', $noteId, PDO::PARAM_INT);
@@ -98,51 +88,44 @@ class DataManager {
         return $this->_formatProperties($propertiesResult, $includeInternal);
     }
 
+    /**
+     * Retrieves a single note by its ID, including its formatted properties.
+     *
+     * @param int $noteId The ID of the note.
+     * @param bool $includeInternal If true, includes properties not normally visible in view mode.
+     * @return array|null The note data or null if not found.
+     */
     public function getNoteById($noteId, $includeInternal = false) {
+        // The `has_attachments` check is useful for the frontend.
         $sql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes WHERE Notes.id = :id";
-        if (!$includeInternal) {
-            // This condition needs to be carefully considered.
-            // If a note itself is marked internal, should it be excluded here?
-            // The original api/notes.php had "AND internal = 0" for the note itself.
-            // Let's assume for now that `includeInternal` refers to properties primarily,
-            // but if a note itself is internal, it might be filtered by the calling context or a direct SQL clause.
-            // For now, let's stick to the provided signature and focus on properties' internal status.
-            // The `internal` column on the Notes table itself will be returned as is.
-        }
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindParam(':id', $noteId, PDO::PARAM_INT);
         $stmt->execute();
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($note) {
-            if (!$includeInternal && $note['internal'] == 1) {
-                return null; // If the note itself is internal and we are not including internal items.
-            }
+            // Note: The 'internal' column on the Notes table itself no longer exists in the new schema.
+            // Visibility is now determined by properties.
             $note['properties'] = $this->getNoteProperties($noteId, $includeInternal);
         }
         
         return $note;
     }
 
+    /**
+     * Retrieves all notes for a given page ID, including their formatted properties.
+     *
+     * @param int $pageId The ID of the page.
+     * @param bool $includeInternal If true, includes properties not normally visible in view mode.
+     * @return array An array of note data.
+     */
     public function getNotesByPageId($pageId, $includeInternal = false) {
-        $notesSql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes WHERE Notes.page_id = :pageId";
-        if (!$includeInternal) {
-            $notesSql .= " AND Notes.internal = 0"; // Added Notes. prefix for clarity
-        }
-        $notesSql .= " ORDER BY Notes.order_index ASC"; // Added Notes. prefix for clarity
-        
-        error_log("[DEBUG] getNotesByPageId called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
-        error_log("[DEBUG] SQL query: " . $notesSql);
+        $notesSql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes WHERE Notes.page_id = :pageId AND Notes.active = 1 ORDER BY Notes.order_index ASC";
         
         $stmt = $this->pdo->prepare($notesSql);
         $stmt->bindParam(':pageId', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        error_log("[DEBUG] Found " . count($notes) . " notes for pageId: " . $pageId);
-        if (!empty($notes)) {
-            error_log("[DEBUG] First note: " . json_encode($notes[0]));
-        }
         
         if (empty($notes)) {
             return [];
@@ -150,104 +133,107 @@ class DataManager {
 
         $noteIds = array_column($notes, 'id');
         
-        // Fetch all properties for these notes in a single query
+        // Fetch all properties for these notes in a single query for efficiency.
         $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
-        $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
-        if (!$includeInternal) {
-            $propSql .= " AND internal = 0";
-        }
-        $propSql .= " ORDER BY name";
+        $propSql = "SELECT note_id, name, value, weight, created_at FROM Properties WHERE note_id IN ($placeholders) AND active = 1 ORDER BY created_at ASC";
 
         $stmtProps = $this->pdo->prepare($propSql);
         $stmtProps->execute($noteIds);
         $allPropertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
         
-        // Group properties by note_id
+        // Group properties by note_id for easy distribution.
         $propertiesByNoteId = [];
         foreach ($allPropertiesResult as $prop) {
             $propertiesByNoteId[$prop['note_id']][] = $prop;
         }
         
-        // Embed properties into each note
+        // Embed formatted properties into each note.
         foreach ($notes as &$note) {
             $currentNoteProperties = $propertiesByNoteId[$note['id']] ?? [];
             $note['properties'] = $this->_formatProperties($currentNoteProperties, $includeInternal);
         }
-        unset($note); // Break the reference
+        unset($note); // Break the reference.
         
         return $notes;
     }
 
+    /**
+     * Retrieves a single page by its ID, including its formatted properties.
+     *
+     * @param int $pageId The ID of the page.
+     * @param bool $includeInternal If true, includes properties not normally visible in view mode.
+     * @return array|null The page data or null if not found.
+     */
     public function getPageDetailsById($pageId, $includeInternal = false) {
-        error_log("[DEBUG] getPageDetailsById called for pageId: " . $pageId);
-        
-        $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = :id");
+        $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = :id AND active = 1");
         $stmt->bindParam(':id', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $page = $stmt->fetch(PDO::FETCH_ASSOC);
-        error_log("[DEBUG] Raw page data from database: " . json_encode($page));
 
         if ($page) {
-            error_log("[DEBUG] Getting page properties");
             $page['properties'] = $this->getPageProperties($pageId, $includeInternal);
-            error_log("[DEBUG] Page properties: " . json_encode($page['properties']));
         }
         return $page;
     }
 
+    /**
+     * Retrieves a page and all of its notes, with formatted properties for both.
+     *
+     * @param int $pageId The ID of the page.
+     * @param bool $includeInternal If true, includes properties not normally visible in view mode.
+     * @return array|null An array containing page and notes, or null if the page is not found.
+     */
     public function getPageWithNotes($pageId, $includeInternal = false) {
-        error_log("[DEBUG] getPageWithNotes called for pageId: " . $pageId);
-        
         $pageDetails = $this->getPageDetailsById($pageId, $includeInternal);
-        error_log("[DEBUG] getPageDetailsById result: " . json_encode($pageDetails));
 
         if (!$pageDetails) {
-            error_log("[DEBUG] Page not found by getPageDetailsById for ID: " . $pageId . ". Returning null from getPageWithNotes."); // Updated log
-            return null; // Added this line
+            return null; // Page not found, return null as per API conventions.
         }
         
-        // If $pageDetails was null, the function now exits above.
-        // The original code continued here:
-        // error_log("[DEBUG] Page not found for ID: " . $pageId); // This log might be confusing if pageDetails is null and we proceed.
-        // We should ensure this part is only reached if $pageDetails is valid.
-
         $notes = $this->getNotesByPageId($pageId, $includeInternal);
-        error_log("[DEBUG] getNotesByPageId result: " . json_encode($notes));
         
         return [
             'page' => $pageDetails,
             'notes' => $notes
         ];
     }
-
+    
+    /**
+     * Retrieves formatted properties for multiple note IDs in a single call.
+     *
+     * @param array $noteIds An array of note IDs.
+     * @param bool $includeInternal If true, includes properties not normally visible in view mode.
+     * @return array An associative array mapping note IDs to their formatted properties.
+     */
     public function getPropertiesForNoteIds(array $noteIds, $includeInternal = false) {
         if (empty($noteIds)) {
             return [];
         }
 
         $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
-        $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
-        
-        // Consider if properties themselves should be filtered by their own 'internal' flag here
-        // For now, this method fetches all properties and relies on _formatProperties to handle the includeInternal display logic.
-        // If an `AND internal = 0` clause is needed here based on $includeInternal, it would be:
-        // if (!$includeInternal) { $propSql .= " AND internal = 0"; }
-        // However, _formatProperties is designed to handle this at the formatting stage.
-
-        $propSql .= " ORDER BY note_id, name"; // Order by note_id for easier grouping
+        $propSql = "SELECT note_id, name, value, weight, created_at FROM Properties WHERE note_id IN ($placeholders) AND active = 1 ORDER BY note_id, created_at ASC";
 
         $stmtProps = $this->pdo->prepare($propSql);
         $stmtProps->execute($noteIds);
         $allPropertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
 
+        // Group raw properties by their note_id.
         $propertiesByNoteIdRaw = [];
         foreach ($allPropertiesResult as $prop) {
             $propertiesByNoteIdRaw[$prop['note_id']][] = $prop;
         }
 
+        // Format the properties for each note.
         $formattedPropertiesByNoteId = [];
         foreach ($propertiesByNoteIdRaw as $noteId => $props) {
             $formattedPropertiesByNoteId[$noteId] = $this->_formatProperties($props, $includeInternal);
+        }
+        
+        // Ensure even notes with no properties are represented in the output array if they were requested.
+        foreach ($noteIds as $noteId) {
+            if (!isset($formattedPropertiesByNoteId[$noteId])) {
+                $formattedPropertiesByNoteId[$noteId] = [];
+            }
         }
         
         return $formattedPropertiesByNoteId;
