@@ -378,7 +378,7 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
                     'property' => [
                         'name' => $savedProperty['name'],
                         'value' => $savedProperty['value'],
-                        'internal' => (int)$savedProperty['internal']
+                        'colon_count' => (int)$savedProperty['colon_count']
                     ]
                 ];
                 ApiResponse::success($response);
