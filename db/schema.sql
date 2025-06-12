@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS Notes (
     page_id INTEGER NOT NULL,
     parent_note_id INTEGER,
     content TEXT,
+    internal INTEGER NOT NULL DEFAULT 0,
     order_index INTEGER NOT NULL DEFAULT 0,
     collapsed INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
