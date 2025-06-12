@@ -59,12 +59,19 @@ export async function handleTransclusions() {
 }
 
 async function displayBacklinks(pageName) {
-    if (!ui.domRefs.backlinksContainer) return;
+    console.log('displayBacklinks called for page:', pageName); // Debug log
+    if (!ui.domRefs.backlinksContainer) {
+        console.warn('Backlinks container DOM element not found.'); // Debug log
+        return;
+    }
     try {
         const response = await searchAPI.getBacklinks(pageName);
+        console.log('Backlinks API response:', response); // Debug log
         const backlinksData = response.results || [];
+        console.log('Processed backlinks data:', backlinksData); // Debug log
         if (backlinksData.length === 0) {
             ui.domRefs.backlinksContainer.innerHTML = '<p>No backlinks found.</p>';
+            console.log('No backlinks found for page:', pageName); // Debug log
             return;
         }
         const html = backlinksData.map(link => `
@@ -74,6 +81,7 @@ async function displayBacklinks(pageName) {
             </div>
         `).join('');
         ui.domRefs.backlinksContainer.innerHTML = html;
+        console.log('Backlinks rendered successfully.'); // Debug log
     } catch (error) {
         console.error("Error fetching backlinks:", error);
         ui.domRefs.backlinksContainer.innerHTML = '<p>Error loading backlinks.</p>';

@@ -15,6 +15,7 @@ export const domRefs = {
     noteFocusBreadcrumbsContainer: document.getElementById('note-focus-breadcrumbs-container'),
     // **FIX**: Corrected the ID to match the HTML
     extensionIconsContainer: document.getElementById('extension-icons-container'),
+    backlinksContainer: document.getElementById('backlinks-container'),
     
     // Modals
     pagePropertiesModal: document.getElementById('page-properties-modal'),
