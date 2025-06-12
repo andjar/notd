@@ -9,17 +9,15 @@
  * The default initial page is today's journal page in 'YYYY-MM-DD' format.
  */
 
-// Determine the initial page name.
-// This logic should be minimal and match what the JavaScript expects.
+// Determine the initial page name. This should match the logic in the JS app.
 $initial_page_name = date('Y-m-d');
 
 // Construct the URL for the main application shell.
 // We use urlencode() to ensure the page name is safely passed in the URL.
 $redirect_url = 'page.php?page=' . urlencode($initial_page_name);
 
-// Perform the redirect.
-// HTTP 302 is a temporary redirect, which is appropriate here as the "home"
-// page changes daily.
+// Perform a temporary (302) redirect, which is appropriate as the "home"
+// page changes daily. This prevents aggressive browser caching of the redirect.
 header('Location: ' . $redirect_url, true, 302);
 
 // Ensure no further code is executed after the redirect header is sent.

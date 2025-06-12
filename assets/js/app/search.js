@@ -23,7 +23,7 @@ function highlightSearchTerms(text, searchTerm) {
 }
 
 function displaySearchResults(results) {
-    const searchResultsEl = ui.domRefs.searchResults; // Use ui.domRefs
+    const searchResultsEl = ui.domRefs.searchResults;
     if (!searchResultsEl) return;
 
     if (!results || results.length === 0) {
@@ -46,30 +46,18 @@ function displaySearchResults(results) {
         const resultItem = e.target.closest('.search-result-item');
         if (resultItem) {
             const pageName = resultItem.dataset.pageName;
-            const noteId = resultItem.dataset.noteId;
             
             if (ui.domRefs.globalSearchInput) ui.domRefs.globalSearchInput.value = '';
             searchResultsEl.classList.remove('has-results');
             searchResultsEl.innerHTML = '';
             
-            loadPage(pageName).then(() => {
-                if (noteId) {
-                    const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
-                    if (noteElement) {
-                        noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        const contentDiv = noteElement.querySelector('.note-content');
-                        if (contentDiv) {
-                            setTimeout(() => contentDiv.focus(), 100);
-                        }
-                    }
-                }
-            });
+            loadPage(pageName);
         }
     });
 }
 
 const debouncedSearch = debounce(async (query) => {
-    const searchResultsEl = ui.domRefs.searchResults; // Use ui.domRefs
+    const searchResultsEl = ui.domRefs.searchResults;
     if (!searchResultsEl) return;
 
     if (!query.trim()) {
@@ -79,7 +67,7 @@ const debouncedSearch = debounce(async (query) => {
     }
     
     try {
-        const response = await searchAPI.search(query); // Assumes searchAPI is global
+        const response = await searchAPI.search(query);
         if (response && Array.isArray(response.results)) {
             displaySearchResults(response.results);
         } else {
@@ -109,7 +97,9 @@ async function openSearchOrCreatePageModal() {
         return;
     }
     try {
-        allPagesForSearch = await pagesAPI.getPages({ excludeJournal: true }); // Assumes pagesAPI is global
+        // CORRECTED: Destructure the 'pages' array from the response object.
+        const { pages } = await pagesAPI.getPages({ excludeJournal: true });
+        allPagesForSearch = pages || [];
     } catch (error) {
         console.error('Failed to fetch pages for search modal:', error);
         allPagesForSearch = []; 
@@ -132,11 +122,12 @@ function renderPageSearchResults(query) {
     ui.domRefs.pageSearchModalResults.innerHTML = '';
     selectedSearchResultIndex = -1; 
 
+    const lowerCaseQuery = query.toLowerCase();
     const filteredPages = allPagesForSearch.filter(page => 
-        page.name.toLowerCase().includes(query.toLowerCase())
+        page.name.toLowerCase().includes(lowerCaseQuery)
     );
 
-    filteredPages.forEach(page => {
+    filteredPages.slice(0, 10).forEach(page => {
         const li = document.createElement('li');
         li.textContent = page.name;
         li.dataset.pageName = page.name;
@@ -144,7 +135,7 @@ function renderPageSearchResults(query) {
         ui.domRefs.pageSearchModalResults.appendChild(li);
     });
 
-    const exactMatch = allPagesForSearch.some(page => page.name.toLowerCase() === query.toLowerCase());
+    const exactMatch = allPagesForSearch.some(page => page.name.toLowerCase() === lowerCaseQuery);
     if (query.trim() !== '' && !exactMatch) {
         const li = document.createElement('li');
         li.classList.add('create-new-option');
@@ -165,7 +156,7 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
     closeSearchOrCreatePageModal();
     if (isCreate) {
         try {
-            const newPage = await pagesAPI.createPage(pageName); // Pass pageName directly as string
+            const newPage = await pagesAPI.createPage(pageName);
             if (newPage && newPage.id) {
                 await fetchAndDisplayPages(newPage.name); 
                 await loadPage(newPage.name, true); 
@@ -177,7 +168,7 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
             alert(`Error creating page: ${error.message}`);
         }
     } else {
-        await loadPage(pageName, true);
+        await loadPage(pageName);
     }
 }
 

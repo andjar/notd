@@ -44,21 +44,26 @@ export const sidebarState = {
                 console.error("Favorites container not found");
                 return;
             }
-            favoritesContainer.innerHTML = 'Loading favorites...'; // Initial message
+            favoritesContainer.innerHTML = 'Loading favorites...';
     
             try {
-                const pages = await pagesAPI.getPages({ include_details: true });
+                // CORRECTED: Destructure the 'pages' array from the response object.
+                const { pages } = await pagesAPI.getPages({ include_details: true });
+
+                // This check is now valid because 'pages' is the array.
                 if (!pages || !Array.isArray(pages)) {
                     favoritesContainer.innerHTML = 'Could not load favorites.';
                     console.error('Failed to fetch pages or invalid response:', pages);
                     return;
                 }
     
+                // CORRECTED: Filter based on the new property structure.
+                // A page is a favorite if it has a 'favorite' property array where at least one entry's value is 'true'.
                 const favoritePages = pages.filter(
-                    page => page.properties && page.properties.favorite === 'true'
+                    page => page.properties?.favorite?.some(prop => String(prop.value).toLowerCase() === 'true')
                 );
     
-                favoritesContainer.innerHTML = ''; // Clear loading message
+                favoritesContainer.innerHTML = '';
     
                 if (favoritePages.length === 0) {
                     favoritesContainer.textContent = 'No favorite pages yet.';
@@ -76,45 +81,45 @@ export const sidebarState = {
     
                 pagesToDisplay.forEach(page => {
                     const link = document.createElement('a');
-                    link.href = `page.php?id=${page.id}`;
+                    link.href = `page.php?page=${encodeURIComponent(page.name)}`; // Use page name for consistency
                     link.textContent = page.name;
-                    link.classList.add('favorite-page-link'); // Add a class for potential styling
+                    link.classList.add('favorite-page-link');
                     favoritesContainer.appendChild(link);
                 });
     
                 if (showMoreNeeded) {
                     const showMoreBtn = document.createElement('button');
                     showMoreBtn.textContent = `Show more (${favoritePages.length - displayLimit})`;
-                    showMoreBtn.classList.add('show-more-favorites-btn'); // Add a class
+                    showMoreBtn.classList.add('show-more-favorites-btn');
                     showMoreBtn.addEventListener('click', () => {
-                        favoritesContainer.innerHTML = ''; // Clear current items and button
-                        favoritePages.forEach(page => { // Render all favorites
+                        favoritesContainer.innerHTML = '';
+                        favoritePages.forEach(page => {
                             const link = document.createElement('a');
-                            link.href = `page.php?id=${page.id}`;
+                            link.href = `page.php?page=${encodeURIComponent(page.name)}`;
                             link.textContent = page.name;
                             link.classList.add('favorite-page-link');
                             favoritesContainer.appendChild(link);
                         });
-                    }, { once: true }); // Remove listener after first click
+                    }, { once: true });
                     favoritesContainer.appendChild(showMoreBtn);
                 }
     
             } catch (error) {
                 console.error("Error rendering favorites:", error);
-                if (favoritesContainer) { // Check again in case error happened before it was set
+                if (favoritesContainer) {
                     favoritesContainer.innerHTML = 'Error loading favorites.';
                 }
             }
         },
         async renderExtensionIcons() {
-            const apiUrl = 'api/v1/extensions.php'; // Ensure this path is correct from your web root
+            const apiUrl = 'api/v1/extensions.php';
             const iconsContainer = ui.domRefs.extensionIconsContainer;
 
             if (!iconsContainer) {
                 console.error('Extension icons container (extension-icons-container) not found.');
                 return;
             }
-            iconsContainer.innerHTML = ''; // Clear existing icons
+            iconsContainer.innerHTML = '';
 
             try {
                 const response = await fetch(apiUrl);
@@ -123,32 +128,35 @@ export const sidebarState = {
                 }
                 const data = await response.json();
 
-                if (data.success && Array.isArray(data.extensions)) {
-                    if (data.extensions.length === 0) {
-                        // iconsContainer.textContent = 'No active extensions.'; // Optional: display message
+                // CORRECTED: Check for the new API response format.
+                if (data.status === 'success' && data.data && Array.isArray(data.data.extensions)) {
+                    if (data.data.extensions.length === 0) {
                         return; // Nothing to render
                     }
 
-                    data.extensions.forEach(extension => {
+                    data.data.extensions.forEach(extension => {
                         const linkEl = document.createElement('a');
-                        linkEl.href = `extensions/${extension.name}/index.php`; // Link to the extension's entry point
-                        linkEl.title = extension.name; // Tooltip for accessibility
+                        linkEl.href = `extensions/${extension.name}/index.php`;
+                        linkEl.title = extension.name;
 
-                        const iconEl = document.createElement('i'); // Using <i> as is common for icon fonts/SVG icons
+                        const iconEl = document.createElement('i');
                         iconEl.setAttribute('data-feather', extension.featherIcon);
-                        iconEl.classList.add('sidebar-extension-icon'); // For common styling
+                        iconEl.classList.add('sidebar-extension-icon');
                         
                         linkEl.appendChild(iconEl);
                         iconsContainer.appendChild(linkEl);
                     });
+                    
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
 
                 } else {
-                    console.error('Failed to load extension icons or data format is incorrect:', data);
-                    // iconsContainer.textContent = 'Error loading extensions.'; // Optional: display error
+                    throw new Error('Failed to load extension icons or data format is incorrect.');
                 }
             } catch (error) {
                 console.error('Error fetching or rendering extension icons:', error);
-                // iconsContainer.textContent = 'Error loading extensions.'; // Optional: display error
+                if(iconsContainer) iconsContainer.innerHTML = '<small>Extensions unavailable</small>';
             }
         }
     },
@@ -173,11 +181,8 @@ export const sidebarState = {
             document.body.classList.toggle('right-sidebar-collapsed', this.right.isCollapsed);
             this.right.updateButtonVisuals();
             this.right.button.addEventListener('click', () => this.right.toggle());
-            if (this.right.element) { // Ensure right sidebar exists
+            if (this.right.element) {
                 await Promise.all([this.right.renderFavorites(), this.right.renderExtensionIcons()]);
-            }
-            if (typeof feather !== 'undefined') {
-                feather.replace();
             }
         }
     }

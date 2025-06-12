@@ -4,8 +4,7 @@
  */
 
 // State imports
-import { notesForCurrentPage, currentPageName, saveStatus, setSaveStatus } from './state.js';
-import { debounce } from '../utils.js';
+import { setSaveStatus } from './state.js';
 
 // Module initializers and core functions
 import { sidebarState } from './sidebar.js';
@@ -17,62 +16,67 @@ import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js'
 // Import UI module
 import { ui } from '../ui.js';
 
-async function initializeApp() {
+/**
+ * Initializes the entire application.
+ * This function sets up UI components, event listeners, and loads the initial page.
+ */
+export async function initializeApp() {
     const splashScreen = document.getElementById('splash-screen');
     if (splashScreen) splashScreen.classList.remove('hidden'); 
     
     try {
+        // Initialize sidebars
         sidebarState.init(); 
         
-        // Initialize UI components
-        if (typeof ui !== 'undefined') {
-            ui.initPagePropertiesModal();
-            ui.updateSaveStatusIndicator('saved');
-        } else {
-            console.error("UI module not loaded. Please check script loading order.");
-            return;
-        }
+        // Initialize UI components and modals
+        ui.initPagePropertiesModal();
+        ui.updateSaveStatusIndicator('saved');
         
+        // Initialize search functionalities
         initGlobalSearch();
         initPageSearchModal();
+        
+        // Set up global event listeners (e.g., popstate, keyboard shortcuts)
         initGlobalEventListeners();
         
-        // Initialize page link suggestions
+        // Initialize the UI for page link suggestions `[[...]]`
         initSuggestionUI();
-        fetchAllPages(); // Asynchronously fetch page names
+        // Asynchronously fetch all page names for the suggestion cache
+        fetchAllPages(); 
         
+        // Determine the initial page to load from URL or default
         const urlParams = new URLSearchParams(window.location.search);
         const initialPageName = urlParams.get('page') || getInitialPage(); 
         
+        // Load the main page content
         await loadPage(initialPageName, false); 
+        // Fetch and display the list of recent pages in the sidebar
         await fetchAndDisplayPages(initialPageName);
         
+        // Pre-fetch data for other recent pages in the background
         await prefetchRecentPagesData(); 
         
+        // Hide the initial save indicator until a change is made
         const initialSaveIndicator = document.getElementById('save-status-indicator');
         if (initialSaveIndicator) {
             initialSaveIndicator.classList.add('status-hidden'); 
         }
         
+        console.log('App initialized successfully');
+        
+    } catch (error) { 
+        console.error('Failed to initialize application:', error);
+        // Ensure splash screen is hidden on error to show error message
+        if (splashScreen) splashScreen.classList.add('hidden');
+        // Provide feedback to the user in case of a critical initialization failure
+        document.body.innerHTML = `<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>${error.message}</p><p>Check console for details.</p></div>`;
+    } finally {
+        // Ensure the splash screen is always hidden after initialization attempt
         if (splashScreen) {
             if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
                 window.splashAnimations.stop();
             }
             splashScreen.classList.add('hidden');
         }
-        console.log('App initialized successfully');
-        
-    } catch (error) { 
-        console.error('Failed to initialize application:', error);
-        if (splashScreen && typeof window.splashAnimations !== 'undefined' && typeof window.splashAnimations.stop === 'function') {
-            window.splashAnimations.stop(); 
-        }
-        if(splashScreen) splashScreen.classList.add('hidden');
-        if (document.body) {
-            document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>' + error.message + '</p>Check console for details.</div>';
-        }
     }
 }
-
-// Export the initializeApp function
-export { initializeApp };
