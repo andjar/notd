@@ -1,25 +1,14 @@
-// Import UI module
+import { pagesAPI, searchAPI } from '../api_client.js';
+import { loadPage, fetchAndDisplayPages } from './page-loader.js';
+import { debounce, safeAddEventListener } from '../utils.js';
 import { ui } from '../ui.js';
 
-// Import page management
-import { loadPage, fetchAndDisplayPages } from './page-loader.js';
-
-// Import utilities
-import { debounce, safeAddEventListener } from '../utils.js';
-
-// Import API clients
-import { searchAPI, pagesAPI } from '../api_client.js';
-
-// --- Variables ---
-let allPagesForSearch = [];
-let selectedSearchResultIndex = -1; // Specific to page search modal
-
-// --- Global Search Logic ---
+// --- Global Search (Sidebar) ---
 
 function highlightSearchTerms(text, searchTerm) {
     if (!searchTerm || !text) return text;
     const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, `<span class="search-result-highlight">$1</span>`);
+    return text.replace(regex, '<span class="search-result-highlight">$1</span>');
 }
 
 function displaySearchResults(results) {
@@ -33,7 +22,7 @@ function displaySearchResults(results) {
     }
 
     const html = results.map(result => `
-        <div class="search-result-item" data-page-name="${result.page_name}" data-note-id="${result.note_id}">
+        <div class="search-result-item" data-page-name="${result.page_name}">
             <div class="search-result-title">${result.page_name}</div>
             <div class="search-result-snippet">${highlightSearchTerms(result.content_snippet, ui.domRefs.globalSearchInput.value)}</div>
         </div>
@@ -68,8 +57,6 @@ const debouncedSearch = debounce(async (query) => {
     
     try {
         const response = await searchAPI.search(query);
-        // The search API returns the full object { results: [...], pagination: ... } inside the `data` key.
-        // The apiRequest client returns this object.
         if (response && Array.isArray(response.results)) {
             displaySearchResults(response.results);
         } else {
@@ -85,22 +72,21 @@ const debouncedSearch = debounce(async (query) => {
 
 export function initGlobalSearch() {
     if (ui.domRefs.globalSearchInput) {
-        safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => {
-            debouncedSearch(e.target.value);
-        }, 'globalSearchInput');
+        safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => debouncedSearch(e.target.value), 'globalSearchInput');
     }
 }
 
-// --- Page Search Modal Logic ---
+
+// --- Page Search Modal ---
+
+let allPagesForSearch = [];
+let selectedSearchResultIndex = -1;
 
 async function openSearchOrCreatePageModal() {
-    if (!ui.domRefs.pageSearchModal || !ui.domRefs.pageSearchModalInput || !ui.domRefs.pageSearchModalResults || !ui.domRefs.pageSearchModalCancel) {
-        console.error('Page search modal elements not found!');
-        return;
-    }
+    if (!ui.domRefs.pageSearchModal) return;
     try {
         // **FIXED**: Destructure the `pages` array from the response object.
-        const { pages } = await pagesAPI.getPages({ excludeJournal: true });
+        const { pages } = await pagesAPI.getPages({ excludeJournal: true, per_page: 5000 });
         allPagesForSearch = pages || [];
     } catch (error) {
         console.error('Failed to fetch pages for search modal:', error);
@@ -113,10 +99,8 @@ async function openSearchOrCreatePageModal() {
 }
 
 function closeSearchOrCreatePageModal() {
-    if (ui.domRefs.pageSearchModal) {
-        ui.domRefs.pageSearchModal.classList.remove('active');
-    }
-    selectedSearchResultIndex = -1; 
+    if (ui.domRefs.pageSearchModal) ui.domRefs.pageSearchModal.classList.remove('active');
+    selectedSearchResultIndex = -1;
 }
 
 function renderPageSearchResults(query) {
@@ -142,7 +126,7 @@ function renderPageSearchResults(query) {
         const li = document.createElement('li');
         li.classList.add('create-new-option');
         li.innerHTML = `Create page: <span>"${query}"</span>`;
-        li.dataset.pageName = query; 
+        li.dataset.pageName = query;
         li.dataset.isCreate = 'true';
         li.addEventListener('click', () => selectAndActionPageSearchResult(query, true));
         ui.domRefs.pageSearchModalResults.appendChild(li);
@@ -183,9 +167,7 @@ export function initPageSearchModal() {
     }
 
     if (ui.domRefs.pageSearchModalInput) {
-        ui.domRefs.pageSearchModalInput.addEventListener('input', (e) => {
-            renderPageSearchResults(e.target.value);
-        });
+        ui.domRefs.pageSearchModalInput.addEventListener('input', (e) => renderPageSearchResults(e.target.value));
 
         ui.domRefs.pageSearchModalInput.addEventListener('keydown', (e) => {
             const items = ui.domRefs.pageSearchModalResults.children;
@@ -211,24 +193,19 @@ export function initPageSearchModal() {
                 case 'Enter':
                     e.preventDefault();
                     const pageName = ui.domRefs.pageSearchModalInput.value.trim();
-
                     if (!pageName) {
                         closeSearchOrCreatePageModal();
                         return;
                     }
                     
-                    // If user is navigating list with arrows, respect that. Otherwise, use text.
                     if (selectedSearchResultIndex > -1 && items[selectedSearchResultIndex]) {
                         const selectedItem = items[selectedSearchResultIndex];
-                        // If the typed text is what is selected, proceed.
                         if (pageName.toLowerCase() === selectedItem.dataset.pageName.toLowerCase()) {
                            selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
                            return;
                         }
                     }
-
                     const exactMatch = allPagesForSearch.find(p => p.name.toLowerCase() === pageName.toLowerCase());
-
                     if (exactMatch) {
                         selectAndActionPageSearchResult(exactMatch.name, false);
                     } else {
@@ -242,7 +219,6 @@ export function initPageSearchModal() {
         });
     }
 
-    // Global Ctrl+Space listener
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.code === 'Space') {
             e.preventDefault();

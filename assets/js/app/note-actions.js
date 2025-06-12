@@ -1,12 +1,12 @@
 /**
  * @file Manages note-related actions such as creation, updates, deletion,
- * indentation, and interaction handling (keyboard, clicks). It orchestrates
- * optimistic UI updates and communication with the backend API using batch operations.
+ * indentation, and interaction handling. It orchestrates optimistic UI updates
+ * and communication with the backend API using batch operations.
  */
 
 import {
-    notesForCurrentPage,
     currentPageId,
+    notesForCurrentPage,
     addNoteToCurrentPage,
     updateNoteInCurrentPage,
     removeNoteFromCurrentPageById,
@@ -37,14 +37,10 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
         return;
     }
     const permanentId = noteFromServer.id;
-
     const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(clientTempId));
     if (noteIndex > -1) {
         notesForCurrentPage[noteIndex] = { ...notesForCurrentPage[noteIndex], ...noteFromServer, id: permanentId };
-    } else {
-        console.warn(`[_finalizeNewNote] Could not find note with temp ID ${clientTempId} in local state to finalize.`);
     }
-
     const tempNoteEl = getNoteElementById(clientTempId);
     if (tempNoteEl) {
         tempNoteEl.dataset.noteId = permanentId;
@@ -64,8 +60,6 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         const batchResponse = await notesAPI.batchUpdateNotes(operations);
         let allSubOperationsSucceeded = true;
         
-        // **FIXED**: The API client now returns the object containing the results array.
-        // We must iterate over `batchResponse.results`.
         if (batchResponse && Array.isArray(batchResponse.results)) {
             batchResponse.results.forEach(opResult => {
                 if (opResult.status === 'error') {
@@ -96,34 +90,22 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
 }
 
 // --- Note Saving Logic ---
-
 async function _saveNoteToServer(noteId, rawContent) {
     if (String(noteId).startsWith('temp-')) return null;
     
-    // Prepare the content for saving, including encryption if applicable
     let contentToSave = rawContent;
     if (window.decryptionPassword) {
         contentToSave = encrypt(rawContent, window.decryptionPassword);
     }
-
+    
     const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
 
     const operations = [{
         type: 'update',
-        payload: {
-            id: noteId,
-            page_id: currentPageId, // Ensure page_id is sent for context if needed by backend
-            content: contentToSave
-        }
+        payload: { id: noteId, content: contentToSave }
     }];
 
-    // Using executeBatchOperations for consistency and error handling
-    const success = await executeBatchOperations(originalNotesState, operations, () => {
-        // Optimistic DOM update for content is handled elsewhere (e.g., when typing stops)
-        // This save operation only ensures the data is sent to the server.
-        // updateNoteInCurrentPage is called by executeBatchOperations on success via opResult.note
-    }, "Save Note Content");
-
+    const success = await executeBatchOperations(originalNotesState, operations, null, "Save Note Content");
     return success ? getNoteDataById(noteId) : null;
 }
 
@@ -149,7 +131,6 @@ export const debouncedSaveNote = debounce(async (noteEl) => {
 }, 1000);
 
 // --- Event Handlers for Structural Changes ---
-
 export async function handleAddRootNote() {
     if (!currentPageId) return;
     const clientTempId = `temp-R-${Date.now()}`;
@@ -164,7 +145,6 @@ export async function handleAddRootNote() {
     const operations = [{ type: 'create', payload: { page_id: currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    // Optimistically update local state for siblings
     siblingUpdates.forEach(upd => {
         const note = getNoteDataById(upd.id);
         if(note) note.order_index = upd.newOrderIndex;
@@ -187,7 +167,6 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
 
     const clientTempId = `temp-E-${Date.now()}`;
     const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
-
     const siblings = notesForCurrentPage.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a, b) => a.order_index - b.order_index);
     const currentNoteIndexInSiblings = siblings.findIndex(n => String(n.id) === String(noteData.id));
     const nextSibling = siblings[currentNoteIndexInSiblings + 1];
@@ -196,14 +175,13 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     
     const optimisticNewNote = { id: clientTempId, page_id: currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
     addNoteToCurrentPage(optimisticNewNote);
-
+    
     const operations = [{ type: 'create', payload: { page_id: currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    // Optimistically update local state for siblings
     siblingUpdates.forEach(op => {
-        const note = getNoteDataById(op.payload.id);
-        if (note) note.order_index = op.payload.order_index;
+        const note = getNoteDataById(op.id);
+        if (note) note.order_index = op.newOrderIndex;
     });
 
     const optimisticDOMUpdater = () => {
@@ -218,9 +196,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Sibling Note");
 }
 
-async function handleTabKey(e, noteItem, noteData, contentDiv) {
+async function handleTabKey(e, noteItem, noteData) {
     e.preventDefault();
-    await saveNoteImmediately(noteItem); // Ensure content is saved before structural change
+    await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
 
     const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
     let operations = [];
@@ -250,7 +228,7 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
         siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     }
     
-    // **FIXED**: Perform optimistic state updates before calling the batch operation
+    // Perform optimistic state updates before calling the batch operation
     const noteToMove = getNoteDataById(noteData.id);
     if(noteToMove) noteToMove.parent_note_id = newParentId;
     operations.forEach(op => {
@@ -269,7 +247,6 @@ async function handleTabKey(e, noteItem, noteData, contentDiv) {
             if (newContentDiv) ui.switchToEditMode(newContentDiv);
         }
     };
-
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
 }
 
@@ -318,101 +295,6 @@ function handleArrowKey(e, contentDiv) {
     }
 }
 
-export async function handleNoteKeyDown(e) {
-    if (!e.target.matches('.note-content')) return;
-    const noteItem = e.target.closest('.note-item');
-    if (!noteItem) return;
-
-    const noteId = noteItem.dataset.noteId;
-    const contentDiv = e.target;
-    const noteData = getNoteDataById(noteId);
-
-    // Handle shortcuts and auto-close brackets first if in edit mode
-    if (contentDiv.classList.contains('edit-mode')) {
-        if (await handleShortcutExpansion(e, contentDiv)) return;
-        if (handleAutocloseBrackets(e)) return;
-    }
-
-    // --- Pre-action checks for structural changes ---
-    const structuralKeys = ['Enter', 'Tab', 'Backspace'];
-    if (structuralKeys.includes(e.key) && !e.shiftKey) { // Shift+Key usually has different meaning
-        if (String(noteId).startsWith('temp-')) {
-            console.warn(`Structural action (${e.key}) blocked on temp note ID: ${noteId}`);
-            e.preventDefault(); return;
-        }
-        if (!noteData) {
-            console.warn(`Note data not found for ID: ${noteId}. Key: ${e.key}. Blocking structural change.`);
-            e.preventDefault(); return;
-        }
-    }
-    // Allow Enter on rendered mode to switch to edit mode (handled in handleEnterKey)
-    // Allow arrow keys even if noteData is somehow missing (for navigation)
-
-    switch (e.key) {
-        case 'Enter':     await handleEnterKey(e, noteItem, noteData, contentDiv); break;
-        case 'Tab':       await handleTabKey(e, noteItem, noteData, contentDiv); break;
-        case 'Backspace': await handleBackspaceKey(e, noteItem, noteData, contentDiv); break;
-        case 'ArrowUp':
-        case 'ArrowDown':
-            if (contentDiv.classList.contains('edit-mode')) { // Only navigate if in edit mode
-                 handleArrowKey(e, contentDiv);
-            }
-            break;
-        // Default: allow native behavior for other keys (typing, etc.)
-    }
-}
-
-export async function handleTaskCheckboxClick(e) {
-    const checkbox = e.target;
-    const noteItem = checkbox.closest('.note-item');
-    if (!noteItem) return;
-    
-    const noteId = noteItem.dataset.noteId;
-    const noteData = getNoteDataById(noteId);
-    if (!noteData || String(noteId).startsWith('temp-')) {
-        checkbox.checked = !checkbox.checked;
-        return;
-    }
-    
-    let currentRawContent = noteData.content;
-    let newRawContent = currentRawContent;
-    const isChecked = checkbox.checked;
-    
-    const taskMarkers = ["TODO ", "DOING ", "SOMEDAY ", "DONE ", "WAITING ", "CANCELLED ", "NLR "];
-    const currentPrefix = taskMarkers.find(p => currentRawContent.toUpperCase().startsWith(p));
-    
-    if (currentPrefix) {
-        const contentWithoutPrefix = currentRawContent.substring(currentPrefix.length);
-        newRawContent = (isChecked ? 'DONE ' : 'TODO ') + contentWithoutPrefix;
-    } else {
-        newRawContent = (isChecked ? 'DONE ' : 'TODO ') + currentRawContent;
-    }
-
-    const contentDiv = noteItem.querySelector('.note-content');
-    if (contentDiv) {
-        contentDiv.dataset.rawContent = newRawContent;
-        contentDiv.innerHTML = ui.parseAndRenderContent(newRawContent);
-    }
-    noteData.content = newRawContent;
-    
-    try {
-        await _saveNoteToServer(noteId, newRawContent);
-    } catch (error) {
-        checkbox.checked = !checkbox.checked;
-        noteData.content = currentRawContent;
-        if (contentDiv) {
-            contentDiv.dataset.rawContent = currentRawContent;
-            contentDiv.innerHTML = ui.parseAndRenderContent(currentRawContent);
-        }
-    }
-}
-
-/**
- * Handles shortcut expansions (e.g., :tag: -> {tag::}).
- * @param {Event} e - The keyboard event.
- * @param {HTMLElement} contentDiv - The content-editable div.
- * @returns {Promise<boolean>} True if a shortcut was handled, false otherwise.
- */
 async function handleShortcutExpansion(e, contentDiv) {
     if (e.key !== ' ') return false;
     const selection = window.getSelection();
@@ -428,25 +310,52 @@ async function handleShortcutExpansion(e, contentDiv) {
     let replacementText = '';
     let cursorOffsetAfterReplace = 0;
 
-    if (precedingText2Chars === ':t') { replacementText = '{tag::}'; cursorOffsetAfterReplace = 6; }
-    else if (precedingText2Chars === ':d') { const today = new Date().toISOString().slice(0, 10); replacementText = `{date::${today}}`; cursorOffsetAfterReplace = replacementText.length; }
-    else if (precedingText2Chars === ':r') { const now = new Date().toISOString(); replacementText = `{timestamp::${now}}`; cursorOffsetAfterReplace = replacementText.length; }
-    else if (precedingText2Chars === ':k') { replacementText = '{keyword::}'; cursorOffsetAfterReplace = 10; }
+    if (precedingText2Chars === ':t') { replacementText = '{tag::}'; cursorOffsetAfterReplace = 1; }
+    else if (precedingText2Chars === ':d') { const today = new Date().toISOString().slice(0, 10); replacementText = `{date::${today}}`; cursorOffsetAfterReplace = 1; }
+    else if (precedingText2Chars === ':r') { const now = new Date().toISOString(); replacementText = `{timestamp::${now}}`; cursorOffsetAfterReplace = 1; }
+    else if (precedingText2Chars === ':k') { replacementText = '{keyword::}'; cursorOffsetAfterReplace = 1; }
 
     if (replacementText) {
         e.preventDefault();
-        insertTextAtCursor(replacementText, replacementText.length - cursorOffsetAfterReplace);
+        range.setStart(textNode, cursorPos - 2);
+        range.deleteContents();
+        insertTextAtCursor(replacementText, cursorOffsetAfterReplace);
         shortcutHandled = true;
     }
 
     if (shortcutHandled) {
         const noteItemForShortcut = contentDiv.closest('.note-item');
         if (noteItemForShortcut) {
-            const rawTextValue = window.ui.getRawTextWithNewlines(contentDiv);
-            contentDiv.dataset.rawContent = window.ui.normalizeNewlines(rawTextValue);
-            debouncedSaveNote(noteItemForShortcut); // Save after shortcut expansion
+            debouncedSaveNote(noteItemForShortcut);
         }
         return true;
     }
     return false;
+}
+
+export async function handleNoteKeyDown(e) {
+    if (!e.target.matches('.note-content')) return;
+    const noteItem = e.target.closest('.note-item');
+    const contentDiv = e.target;
+    if (!noteItem || !contentDiv) return;
+
+    const noteData = getNoteDataById(noteItem.dataset.noteId);
+    if (!noteData) return;
+
+    if (await handleShortcutExpansion(e, contentDiv)) return;
+    if (handleAutocloseBrackets(e)) return;
+    
+    switch (e.key) {
+        case 'Enter': return await handleEnterKey(e, noteItem, noteData, contentDiv);
+        case 'Tab': return await handleTabKey(e, noteItem, noteData);
+        case 'Backspace': return await handleBackspaceKey(e, noteItem, noteData, contentDiv);
+        case 'ArrowUp':
+        case 'ArrowDown': return handleArrowKey(e, contentDiv);
+    }
+}
+
+export async function handleTaskCheckboxClick(e) {
+    // This function is now delegated to `note-renderer.js` to keep it with the element creation logic.
+    // The call remains in app.js, but the implementation is now in the UI layer.
+    // This is a placeholder or can be removed if app.js calls the UI function directly.
 }

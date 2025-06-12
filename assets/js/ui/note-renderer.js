@@ -1362,6 +1362,43 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
     }
 }
 
+/**
+ * Renders the content of a fetched transclusion into its placeholder.
+ * @param {HTMLElement} placeholderEl - The placeholder element to be replaced.
+ * @param {string} noteContent - The raw content of the note to be rendered inside the placeholder.
+ * @param {string} noteId - The ID of the transcluded note, for creating a link.
+ */
+export function renderTransclusion(placeholderEl, noteContent, noteId) {
+    if (!placeholderEl) return;
+
+    // Create a container for the transcluded content
+    const contentEl = document.createElement('div');
+    contentEl.className = 'transcluded-content';
+    
+    // Parse the fetched note content into HTML
+    const renderedHTML = parseAndRenderContent(noteContent);
+
+    // Create a header with a link to the original note
+    const headerEl = document.createElement('div');
+    headerEl.className = 'transclusion-header';
+    headerEl.innerHTML = `<a href="#" class="transclusion-link" data-note-id="${noteId}" title="Go to original note"><i data-feather="corner-up-left"></i></a>`;
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'transclusion-body';
+    bodyEl.innerHTML = renderedHTML;
+
+    contentEl.appendChild(headerEl);
+    contentEl.appendChild(bodyEl);
+    
+    // Replace the placeholder with the new content element
+    placeholderEl.replaceWith(contentEl);
+
+    // Re-run Feather icons for the new link icon
+    if (typeof feather !== 'undefined') {
+        feather.replace({ width: '1em', height: '1em' });
+    }
+}
+
 
 /**
  * Initializes delegated event listeners for notes on the provided container.

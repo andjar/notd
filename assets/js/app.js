@@ -1,6 +1,5 @@
 /**
- * Main application module for NotTD
- * Handles state management, event handling, and coordination between UI and API
+ * @file Main application entry point. Initializes the app and sets up global event listeners.
  * @module app
  */
 
@@ -19,7 +18,6 @@ import { safeAddEventListener } from './utils.js';
 import {
     handleAddRootNote,
     handleNoteKeyDown,
-    handleTaskCheckboxClick,
     debouncedSaveNote
 } from './app/note-actions.js';
 
@@ -59,13 +57,8 @@ if (notesContainer) {
     // Keydown for structural changes (Enter, Tab, Backspace) and navigation (Arrows)
     notesContainer.addEventListener('keydown', handleNoteKeyDown);
 
-    // Click handler for task checkboxes
-    notesContainer.addEventListener('click', (e) => {
-        if (e.target.matches('.task-checkbox')) {
-            handleTaskCheckboxClick(e);
-        }
-    });
-
+    // Click handler for task checkboxes is now in `ui.initializeDelegatedNoteEventListeners`
+    
     // Input handler for debounced saving of content
     notesContainer.addEventListener('input', (e) => {
         if (e.target.matches('.note-content.edit-mode')) {
@@ -147,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initializeApp();
         initPropertyEditor(); // Initialize listeners for the property modal
         ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
-        ui.calendarWidget.init(); // Initialize the calendar widget
+        // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.
     } catch (error) {
         console.error('Failed to initialize application:', error);
         document.body.innerHTML = `<h1>Application Initialization Failed</h1><p>${error.message}</p><p>Check the console for more details.</p>`;

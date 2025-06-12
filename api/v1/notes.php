@@ -19,20 +19,16 @@ if ($method === 'POST' && isset($input['_method'])) {
 
 // New "Smart Property Indexer"
 // This function is the single source of truth for processing properties from content.
-// It is fully compliant with the new weight and update_behavior system from config.php.
 if (!function_exists('_indexPropertiesFromContent')) {
     function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
-        // For notes, check if an 'encrypted' property exists. If so, do not parse content.
         if ($entityType === 'note') {
             $encryptedStmt = $pdo->prepare("SELECT 1 FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND value = 'true' LIMIT 1");
             $encryptedStmt->execute([':note_id' => $entityId]);
             if ($encryptedStmt->fetch()) {
-                // Note is marked as encrypted, so we do not parse or modify properties from its content.
-                return;
+                return; 
             }
         }
 
-        // 1. Get weights for properties with 'replace' behavior from config
         $replaceableWeights = [];
         if (defined('PROPERTY_WEIGHTS')) {
             foreach (PROPERTY_WEIGHTS as $weight => $config) {
@@ -42,8 +38,6 @@ if (!function_exists('_indexPropertiesFromContent')) {
             }
         }
         
-        // 2. Clear all existing 'replaceable' properties for the entity.
-        // Properties with 'append' behavior (like system logs) are preserved.
         if (!empty($replaceableWeights)) {
             $placeholders = str_repeat('?,', count($replaceableWeights) - 1) . '?';
             $idColumn = $entityType . '_id';
@@ -52,31 +46,31 @@ if (!function_exists('_indexPropertiesFromContent')) {
             $stmtDelete->execute(array_merge([$entityId], $replaceableWeights));
         }
 
-        // 3. Parse new properties from the provided content.
         $propertyParser = new PropertyParser($pdo);
         $parsedProperties = $propertyParser->parsePropertiesFromContent($content);
 
-        // 4. Insert all parsed properties into the database.
-        // This adds new 'replaceable' properties and all 'appendable' properties.
         if (!empty($parsedProperties)) {
             $idColumn = $entityType . '_id';
             $insertSql = "INSERT INTO Properties ({$idColumn}, name, value, weight) VALUES (?, ?, ?, ?)";
             $stmtInsert = $pdo->prepare($insertSql);
+            $hasInternalTrue = false;
 
             foreach ($parsedProperties as $prop) {
-                $stmtInsert->execute([
-                    $entityId,
-                    $prop['name'],
-                    (string)$prop['value'],
-                    $prop['weight']
-                ]);
+                $stmtInsert->execute([$entityId, $prop['name'], (string)$prop['value'], $prop['weight']]);
+                if (strtolower($prop['name']) === 'internal' && strtolower((string)$prop['value']) === 'true') {
+                    $hasInternalTrue = true;
+                }
+            }
+
+            // **FIX**: Update the note's internal flag based on parsed properties.
+            if ($entityType === 'note') {
+                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
+                $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
             }
         }
-        
-        // Future enhancement: Webhook dispatch logic should be triggered here to notify
-        // other systems of the property changes.
     }
 }
+
 
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
@@ -88,7 +82,7 @@ if (!function_exists('_createNoteInBatch')) {
         $pageId = (int)$payload['page_id'];
         $content = $payload['content'] ?? '';
         $parentNoteId = null;
-        if (isset($payload['parent_note_id'])) {
+        if (array_key_exists('parent_note_id', $payload)) {
             $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : (int)$payload['parent_note_id'];
         }
         $orderIndex = $payload['order_index'] ?? null;
@@ -121,7 +115,7 @@ if (!function_exists('_createNoteInBatch')) {
             }
 
             // 3. Fetch the newly created note using DataManager for a consistent response
-            $newNote = $dataManager->getNoteById($noteId); // Removed second argument
+            $newNote = $dataManager->getNoteById($noteId); 
 
             if ($clientTempId !== null) {
                 $tempIdMap[$clientTempId] = $noteId;
@@ -176,21 +170,22 @@ if (!function_exists('_updateNoteInBatch')) {
                 $setClauses[] = "parent_note_id = ?";
                 $executeParams[] = $newParentNoteId === null ? null : (int)$newParentNoteId;
             }
-            // ... add other updatable fields here ...
             if (isset($payload['order_index'])) { $setClauses[] = "order_index = ?"; $executeParams[] = (int)$payload['order_index']; }
             if (isset($payload['collapsed'])) { $setClauses[] = "collapsed = ?"; $executeParams[] = (int)$payload['collapsed']; }
             if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = (int)$payload['page_id']; }
 
-            if (empty($setClauses)) {
+            if (empty($setClauses) && !$contentWasUpdated) { // Check content update flag as well
                 return ['type' => 'update', 'status' => 'warning', 'message' => 'No updatable fields provided for note.', 'id' => $noteId];
             }
-
-            $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
-            $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
-            $executeParams[] = $noteId;
             
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($executeParams);
+            if (!empty($setClauses)) {
+                $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
+                $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
+                $executeParams[] = $noteId;
+                
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($executeParams);
+            }
             
             // Re-index all properties from content if it was provided.
             if ($contentWasUpdated) {
@@ -198,7 +193,7 @@ if (!function_exists('_updateNoteInBatch')) {
             }
 
             // Fetch updated note using DataManager for a consistent response
-            $updatedNote = $dataManager->getNoteById($noteId); // Removed second argument
+            $updatedNote = $dataManager->getNoteById($noteId);
 
             return ['type' => 'update', 'status' => 'success', 'note' => $updatedNote];
 
@@ -255,13 +250,13 @@ if (!function_exists('_handleBatchOperations')) {
         $pdo->beginTransaction();
         try {
             // Process operations in a safe order: Delete -> Create -> Update
-            $deleteOps = array_filter($operations, fn($op) => $op['type'] === 'delete');
-            $createOps = array_filter($operations, fn($op) => $op['type'] === 'create');
-            $updateOps = array_filter($operations, fn($op) => $op['type'] === 'update');
+            $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
+            $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
+            $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
 
-            foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'], $tempIdMap);
-            foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'], $tempIdMap);
-            foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'], $tempIdMap);
+            foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
+            foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+            foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
             
             $pdo->commit();
 
@@ -279,8 +274,7 @@ if (!function_exists('_handleBatchOperations')) {
 }
 
 if ($method === 'GET') {
-    // --- THIS IS THE FIX ---
-    // Cast the result of filter_input to a boolean.
+    // **FIX**: Cast the result of filter_input to a boolean.
     // If 'include_internal' is not set, filter_input returns null, which (bool)null casts to false.
     // This prevents the TypeError in the DataManager.
     $includeInternal = (bool)filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);

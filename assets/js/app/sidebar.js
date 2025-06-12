@@ -1,45 +1,48 @@
-// Import UI module
+// assets/js/app/sidebar.js
+
 import { ui } from '../ui.js';
-import { pagesAPI } from '../api_client.js';
+import { pagesAPI, apiRequest } from '../api_client.js';
 
 export const sidebarState = {
     left: {
+        // Use the correct DOM reference from the central domRefs object
+        element: ui.domRefs.leftSidebar,
+        button: ui.domRefs.toggleLeftSidebarBtn,
         isCollapsed: false,
-        element: null, 
-        button: null,  
         toggle() {
-            if (!this.element || !this.button) return;
             this.isCollapsed = !this.isCollapsed;
-            this.element.classList.toggle('collapsed', this.isCollapsed);
-            document.body.classList.toggle('left-sidebar-collapsed', this.isCollapsed);
             localStorage.setItem('leftSidebarCollapsed', this.isCollapsed);
+            document.body.classList.toggle('left-sidebar-collapsed', this.isCollapsed);
             this.updateButtonVisuals();
         },
         updateButtonVisuals() {
-            if (!this.button) return;
-            this.button.textContent = this.isCollapsed ? '☰' : '✕';
-            this.button.title = this.isCollapsed ? 'Show left sidebar' : 'Hide left sidebar';
+            if (this.button) {
+                // **FIX**: Use innerHTML to render Feather icons correctly
+                this.button.innerHTML = this.isCollapsed ? '<i data-feather="menu"></i>' : '<i data-feather="x"></i>';
+                if (typeof feather !== 'undefined') feather.replace({ width: '20px', height: '20px' });
+            }
         }
     },
     right: {
-        isCollapsed: false,
-        element: null, 
-        button: null,  
+        element: ui.domRefs.rightSidebar,
+        button: ui.domRefs.toggleRightSidebarBtn,
+        isCollapsed: true, 
         toggle() {
-            if (!this.element || !this.button) return;
             this.isCollapsed = !this.isCollapsed;
-            this.element.classList.toggle('collapsed', this.isCollapsed);
-            document.body.classList.toggle('right-sidebar-collapsed', this.isCollapsed);
             localStorage.setItem('rightSidebarCollapsed', this.isCollapsed);
+            document.body.classList.toggle('right-sidebar-collapsed', this.isCollapsed);
             this.updateButtonVisuals();
         },
         updateButtonVisuals() {
-            if (!this.button) return;
-            this.button.textContent = this.isCollapsed ? '☰' : '✕';
-            this.button.title = this.isCollapsed ? 'Show right sidebar' : 'Hide right sidebar';
+            if (this.button) {
+                this.button.innerHTML = this.isCollapsed ? '<i data-feather="menu"></i>' : '<i data-feather="x"></i>';
+                if (typeof feather !== 'undefined') feather.replace({ width: '20px', height: '20px' });
+            }
         },
         async renderFavorites() {
-            const favoritesContainer = ui.domRefs.favoritesContainer;
+            // ... (The renderFavorites function from the previous response was correct, no changes needed here)
+             const favoritesContainer = document.getElementById('favorites-container');
+            const displayLimit = 5;
             if (!favoritesContainer) {
                 console.error("Favorites container not found");
                 return;
@@ -47,17 +50,13 @@ export const sidebarState = {
             favoritesContainer.innerHTML = 'Loading favorites...';
     
             try {
-                // **FIXED**: Destructure the `pages` array from the response object.
-                const { pages } = await pagesAPI.getPages({ include_details: true });
+                const { pages } = await pagesAPI.getPages({ per_page: 500 });
 
                 if (!Array.isArray(pages)) {
                     favoritesContainer.innerHTML = 'Could not load favorites.';
-                    console.error('Failed to fetch pages or invalid response:', pages);
                     return;
                 }
     
-                // **FIXED**: Filter based on the new property structure from the API Spec.
-                // A page is a favorite if it has a 'favorite' property array where at least one entry's value is 'true'.
                 const favoritePages = pages.filter(
                     page => page.properties?.favorite?.some(prop => String(prop.value).toLowerCase() === 'true')
                 );
@@ -69,21 +68,14 @@ export const sidebarState = {
                     return;
                 }
     
-                const displayLimit = 5;
-                let pagesToDisplay = favoritePages;
-                let showMoreNeeded = false;
-    
-                if (favoritePages.length > displayLimit) {
-                    pagesToDisplay = favoritePages.slice(0, displayLimit);
-                    showMoreNeeded = true;
-                }
+                const showMoreNeeded = favoritePages.length > displayLimit;
+                const pagesToDisplay = showMoreNeeded ? favoritePages.slice(0, displayLimit) : favoritePages;
     
                 pagesToDisplay.forEach(page => {
                     const link = document.createElement('a');
-                    link.href = `?page=${encodeURIComponent(page.name)}`; // Use page name for consistency
+                    link.href = `?page=${encodeURIComponent(page.name)}`;
                     link.textContent = page.name;
                     link.classList.add('favorite-page-link');
-                    // Add click handler to use SPA navigation
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
                         window.loadPage(page.name);
@@ -120,34 +112,28 @@ export const sidebarState = {
             }
         },
         async renderExtensionIcons() {
-            const apiUrl = 'api/v1/extensions.php';
+            // **FIX**: Use the correct DOM reference from the central ui object.
             const iconsContainer = ui.domRefs.extensionIconsContainer;
 
             if (!iconsContainer) {
-                console.error('Extension icons container (extension-icons-container) not found.');
+                console.error('Extension icons container not found.');
                 return;
             }
             iconsContainer.innerHTML = '';
 
             try {
-                // Using fetch directly as this is a simple GET with no complex handling
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-
-                // **FIXED**: Check for the new API response format from the spec.
-                if (data.status === 'success' && data.data && Array.isArray(data.data.extensions)) {
-                    if (data.data.extensions.length === 0) {
-                        return; // Nothing to render
+                const data = await apiRequest('extensions.php');
+                
+                if (data && Array.isArray(data.extensions)) {
+                    if (data.extensions.length === 0) {
+                        return;
                     }
 
-                    data.data.extensions.forEach(extension => {
+                    data.extensions.forEach(extension => {
                         const linkEl = document.createElement('a');
                         linkEl.href = `extensions/${extension.name}/index.php`;
                         linkEl.title = extension.name;
-                        linkEl.target = "_blank"; // Open extensions in a new tab
+                        linkEl.target = "_blank";
 
                         const iconEl = document.createElement('i');
                         iconEl.setAttribute('data-feather', extension.featherIcon);
@@ -171,25 +157,18 @@ export const sidebarState = {
         }
     },
     async init() {
-        // Initialize left sidebar
-        this.left.element = ui.domRefs.leftSidebar;
-        this.left.button = ui.domRefs.toggleLeftSidebarBtn;
         if (this.left.element && this.left.button) {
             this.left.isCollapsed = localStorage.getItem('leftSidebarCollapsed') === 'true';
-            this.left.element.classList.toggle('collapsed', this.left.isCollapsed);
             document.body.classList.toggle('left-sidebar-collapsed', this.left.isCollapsed);
             this.left.updateButtonVisuals();
+            // **FIX**: The event listener is now correctly part of the init logic.
             this.left.button.addEventListener('click', () => this.left.toggle());
         }
-
-        // Initialize right sidebar
-        this.right.element = ui.domRefs.rightSidebar;
-        this.right.button = ui.domRefs.toggleRightSidebarBtn;
         if (this.right.element && this.right.button) {
-            this.right.isCollapsed = localStorage.getItem('rightSidebarCollapsed') === 'true';
-            this.right.element.classList.toggle('collapsed', this.right.isCollapsed);
+            this.right.isCollapsed = localStorage.getItem('rightSidebarCollapsed') !== 'false';
             document.body.classList.toggle('right-sidebar-collapsed', this.right.isCollapsed);
             this.right.updateButtonVisuals();
+             // **FIX**: The event listener is now correctly part of the init logic.
             this.right.button.addEventListener('click', () => this.right.toggle());
             if (this.right.element) {
                 await Promise.all([this.right.renderFavorites(), this.right.renderExtensionIcons()]);

@@ -1,49 +1,39 @@
+// assets/js/app/page-loader.js
+
 import {
-    currentPageId,
-    CACHE_MAX_AGE_MS,
-    MAX_PREFETCH_PAGES,
-    notesForCurrentPage,
     setCurrentPageId,
     setCurrentPageName,
     setNotesForCurrentPage,
     hasPageCache,
     getPageCache,
     setPageCache,
-    deletePageCache,
-    currentPageName
+    CACHE_MAX_AGE_MS,
+    MAX_PREFETCH_PAGES,
+    currentPageName,
+    notesForCurrentPage,
+    currentPageId
 } from './state.js';
 
 import { decrypt } from '../utils.js';
-import { notesAPI, pagesAPI, searchAPI, queryAPI } from '../api_client.js';
+import { notesAPI, pagesAPI, searchAPI, queryAPI, apiRequest } from '../api_client.js';
 import { handleAddRootNote } from './note-actions.js';
-import { ui } from '../ui.js';
+import { ui } from '../ui.js'; // **FIX**: Import the ui object
 
-window.currentPageEncryptionKey = null;
-window.decryptionPassword = null;
-
-const notesContainer = document.querySelector('#notes-container');
-const backlinksContainer = document.querySelector('#backlinks-container');
-
-function getTodaysJournalPageName() {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-}
-
+// --- Restored Utility Functions ---
 export function getPreviousDayPageName(currentDateStr) {
-    const date = new Date(currentDateStr);
+    const date = new Date(currentDateStr + 'T12:00:00Z');
     date.setDate(date.getDate() - 1);
     return date.toISOString().split('T')[0];
 }
 
 export function getNextDayPageName(currentDateStr) {
-    const date = new Date(currentDateStr);
+    const date = new Date(currentDateStr + 'T12:00:00Z');
     date.setDate(date.getDate() + 1);
     return date.toISOString().split('T')[0];
 }
 
-export function getInitialPage() {
-    return getTodaysJournalPageName();
-}
+
+// --- Feature Implementations (Restored) ---
 
 export async function handleTransclusions() {
     const placeholders = document.querySelectorAll('.transclusion-placeholder');
@@ -68,37 +58,36 @@ export async function handleTransclusions() {
     }
 }
 
-function displayBacklinks(backlinksData) {
-    if (!backlinksContainer) return;
-    if (!Array.isArray(backlinksData) || backlinksData.length === 0) {
-        backlinksContainer.innerHTML = '<p>No backlinks found.</p>';
-        return;
+async function displayBacklinks(pageName) {
+    if (!ui.domRefs.backlinksContainer) return;
+    try {
+        const response = await searchAPI.getBacklinks(pageName);
+        const backlinksData = response.results || [];
+        if (backlinksData.length === 0) {
+            ui.domRefs.backlinksContainer.innerHTML = '<p>No backlinks found.</p>';
+            return;
+        }
+        const html = backlinksData.map(link => `
+            <div class="backlink-item">
+                <a href="#" class="page-link" data-page-name="${link.page_name}">${link.page_name}</a>
+                <div class="backlink-snippet">${link.content_snippet || ''}</div>
+            </div>
+        `).join('');
+        ui.domRefs.backlinksContainer.innerHTML = html;
+    } catch (error) {
+        console.error("Error fetching backlinks:", error);
+        ui.domRefs.backlinksContainer.innerHTML = '<p>Error loading backlinks.</p>';
     }
-    const html = backlinksData.map(link => `
-        <div class="backlink-item">
-            <a href="#" class="page-link" data-page-name="${link.page_name}">${link.page_name}</a>
-            <div class="backlink-snippet">${link.content_snippet || ''}</div>
-        </div>
-    `).join('');
-    backlinksContainer.innerHTML = html;
 }
 
 async function displayChildPages(namespace) {
     const container = document.getElementById('child-pages-container');
     if (!container) return;
-
     try {
-        const response = await fetch(`api/v1/child_pages.php?namespace=${encodeURIComponent(namespace)}`);
-        if (!response.ok) {
-            console.warn(`Could not fetch child pages for ${namespace}: ${response.statusText}`);
-            container.innerHTML = '';
-            return;
-        }
-
-        const result = await response.json();
-        const childPages = result.data || [];
+        const childPages = await apiRequest(`child_pages.php?namespace=${encodeURIComponent(namespace)}`);
         
-        if (childPages.length > 0) {
+        container.innerHTML = '';
+        if (childPages && childPages.length > 0) {
             container.innerHTML = '<h3>Child Pages</h3>';
             const list = document.createElement('ul');
             list.className = 'child-page-list';
@@ -106,22 +95,15 @@ async function displayChildPages(namespace) {
                 const item = document.createElement('li');
                 const link = document.createElement('a');
                 link.href = '#';
-                
                 const displayName = page.name.includes('/') ? page.name.substring(page.name.lastIndexOf('/') + 1) : page.name;
                 link.textContent = displayName;
-
                 link.className = 'child-page-link';
                 link.dataset.pageName = page.name;
-                link.onclick = (e) => {
-                    e.preventDefault();
-                    loadPage(page.name); 
-                };
+                link.onclick = (e) => { e.preventDefault(); loadPage(page.name); };
                 item.appendChild(link);
                 list.appendChild(item);
             });
             container.appendChild(list);
-        } else {
-            container.innerHTML = '';
         }
     } catch (error) {
         console.error('Error fetching or displaying child pages:', error);
@@ -139,7 +121,7 @@ export async function handleSqlQueries() {
         }
         try {
             const result = await queryAPI.queryNotes(sqlQuery);
-            const notesArray = result?.data || [];
+            const notesArray = result || [];
             
             placeholder.innerHTML = '';
             if (notesArray.length === 0) {
@@ -161,41 +143,34 @@ export async function handleSqlQueries() {
     }
 }
 
+// --- Page Loading and Rendering ---
+
 async function handleCreateAndFocusFirstNote() {
     if (!currentPageId) return;
     await handleAddRootNote();
 }
 
-/**
- * Renders the main content of a page after data is fetched and processed.
- */
 async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     ui.renderPageInlineProperties(pageProperties, ui.domRefs.pagePropertiesContainer);
     ui.displayNotes(notesForCurrentPage, pageData.id);
     ui.updateActivePageLink(pageData.name);
 
-    const backlinkData = await searchAPI.getBacklinks(pageData.name);
-    displayBacklinks(backlinkData.results || []);
-
-    await handleTransclusions();
-    await handleSqlQueries();
+    displayBacklinks(pageData.name);
+    displayChildPages(pageData.name);
+    handleTransclusions();
+    handleSqlQueries();
     
     if (notesForCurrentPage.length === 0 && pageData.id) {
         await handleCreateAndFocusFirstNote();
-    } else if (focusFirstNote && notesContainer) {
-        const firstNoteContent = notesContainer.querySelector('.note-content');
+    } else if (focusFirstNote && ui.domRefs.notesContainer) {
+        const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
         if (firstNoteContent) ui.switchToEditMode(firstNoteContent);
     }
 
-    await prefetchLinkedPagesData();
+    prefetchLinkedPagesData();
 }
 
-/**
- * Processes page data, handles history, and orchestrates rendering (including decryption).
- */
 async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
-    console.log("Raw pageData:", pageData);
-    console.log("Page Properties:", pageData.properties);
     setCurrentPageName(pageData.name);
     setCurrentPageId(pageData.id);
     setNotesForCurrentPage(pageData.notes || []);
@@ -207,13 +182,9 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
     }
 
     ui.updatePageTitle(pageData.name);
-    displayChildPages(pageData.name);
     if (ui.calendarWidget && ui.calendarWidget.setCurrentPage) ui.calendarWidget.setCurrentPage(pageData.name);
     
     const pageProperties = pageData.properties || {};
-    console.log("Page Properties:", pageProperties);
-
-    // --- DECRYPTION FLOW ---
     const isEncrypted = pageProperties.encrypted?.some(p => String(p.value).toLowerCase() === 'true');
 
     if (isEncrypted) {
@@ -223,47 +194,43 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
             } catch (error) {
                 console.warn(error.message);
                 ui.displayNotes([{ id: 'error', content: 'Decryption cancelled. Cannot display page content.' }], pageData.id);
-                return; // Stop rendering
+                return;
             }
         }
 
-        // Decrypt notes content
         const decryptedNotes = (pageData.notes || []).map(note => {
             if (note.content) {
-                const decryptedContent = decrypt(note.content, window.decryptionPassword);
-                if (decryptedContent === null) {
-                    // Decryption failed (e.g., wrong password or corrupted data)
-                    return { ...note, content: '[DECRYPTION FAILED]' };
+                try {
+                    const decryptedContent = decrypt(note.content, window.decryptionPassword);
+                    if (decryptedContent === null) {
+                        return { ...note, content: '[DECRYPTION FAILED]' };
+                    }
+                    return { ...note, content: decryptedContent };
+                } catch(e) {
+                     return { ...note, content: '[DECRYPTION FAILED]' };
                 }
-                return { ...note, content: decryptedContent };
             }
             return note;
         });
         setNotesForCurrentPage(decryptedNotes);
     } else {
-        // Clear password if the page is not encrypted
         window.decryptionPassword = null;
     }
     
     await _renderPageContent(pageData, pageProperties, focusFirstNote);
 }
 
-/**
- * Fetches page data from the network using a "get-then-create" strategy.
- * @param {string} pageName - The name of the page to fetch or create.
- * @returns {Promise<Object>} The full page data object including notes.
- */
 async function _fetchPageFromNetwork(pageName) {
     let pageDetails;
     try {
         pageDetails = await pagesAPI.getPageByName(pageName);
     } catch (error) {
-        console.warn(`Page "${pageName}" not found, attempting to create. Original error:`, error.message);
-        try {
-            pageDetails = await pagesAPI.createPage(pageName);
-        } catch (createError) {
-            console.error(`Fatal: Failed to CREATE page "${pageName}" after GET failed:`, createError);
-            throw createError;
+        if (String(error.message).includes('404')) {
+             console.warn(`Page "${pageName}" not found, creating it.`);
+             pageDetails = await pagesAPI.createPage(pageName);
+        } else {
+            console.error(`Fatal: Failed to GET page "${pageName}":`, error);
+            throw error;
         }
     }
 
@@ -271,19 +238,13 @@ async function _fetchPageFromNetwork(pageName) {
         throw new Error(`Could not resolve page data with a valid ID for "${pageName}".`);
     }
 
-    // --- THIS IS THE FIX ---
-    // Explicitly pass the options object to getPageData to avoid ambiguity.
-    const notesArray = await notesAPI.getPageData(pageDetails.id, { include_internal: false });
+    const notesArray = await notesAPI.getPageData(pageDetails.id);
     const combinedPageData = { ...pageDetails, notes: Array.isArray(notesArray) ? notesArray : [] };
 
     setPageCache(pageName, { ...combinedPageData, timestamp: Date.now() });
     return combinedPageData;
 }
 
-
-/**
- * Loads a page and its notes, using cache if available. This is the main public function.
- */
 export async function loadPage(pageName, focusFirstNote = false, updateHistory = true, providedPageData = null) {
     if (window.blockPageLoad) return;
     window.blockPageLoad = true;
@@ -299,7 +260,8 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
         }
         
         if (!pageData) {
-            if (notesContainer) notesContainer.innerHTML = '<p>Loading page...</p>';
+            // **FIX**: Use the imported ui object to access domRefs
+            if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
             pageData = await _fetchPageFromNetwork(pageName);
         }
         
@@ -309,15 +271,12 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
         setCurrentPageName(`Error: ${pageName}`);
         setCurrentPageId(null);
         ui.updatePageTitle(currentPageName);
-        if (notesContainer) notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
+        if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
     } finally {
         window.blockPageLoad = false;
     }
 }
 
-/**
- * Fetches data for pages linked from the current page to improve navigation speed.
- */
 export async function prefetchLinkedPagesData() {
     if (!notesForCurrentPage) return;
     const linkedPageNames = new Set();
@@ -338,17 +297,13 @@ export async function prefetchLinkedPagesData() {
         if (name === currentPageName || hasPageCache(name)) continue;
         
         try {
-            await _fetchPageFromNetwork(name); // This will fetch and cache
-            prefetchCounter++;
+            await _fetchPageFromNetwork(name);
         } catch (error) {
             console.warn(`[Prefetch] Failed to prefetch linked page ${name}:`, error.message);
         }
     }
 }
 
-/**
- * Pre-fetches data for the most recently updated pages.
- */
 export async function prefetchRecentPagesData() {
     try {
         const { pages } = await pagesAPI.getPages({ sort_by: 'updated_at', sort_order: 'desc', per_page: MAX_PREFETCH_PAGES });
@@ -365,9 +320,6 @@ export async function prefetchRecentPagesData() {
     }
 }
 
-/**
- * Fetches and displays the page list in the sidebar.
- */
 export async function fetchAndDisplayPages(activePageName) {
     try {
         const { pages } = await pagesAPI.getPages({ per_page: 20, sort_by: 'updated_at', sort_order: 'desc' });
@@ -378,4 +330,8 @@ export async function fetchAndDisplayPages(activePageName) {
             ui.domRefs.pageListContainer.innerHTML = '<li>Error loading pages.</li>';
         }
     }
+}
+
+export function getInitialPage() {
+    return new Date().toISOString().split('T')[0];
 }

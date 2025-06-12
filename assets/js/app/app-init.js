@@ -1,6 +1,6 @@
 /**
- * Application Initializer
- * Handles the main setup and DOMContentLoaded event.
+ * @file Initializes the application, setting up UI components and loading the initial page.
+ * @module app-init
  */
 
 // State imports
@@ -44,38 +44,31 @@ export async function initializeApp() {
     if (splashScreen) splashScreen.classList.remove('hidden'); 
     
     try {
-        // Initialize sidebars
-        sidebarState.init(); 
+        // **FIX**: Initialize the sidebar here, after the DOM is loaded
+        // but before other components that might depend on it.
+        await sidebarState.init(); 
         
-        // Initialize UI components and modals
         ui.initPagePropertiesModal();
         ui.updateSaveStatusIndicator('saved');
         
-        // Initialize search functionalities
         initGlobalSearch();
         initPageSearchModal();
         
-        // Set up global event listeners (e.g., popstate, keyboard shortcuts)
-        initGlobalEventListeners();
+        if (ui.calendarWidget && typeof ui.calendarWidget.init === 'function') {
+            ui.calendarWidget.init();
+        }
         
-        // Initialize the UI for page link suggestions `[[...]]`
+        initGlobalEventListeners();
         initSuggestionUI();
-        // Asynchronously fetch all page names for the suggestion cache
         fetchAllPages(); 
         
-        // Determine the initial page to load from URL or default
         const urlParams = new URLSearchParams(window.location.search);
         const initialPageName = urlParams.get('page') || getInitialPage(); 
         
-        // Load the main page content
         await loadPage(initialPageName, false); 
-        // Fetch and display the list of recent pages in the sidebar
         await fetchAndDisplayPages(initialPageName);
-        
-        // Pre-fetch data for other recent pages in the background
         await prefetchRecentPagesData(); 
         
-        // Hide the initial save indicator until a change is made
         const initialSaveIndicator = document.getElementById('save-status-indicator');
         if (initialSaveIndicator) {
             initialSaveIndicator.classList.add('status-hidden'); 
@@ -85,12 +78,9 @@ export async function initializeApp() {
         
     } catch (error) { 
         console.error('Failed to initialize application:', error);
-        // Ensure splash screen is hidden on error to show error message
         if (splashScreen) splashScreen.classList.add('hidden');
-        // Provide feedback to the user in case of a critical initialization failure
         document.body.innerHTML = `<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>${error.message}</p><p>Check console for details.</p></div>`;
     } finally {
-        // Ensure the splash screen is always hidden after initialization attempt
         if (splashScreen) {
             if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
                 window.splashAnimations.stop();

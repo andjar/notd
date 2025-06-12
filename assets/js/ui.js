@@ -1,13 +1,10 @@
 /**
- * UI Module for NotTD application
- * Handles all DOM manipulation and rendering
- * @module ui
+ * @file UI module for handling all direct DOM manipulations.
+ * This module exports a single `ui` object that contains all UI-related functions.
  */
 
-import { saveStatus, setSaveStatus } from './app/state.js';
+import { setSaveStatus } from './app/state.js';
 import { domRefs } from './ui/dom-refs.js';
-
-// Import functions related to note elements
 import {
     displayNotes,
     addNoteElement,
@@ -17,20 +14,19 @@ import {
     handleNoteDrop
 } from './ui/note-elements.js';
 
-// Import calendar widget
+// **FIX**: Import the new calendar widget
 import { calendarWidget } from './ui/calendar-widget.js';
 
-// Import functions related to note rendering
 import {
     renderNote,
     parseAndRenderContent,
     switchToEditMode,
-    switchToRenderedMode,
     getRawTextWithNewlines,
     normalizeNewlines,
     renderAttachments,
     renderProperties,
-    initializeDelegatedNoteEventListeners
+    initializeDelegatedNoteEventListeners,
+    renderTransclusion
 } from './ui/note-renderer.js';
 
 /**
@@ -41,7 +37,7 @@ function updatePageTitle(pageName) {
     document.title = `${pageName} - notd`;
     if (!domRefs.pageTitleContainer) return;
 
-    domRefs.pageTitleContainer.innerHTML = ''; // Clear existing content
+    domRefs.pageTitleContainer.innerHTML = '';
 
     const pageNameParts = pageName.split('/');
     let currentPath = '';
@@ -76,7 +72,6 @@ function updatePageTitle(pageName) {
     if (typeof feather !== 'undefined') feather.replace();
 }
 
-
 /**
  * Updates the page list in the sidebar
  * @param {Array} pages - Array of page objects
@@ -109,12 +104,18 @@ function updatePageList(pages, activePageName) {
 }
 
 /**
- * Updates the active page link in the sidebar
- * @param {string} pageName - Active page name
+ * Updates which link in the sidebar is marked as active
+ * @param {string} pageName - The name of the page to mark as active
  */
 function updateActivePageLink(pageName) {
-    document.querySelectorAll('#page-list a').forEach(link => {
-        link.classList.toggle('active', link.dataset.pageName === pageName);
+    if (!domRefs.pageListContainer) return;
+    const links = domRefs.pageListContainer.querySelectorAll('a');
+    links.forEach(link => {
+        if (link.dataset.pageName === pageName) {
+            link.classList.add('active');
+        } else {
+            link.classList.remove('active');
+        }
     });
 }
 
@@ -135,6 +136,7 @@ function renderPageInlineProperties(properties, targetContainer) {
     const RENDER_INTERNAL = window.APP_CONFIG?.RENDER_INTERNAL_PROPERTIES ?? false;
 
     Object.entries(properties).forEach(([key, instances]) => {
+        if (!Array.isArray(instances)) return;
         instances.forEach(instance => {
             if (instance.internal && !RENDER_INTERNAL) return;
 
@@ -180,7 +182,6 @@ function initPagePropertiesModal() {
 
     const hideModal = () => modal.classList.remove('active');
     
-    // Use event delegation on the document to catch clicks on the gear icon
     document.addEventListener('click', (e) => {
         if (e.target.closest('#page-properties-gear')) {
             showModal();
@@ -200,7 +201,7 @@ function updateSaveStatusIndicator(newStatus) {
     if (!indicator) return;
 
     setSaveStatus(newStatus);
-    indicator.className = 'save-status-indicator'; // Reset classes
+    indicator.className = 'save-status-indicator';
     indicator.classList.add(`status-${newStatus}`);
 
     let iconHtml = '';
@@ -222,24 +223,6 @@ function updateSaveStatusIndicator(newStatus) {
     if (newStatus !== 'pending' && typeof feather !== 'undefined') {
         feather.replace({ width: '18px', height: '18px' });
     }
-}
-
-
-// --- Fully restored UI functions from original context ---
-
-function getNoteAncestors(noteId, allNotesOnPage) {
-    const ancestors = [];
-    let currentNote = allNotesOnPage.find(note => String(note.id) === String(noteId));
-    while (currentNote && currentNote.parent_note_id) {
-        const parentNote = allNotesOnPage.find(note => String(note.id) === String(currentNote.parent_note_id));
-        if (parentNote) {
-            ancestors.unshift(parentNote);
-            currentNote = parentNote;
-        } else {
-            break;
-        }
-    }
-    return ancestors;
 }
 
 function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
@@ -299,44 +282,21 @@ function getNestingLevel(noteElement) {
     return level;
 }
 
-/**
- * Renders the content of a transcluded block into a placeholder element.
- * @param {HTMLElement} placeholder - The placeholder element to render into.
- * @param {string} content - The raw content of the note to be rendered.
- * @param {string} blockId - The ID of the block being transcluded.
- */
-function renderTransclusion(placeholder, content, blockId) {
-    if (!placeholder) return;
-
-    // The main content of the transclusion
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'transclusion-content';
-    contentDiv.innerHTML = parseAndRenderContent(content); // Use existing parser
-
-    // Optional: Add a link back to the original block
-    const permalink = document.createElement('a');
-    permalink.href = `?block_id=${blockId}`; // Simple link, might need context-aware routing
-    permalink.className = 'transclusion-permalink';
-    permalink.innerHTML = '<i data-feather="corner-up-left"></i>';
-    permalink.title = 'Go to block';
-    
-    // Clear placeholder and append new elements
-    placeholder.innerHTML = '';
-    placeholder.appendChild(contentDiv);
-    placeholder.appendChild(permalink);
-    placeholder.classList.remove('transclusion-placeholder');
-    placeholder.classList.add('transclusion-item');
-    
-    // Re-run feather icons if needed
-    if (typeof feather !== 'undefined') {
-        feather.replace({ width: '1em', height: '1em' });
+function getNoteAncestors(noteId, allNotesOnPage) {
+    const ancestors = [];
+    let currentNote = allNotesOnPage.find(note => String(note.id) === String(noteId));
+    while (currentNote && currentNote.parent_note_id) {
+        const parentNote = allNotesOnPage.find(note => String(note.id) === String(currentNote.parent_note_id));
+        if (parentNote) {
+            ancestors.unshift(parentNote);
+            currentNote = parentNote;
+        } else {
+            break;
+        }
     }
+    return ancestors;
 }
 
-/**
- * Prompts the user for a password using a modal.
- * @returns {Promise<string>} A promise that resolves with the entered password.
- */
 function promptForPassword() {
     return new Promise((resolve, reject) => {
         const modal = domRefs.passwordModal;
@@ -397,7 +357,6 @@ export const ui = {
     renderNote,
     parseAndRenderContent,
     switchToEditMode,
-    switchToRenderedMode,
     getRawTextWithNewlines,
     normalizeNewlines,
     renderAttachments,

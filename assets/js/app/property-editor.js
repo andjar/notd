@@ -2,6 +2,7 @@ import { currentPageId } from './state.js';
 import { ui } from '../ui.js';
 import { pagesAPI } from '../api_client.js';
 
+// Stores the full page content while the modal is open
 let pageContentForModal = '';
 
 function parsePropertiesFromContent(content) {
@@ -22,8 +23,10 @@ function parsePropertiesFromContent(content) {
 }
 
 function rebuildContentWithProperties(originalContent, properties) {
+    // Remove all old property lines from the content
     let cleanContent = (originalContent || '').replace(/\{([^:}]+):(:{2,})([^}]+)\}\n?/g, '').trim();
     let propertiesString = '';
+
     for (const [key, instances] of Object.entries(properties)) {
         if (!instances) continue;
         for (const instance of instances) {
@@ -88,10 +91,13 @@ async function updatePageProperty(key, index, newValue) {
 async function renamePropertyKey(oldKey, index, newKey) {
     const properties = parsePropertiesFromContent(pageContentForModal);
     if (properties[oldKey] && properties[oldKey][index] !== undefined) {
+        // Remove the specific instance from the old key
         const instance = properties[oldKey].splice(index, 1)[0];
+        // If the old key array is now empty, delete it
         if (properties[oldKey].length === 0) {
             delete properties[oldKey];
         }
+        // Add the instance to the new key
         if (!properties[newKey]) {
             properties[newKey] = [];
         }
@@ -104,6 +110,7 @@ async function renamePropertyKey(oldKey, index, newKey) {
 // --- UI Rendering and Event Handling ---
 
 export async function displayPageProperties(properties) {
+    // When the modal is opened, fetch the LATEST page content to work with.
     try {
         const pageData = await pagesAPI.getPageById(currentPageId);
         pageContentForModal = pageData.content || '';
@@ -143,6 +150,7 @@ export async function displayPageProperties(properties) {
 const propertyModalListener = async (e) => {
     const target = e.target;
     
+    // Handle rename on blur
     if (e.type === 'blur' && target.matches('.page-property-key')) {
         const oldKey = target.dataset.key;
         const index = parseInt(target.dataset.index, 10);
@@ -150,10 +158,11 @@ const propertyModalListener = async (e) => {
         if (newKey && newKey !== oldKey) {
             await renamePropertyKey(oldKey, index, newKey);
         } else {
-            target.textContent = oldKey;
+            target.textContent = oldKey; // Revert if empty or unchanged
         }
     }
 
+    // Handle value update on change (e.g., input blur)
     if (e.type === 'change' && target.matches('.page-property-value')) {
         const key = target.dataset.key;
         const index = parseInt(target.dataset.index, 10);
@@ -161,6 +170,7 @@ const propertyModalListener = async (e) => {
         await updatePageProperty(key, index, newValue);
     }
 
+    // Handle delete button click
     if (e.type === 'click' && target.matches('.page-property-delete')) {
         const key = target.dataset.key;
         const index = parseInt(target.dataset.index, 10);
@@ -169,11 +179,12 @@ const propertyModalListener = async (e) => {
         }
     }
 
+    // Handle Add Property button click
     if (e.type === 'click' && target.id === 'add-page-property-btn') {
         const newKey = prompt("Enter new property key:");
         if (newKey && newKey.trim()) {
             const newValue = prompt(`Enter value for "${newKey}":`);
-            if (newValue !== null) {
+            if (newValue !== null) { // Allow empty string value
                 await addPageProperty(newKey.trim(), newValue.trim());
             }
         }
@@ -185,12 +196,12 @@ export function initPropertyEditor() {
     const addBtn = ui.domRefs.addPagePropertyBtn;
     if (list) {
         list.addEventListener('blur', propertyModalListener, true);
-        list.addEventListener('change', propertyModalListener, true);
+        list.addEventListener('change', propertyModalListener, true); // Catches blur on inputs
         list.addEventListener('click', propertyModalListener);
         list.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.target.matches('.page-property-key, .page-property-value')) {
                 e.preventDefault();
-                e.target.blur();
+                e.target.blur(); // Trigger blur to save change
             }
         });
     }
