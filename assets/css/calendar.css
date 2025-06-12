@@ -58,7 +58,7 @@
 
 /* **NEW**: Specific styling for the today button. */
 .today-btn {
-    padding: var(--ls-space-1) var(--ls-space-2);
+    padding: var(--ls-space-1) var(--ls-space-1);
     font-size: var(--ls-font-size-s);
     font-weight: 600;
 }
@@ -96,7 +96,7 @@
 
 .calendar-day {
     box-sizing: border-box;
-    padding: var(--ls-space-2) var(--ls-space-1);
+    padding: var(--ls-space-1) var(--ls-space-1);
     border-radius: var(--ls-border-radius-small);
     cursor: pointer;
     transition: background-color 0.2s ease, box-shadow 0.2s ease;

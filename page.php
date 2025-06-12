@@ -80,7 +80,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     <div class="app-container">
         <!-- Left Sidebar -->
         <div id="left-sidebar-outer">
-            <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn left-toggle"><i data-feather="menu"></i></button>
+            <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn left-toggle"><i data-feather="x"></i></button>
             <div id="left-sidebar" class="sidebar left-sidebar">
                 <div class="sidebar-content">
                     <div class="app-header">
@@ -138,7 +138,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
 
         <!-- Right Sidebar -->
         <div id="right-sidebar-outer">
-            <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn right-toggle"><i data-feather="menu"></i></button>
+            <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn right-toggle"><i data-feather="x"></i></button>
             <div id="right-sidebar" class="sidebar right-sidebar">
                 <div class="sidebar-content">
                     <div class="sidebar-section">
@@ -178,7 +178,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     </div>
 
     <!-- Page Properties Modal -->
-    <div id="page-properties-modal" class="modal-container" style="display: none;">
+    <div id="page-properties-modal" class="generic-modal">
         <div class="modal-content">
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
