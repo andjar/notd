@@ -117,12 +117,10 @@ function setupEventListeners() {
         if (pageNameToLoad) {
             window.loadPage(pageNameToLoad);
         } else if (dayEl.dataset.date) {
-            // Day has no page, so create it
-            const dateToCreate = dayEl.dataset.date;
-            const created = await window.createPageWithContent(dateToCreate, '{type::journal}');
-            if (!created) {
-                alert(`Could not create journal page for ${dateToCreate}.`);
-            }
+            // Day has no page, so we load the page for the date.
+            // The backend will automatically create it if it doesn't exist.
+            const dateToLoad = dayEl.dataset.date;
+            window.loadPage(dateToLoad);
         }
     });
 }
