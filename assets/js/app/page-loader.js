@@ -99,7 +99,7 @@ async function displayChildPages(namespace) {
                 link.textContent = displayName;
                 link.className = 'child-page-link';
                 link.dataset.pageName = page.name;
-                link.onclick = (e) => { e.preventDefault(); loadPage(page.name); };
+                // **FIX**: Removed onclick, the new global handler will manage this.
                 item.appendChild(link);
                 list.appendChild(item);
             });

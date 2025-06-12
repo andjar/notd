@@ -53,10 +53,7 @@ function updatePageTitle(pageName) {
             link.href = '#';
             link.textContent = part;
             link.dataset.pageName = currentPath;
-            link.onclick = (e) => {
-                e.preventDefault();
-                if (window.loadPage) window.loadPage(link.dataset.pageName);
-            };
+            // **FIX**: Removed onclick, the new global handler will manage this.
             domRefs.pageTitleContainer.appendChild(link);
         } else {
             domRefs.pageTitleContainer.appendChild(document.createTextNode(part));
