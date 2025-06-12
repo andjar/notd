@@ -42,6 +42,29 @@ import { initializeApp } from './app/app-init.js';
 // --- Global Function Exposure ---
 window.displayPageProperties = displayPagePropertiesFromEditor;
 
+// Splash screen toggle
+const splashScreen = document.getElementById('splash-screen');
+const toggleSplashBtn = document.getElementById('toggle-splash-btn');
+
+if (toggleSplashBtn && splashScreen) {
+    toggleSplashBtn.addEventListener('click', () => {
+        splashScreen.classList.toggle('hidden');
+        if (splashScreen.classList.contains('hidden')) {
+            window.splashAnimations.stop();
+        } else {
+            window.splashAnimations.start();
+        }
+    });
+}
+
+// Close splash screen on click of the splash screen itself
+if (splashScreen) {
+    splashScreen.addEventListener('click', () => {
+        splashScreen.classList.add('hidden');
+        window.splashAnimations.stop();
+    });
+}
+
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
 
@@ -140,6 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initializeApp();
         initPropertyEditor(); // Initialize listeners for the property modal
         ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
+        feather.replace(); // Initialize feather icons after DOM is ready
         // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.
     } catch (error) {
         console.error('Failed to initialize application:', error);

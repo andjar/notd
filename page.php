@@ -159,9 +159,9 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         
         <!-- Save Status Indicator -->
         <div id="save-status-indicator" title="All changes saved"></div>
-        <div id="toggle-splash-btn" title="Toggle Splash Screen">
-            z
-        </div>
+        <button id="toggle-splash-btn" class="action-button round-button absolute-bottom-right" title="Toggle Splash Screen">
+            <i data-feather="pause-circle"></i>
+        </button>
     </div>
 
     <!-- Password Modal for Encrypted Pages -->
