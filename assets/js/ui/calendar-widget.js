@@ -21,7 +21,10 @@ let isDataInitialized = false;
  * @returns {string} The formatted date string.
  */
 function toYYYYMMDD(date) {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 /**
@@ -97,7 +100,9 @@ function createDayElement(day, isEmpty, isToday = false, pageForThisDate = null,
         div.classList.add('empty');
     } else {
         div.textContent = day;
-        const formattedDate = toYYYYMMDD(new Date(currentDisplayDate.getFullYear(), currentDisplayDate.getMonth(), day));
+        // Use local date components to avoid timezone issues.
+        const date = new Date(currentDisplayDate.getFullYear(), currentDisplayDate.getMonth(), day);
+        const formattedDate = toYYYYMMDD(date);
         div.dataset.date = formattedDate;
 
         if (isToday) div.classList.add('today');
@@ -137,7 +142,9 @@ function renderCalendar() {
     const todayFormatted = toYYYYMMDD(new Date());
 
     for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+        // Create date object in local timezone and set to noon to avoid timezone issues.
         const currentDate = new Date(year, month, day);
+        currentDate.setHours(12, 0, 0, 0); 
         const formattedDate = toYYYYMMDD(currentDate);
 
         // **PERFORMANCE-FIX**: O(1) map lookup instead of slow O(N) array.find().
