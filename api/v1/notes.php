@@ -34,9 +34,11 @@ if (!function_exists('_indexPropertiesFromContent')) {
 
         // 1. Get weights for properties with 'replace' behavior from config
         $replaceableWeights = [];
-        foreach (PROPERTY_WEIGHTS as $weight => $config) {
-            if ($config['update_behavior'] === 'replace') {
-                $replaceableWeights[] = (int)$weight;
+        if (defined('PROPERTY_WEIGHTS')) {
+            foreach (PROPERTY_WEIGHTS as $weight => $config) {
+                if (isset($config['update_behavior']) && $config['update_behavior'] === 'replace') {
+                    $replaceableWeights[] = (int)$weight;
+                }
             }
         }
         
@@ -119,7 +121,7 @@ if (!function_exists('_createNoteInBatch')) {
             }
 
             // 3. Fetch the newly created note using DataManager for a consistent response
-            $newNote = $dataManager->getNoteById($noteId, true);
+            $newNote = $dataManager->getNoteById($noteId); // Removed second argument
 
             if ($clientTempId !== null) {
                 $tempIdMap[$clientTempId] = $noteId;
@@ -151,7 +153,9 @@ if (!function_exists('_updateNoteInBatch')) {
         $noteId = (int)$noteId;
 
         try {
-            if (!$pdo->prepare("SELECT id FROM Notes WHERE id = ?")->execute([$noteId])->fetch()) {
+            $checkStmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
+            $checkStmt->execute([$noteId]);
+            if (!$checkStmt->fetch()) {
                 return ['type' => 'update', 'status' => 'error', 'message' => 'Note not found for update.', 'id' => $noteId];
             }
 
@@ -194,7 +198,7 @@ if (!function_exists('_updateNoteInBatch')) {
             }
 
             // Fetch updated note using DataManager for a consistent response
-            $updatedNote = $dataManager->getNoteById($noteId, true);
+            $updatedNote = $dataManager->getNoteById($noteId); // Removed second argument
 
             return ['type' => 'update', 'status' => 'success', 'note' => $updatedNote];
 
@@ -275,7 +279,12 @@ if (!function_exists('_handleBatchOperations')) {
 }
 
 if ($method === 'GET') {
-    $includeInternal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
+    // --- THIS IS THE FIX ---
+    // Cast the result of filter_input to a boolean.
+    // If 'include_internal' is not set, filter_input returns null, which (bool)null casts to false.
+    // This prevents the TypeError in the DataManager.
+    $includeInternal = (bool)filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
+    
     try {
         if (isset($_GET['id'])) {
             $noteId = (int)$_GET['id'];

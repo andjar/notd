@@ -6,20 +6,16 @@
 
 // Core state management
 import {
-    setCurrentPageId,
-    setCurrentPageName,
-    setSaveStatus,
-    setNotesForCurrentPage
+    currentPageId
 } from './app/state.js';
 
 // Page management
-import { loadPage, getInitialPage } from './app/page-loader.js';
+import { loadPage } from './app/page-loader.js';
+window.loadPage = loadPage; 
 
 // UI and event handling
-import { sidebarState } from './app/sidebar.js';
-import { initGlobalEventListeners } from './app/event-handlers.js';
-import { safeAddEventListener } from './utils.js';
 import { ui } from './ui.js';
+import { safeAddEventListener } from './utils.js';
 
 // Note actions
 import {
@@ -29,70 +25,125 @@ import {
     debouncedSaveNote
 } from './app/note-actions.js';
 
-// Import API clients for global exposure if needed
-import { notesAPI, propertiesAPI, templatesAPI, pagesAPI } from './api_client.js';
-
-// Import app initialization
-import { initializeApp } from './app/app-init.js';
-
-// Make some APIs globally accessible for debugging or legacy access
+// API clients for global exposure if needed
+import { notesAPI, propertiesAPI, attachmentsAPI, searchAPI, pagesAPI, templatesAPI } from './api_client.js';
 window.notesAPI = notesAPI;
 window.propertiesAPI = propertiesAPI;
-window.templatesAPI = templatesAPI;
+window.attachmentsAPI = attachmentsAPI;
+window.searchAPI = searchAPI;
 window.pagesAPI = pagesAPI;
-window.loadPage = loadPage; // Expose for direct calls if necessary
+window.templatesAPI = templatesAPI;
 
-// Get DOM references from UI module
-const {
-    notesContainer,
-    addRootNoteBtn,
-} = ui.domRefs;
+// Property editor functions
+import { 
+    displayPageProperties as displayPagePropertiesFromEditor, 
+    initPropertyEditor
+} from './app/property-editor.js';
+
+// App initialization
+import { initializeApp } from './app/app-init.js';
+
+// --- Global Function Exposure ---
+// Expose ONLY the necessary functions to be called from inline HTML event handlers.
+// The core property modification functions are now inside property-editor.js and are handled by its internal listeners.
+window.displayPageProperties = displayPagePropertiesFromEditor;
+
+
+// --- Event Handlers Setup ---
+const { notesContainer, addRootNoteBtn } = ui.domRefs;
 
 // Verify critical DOM elements
 if (!notesContainer) {
     console.error('Critical DOM element missing: notesContainer. App cannot function.');
 }
 
-// --- Event Handlers ---
-
-// Add root note
+// Add root note button
 safeAddEventListener(addRootNoteBtn, 'click', handleAddRootNote, 'addRootNoteBtn');
 
-// Note-level event delegation
+// Note-level event delegation for keyboard, clicks, and input
 if (notesContainer) {
-    // Keyboard navigation and editing
     notesContainer.addEventListener('keydown', handleNoteKeyDown);
 
-    // Click interactions (e.g., task markers)
     notesContainer.addEventListener('click', (e) => {
         if (e.target.matches('.task-checkbox')) {
             handleTaskCheckboxClick(e);
         }
     });
 
-    // Input event for debounced save.
-    // This listener handles live typing in any note's content area.
     safeAddEventListener(notesContainer, 'input', (e) => {
         if (e.target.matches('.note-content.edit-mode')) {
             const noteItem = e.target.closest('.note-item');
             if (noteItem) {
                 const contentDiv = e.target;
-                // Update the rawContent dataset immediately on input.
-                // This dataset is the source of truth for debounced saves.
                 const rawTextValue = ui.getRawTextWithNewlines(contentDiv);
                 const normalizedContent = ui.normalizeNewlines(rawTextValue);
                 contentDiv.dataset.rawContent = normalizedContent;
-                // Trigger the debounced save function.
                 debouncedSaveNote(noteItem);
             }
         }
     }, 'notesContainerInput');
 }
 
-// --- Application Startup ---
 
+// --- Drag and Drop for File Uploads ---
+if (notesContainer) {
+    notesContainer.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const noteWrapper = e.target.closest('.note-content-wrapper');
+        if (noteWrapper) {
+            noteWrapper.classList.add('dragover');
+        }
+    });
+
+    notesContainer.addEventListener('dragleave', (e) => {
+        const noteWrapper = e.target.closest('.note-content-wrapper');
+        if (noteWrapper) {
+            noteWrapper.classList.remove('dragover');
+        }
+    });
+
+    notesContainer.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        const noteWrapper = e.target.closest('.note-content-wrapper');
+        if (!noteWrapper) return;
+        
+        noteWrapper.classList.remove('dragover');
+        const noteItem = noteWrapper.closest('.note-item');
+        const noteId = noteItem?.dataset.noteId;
+
+        if (!noteId || noteId.startsWith('temp-')) {
+            alert('Please save the note before adding attachments.');
+            return;
+        }
+
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) return;
+
+        ui.updateSaveStatusIndicator('pending');
+        try {
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('attachmentFile', file);
+                formData.append('note_id', noteId);
+                await attachmentsAPI.uploadAttachment(formData);
+            }
+            // Refresh attachments for the specific note instead of reloading the whole page
+            const attachmentsContainer = noteItem.querySelector('.note-attachments');
+            if(attachmentsContainer) {
+                 await ui.renderAttachments(attachmentsContainer, noteId, true);
+            }
+            ui.updateSaveStatusIndicator('saved');
+        } catch (error) {
+            console.error('Error uploading file(s) via drag and drop:', error);
+            alert('File upload failed: ' + error.message);
+            ui.updateSaveStatusIndicator('error');
+        }
+    });
+}
+
+
+// --- Application Startup ---
 document.addEventListener('DOMContentLoaded', async () => {
-    // Ensure UI module is loaded and critical elements are present
     if (typeof ui === 'undefined' || !notesContainer) {
         console.error('UI module or critical DOM elements not loaded. Application cannot start.');
         document.body.innerHTML = '<h1>Application failed to start. Please check the console.</h1>';
@@ -101,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
         await initializeApp();
+        initPropertyEditor(); // Initialize listeners for the property modal
     } catch (error) {
         console.error('Failed to initialize application:', error);
         document.body.innerHTML = `<h1>Application Initialization Failed</h1><p>${error.message}</p><p>Check the console for more details.</p>`;

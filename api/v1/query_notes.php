@@ -75,8 +75,9 @@ try {
 
     if (empty($noteIds)) {
         ApiResponse::success(
-            ['data' => [], 'pagination' => ['current_page' => $page, 'per_page' => $perPage, 'total_items' => $totalCount, 'total_pages' => $totalPages]]
+            [], 200, ['pagination' => ['current_page' => $page, 'per_page' => $perPage, 'total_items' => $totalCount, 'total_pages' => $totalPages]]
         );
+        exit;
     }
 
     // Fetch full note data for the retrieved IDs
@@ -97,15 +98,18 @@ try {
         }
     }
 
-    ApiResponse::success([
-        'data' => $notes,
-        'pagination' => [
-            'current_page' => $page,
-            'per_page' => $perPage,
-            'total_items' => $totalCount,
-            'total_pages' => $totalPages
+    ApiResponse::success(
+        $notes,
+        200,
+        [
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total_items' => $totalCount,
+                'total_pages' => $totalPages
+            ]
         ]
-    ]);
+    );
 
 } catch (PDOException $e) {
     error_log("Database error in query_notes.php: " . $e->getMessage() . " SQL: " . $sqlQuery);
