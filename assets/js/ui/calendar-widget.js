@@ -6,6 +6,8 @@ const domRefs = {}; // To store DOM references for the calendar widget
 
 let currentPageName = null;
 let currentDisplayDate = new Date();
+let calendarPagesCache = [];
+let isDataInitialized = false;
 
 /**
  * Converts a Date object to a 'YYYY-MM-DD' string.
@@ -53,41 +55,57 @@ function createDayElement(day, isEmpty, isToday = false, pageForThisDate = null,
     return div;
 }
 
-async function fetchAndRenderCalendar() {
+/**
+ * Renders the calendar grid using cached page data.
+ */
+function renderCalendar() {
     if (!domRefs.monthYearDisplay || !domRefs.calendarDaysGrid) return;
-    
+
     domRefs.monthYearDisplay.textContent = currentDisplayDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-    domRefs.calendarDaysGrid.innerHTML = '<div>Loading...</div>';
+    domRefs.calendarDaysGrid.innerHTML = ''; // Clear previous content
 
     const year = currentDisplayDate.getFullYear();
     const month = currentDisplayDate.getMonth(); // 0-indexed
 
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    let startDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Assuming Monday is the first day (0=Sun, 1=Mon...6=Sat)
+
+    for (let i = 0; i < startDayOfWeek; i++) {
+        domRefs.calendarDaysGrid.appendChild(createDayElement('', true));
+    }
+
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+        const currentDate = new Date(year, month, day);
+        const formattedDate = toYYYYMMDD(currentDate);
+
+        const pageForThisDate = calendarPagesCache.find(p => p.name === formattedDate || p.properties?.date?.some(d => d.value === formattedDate));
+        const isToday = formattedDate === toYYYYMMDD(new Date());
+        
+        // **FIXED**: More robust check for the current page to enable glowing effect.
+        const isCurrentPageDate = (currentPageName === formattedDate) || (pageForThisDate && currentPageName === pageForThisDate.name);
+
+        domRefs.calendarDaysGrid.appendChild(
+            createDayElement(day, false, isToday, pageForThisDate, isCurrentPageDate)
+        );
+    }
+}
+
+/**
+ * Fetches all page data for the calendar, caches it, and then renders the calendar.
+ */
+async function fetchCalendarData() {
+    if (!domRefs.monthYearDisplay || !domRefs.calendarDaysGrid) return;
+    
+    if (!isDataInitialized) {
+        domRefs.calendarDaysGrid.innerHTML = '<div>Loading...</div>';
+    }
+
     try {
-        const response = await apiRequest('pages.php?per_page=5000'); // Fetch a large number to get all relevant pages
-        const allPages = response?.data || [];
-        
-        domRefs.calendarDaysGrid.innerHTML = ''; // Clear loading message
-        
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        let startDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
-
-        for (let i = 0; i < startDayOfWeek; i++) {
-            domRefs.calendarDaysGrid.appendChild(createDayElement('', true));
-        }
-
-        for (let day = 1; day <= lastDay.getDate(); day++) {
-            const currentDate = new Date(year, month, day);
-            const formattedDate = toYYYYMMDD(currentDate);
-
-            const pageForThisDate = allPages.find(p => p.name === formattedDate || p.properties?.date?.some(d => d.value === formattedDate));
-            const isToday = formattedDate === toYYYYMMDD(new Date());
-            const isCurrentPageDate = currentPageName === pageForThisDate?.name;
-
-            domRefs.calendarDaysGrid.appendChild(
-                createDayElement(day, false, isToday, pageForThisDate, isCurrentPageDate)
-            );
-        }
+        const response = await apiRequest('pages.php?per_page=5000');
+        calendarPagesCache = response?.data || [];
+        isDataInitialized = true;
+        renderCalendar(); // Render with the newly fetched data
     } catch (error) {
         console.error('Error fetching pages for calendar:', error);
         if (domRefs.calendarDaysGrid) domRefs.calendarDaysGrid.innerHTML = '<div>Error loading.</div>';
@@ -100,27 +118,22 @@ function setupEventListeners() {
 
     domRefs.prevMonthBtn.addEventListener('click', () => {
         currentDisplayDate.setMonth(currentDisplayDate.getMonth() - 1);
-        fetchAndRenderCalendar();
+        renderCalendar(); // **FIXED**: Just render from cache
     });
 
     domRefs.nextMonthBtn.addEventListener('click', () => {
         currentDisplayDate.setMonth(currentDisplayDate.getMonth() + 1);
-        fetchAndRenderCalendar();
+        renderCalendar(); // **FIXED**: Just render from cache
     });
 
-    domRefs.calendarDaysGrid.addEventListener('click', async (e) => {
+    domRefs.calendarDaysGrid.addEventListener('click', (e) => {
         const dayEl = e.target.closest('.calendar-day:not(.empty)');
         if (!dayEl) return;
 
-        let pageNameToLoad = dayEl.dataset.pageName;
-
+        // A page name can be from an existing page or the date itself for a new page
+        const pageNameToLoad = dayEl.dataset.pageName || dayEl.dataset.date;
         if (pageNameToLoad) {
             window.loadPage(pageNameToLoad);
-        } else if (dayEl.dataset.date) {
-            // Day has no page, so we load the page for the date.
-            // The backend will automatically create it if it doesn't exist.
-            const dateToLoad = dayEl.dataset.date;
-            window.loadPage(dateToLoad);
         }
     });
 }
@@ -129,10 +142,32 @@ export const calendarWidget = {
     init() {
         initializeDomRefs();
         setupEventListeners();
-        fetchAndRenderCalendar();
+        fetchCalendarData(); // Initial data fetch
     },
-    setCurrentPage(pageName) {
+    async setCurrentPage(pageName) {
+        const oldPageName = currentPageName;
         currentPageName = pageName;
-        fetchAndRenderCalendar();
+
+        if (!isDataInitialized) return; // Wait for initial fetch to complete
+
+        // If the page has changed, check if we need to refresh our data
+        if (oldPageName !== pageName) {
+            const isNewPageInCache = calendarPagesCache.some(p => p.name === pageName);
+            // If the new page isn't in our cache, it's likely just been created.
+            // We need to refetch our data to get it.
+            if (!isNewPageInCache) {
+                await fetchCalendarData(); // This fetches and then renders.
+                return; // Render is done, exit.
+            }
+        }
+        
+        // If it's a known page or the same page, just re-render from cache.
+        renderCalendar();
+    },
+    /**
+     * Public method to allow external components to trigger a data refresh.
+     */
+    refresh() {
+        fetchCalendarData();
     }
 };
