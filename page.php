@@ -94,7 +94,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                                 <button id="next-month-btn" class="arrow-btn"><i data-feather="chevron-right"></i></button>
                             </div>
                             <div class="calendar-grid calendar-weekdays">
-                                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                                <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
                             </div>
                             <div id="calendar-days-grid" class="calendar-grid calendar-days"></div>
                         </div>

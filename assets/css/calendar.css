@@ -1,10 +1,12 @@
 /* Calendar Widget */
 .calendar-widget {
+    box-sizing: border-box;
     background-color: var(--ls-primary-background-color);
     border: 1px solid var(--ls-border-color);
     border-radius: var(--ls-border-radius-medium);
     padding: var(--ls-space-3);
     font-size: var(--ls-font-size-s);
+    max-width: 100%;
 }
 
 .calendar-header {
@@ -62,14 +64,16 @@
 }
 
 .calendar-grid {
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: var(--ls-space-2);
 }
 
 .calendar-weekdays {
+    box-sizing: border-box;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     text-align: center;
     font-weight: bold;
     color: var(--ls-secondary-text-color);
@@ -78,17 +82,20 @@
 }
 
 .calendar-weekdays > span {
+    box-sizing: border-box;
     padding: 0 var(--ls-space-1);
 }
 
 .calendar-days {
+    box-sizing: border-box;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     text-align: center;
     gap: var(--ls-space-2);
 }
 
 .calendar-day {
+    box-sizing: border-box;
     padding: var(--ls-space-2) var(--ls-space-1);
     border-radius: var(--ls-border-radius-small);
     cursor: pointer;
@@ -137,7 +144,6 @@
 .calendar-day.current-page {
     box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7)); /* Enhanced glow */
     border-color: var(--ls-accent-8);
-    text-shadow: 0 0 5px var(--ls-accent-9); /* Text glow */
     animation: pulse-glow 2s infinite alternate; /* Pulsing animation */
 }
 
