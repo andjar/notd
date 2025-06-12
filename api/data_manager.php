@@ -9,93 +9,61 @@ class DataManager {
         $this->pdo = $pdo;
     }
 
-    // Placeholder for _formatProperties helper method
-    private function _formatProperties($propertiesResult, $includeInternal = false) {
+    // Formats properties into the structure: ['propertyName' => [{value: 'v1', colon_count: 2}, {value: 'v2', colon_count: 2}]]
+    // The $includeInternal parameter is no longer used here for filtering, as visibility is now based on colon_count 
+    // and handled by the caller using PROPERTY_BEHAVIORS_BY_COLON_COUNT.
+    // This function will format all properties passed to it.
+    private function _formatProperties($propertiesResult) {
         $formattedProperties = [];
         if (empty($propertiesResult)) {
             return $formattedProperties;
         }
 
-        // Group properties by name first
-        $groupedByName = [];
         foreach ($propertiesResult as $prop) {
-            $groupedByName[$prop['name']][] = ['value' => $prop['value'], 'internal' => (int)$prop['internal']];
-        }
-
-        foreach ($groupedByName as $name => $values) {
-            if (count($values) === 1) {
-                // If only one property value
-                if (!$includeInternal && $values[0]['internal'] == 0) {
-                    // If not including internal and the property is not internal, simplify to value
-                    $formattedProperties[$name] = $values[0]['value'];
-                } else {
-                    // Otherwise, keep as an object to show internal flag or if it's an internal property
-                    $formattedProperties[$name] = $values[0];
-                }
-            } else {
-                // For multiple values (lists)
-                if (!$includeInternal) {
-                    // Filter out internal properties if not included
-                    $filteredValues = array_filter($values, function($value) {
-                        return $value['internal'] == 0;
-                    });
-                    // If all were internal and filtered out, this property might become empty or just not be set.
-                    // If after filtering, only one non-internal item remains, simplify it.
-                    if (count($filteredValues) === 1) {
-                         $singleValue = array_values($filteredValues)[0]; // Get the single item
-                         $formattedProperties[$name] = $singleValue['value'];
-                    } elseif (count($filteredValues) > 1) {
-                        // If multiple non-internal items, return array of values
-                        $formattedProperties[$name] = array_map(function($v) { return $v['value']; }, $filteredValues);
-                    } else {
-                        // If all values were internal and includeInternal is false, the property is effectively empty or not shown
-                        // Depending on desired behavior, one might choose to add an empty array or skip the property.
-                        // For now, let's skip it if all are internal and not included.
-                    }
-                } else {
-                    // If including internal, return all values as an array of objects
-                    $formattedProperties[$name] = $values;
-                }
+            // Ensure colon_count is an integer.
+            $colon_count = isset($prop['colon_count']) ? (int)$prop['colon_count'] : 2; // Default to 2 if not set
+            
+            if (!isset($formattedProperties[$prop['name']])) {
+                $formattedProperties[$prop['name']] = [];
             }
+            $formattedProperties[$prop['name']][] = [
+                'value' => $prop['value'], 
+                'colon_count' => $colon_count
+            ];
         }
         return $formattedProperties;
     }
 
-    public function getPageProperties($pageId, $includeInternal = false) {
-        error_log("[DEBUG] getPageProperties called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
+    public function getPageProperties($pageId, $includeInternal = false /* Kept for signature compatibility, but not used for filtering here */) {
+        // error_log("[DEBUG] getPageProperties called for pageId: " . $pageId);
         
-        $sql = "SELECT name, value, internal FROM Properties WHERE page_id = :pageId AND note_id IS NULL";
-        if (!$includeInternal) {
-            $sql .= " AND internal = 0";
-        }
-        $sql .= " ORDER BY name"; 
-        error_log("[DEBUG] SQL query: " . $sql);
+        // Fetches all active properties for the page, caller will filter based on colon_count behavior.
+        $sql = "SELECT name, value, colon_count FROM Properties WHERE page_id = :pageId AND note_id IS NULL AND active = 1 ORDER BY name";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindParam(':pageId', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $propertiesResult = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("[DEBUG] Raw properties from database: " . json_encode($propertiesResult));
+        // error_log("[DEBUG] Raw properties from database for page $pageId: " . json_encode($propertiesResult));
         
-        $formattedProperties = $this->_formatProperties($propertiesResult, $includeInternal);
-        error_log("[DEBUG] Formatted properties: " . json_encode($formattedProperties));
+        // The $includeInternal parameter is not strictly used by _formatProperties for filtering anymore.
+        // Visibility decisions are pushed to the API endpoint layer (e.g., notes.php) based on colon_count.
+        $formattedProperties = $this->_formatProperties($propertiesResult);
+        // error_log("[DEBUG] Formatted properties for page $pageId: " . json_encode($formattedProperties));
         
         return $formattedProperties;
     }
 
-    public function getNoteProperties($noteId, $includeInternal = false) {
-        $sql = "SELECT name, value, internal FROM Properties WHERE note_id = :noteId";
-        if (!$includeInternal) {
-            $sql .= " AND internal = 0";
-        }
-        $sql .= " ORDER BY name";
+    public function getNoteProperties($noteId, $includeInternal = false /* Kept for signature compatibility */) {
+        // Fetches all active properties for the note.
+        $sql = "SELECT name, value, colon_count FROM Properties WHERE note_id = :noteId AND active = 1 ORDER BY name";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindParam(':noteId', $noteId, PDO::PARAM_INT);
         $stmt->execute();
         $propertiesResult = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        return $this->_formatProperties($propertiesResult, $includeInternal);
+        return $this->_formatProperties($propertiesResult);
     }
 
     public function getNoteById($noteId, $includeInternal = false) {
@@ -115,9 +83,13 @@ class DataManager {
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($note) {
-            if (!$includeInternal && $note['internal'] == 1) {
-                return null; // If the note itself is internal and we are not including internal items.
+            // This filter is for the Note's own 'internal' flag, not its properties.
+            // This specific behavior is retained as it's outside the direct scope of property formatting.
+            if (!$includeInternal && isset($note['internal']) && $note['internal'] == 1) {
+                return null; 
             }
+            // Pass $includeInternal to getNoteProperties for its signature, though it won't filter by internal flag there anymore.
+            // The actual filtering based on colon_count behavior will happen in the API endpoint.
             $note['properties'] = $this->getNoteProperties($noteId, $includeInternal);
         }
         
@@ -126,23 +98,18 @@ class DataManager {
 
     public function getNotesByPageId($pageId, $includeInternal = false) {
         $notesSql = "SELECT Notes.*, EXISTS(SELECT 1 FROM Attachments WHERE Attachments.note_id = Notes.id) as has_attachments FROM Notes WHERE Notes.page_id = :pageId";
+        // Filter notes based on their own 'internal' flag
         if (!$includeInternal) {
-            $notesSql .= " AND Notes.internal = 0"; // Added Notes. prefix for clarity
+            $notesSql .= " AND Notes.internal = 0"; 
         }
-        $notesSql .= " ORDER BY Notes.order_index ASC"; // Added Notes. prefix for clarity
+        $notesSql .= " ORDER BY Notes.order_index ASC"; 
         
-        error_log("[DEBUG] getNotesByPageId called for pageId: " . $pageId . ", includeInternal: " . ($includeInternal ? 'true' : 'false'));
-        error_log("[DEBUG] SQL query: " . $notesSql);
+        // error_log("[DEBUG] getNotesByPageId SQL: " . $notesSql);
         
         $stmt = $this->pdo->prepare($notesSql);
         $stmt->bindParam(':pageId', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        error_log("[DEBUG] Found " . count($notes) . " notes for pageId: " . $pageId);
-        if (!empty($notes)) {
-            error_log("[DEBUG] First note: " . json_encode($notes[0]));
-        }
         
         if (empty($notes)) {
             return [];
@@ -150,28 +117,26 @@ class DataManager {
 
         $noteIds = array_column($notes, 'id');
         
-        // Fetch all properties for these notes in a single query
+        // Fetch all active properties for these notes in a single query
         $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
-        $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
-        if (!$includeInternal) {
-            $propSql .= " AND internal = 0";
-        }
-        $propSql .= " ORDER BY name";
+        // Fetches all active properties; formatting and visibility decisions based on colon_count are for the caller.
+        $propSql = "SELECT note_id, name, value, colon_count FROM Properties WHERE note_id IN ($placeholders) AND active = 1 ORDER BY name";
 
         $stmtProps = $this->pdo->prepare($propSql);
         $stmtProps->execute($noteIds);
         $allPropertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
         
         // Group properties by note_id
-        $propertiesByNoteId = [];
+        $propertiesByNoteIdRaw = [];
         foreach ($allPropertiesResult as $prop) {
-            $propertiesByNoteId[$prop['note_id']][] = $prop;
+            $propertiesByNoteIdRaw[$prop['note_id']][] = $prop;
         }
         
         // Embed properties into each note
         foreach ($notes as &$note) {
-            $currentNoteProperties = $propertiesByNoteId[$note['id']] ?? [];
-            $note['properties'] = $this->_formatProperties($currentNoteProperties, $includeInternal);
+            $currentNoteProperties = $propertiesByNoteIdRaw[$note['id']] ?? [];
+            // $includeInternal is passed but _formatProperties now primarily uses colon_count
+            $note['properties'] = $this->_formatProperties($currentNoteProperties);
         }
         unset($note); // Break the reference
         
@@ -179,40 +144,36 @@ class DataManager {
     }
 
     public function getPageDetailsById($pageId, $includeInternal = false) {
-        error_log("[DEBUG] getPageDetailsById called for pageId: " . $pageId);
+        // error_log("[DEBUG] getPageDetailsById called for pageId: " . $pageId);
         
         $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = :id");
         $stmt->bindParam(':id', $pageId, PDO::PARAM_INT);
         $stmt->execute();
         $page = $stmt->fetch(PDO::FETCH_ASSOC);
-        error_log("[DEBUG] Raw page data from database: " . json_encode($page));
+        // error_log("[DEBUG] Raw page data from database: " . json_encode($page));
 
         if ($page) {
-            error_log("[DEBUG] Getting page properties");
+            // error_log("[DEBUG] Getting page properties");
+            // $includeInternal is passed but not used for filtering in getPageProperties anymore
             $page['properties'] = $this->getPageProperties($pageId, $includeInternal);
-            error_log("[DEBUG] Page properties: " . json_encode($page['properties']));
+            // error_log("[DEBUG] Page properties: " . json_encode($page['properties']));
         }
         return $page;
     }
 
     public function getPageWithNotes($pageId, $includeInternal = false) {
-        error_log("[DEBUG] getPageWithNotes called for pageId: " . $pageId);
+        // error_log("[DEBUG] getPageWithNotes called for pageId: " . $pageId);
         
         $pageDetails = $this->getPageDetailsById($pageId, $includeInternal);
-        error_log("[DEBUG] getPageDetailsById result: " . json_encode($pageDetails));
+        // error_log("[DEBUG] getPageDetailsById result: " . json_encode($pageDetails));
 
         if (!$pageDetails) {
-            error_log("[DEBUG] Page not found by getPageDetailsById for ID: " . $pageId . ". Returning null from getPageWithNotes."); // Updated log
-            return null; // Added this line
+            // error_log("[DEBUG] Page not found by getPageDetailsById for ID: " . $pageId . ". Returning null from getPageWithNotes.");
+            return null; 
         }
         
-        // If $pageDetails was null, the function now exits above.
-        // The original code continued here:
-        // error_log("[DEBUG] Page not found for ID: " . $pageId); // This log might be confusing if pageDetails is null and we proceed.
-        // We should ensure this part is only reached if $pageDetails is valid.
-
         $notes = $this->getNotesByPageId($pageId, $includeInternal);
-        error_log("[DEBUG] getNotesByPageId result: " . json_encode($notes));
+        // error_log("[DEBUG] getNotesByPageId result: " . json_encode($notes));
         
         return [
             'page' => $pageDetails,
@@ -220,21 +181,14 @@ class DataManager {
         ];
     }
 
-    public function getPropertiesForNoteIds(array $noteIds, $includeInternal = false) {
+    public function getPropertiesForNoteIds(array $noteIds, $includeInternal = false /* Kept for signature compatibility */) {
         if (empty($noteIds)) {
             return [];
         }
 
         $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
-        $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders)";
-        
-        // Consider if properties themselves should be filtered by their own 'internal' flag here
-        // For now, this method fetches all properties and relies on _formatProperties to handle the includeInternal display logic.
-        // If an `AND internal = 0` clause is needed here based on $includeInternal, it would be:
-        // if (!$includeInternal) { $propSql .= " AND internal = 0"; }
-        // However, _formatProperties is designed to handle this at the formatting stage.
-
-        $propSql .= " ORDER BY note_id, name"; // Order by note_id for easier grouping
+        // Fetches all active properties; formatting and visibility decisions based on colon_count are for the caller.
+        $propSql = "SELECT note_id, name, value, colon_count FROM Properties WHERE note_id IN ($placeholders) AND active = 1 ORDER BY note_id, name";
 
         $stmtProps = $this->pdo->prepare($propSql);
         $stmtProps->execute($noteIds);
@@ -247,7 +201,8 @@ class DataManager {
 
         $formattedPropertiesByNoteId = [];
         foreach ($propertiesByNoteIdRaw as $noteId => $props) {
-            $formattedPropertiesByNoteId[$noteId] = $this->_formatProperties($props, $includeInternal);
+            // $includeInternal is passed but _formatProperties now primarily uses colon_count
+            $formattedPropertiesByNoteId[$noteId] = $this->_formatProperties($props);
         }
         
         return $formattedPropertiesByNoteId;

@@ -3,7 +3,8 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 // require_once __DIR__ . '/../property_triggers.php'; // Old trigger system replaced
 require_once __DIR__ . '/../property_trigger_service.php'; // New trigger service
-require_once __DIR__ . '/../property_auto_internal.php';
+// require_once __DIR__ . '/../property_auto_internal.php'; // Removed
+require_once __DIR__ . '/../property_parser.php'; // Ensure PropertyParser is included
 require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
 require_once __DIR__ . '/../data_manager.php';   // Include the new DataManager
 require_once __DIR__ . '/../validator_utils.php'; // Include the new Validator
@@ -79,32 +80,33 @@ if (!function_exists('_updateOrAddPropertyAndDispatchTriggers')) {
     }
     $deactivateStmt->execute([$entityId, $validatedName]);
     
-    // Check property definitions to determine internal status
-    // $explicitInternal will typically come from property definition applications
-    $finalInternal = determinePropertyInternalStatus($pdo, $validatedName, $explicitInternal);
+    // Determine colon_count based on explicitInternal. Default to 2.
+    // For pages (or if this function is ever called for notes directly),
+    // map explicitInternal: true (1) to 3 colons, false (0) or null to 2 colons.
+    $colonCountToSave = (isset($explicitInternal) && $explicitInternal == 1) ? 3 : 2;
     
     if ($entityType === 'page') {
         $stmt = $pdo->prepare("
-            REPLACE INTO Properties (page_id, note_id, name, value, internal, active)
+            REPLACE INTO Properties (page_id, note_id, name, value, colon_count, active)
             VALUES (?, NULL, ?, ?, ?, 1)
         ");
-        $stmt->execute([$entityId, $validatedName, $validatedValue, $finalInternal]);
-    } else { // 'note'
+        $stmt->execute([$entityId, $validatedName, $validatedValue, $colonCountToSave]);
+    } else { // 'note' - This path is less likely to be used by main logic now, but updated for consistency.
         // Try to update existing property first
         $updateStmt = $pdo->prepare("
             UPDATE Properties 
-            SET value = ?, internal = ?, active = 1, updated_at = CURRENT_TIMESTAMP 
+            SET value = ?, colon_count = ?, active = 1, updated_at = CURRENT_TIMESTAMP 
             WHERE note_id = ? AND name = ?
         ");
-        $updateStmt->execute([$validatedValue, $finalInternal, $entityId, $validatedName]);
+        $updateStmt->execute([$validatedValue, $colonCountToSave, $entityId, $validatedName]);
         
         // If no rows were affected, insert a new one
         if ($updateStmt->rowCount() === 0) {
             $insertStmt = $pdo->prepare("
-                INSERT INTO Properties (note_id, page_id, name, value, internal, active)
+                INSERT INTO Properties (note_id, page_id, name, value, colon_count, active)
                 VALUES (?, NULL, ?, ?, ?, 1)
             ");
-            $insertStmt->execute([$entityId, $validatedName, $validatedValue, $finalInternal]);
+            $insertStmt->execute([$entityId, $validatedName, $validatedValue, $colonCountToSave]);
         }
     }
     
@@ -112,7 +114,7 @@ if (!function_exists('_updateOrAddPropertyAndDispatchTriggers')) {
     $triggerService = new PropertyTriggerService($pdo);
     $triggerService->dispatch($entityType, $entityId, $validatedName, $validatedValue);
     
-    return ['name' => $validatedName, 'value' => $validatedValue, 'internal' => $finalInternal];
+    return ['name' => $validatedName, 'value' => $validatedValue, 'colon_count' => $colonCountToSave];
     }
 }
 
@@ -218,74 +220,10 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
                     ApiResponse::error('Server error: ' . $e->getMessage(), 500);
                 }
                 exit;
-            } elseif ($input['action'] === 'set_internal_status') {
-                $validationRules = [
-                    'entity_type' => 'required|isValidEntityType',
-                    'entity_id' => 'required|isPositiveInteger',
-                    'name' => 'required|isNotEmpty',
-                    'internal' => 'required|isBooleanLike'
-                ];
-                $errors = Validator::validate($input, $validationRules);
-                if (!empty($errors)) {
-                    ApiResponse::error('Invalid input for setting internal status.', 400, $errors);
-                    exit;
-                }
-
-                $entityType = $input['entity_type']; // Validated
-                $entityId = (int)$input['entity_id']; // Validated
-                $name = $input['name']; // Validated
-                $internalFlag = (int)$input['internal']; // Validated
-
-                if ($internalFlag !== 0 && $internalFlag !== 1) {
-                    ApiResponse::error('Invalid internal flag value. Must be 0 or 1.', 400);
-                    exit;
-                }
-
-                try {
-                    $pdo = get_db_connection();
-                    
-                    // Check if entity exists
-                    if (!checkEntityExists($pdo, $entityType, $entityId)) {
-                        ApiResponse::error($entityType === 'note' ? 'Note not found' : 'Page not found', 404);
-                        exit;
-                    }
-
-                    $idColumn = ($entityType === 'page') ? 'page_id' : 'note_id';
-
-                    // Check if property exists
-                    $stmtCheck = $pdo->prepare("SELECT id FROM Properties WHERE {$idColumn} = ? AND name = ?");
-                    $stmtCheck->execute([$entityId, $name]);
-                    if (!$stmtCheck->fetch()) {
-                        ApiResponse::error('Property not found. Cannot set internal status for a non-existent property.', 404);
-                        exit;
-                    }
-
-                    // Update internal status
-                    $stmt = $pdo->prepare("UPDATE Properties SET internal = ? WHERE {$idColumn} = ? AND name = ?");
-                    $success = $stmt->execute([$internalFlag, $entityId, $name]);
-
-                    if ($success) {
-                        // Get property value for trigger dispatch
-                        $stmtGetValue = $pdo->prepare("SELECT value FROM Properties WHERE {$idColumn} = ? AND name = ?");
-                        $stmtGetValue->execute([$entityId, $name]);
-                        $propertyRow = $stmtGetValue->fetch(PDO::FETCH_ASSOC);
-
-                        if ($propertyRow) {
-                            $triggerService = new PropertyTriggerService($pdo);
-                            $triggerService->dispatch($entityType, $entityId, $name, $propertyRow['value']);
-                        } else {
-                            error_log("Could not retrieve property value after updating internal status for {$name} on {$entityType} {$entityId}");
-                        }
-
-                        ApiResponse::success(['message' => 'Property internal status updated.']);
-                    } else {
-                        ApiResponse::error('Failed to update property internal status', 500);
-                    }
-                } catch (Exception $e) {
-                    ApiResponse::error('Server error: ' . $e->getMessage(), 500);
-                }
-                exit;
-            }
+            } 
+            // Removed 'set_internal_status' action block as the 'internal' column is gone.
+            // Any logic to change a property's type (colon_count) would need a new specific action
+            // or be handled by deleting and re-adding the property with a different colon_count via note content.
         }
         
         // Handle regular property creation/update
@@ -294,7 +232,9 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             'entity_id' => 'required|isPositiveInteger',
             'name' => 'required|isNotEmpty',
             'value' => 'required',
-            'internal' => 'optional|isBooleanLike'
+            // 'internal' is deprecated in favor of 'colon_count' for notes
+            'colon_count' => 'optional|isInteger|min:2', 
+            'internal' => 'optional|isBooleanLike' // Kept for page compatibility for now
         ];
         $errors = Validator::validate($input, $validationRules);
         if (!empty($errors)) {
@@ -306,6 +246,14 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
         $entityId = (int)$input['entity_id']; // Validated
         $name = $input['name']; // Validated
         $value = $input['value']; // Validated (presence)
+        
+        $colon_count = 2; // Default for notes
+        if ($entityType === 'note') {
+            if (isset($input['colon_count']) && is_numeric($input['colon_count']) && (int)$input['colon_count'] >= 2) {
+                $colon_count = (int)$input['colon_count'];
+            }
+        }
+        // $explicitInternal is still used for 'page' entities if they go through _updateOrAddPropertyAndDispatchTriggers
         $explicitInternal = isset($input['internal']) ? (int)$input['internal'] : null;
 
         // The specific validate_property_data function can still be used for its tag normalization logic
@@ -326,76 +274,115 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
                 exit;
             }
 
-            $pdo->beginTransaction();
-            
-            $savedProperty = _updateOrAddPropertyAndDispatchTriggers(
-                $pdo,
-                $entityType,
-                $entityId,
-                $name,
-                $value,
-                $explicitInternal 
-            );
+            $pdo = get_db_connection(); // Ensure $pdo is initialized
 
             if ($entityType === 'note') {
-                // Fetch note content
-                $stmtNote = $pdo->prepare("SELECT content FROM Notes WHERE id = ?");
-                $stmtNote->execute([$entityId]);
-                $note = $stmtNote->fetch(PDO::FETCH_ASSOC);
+                // Refactored logic for 'note'
+                try {
+                    $pdo->beginTransaction();
 
-                if ($note) {
-                    $currentContent = $note['content'] ?: ''; // Handle null content
+                    // 1. Fetch Note Content
+                    $stmtNote = $pdo->prepare("SELECT content FROM Notes WHERE id = ?");
+                    $stmtNote->execute([$entityId]);
+                    $note = $stmtNote->fetch(PDO::FETCH_ASSOC);
+
+                    if (!$note) {
+                        $pdo->rollBack();
+                        ApiResponse::error('Note not found', 404);
+                        exit;
+                    }
+                    $currentContent = $note['content'] ?: '';
+
+                    // 2. Determine Property String and Internal Status
+                    // 2. Determine Property String using colon_count for notes
+                    $separator = str_repeat(':', $colon_count);
+                    $propertyLine = "{" . $name . $separator . $value . "}";
+
+                    // 3. Modify Content
+                    $escapedName = preg_quote($name, '/');
+                    // Regex to find an existing property string (key only, any value, any number of colons >= 2)
+                    // Ensure it matches the whole line for the property to be replaced.
+                    $pattern = "/^\{" . $escapedName . "(:{2,}).*?\}$/m";
                     
-                    // Determine property format from the saved property data
-                    $propertyName = $savedProperty['name'];
-                    $propertyValue = $savedProperty['value'];
-                    $isInternal = (bool)$savedProperty['internal'];
-                    
-                    // Construct the new property string. Always prepend with a newline for consistency.
-                    $propertyString = "\n{" . $propertyName . ($isInternal ? ':::' : '::') . $propertyValue . "}";
-                    
-                    // Escape property name for use in regex.
-                    $escapedName = preg_quote($propertyName, '/');
-                    // Regex to find an existing property string, matching either ::: or :: separators.
-                    // The 's' modifier allows '.' to match newlines, in case property values contain them.
-                    $pattern = "/\n?\{" . $escapedName . "(?:::|::).*?\}/s";
-                    
-                    $count = 0;
-                    // Try to replace the first occurrence of the property.
-                    $newContent = preg_replace($pattern, $propertyString, $currentContent, 1, $count);
-                    
-                    // If the property was not found and replaced, append the new property string.
-                    if ($count === 0) {
-                        // Use rtrim to avoid piling up newlines if content already ends with one.
-                        $newContent = rtrim($currentContent) . $propertyString;
+                    $newContent = $currentContent;
+                    $foundAndReplaced = false;
+
+                    // Check if property with the same name exists
+                    if (preg_match($pattern, $currentContent)) {
+                        $newContent = preg_replace($pattern, $propertyLine, $currentContent, 1);
+                        $foundAndReplaced = true;
+                    } else {
+                        // Append if not found
+                        if (!empty($newContent) && !preg_match("/\n$/", $newContent)) {
+                            $newContent .= "\n";
+                        }
+                        $newContent .= $propertyLine;
                     }
                     
-                    // Only execute DB update if the content has actually changed to avoid unnecessary writes.
+                    // 4. Save Updated Note Content (only if changed)
                     if ($newContent !== $currentContent) {
-                        $updateNoteStmt = $pdo->prepare("UPDATE Notes SET content = ? WHERE id = ?");
-                        $updateNoteStmt->execute([$newContent, $entityId]);
+                        $updateNoteStmt = $pdo->prepare("UPDATE Notes SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                        if (!$updateNoteStmt->execute([$newContent, $entityId])) {
+                            throw new Exception("Failed to update note content.");
+                        }
                     }
-                } else {
-                    // This case should ideally not happen if checkEntityExists passed earlier
-                    // but as a safeguard, we can log it.
-                    error_log("Note with ID {$entityId} not found when trying to append property to content.");
-                    // Optionally, throw an exception to rollback if this is critical
-                    // throw new Exception("Note not found, cannot append property to content.");
+                    
+                    $pdo->commit(); // Commit changes to Notes table before sync
+
+                    // 5. Call Synchronizer
+                    $propertyParser = new PropertyParser($pdo);
+                    // Pass the *new* content to the synchronizer
+                    $syncSuccess = $propertyParser->syncNotePropertiesFromContent($entityId, $newContent); 
+                    
+                    if (!$syncSuccess) {
+                        // syncNotePropertiesFromContent handles its own transaction and error logging.
+                        // If it returns false, it means an error occurred during sync.
+                        // The note content IS updated, but properties might be out of sync.
+                        // This state might require manual intervention or specific error handling.
+                        // For now, report a generic error but acknowledge content was likely updated.
+                        ApiResponse::error('Note content updated, but property synchronization failed.', 500, ['details' => 'Check server logs for PropertyParser errors.']);
+                        exit;
+                    }
+
+                    // 6. Response
+                    ApiResponse::success([
+                        'message' => 'Property operation processed for note. Content updated and properties synced.',
+                        'property' => [
+                            'name' => $name,
+                            'value' => $value,
+                            'colon_count' => (int)$colon_count
+                        ]
+                    ]);
+
+                } catch (Exception $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    ApiResponse::error('Server error for note property: ' . $e->getMessage(), 500);
                 }
+            } else { // 'page' or other entity types - keep existing logic for now
+                $pdo->beginTransaction();
+            
+                $savedProperty = _updateOrAddPropertyAndDispatchTriggers(
+                    $pdo,
+                    $entityType,
+                    $entityId,
+                    $name,
+                    $value,
+                    $explicitInternal 
+                );
+                
+                $pdo->commit();
+                
+                $response = [
+                    'property' => [
+                        'name' => $savedProperty['name'],
+                        'value' => $savedProperty['value'],
+                        'internal' => (int)$savedProperty['internal']
+                    ]
+                ];
+                ApiResponse::success($response);
             }
-            
-            $pdo->commit();
-            
-            // Standardize the response format
-            $response = [
-                'property' => [
-                    'name' => $savedProperty['name'],
-                    'value' => $savedProperty['value'],
-                    'internal' => (int)$savedProperty['internal']
-                ]
-            ];
-            
-            ApiResponse::success($response);
             
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {

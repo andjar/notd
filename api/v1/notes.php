@@ -4,8 +4,8 @@ require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../property_trigger_service.php';
 require_once __DIR__ . '/../pattern_processor.php';
 require_once __DIR__ . '/../property_parser.php';
-require_once __DIR__ . '/../property_auto_internal.php'; // Added for determinePropertyInternalStatus
-require_once __DIR__ . '/properties.php'; // Required for _updateOrAddPropertyAndDispatchTriggers
+// require_once __DIR__ . '/../property_auto_internal.php'; // Removed
+// require_once __DIR__ . '/properties.php'; // Removed
 require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../response_utils.php';
 
@@ -34,45 +34,35 @@ if (!function_exists('validateNoteData')) {
     }
 }
 
-// Helper function to check for 'internal' property and update Notes.internal
-if (!function_exists('_checkAndSetNoteInternalFlag')) {
-    function _checkAndSetNoteInternalFlag($pdo, $noteId) {
-        $stmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = ? AND name = 'internal' AND active = 1");
-        $stmt->execute([$noteId]);
-        $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Helper function to filter properties based on visibility from PROPERTY_BEHAVIORS_BY_COLON_COUNT
+if (!function_exists('_filterPropertiesByVisibility')) {
+    function _filterPropertiesByVisibility($properties) {
+        if (empty($properties) || !defined('PROPERTY_BEHAVIORS_BY_COLON_COUNT')) {
+            return $properties; // Return as is if no properties or config missing
+        }
 
-        foreach ($properties as $prop) {
-            if (strtolower($prop['value']) === 'true') {
-                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = 1 WHERE id = ?");
-                $updateStmt->execute([$noteId]);
-                return true; // Flag set
+        $visibleProperties = [];
+        foreach ($properties as $name => $propertyValues) {
+            $retainedValues = [];
+            foreach ($propertyValues as $propEntry) {
+                $colonCount = isset($propEntry['colon_count']) ? (int)$propEntry['colon_count'] : 2;
+                
+                $behavior = PROPERTY_BEHAVIORS_BY_COLON_COUNT[$colonCount] 
+                            ?? PROPERTY_BEHAVIORS_BY_COLON_COUNT[2] 
+                            ?? ['visible_view' => true]; // Default to visible if completely misconfigured
+
+                if (isset($behavior['visible_view']) && $behavior['visible_view']) {
+                    $retainedValues[] = $propEntry;
+                }
+            }
+            if (!empty($retainedValues)) {
+                $visibleProperties[$name] = $retainedValues;
             }
         }
-        return false; // Flag not set or property not found/not true
+        return $visibleProperties;
     }
 }
 
-// Helper function to process note content and extract properties
-if (!function_exists('processNoteContent')) {
-    function processNoteContent($pdo, $content, $entityType, $entityId) {
-        // Create a PropertyParser instance and use it to process the content
-        $propertyParser = new PropertyParser($pdo);
-        $properties = $propertyParser->parsePropertiesFromContent($content);
-        
-        // Save the properties using the centralized function
-        foreach ($properties as $name => $value) {
-            _updateOrAddPropertyAndDispatchTriggers(
-                $pdo,
-                $entityType,
-                $entityId,
-                $name,
-                $value
-            );
-        }
-        
-        return $properties;
-    }
-}
 
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
@@ -120,56 +110,52 @@ if (!function_exists('_createNoteInBatch')) {
                  return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note record in database.', 'client_temp_id' => $clientTempId];
             }
 
-            // 2. Handle properties
-            $finalProperties = [];
+            // 2. Sync properties from content using PropertyParser
+            // $propertiesExplicit is no longer used for direct property creation here.
+            // All properties are derived from content by PropertyParser.
+            $propertyParser = new PropertyParser($pdo);
+            $propertyParser->syncNotePropertiesFromContent($noteId, $content);
+            
+            // Notes.internal flag update is removed from here.
 
-            if (is_array($propertiesExplicit)) {
-                 // Clear existing non-internal properties (though for a new note, there shouldn't be any)
-                $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
-                $stmtDeleteOld->execute([':note_id' => $noteId]);
+            // 3. Fetch the newly created note to return it, including its properties
+            // Using DataManager or a direct detailed query to get properties as they are after sync.
+            // For batch, a full DataManager call per note might be heavy.
+            // Let's fetch directly for now, ensuring the property structure is consistent.
+            $stmtFetch = $pdo->prepare("SELECT * FROM Notes WHERE id = :id");
+            $stmtFetch->execute([':id' => $noteId]);
+            $newNote = $stmtFetch->fetch(PDO::FETCH_ASSOC);
 
-                foreach ($propertiesExplicit as $name => $values) {
-                    if (!is_array($values)) $values = [$values]; // Ensure values are in an array
-                    foreach ($values as $value) {
-                        $isInternal = determinePropertyInternalStatus($name, $value);
-                         _updateOrAddPropertyAndDispatchTriggers($pdo, 'note', $noteId, $name, (string)$value, $isInternal, false); // No individual commit
-                        // Collect for response, mimicking structure from single GET/POST
-                        if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
-                        $finalProperties[$name][] = ['value' => (string)$value, 'internal' => (int)$isInternal];
-                    }
-                }
-            } elseif (trim($content) !== '') {
-                // Parse and save properties from content if no explicit properties given
-                // processNoteContent already calls _updateOrAddPropertyAndDispatchTriggers
-                // which in turn calls determinePropertyInternalStatus.
-                // We need to ensure processNoteContent can run without individual commits or adapt it.
-                // For now, let's assume processNoteContent works within a transaction.
-                $parsedProps = processNoteContent($pdo, $content, 'note', $noteId); // This function needs to be transaction-aware or not commit itself.
-                                                                                     // It internally calls _updateOrAddPropertyAndDispatchTriggers.
-                // Structure $parsedProps for $finalProperties
-                foreach($parsedProps as $name => $value) { // processNoteContent returns a simple key/value map
-                    if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
-                     // Assuming processNoteContent gives single values, adjust if it can give arrays
-                    $isInternal = determinePropertyInternalStatus($name, $value); // Re-check internal status as processNoteContent might not return it structured
-                    $finalProperties[$name][] = ['value' => $value, 'internal' => (int)$isInternal];
-                }
+            if (!$newNote) {
+                // This should ideally not happen if note creation succeeded
+                return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to fetch newly created note.', 'client_temp_id' => $clientTempId];
             }
             
-            _checkAndSetNoteInternalFlag($pdo, $noteId);
+            // Fetch properties for the new note
+            $propSql = "SELECT name, value, colon_count FROM Properties WHERE note_id = :note_id AND active = 1 ORDER BY name";
+            $stmtProps = $pdo->prepare($propSql);
+            $stmtProps->bindParam(':note_id', $noteId, PDO::PARAM_INT);
+            $stmtProps->execute();
+            $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
 
-            // 3. Fetch the newly created note to return it
-            $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = :id");
-            $stmt->execute([':id' => $noteId]);
-            $newNote = $stmt->fetch(PDO::FETCH_ASSOC);
-            $newNote['properties'] = $finalProperties; // Attach the collected properties
+            $newNote['properties'] = [];
+            foreach ($propertiesResult as $prop) {
+                if (!isset($newNote['properties'][$prop['name']])) {
+                    $newNote['properties'][$prop['name']] = [];
+                }
+                $newNote['properties'][$prop['name']][] = [
+                    'value' => $prop['value'],
+                    'colon_count' => isset($prop['colon_count']) ? (int)$prop['colon_count'] : 2
+                ];
+            }
+            // Ensure 'id' is part of the main note object
+            $newNote['id'] = $noteId;
+
 
             if ($clientTempId !== null) {
                 $tempIdMap[$clientTempId] = $noteId;
             }
             
-            // Ensure $newNote contains the 'id'
-            $newNote['id'] = $noteId; 
-
             $result = [
                 'type' => 'create',
                 'status' => 'success',
@@ -181,7 +167,9 @@ if (!function_exists('_createNoteInBatch')) {
             return $result;
 
         } catch (Exception $e) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note: ' . $e->getMessage(), 'client_temp_id' => $clientTempId, 'details_trace' => $e->getTraceAsString()]; // Renamed 'details' to 'details_trace' to avoid clash
+            // Log the full error for server-side diagnosis
+            error_log("Error in _createNoteInBatch (note ID: {$noteId}, client temp ID: {$clientTempId}): " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note: ' . $e->getMessage(), 'client_temp_id' => $clientTempId];
         }
     }
 }
@@ -269,51 +257,39 @@ if (!function_exists('_updateNoteInBatch')) {
                 }
             }
             
-            // Properties Handling
-            $finalProperties = []; // To collect properties for the response
+            // Properties Handling - Refactored to use PropertyParser
+            // Determine the content to use for syncing properties.
+            // If new content is provided in the payload, use that. Otherwise, use the existing note content.
+            $contentForSync = isset($payload['content']) ? $payload['content'] : $existingNote['content'];
 
-            if (isset($payload['properties_explicit']) && is_array($payload['properties_explicit'])) {
-                // Delete existing non-internal properties
-                $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
-                $stmtDeleteOld->execute([':note_id' => $noteId]);
-            
-                foreach ($payload['properties_explicit'] as $name => $values) {
-                    if (!is_array($values)) $values = [$values];
-                    foreach ($values as $value) {
-                        $isInternal = determinePropertyInternalStatus($name, $value);
-                        _updateOrAddPropertyAndDispatchTriggers($pdo, 'note', $noteId, $name, (string)$value, $isInternal, false); // No individual commit
-                        if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
-                        $finalProperties[$name][] = ['value' => (string)$value, 'internal' => (int)$isInternal];
-                    }
-                }
-            } elseif ($updateContent) { // Only process content for properties if content was actually updated
-                // And if note is not encrypted (assuming similar logic to existing PUT)
-                $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 LIMIT 1");
-                $encryptedStmt->execute([':note_id' => $noteId]);
-                $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
-
-                if (!$encryptedProp || $encryptedProp['value'] !== 'true') {
-                    $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
-                    $stmtDeleteOld->execute([':note_id' => $noteId]);
-                    
-                    $parsedProps = processNoteContent($pdo, $payload['content'], 'note', $noteId);
-                    foreach($parsedProps as $name => $value) {
-                        if (!isset($finalProperties[$name])) $finalProperties[$name] = [];
-                        $isInternal = determinePropertyInternalStatus($name, $value); 
-                        $finalProperties[$name][] = ['value' => $value, 'internal' => (int)$isInternal];
-                    }
-                }
+            // Check if note is encrypted. If so, properties from content are not parsed or synced.
+            $isEncrypted = false;
+            // We need to check active properties here
+            $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 AND active = 1 LIMIT 1");
+            $encryptedStmt->execute([':note_id' => $noteId]);
+            $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
+            if ($encryptedProp && $encryptedProp['value'] === 'true') {
+                $isEncrypted = true;
             }
 
-            _checkAndSetNoteInternalFlag($pdo, $noteId);
+            if (!$isEncrypted) {
+                $propertyParser = new PropertyParser($pdo);
+                $propertyParser->syncNotePropertiesFromContent($noteId, $contentForSync);
+            }
+            // If $isEncrypted is true, properties are not touched based on content.
+            // Notes.internal flag update is removed.
 
             // Fetch updated note and its properties
             $stmtFetch = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
             $stmtFetch->execute([$noteId]);
             $updatedNote = $stmtFetch->fetch(PDO::FETCH_ASSOC);
 
-            // Fetch all properties for the response, including those not touched by this update
-            $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id ORDER BY name";
+            if (!$updatedNote) {
+                 return ['type' => 'update', 'status' => 'error', 'message' => 'Failed to fetch updated note after update.', 'id' => $noteId];
+            }
+
+            // Fetch all active properties for the response
+            $propSql = "SELECT name, value, colon_count FROM Properties WHERE note_id = :note_id AND active = 1 ORDER BY name";
             $stmtProps = $pdo->prepare($propSql);
             $stmtProps->bindParam(':note_id', $noteId, PDO::PARAM_INT);
             $stmtProps->execute();
@@ -326,7 +302,7 @@ if (!function_exists('_updateNoteInBatch')) {
                 }
                 $updatedNote['properties'][$prop['name']][] = [
                     'value' => $prop['value'],
-                    'internal' => (int)$prop['internal']
+                    'colon_count' => isset($prop['colon_count']) ? (int)$prop['colon_count'] : 2
                 ];
             }
             
@@ -336,7 +312,9 @@ if (!function_exists('_updateNoteInBatch')) {
             return ['type' => 'update', 'status' => 'success', 'note' => $updatedNote];
 
         } catch (Exception $e) {
-            return ['type' => 'update', 'status' => 'error', 'message' => 'Failed to update note: ' . $e->getMessage(), 'id' => $noteId, 'details_trace' => $e->getTraceAsString()]; // Renamed 'details' to 'details_trace'
+            // Log the full error for server-side diagnosis
+            error_log("Error in _updateNoteInBatch (note ID: {$noteId}): " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
+            return ['type' => 'update', 'status' => 'error', 'message' => 'Failed to update note: ' . $e->getMessage(), 'id' => $noteId];
         }
     }
 }
@@ -596,18 +574,10 @@ if ($method === 'GET') {
             $note = $dataManager->getNoteById($noteId, $includeInternal);
             
             if ($note) {
-                // Standardize property structure
-                if (isset($note['properties'])) {
-                    $standardizedProps = [];
-                    foreach ($note['properties'] as $name => $values) {
-                        if (!is_array($values)) {
-                            $values = [$values];
-                        }
-                        $standardizedProps[$name] = array_map(function($value) {
-                            return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
-                        }, $values);
-                    }
-                    $note['properties'] = $standardizedProps;
+                // Properties are already fetched by DataManager in the desired structure
+                // Apply visibility filtering if !$includeInternal
+                if (!$includeInternal && isset($note['properties'])) {
+                    $note['properties'] = _filterPropertiesByVisibility($note['properties']);
                 }
                 ApiResponse::success($note);
             } else {
@@ -627,21 +597,16 @@ if ($method === 'GET') {
             $pageData = $dataManager->getPageWithNotes($pageId, $includeInternal);
 
             if ($pageData) {
-                // Standardize property structure for all notes
-                foreach ($pageData['notes'] as &$note) {
-                    if (isset($note['properties'])) {
-                        $standardizedProps = [];
-                        foreach ($note['properties'] as $name => $values) {
-                            if (!is_array($values)) {
-                                $values = [$values];
-                            }
-                            $standardizedProps[$name] = array_map(function($value) {
-                                return is_array($value) ? $value : ['value' => $value, 'internal' => 0];
-                            }, $values);
+                // Properties are fetched by DataManager. Apply visibility filtering.
+                foreach ($pageData['notes'] as &$noteRef) { // Use different var name to avoid confusion
+                    if (isset($noteRef['properties'])) {
+                        if (!$includeInternal) {
+                            $noteRef['properties'] = _filterPropertiesByVisibility($noteRef['properties']);
                         }
-                        $note['properties'] = $standardizedProps;
+                        // DataManager now returns properties as array of objects, so direct assignment is fine.
                     }
                 }
+                unset($noteRef); // release reference
                 ApiResponse::success($pageData['notes']);
             } else {
                 ApiResponse::error('Page not found', 404);
@@ -677,31 +642,40 @@ if ($method === 'GET') {
             if (!empty($notes)) {
                 $noteIds = array_column($notes, 'id');
                 $placeholders = str_repeat('?,', count($noteIds) - 1) . '?';
-                $propSql = "SELECT note_id, name, value, internal FROM Properties WHERE note_id IN ($placeholders) ORDER BY note_id, name";
+                // Fetch colon_count instead of internal
+                $propSql = "SELECT note_id, name, value, colon_count FROM Properties WHERE note_id IN ($placeholders) AND active = 1 ORDER BY note_id, name";
                 $propStmt = $pdo->prepare($propSql);
                 $propStmt->execute($noteIds);
-                $properties = $propStmt->fetchAll(PDO::FETCH_ASSOC);
+                $allPropertiesResult = $propStmt->fetchAll(PDO::FETCH_ASSOC);
 
                 // Group properties by note_id
-                $noteProperties = [];
-                foreach ($properties as $prop) {
-                    $noteId = $prop['note_id'];
-                    if (!isset($noteProperties[$noteId])) {
-                        $noteProperties[$noteId] = [];
+                $propertiesByNoteId = [];
+                foreach ($allPropertiesResult as $prop) {
+                    $currentNoteId = $prop['note_id'];
+                    if (!isset($propertiesByNoteId[$currentNoteId])) {
+                        $propertiesByNoteId[$currentNoteId] = [];
                     }
-                    if (!isset($noteProperties[$noteId][$prop['name']])) {
-                        $noteProperties[$noteId][$prop['name']] = [];
+                    // Store in the target format: propertyName => [ {value: v, colon_count: c}, ... ]
+                    $propName = $prop['name'];
+                    if (!isset($propertiesByNoteId[$currentNoteId][$propName])) {
+                        $propertiesByNoteId[$currentNoteId][$propName] = [];
                     }
-                    $noteProperties[$noteId][$prop['name']][] = [
+                    $propertiesByNoteId[$currentNoteId][$propName][] = [
                         'value' => $prop['value'],
-                        'internal' => (int)$prop['internal']
+                        'colon_count' => isset($prop['colon_count']) ? (int)$prop['colon_count'] : 2
                     ];
                 }
 
-                // Attach properties to notes
-                foreach ($notes as &$note) {
-                    $note['properties'] = $noteProperties[$note['id']] ?? [];
+                // Attach properties to notes and filter if needed
+                foreach ($notes as &$noteRef) { // Use different var name
+                    $noteSpecificProperties = $propertiesByNoteId[$noteRef['id']] ?? [];
+                    if (!$includeInternal) {
+                        $noteRef['properties'] = _filterPropertiesByVisibility($noteSpecificProperties);
+                    } else {
+                        $noteRef['properties'] = $noteSpecificProperties;
+                    }
                 }
+                unset($noteRef); // release reference
             }
 
             // Calculate pagination metadata
@@ -777,26 +751,46 @@ if ($method === 'GET') {
         $stmt->execute($params);
         $noteId = $pdo->lastInsertId();
 
-        // 2. Parse and save properties from the content
-        $properties = []; // Initialize properties
-        if (trim($content) !== '') {
-            $properties = processNoteContent($pdo, $content, 'note', $noteId);
-        }
+        // 2. Sync properties from content using PropertyParser
+        $propertyParser = new PropertyParser($pdo);
+        $propertyParser->syncNotePropertiesFromContent($noteId, $content);
 
-        // Check and set internal flag for the note
-        _checkAndSetNoteInternalFlag($pdo, $noteId);
+        // The internal flag for the note (Notes.internal) is now implicitly handled 
+        // by PropertyParser logic if 'internal::true' is in content and 
+        // if there's a separate mechanism to update Notes.internal based on Properties table.
+        // For now, direct update to Notes.internal based on properties is removed from here.
+        // If needed, a separate function/trigger would handle that.
 
         $pdo->commit();
 
-        // 3. Fetch the newly created note to return it
-        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = :id");
-        $stmt->execute([':id' => $noteId]);
-        $newNote = $stmt->fetch(PDO::FETCH_ASSOC);
+        // 3. Fetch the newly created note using DataManager to ensure properties are included
+        $dataManager = new DataManager($pdo);
+        $newNote = $dataManager->getNoteById($noteId, true); // true to include internal properties if any
 
-        // Attach the parsed properties to the response
-        $newNote['properties'] = $properties;
-
-        ApiResponse::success($newNote, 201); // 201 Created
+        if ($newNote) {
+            // DataManager's getNoteById already returns properties in the new format
+            // For POST (create), we typically return all properties ($includeInternal = true was used)
+            // No further filtering by _filterPropertiesByVisibility needed here.
+            // Ensure the structure is correct if DataManager didn't perfectly align (though it should).
+            if (isset($newNote['properties']) && is_array($newNote['properties'])) {
+                foreach ($newNote['properties'] as $name => &$propValueArray) { // Pass by reference
+                     if (!is_array($propValueArray)) $propValueArray = [$propValueArray]; // Should not happen with new DataManager
+                     foreach ($propValueArray as &$entry) { // Pass by reference
+                          if (!isset($entry['colon_count']) && isset($entry['internal'])) { // Compatibility or error case
+                               $entry['colon_count'] = $entry['internal'] === 1 ? 3 : 2; // Approximate
+                               unset($entry['internal']);
+                          } else if (!isset($entry['colon_count'])) {
+                               $entry['colon_count'] = 2; // Default
+                          }
+                     }
+                }
+                unset($propValueArray); unset($entry); // Release references
+            }
+            ApiResponse::success($newNote, 201); // 201 Created
+        } else {
+            // This case should ideally not happen if note creation and fetching are correct
+            ApiResponse::error('Failed to retrieve created note.', 500);
+        }
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
@@ -835,30 +829,30 @@ if ($method === 'GET') {
             ApiResponse::error('Note not found', 404);
         }
 
-        // --- BEGIN order_index recalculation logic: Step 1 ---
+        // --- BEGIN order_index recalculation logic: Step 1 (preserved if still needed) ---
+        // This part is complex and related to reordering, not directly properties.
+        // Assuming it's still needed for now.
         $old_parent_note_id = null;
         $old_order_index = null;
-        $page_id_for_reordering = $existingNote['page_id']; // page_id should not change
+        // $page_id_for_reordering = $existingNote['page_id']; // page_id should not change
 
-        // Only fetch old parent and order if parent_note_id is part of the input,
-        // or if order_index is changing (which might imply a move between siblings lists if parent_note_id is also changing)
-        // For now, to be safe, we fetch if parent_note_id is potentially changing.
-        // The problem description says "If parent_note_id is present in the $input (meaning it might change)"
         if (array_key_exists('parent_note_id', $input) || array_key_exists('order_index', $input)) {
             $old_parent_note_id = $existingNote['parent_note_id'];
             $old_order_index = $existingNote['order_index'];
         }
         // --- END order_index recalculation logic: Step 1 ---
         
-        // Build the SET part of the SQL query dynamically
+        // Build the SET part of the SQL query dynamically for Notes table
         $setClauses = [];
         $executeParams = [];
+        $contentChanged = false;
 
         if (isset($input['content'])) {
             $setClauses[] = "content = ?";
             $executeParams[] = $input['content'];
+            $contentChanged = true;
         }
-        if (array_key_exists('parent_note_id', $input)) { // Use array_key_exists to allow null
+        if (array_key_exists('parent_note_id', $input)) { 
             $setClauses[] = "parent_note_id = ?";
             $executeParams[] = $input['parent_note_id'] === null ? null : (int)$input['parent_note_id'];
         }
@@ -868,18 +862,23 @@ if ($method === 'GET') {
         }
         if (isset($input['collapsed'])) {
             $setClauses[] = "collapsed = ?";
-            $executeParams[] = (int)$input['collapsed']; // Should be 0 or 1
+            $executeParams[] = (int)$input['collapsed']; 
         }
 
-        if (empty($setClauses) && !isset($input['properties_explicit'])) {
-            $pdo->rollBack();
-            ApiResponse::error('No updateable fields provided', 400);
-            return; // Exit early
+        // If only properties are being changed via content, but no other note fields.
+        // $input['properties_explicit'] is no longer a primary way to update properties.
+        // Sync will happen based on content.
+        if (empty($setClauses) && !$contentChanged && !isset($input['content'])) {
+             // Check if content is implicitly provided for property sync even if not in setClauses
+            if (!array_key_exists('content', $input)) { // if content is not even in input
+                $pdo->rollBack();
+                ApiResponse::error('No updateable fields for Note or content for property sync provided', 400);
+                return; 
+            }
         }
-
+        
         if (!empty($setClauses)) {
             $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
-        
             $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
             $executeParams[] = $noteId;
             
@@ -887,87 +886,65 @@ if ($method === 'GET') {
             $stmt->execute($executeParams);
         }
 
-        // --- BEGIN order_index recalculation logic: Step 2 & 3 & 4 (omitted for brevity) ---
+        // --- BEGIN order_index recalculation logic: Step 2 & 3 & 4 (omitted for brevity, assumed to be here if needed) ---
         // ... logic for reordering ...
 
-        // --- BEGIN properties LOGIC ---
-        // Always delete existing non-internal properties if content or explicit properties are being updated.
-        // This simplifies logic and prevents orphaned properties.
-        if (isset($input['content']) || (isset($input['properties_explicit']) && !empty($input['properties_explicit']))) {
-            $stmtDeleteOld = $pdo->prepare("DELETE FROM Properties WHERE note_id = :note_id AND internal = 0");
-            $stmtDeleteOld->execute([':note_id' => $noteId]);
+        // --- SYNC PROPERTIES ---
+        // Determine the content to use for syncing properties.
+        // If new content is provided in the input, use that. Otherwise, use the existing note content.
+        $contentForSync = isset($input['content']) ? $input['content'] : $existingNote['content'];
         
-            $propertiesToSave = [];
-
-            // If explicit properties are provided, use them.
-            if (isset($input['properties_explicit']) && is_array($input['properties_explicit']) && !empty($input['properties_explicit'])) {
-                foreach ($input['properties_explicit'] as $name => $values) {
-                    if (!is_array($values)) {
-                        $values = [$values];
-                    }
-                    foreach ($values as $value) {
-                        $propertiesToSave[] = ['name' => $name, 'value' => (string)$value];
-                    }
-                }
-            } 
-            // Otherwise, if content is updated and the note is not encrypted, parse properties from content.
-            else if (isset($input['content'])) {
-                $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 LIMIT 1");
-                $encryptedStmt->execute([':note_id' => $noteId]);
-                $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
-
-                if (!$encryptedProp || $encryptedProp['value'] !== 'true') {
-                    $processor = getPatternProcessor();
-                    $processedData = $processor->processContent($input['content'], 'note', $noteId);
-                    if (!empty($processedData['properties'])) {
-                        $propertiesToSave = $processedData['properties'];
-                    }
-                }
-            }
-
-            // Save the collected properties to the database using the centralized function.
-            if (!empty($propertiesToSave)) {
-                foreach ($propertiesToSave as $prop) {
-                     _updateOrAddPropertyAndDispatchTriggers(
-                        $pdo,
-                        'note',
-                        $noteId,
-                        $prop['name'],
-                        $prop['value']
-                    );
-                }
-            }
+        // Check if note is encrypted. If so, properties from content are not parsed or synced.
+        // This check should ideally be inside PropertyParser or a service, but for now, keeping it here.
+        $isEncrypted = false;
+        $encryptedStmt = $pdo->prepare("SELECT value FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND internal = 1 AND active = 1 LIMIT 1");
+        $encryptedStmt->execute([':note_id' => $noteId]);
+        $encryptedProp = $encryptedStmt->fetch(PDO::FETCH_ASSOC);
+        if ($encryptedProp && $encryptedProp['value'] === 'true') {
+            $isEncrypted = true;
         }
-        // --- END properties LOGIC ---
 
-        // Check and set internal flag for the note
-        _checkAndSetNoteInternalFlag($pdo, $noteId);
-        
-        // Fetch updated note
-        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE id = ?");
-        $stmt->execute([$noteId]);
-        $note = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        // Get ALL properties for the response, with detailed structure
-        $propSql = "SELECT name, value, internal FROM Properties WHERE note_id = :note_id ORDER BY name";
-        $stmtProps = $pdo->prepare($propSql);
-        $stmtProps->bindParam(':note_id', $note['id'], PDO::PARAM_INT);
-        $stmtProps->execute();
-        $propertiesResult = $stmtProps->fetchAll(PDO::FETCH_ASSOC);
-
-        $note['properties'] = [];
-        foreach ($propertiesResult as $prop) {
-            if (!isset($note['properties'][$prop['name']])) {
-                $note['properties'][$prop['name']] = [];
-            }
-            $note['properties'][$prop['name']][] = [
-                'value' => $prop['value'],
-                'internal' => (int)$prop['internal']
-            ];
+        if (!$isEncrypted) {
+            $propertyParser = new PropertyParser($pdo);
+            $propertyParser->syncNotePropertiesFromContent($noteId, $contentForSync);
         }
+        // If $isEncrypted is true, properties are not touched based on content.
+        // Any explicit property changes for encrypted notes would need a different mechanism (not covered by this refactor).
+
+        // The Notes.internal flag update is removed from here, similar to POST.
         
         $pdo->commit();
-        ApiResponse::success($note);
+
+        // Fetch updated note using DataManager to get properties correctly
+        $dataManager = new DataManager($pdo);
+        // true for includeInternal to get all properties for the response
+        $updatedNote = $dataManager->getNoteById($noteId, true); 
+
+        if ($updatedNote) {
+            // DataManager's getNoteById already returns properties in the new format
+            // For PUT (update), we typically return all properties ($includeInternal = true was used)
+            // No further filtering by _filterPropertiesByVisibility needed here.
+            // Ensure the structure is correct if DataManager didn't perfectly align.
+             if (isset($updatedNote['properties']) && is_array($updatedNote['properties'])) {
+                foreach ($updatedNote['properties'] as $name => &$propValueArray) { // Pass by reference
+                     if (!is_array($propValueArray)) $propValueArray = [$propValueArray]; // Should not happen
+                     foreach ($propValueArray as &$entry) { // Pass by reference
+                          if (!isset($entry['colon_count']) && isset($entry['internal'])) { // Compatibility or error
+                               $entry['colon_count'] = $entry['internal'] === 1 ? 3 : 2; // Approximate
+                               unset($entry['internal']);
+                          } else if (!isset($entry['colon_count'])) {
+                               $entry['colon_count'] = 2; // Default
+                          }
+                     }
+                }
+                unset($propValueArray); unset($entry); // Release references
+            }
+            ApiResponse::success($updatedNote);
+        } else {
+            // Should not happen if the update was successful and ID is correct
+            ApiResponse::error('Failed to retrieve updated note.', 500);
+        }
+
     } catch (PDOException $e) {
         $pdo->rollBack();
         error_log("Failed to update note: " . $e->getMessage());

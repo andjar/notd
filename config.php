@@ -10,13 +10,20 @@ define('WEBHOOKS_ENABLED', true); // Option to disable webhooks
 define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
 define('TASK_STATES', ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING']);
 
-// Property Visibility Configuration
-if (!defined('RENDER_INTERNAL_PROPERTIES')) {
-    define('RENDER_INTERNAL_PROPERTIES', false); // Default: true (internal properties are rendered)
-}
-if (!defined('SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE')) {
-    define('SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE', true); // Default: true (internal properties are visible as text in edit mode)
-}
+// Property Behavior Configuration by Colon Count
+// Defines how properties are treated based on the number of colons in their definition (e.g., key::value, key:::value)
+// - 'name': A friendly name for the behavior type.
+// - 'visible_view': Boolean, true if the property should be visible in read-only views.
+// - 'visible_edit': Boolean, true if the property should be visible in edit modes (e.g., text representation).
+// - 'update_behavior': String, defines how updates are handled during sync:
+//    - 'replace': Existing properties with this name are removed and replaced by those in content.
+//    - 'append': Existing properties are kept, and new ones from content are added. Value changes in content will add a new property, not update existing.
+define('PROPERTY_BEHAVIORS_BY_COLON_COUNT', [
+    2 => ['name' => 'normal', 'visible_view' => true, 'visible_edit' => true, 'update_behavior' => 'replace'], // Default, e.g., key::value
+    3 => ['name' => 'internal', 'visible_view' => false, 'visible_edit' => true, 'update_behavior' => 'replace'], // e.g., key:::value
+    4 => ['name' => 'system_append', 'visible_view' => false, 'visible_edit' => false, 'update_behavior' => 'append'] // e.g., key::::value (system managed, append-only)
+    // Users can add more definitions here, e.g., for 5 colons etc.
+]);
 
 // Error reporting (for development)
 ini_set('display_errors', 1); // Enable error display
