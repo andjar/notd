@@ -12,9 +12,28 @@ import { loadPage, prefetchRecentPagesData, getInitialPage, fetchAndDisplayPages
 import { initGlobalEventListeners } from './event-handlers.js';
 import { initGlobalSearch, initPageSearchModal } from './search.js';
 import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js';
+import { pagesAPI } from '../api_client.js'; // Import pagesAPI
 
 // Import UI module
 import { ui } from '../ui.js';
+
+// Expose page creation function globally for modules like calendar-widget
+window.createPageWithContent = async (pageName, initialContent = '') => {
+    try {
+        const newPage = await pagesAPI.createPage(pageName, initialContent);
+        if (newPage && newPage.id) {
+            await loadPage(newPage.name, true);
+            return true;
+        } else {
+            console.error('Failed to create page: Invalid response from API');
+            return false;
+        }
+    } catch (error) {
+        console.error('Error creating page:', error);
+        alert(`Error creating page: ${error.message}`);
+        return false;
+    }
+};
 
 /**
  * Initializes the entire application.

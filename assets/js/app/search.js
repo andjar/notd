@@ -189,7 +189,7 @@ export function initPageSearchModal() {
 
         ui.domRefs.pageSearchModalInput.addEventListener('keydown', (e) => {
             const items = ui.domRefs.pageSearchModalResults.children;
-            if (items.length === 0) return;
+            if (e.key !== 'Enter' && items.length === 0) return;
 
             switch (e.key) {
                 case 'ArrowDown':
@@ -210,11 +210,29 @@ export function initPageSearchModal() {
                     break;
                 case 'Enter':
                     e.preventDefault();
-                    if (selectedSearchResultIndex !== -1 && items[selectedSearchResultIndex]) {
+                    const pageName = ui.domRefs.pageSearchModalInput.value.trim();
+
+                    if (!pageName) {
+                        closeSearchOrCreatePageModal();
+                        return;
+                    }
+                    
+                    // If user is navigating list with arrows, respect that. Otherwise, use text.
+                    if (selectedSearchResultIndex > -1 && items[selectedSearchResultIndex]) {
                         const selectedItem = items[selectedSearchResultIndex];
-                        selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
-                    } else if (ui.domRefs.pageSearchModalInput.value.trim() !== '') {
-                        selectAndActionPageSearchResult(ui.domRefs.pageSearchModalInput.value.trim(), true);
+                        // If the typed text is what is selected, proceed.
+                        if (pageName.toLowerCase() === selectedItem.dataset.pageName.toLowerCase()) {
+                           selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
+                           return;
+                        }
+                    }
+
+                    const exactMatch = allPagesForSearch.find(p => p.name.toLowerCase() === pageName.toLowerCase());
+
+                    if (exactMatch) {
+                        selectAndActionPageSearchResult(exactMatch.name, false);
+                    } else {
+                        selectAndActionPageSearchResult(pageName, true);
                     }
                     break;
                 case 'Escape':

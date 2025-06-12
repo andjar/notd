@@ -234,3 +234,44 @@ export function handleAutocloseBrackets(e) {
     }
     return handled;
 }
+
+/**
+ * Encrypts a string using SJCL with AES-256-CCM.
+ * @param {string} text - The plaintext to encrypt.
+ * @param {string} password - The password to use for encryption.
+ * @returns {string} The encrypted ciphertext as a JSON string.
+ */
+export function encrypt(text, password) {
+    if (!text || !password) return '';
+    try {
+        const encrypted = sjcl.encrypt(password, text, {
+            ks: 256,
+            ts: 128,
+            mode: 'ccm',
+            iter: 1000
+        });
+        return encrypted; // This is a JSON string
+    } catch (e) {
+        console.error("Encryption failed:", e);
+        return '';
+    }
+}
+
+/**
+ * Decrypts a string using SJCL.
+ * @param {string} encryptedJson - The encrypted JSON string.
+ * @param {string} password - The password to use for decryption.
+ * @returns {string} The decrypted plaintext.
+ */
+export function decrypt(encryptedJson, password) {
+    if (!encryptedJson || !password) return '';
+    try {
+        const decrypted = sjcl.decrypt(password, encryptedJson);
+        return decrypted;
+    } catch (e) {
+        // It's common for this to fail with a wrong password, so we can use console.warn
+        // to avoid flooding the console with errors during normal use.
+        console.warn("Decryption failed. This might be due to a wrong password.");
+        return null; // Return null to indicate failure
+    }
+}

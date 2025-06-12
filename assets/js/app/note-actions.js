@@ -15,7 +15,7 @@ import {
 
 import { calculateOrderIndex } from './order-index-service.js';
 import { notesAPI } from '../api_client.js';
-import { debounce, handleAutocloseBrackets, insertTextAtCursor } from '../utils.js';
+import { debounce, handleAutocloseBrackets, insertTextAtCursor, encrypt } from '../utils.js';
 import { ui } from '../ui.js';
 
 const notesContainer = document.querySelector('#notes-container');
@@ -102,8 +102,8 @@ async function _saveNoteToServer(noteId, rawContent) {
     
     // Prepare the content for saving, including encryption if applicable
     let contentToSave = rawContent;
-    if (window.currentPageEncryptionKey && window.decryptionPassword) {
-        contentToSave = sjcl.encrypt(window.decryptionPassword, rawContent);
+    if (window.decryptionPassword) {
+        contentToSave = encrypt(rawContent, window.decryptionPassword);
     }
 
     const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));

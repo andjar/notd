@@ -17,6 +17,9 @@ import {
     handleNoteDrop
 } from './ui/note-elements.js';
 
+// Import calendar widget
+import { calendarWidget } from './ui/calendar-widget.js';
+
 // Import functions related to note rendering
 import {
     renderNote,
@@ -162,11 +165,11 @@ function initPagePropertiesModal() {
     if (!modal) return;
 
     const showModal = async () => {
-        if (!window.currentPageId || !window.propertiesAPI) return;
+        if (!window.currentPageId || !window.pagesAPI) return;
         try {
             const pageData = await window.pagesAPI.getPageById(window.currentPageId);
             if (window.displayPageProperties) {
-                window.displayPageProperties(pageData.properties || {});
+                await window.displayPageProperties(pageData.properties || {});
                 modal.classList.add('active');
             }
         } catch (error) {
@@ -296,6 +299,93 @@ function getNestingLevel(noteElement) {
     return level;
 }
 
+/**
+ * Renders the content of a transcluded block into a placeholder element.
+ * @param {HTMLElement} placeholder - The placeholder element to render into.
+ * @param {string} content - The raw content of the note to be rendered.
+ * @param {string} blockId - The ID of the block being transcluded.
+ */
+function renderTransclusion(placeholder, content, blockId) {
+    if (!placeholder) return;
+
+    // The main content of the transclusion
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'transclusion-content';
+    contentDiv.innerHTML = parseAndRenderContent(content); // Use existing parser
+
+    // Optional: Add a link back to the original block
+    const permalink = document.createElement('a');
+    permalink.href = `?block_id=${blockId}`; // Simple link, might need context-aware routing
+    permalink.className = 'transclusion-permalink';
+    permalink.innerHTML = '<i data-feather="corner-up-left"></i>';
+    permalink.title = 'Go to block';
+    
+    // Clear placeholder and append new elements
+    placeholder.innerHTML = '';
+    placeholder.appendChild(contentDiv);
+    placeholder.appendChild(permalink);
+    placeholder.classList.remove('transclusion-placeholder');
+    placeholder.classList.add('transclusion-item');
+    
+    // Re-run feather icons if needed
+    if (typeof feather !== 'undefined') {
+        feather.replace({ width: '1em', height: '1em' });
+    }
+}
+
+/**
+ * Prompts the user for a password using a modal.
+ * @returns {Promise<string>} A promise that resolves with the entered password.
+ */
+function promptForPassword() {
+    return new Promise((resolve, reject) => {
+        const modal = domRefs.passwordModal;
+        const input = domRefs.passwordInput;
+        const submit = domRefs.passwordSubmit;
+        const cancel = domRefs.passwordCancel;
+
+        if (!modal || !input || !submit || !cancel) {
+            return reject(new Error('Password modal elements not found in the DOM.'));
+        }
+
+        const cleanup = () => {
+            submit.removeEventListener('click', handleSubmit);
+            cancel.removeEventListener('click', handleCancel);
+            input.removeEventListener('keydown', handleKeydown);
+            modal.style.display = 'none';
+        };
+
+        const handleSubmit = () => {
+            const password = input.value;
+            if (password) {
+                cleanup();
+                resolve(password);
+            }
+        };
+
+        const handleCancel = () => {
+            cleanup();
+            reject(new Error('Password entry cancelled.'));
+        };
+        
+        const handleKeydown = (e) => {
+            if (e.key === 'Enter') {
+                handleSubmit();
+            } else if (e.key === 'Escape') {
+                handleCancel();
+            }
+        };
+
+        input.value = '';
+        submit.addEventListener('click', handleSubmit);
+        cancel.addEventListener('click', handleCancel);
+        input.addEventListener('keydown', handleKeydown);
+
+        modal.style.display = 'flex';
+        input.focus();
+    });
+}
+
 // Export the main UI object
 export const ui = {
     displayNotes,
@@ -313,6 +403,7 @@ export const ui = {
     renderAttachments,
     renderProperties,
     initializeDelegatedNoteEventListeners,
+    renderTransclusion,
     domRefs,
     updatePageTitle,
     updatePageList,
@@ -324,7 +415,9 @@ export const ui = {
     focusOnNote,
     showAllNotes,
     showAllNotesAndLoadPage,
-    getNestingLevel
+    getNestingLevel,
+    calendarWidget,
+    promptForPassword
 };
 
 // Make ui available globally

@@ -232,5 +232,6 @@ export {
     attachmentsAPI,
     searchAPI,
     templatesAPI,
-    queryAPI
+    queryAPI,
+    apiRequest
 };

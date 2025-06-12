@@ -213,4 +213,50 @@ class DataManager {
             ]
         ];
     }
+
+    /**
+     * Retrieves pages that have a 'date' property matching a given date.
+     * @param string $date The date in 'YYYY-MM-DD' format.
+     * @return array A list of pages found.
+     */
+    public function getPagesByDate(string $date): array {
+        // Find page IDs that have a 'date' property with the specified value
+        $sql = "
+            SELECT p.id, p.name, p.content, p.alias, p.updated_at
+            FROM Pages p
+            JOIN Properties prop ON p.id = prop.page_id
+            WHERE prop.name = 'date' AND prop.value = :date AND p.active = 1 AND prop.active = 1
+            ORDER BY p.name ASC
+        ";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':date' => $date]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Retrieves pages that are direct children of a given namespace.
+     * @param string $namespace The parent page/namespace name.
+     * @return array A list of child pages found.
+     */
+    public function getChildPages(string $namespace): array {
+        // We are looking for pages under the namespace, e.g., "Namespace/Child"
+        $prefix = rtrim($namespace, '/') . '/';
+
+        // This query finds pages that are direct children of the namespace.
+        // It avoids matching deeper descendants (e.g., ns/child/grandchild)
+        // by checking that there are no additional slashes in the name after the prefix.
+        $sql = "
+            SELECT id, name, updated_at
+            FROM Pages
+            WHERE
+                LOWER(name) LIKE LOWER(:prefix) || '%' AND
+                SUBSTR(LOWER(name), LENGTH(LOWER(:prefix)) + 1) NOT LIKE '%/%' AND
+                active = 1
+            ORDER BY name ASC
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':prefix' => $prefix]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

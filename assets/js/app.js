@@ -148,6 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initializeApp();
         initPropertyEditor(); // Initialize listeners for the property modal
         ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
+        ui.calendarWidget.init(); // Initialize the calendar widget
     } catch (error) {
         console.error('Failed to initialize application:', error);
         document.body.innerHTML = `<h1>Application Initialization Failed</h1><p>${error.message}</p><p>Check the console for more details.</p>`;

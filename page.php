@@ -41,6 +41,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     <?php include 'assets/css/theme_loader.php'; ?>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/icons.css">
+    <link rel="stylesheet" href="assets/css/calendar.css">
     
     <!-- Libraries -->
     <script src="assets/libs/feather.min.js"></script>
@@ -65,6 +66,20 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     <div class="app-header">
                         <a href="/" id="app-title" class="app-title">notd</a>
                     </div>
+                    <div class="sidebar-section calendar-section">
+                        <h4>Calendar</h4>
+                        <div id="calendar-widget" class="calendar-widget">
+                            <div class="calendar-header">
+                                <button id="prev-month-btn" class="arrow-btn"><i data-feather="chevron-left"></i></button>
+                                <span id="current-month-year" class="month-year-display"></span>
+                                <button id="next-month-btn" class="arrow-btn"><i data-feather="chevron-right"></i></button>
+                            </div>
+                            <div class="calendar-grid calendar-weekdays">
+                                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                            </div>
+                            <div id="calendar-days-grid" class="calendar-grid calendar-days"></div>
+                        </div>
+                    </div>
                     <div class="search-section">
                         <input type="text" id="global-search-input" placeholder="Search..." class="search-input">
                         <div id="search-results" class="search-results"></div>
@@ -88,11 +103,14 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                 <h1 id="page-title" class="page-title">
                     <!-- Page title and breadcrumbs populated by JS -->
                 </h1>
-                <div id="page-properties" class="page-properties-inline"></div>
+                <div id="page-properties-container" class="page-properties-inline"></div>
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner">
                 <!-- Notes will be rendered here by JavaScript -->
+            </div>
+            <div id="child-pages-container">
+                <!-- Child pages will be rendered here by JavaScript -->
             </div>
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
@@ -124,9 +142,22 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         <div id="save-status-indicator" title="All changes saved"></div>
     </div>
 
-    <!-- Modals -->
-    <div id="page-properties-modal" class="generic-modal">
-        <div class="generic-modal-content">
+    <!-- Password Modal for Encrypted Pages -->
+    <div id="password-modal" class="modal-container" style="display: none;">
+        <div class="modal-content">
+            <h3>Encrypted Page</h3>
+            <p>This page is encrypted. Please enter the password to view it.</p>
+            <input type="password" id="password-input" placeholder="Password">
+            <div class="modal-actions">
+                <button id="password-submit">Decrypt</button>
+                <button id="password-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Properties Modal -->
+    <div id="page-properties-modal" class="modal-container" style="display: none;">
+        <div class="modal-content">
             <div class="generic-modal-header">
                 <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
                 <button id="page-properties-modal-close" class="modal-close-x" aria-label="Close">

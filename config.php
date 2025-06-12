@@ -38,7 +38,7 @@ define('PROPERTY_WEIGHTS', [
         'label' => 'Internal',
         'description' => 'Properties for internal logic, hidden by default.',
         'update_behavior' => 'replace', // Replace the value on update.
-        'visible_in_view_mode' => false,  // Frontend should HIDE this in read-only views.
+        'visible_in_view_mode' => true,  // Changed from false to true
         'visible_in_edit_mode' => true    // Frontend should SHOW this in editable views.
     ],
     // System/Log Property (e.g., {key::::value})

@@ -13,6 +13,7 @@ import {
     currentPageName
 } from './state.js';
 
+import { decrypt } from '../utils.js';
 import { notesAPI, pagesAPI, searchAPI, queryAPI } from '../api_client.js';
 import { handleAddRootNote } from './note-actions.js';
 import { ui } from '../ui.js';
@@ -82,6 +83,52 @@ function displayBacklinks(backlinksData) {
     backlinksContainer.innerHTML = html;
 }
 
+async function displayChildPages(namespace) {
+    const container = document.getElementById('child-pages-container');
+    if (!container) return;
+
+    try {
+        const response = await fetch(`api/v1/child_pages.php?namespace=${encodeURIComponent(namespace)}`);
+        if (!response.ok) {
+            console.warn(`Could not fetch child pages for ${namespace}: ${response.statusText}`);
+            container.innerHTML = '';
+            return;
+        }
+
+        const result = await response.json();
+        const childPages = result.data || [];
+        
+        if (childPages.length > 0) {
+            container.innerHTML = '<h3>Child Pages</h3>';
+            const list = document.createElement('ul');
+            list.className = 'child-page-list';
+            childPages.forEach(page => {
+                const item = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = '#';
+                
+                const displayName = page.name.includes('/') ? page.name.substring(page.name.lastIndexOf('/') + 1) : page.name;
+                link.textContent = displayName;
+
+                link.className = 'child-page-link';
+                link.dataset.pageName = page.name;
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    loadPage(page.name); 
+                };
+                item.appendChild(link);
+                list.appendChild(item);
+            });
+            container.appendChild(list);
+        } else {
+            container.innerHTML = '';
+        }
+    } catch (error) {
+        console.error('Error fetching or displaying child pages:', error);
+        container.innerHTML = '';
+    }
+}
+
 export async function handleSqlQueries() {
     const placeholders = document.querySelectorAll('.sql-query-placeholder');
     for (const placeholder of placeholders) {
@@ -147,6 +194,8 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
  * Processes page data, handles history, and orchestrates rendering (including decryption).
  */
 async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
+    console.log("Raw pageData:", pageData);
+    console.log("Page Properties:", pageData.properties);
     setCurrentPageName(pageData.name);
     setCurrentPageId(pageData.id);
     setNotesForCurrentPage(pageData.notes || []);
@@ -158,11 +207,43 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
     }
 
     ui.updatePageTitle(pageData.name);
-    if (ui.calendarWidget) ui.calendarWidget.setCurrentPage(pageData.name);
+    displayChildPages(pageData.name);
+    if (ui.calendarWidget && ui.calendarWidget.setCurrentPage) ui.calendarWidget.setCurrentPage(pageData.name);
     
     const pageProperties = pageData.properties || {};
-    
-    // Decryption flow would go here
+    console.log("Page Properties:", pageProperties);
+
+    // --- DECRYPTION FLOW ---
+    const isEncrypted = pageProperties.encrypted?.some(p => String(p.value).toLowerCase() === 'true');
+
+    if (isEncrypted) {
+        if (!window.decryptionPassword) {
+            try {
+                window.decryptionPassword = await ui.promptForPassword();
+            } catch (error) {
+                console.warn(error.message);
+                ui.displayNotes([{ id: 'error', content: 'Decryption cancelled. Cannot display page content.' }], pageData.id);
+                return; // Stop rendering
+            }
+        }
+
+        // Decrypt notes content
+        const decryptedNotes = (pageData.notes || []).map(note => {
+            if (note.content) {
+                const decryptedContent = decrypt(note.content, window.decryptionPassword);
+                if (decryptedContent === null) {
+                    // Decryption failed (e.g., wrong password or corrupted data)
+                    return { ...note, content: '[DECRYPTION FAILED]' };
+                }
+                return { ...note, content: decryptedContent };
+            }
+            return note;
+        });
+        setNotesForCurrentPage(decryptedNotes);
+    } else {
+        // Clear password if the page is not encrypted
+        window.decryptionPassword = null;
+    }
     
     await _renderPageContent(pageData, pageProperties, focusFirstNote);
 }

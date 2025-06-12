@@ -11,6 +11,53 @@ require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../property_parser.php';
 require_once __DIR__ . '/../response_utils.php';
 
+if (!function_exists('_indexPropertiesFromContent')) {
+    function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
+        // For pages, we don't have the 'encrypted' property check as for notes.
+
+        // 1. Get weights for properties with 'replace' behavior from config
+        $replaceableWeights = [];
+        if (defined('PROPERTY_WEIGHTS')) {
+            foreach (PROPERTY_WEIGHTS as $weight => $config) {
+                if (isset($config['update_behavior']) && $config['update_behavior'] === 'replace') {
+                    $replaceableWeights[] = (int)$weight;
+                }
+            }
+        }
+        
+        // 2. Clear all existing 'replaceable' properties for the entity.
+        // Properties with 'append' behavior (like system logs) are preserved.
+        if (!empty($replaceableWeights)) {
+            $placeholders = str_repeat('?,' , count($replaceableWeights) - 1) . '?';
+            $idColumn = $entityType . '_id';
+            $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND weight IN ($placeholders)";
+            $stmtDelete = $pdo->prepare($deleteSql);
+            $stmtDelete->execute(array_merge([$entityId], $replaceableWeights));
+        }
+
+        // 3. Parse new properties from the provided content.
+        $propertyParser = new PropertyParser($pdo);
+        $parsedProperties = $propertyParser->parsePropertiesFromContent($content);
+
+        // 4. Insert all parsed properties into the database.
+        // This adds new 'replaceable' properties and all 'appendable' properties.
+        if (!empty($parsedProperties)) {
+            $idColumn = $entityType . '_id';
+            $insertSql = "INSERT INTO Properties ({$idColumn}, name, value, weight) VALUES (?, ?, ?, ?)";
+            $stmtInsert = $pdo->prepare($insertSql);
+
+            foreach ($parsedProperties as $prop) {
+                $stmtInsert->execute([
+                    $entityId,
+                    $prop['name'],
+                    (string)$prop['value'],
+                    $prop['weight']
+                ]);
+            }
+        }
+    }
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -39,6 +86,9 @@ try {
                 } else {
                     ApiResponse::error('Page not found', 404);
                 }
+            } elseif (isset($_GET['date'])) {
+                $pages = $dataManager->getPagesByDate($_GET['date']);
+                ApiResponse::success($pages);
             } else {
                 $page = $_GET['page'] ?? 1;
                 $per_page = $_GET['per_page'] ?? 20;
@@ -69,7 +119,7 @@ try {
             $pageId = $pdo->lastInsertId();
             
             if ($content) {
-                $propertyParser->syncProperties('page', $pageId, $content);
+                _indexPropertiesFromContent($pdo, 'page', $pageId, $content);
             }
             $pdo->commit();
 
@@ -98,7 +148,7 @@ try {
 
             // Re-index properties if content changed
             if (array_key_exists('content', $input)) {
-                $propertyParser->syncProperties('page', $pageId, $newContent);
+                _indexPropertiesFromContent($pdo, 'page', $pageId, $newContent);
             }
             $pdo->commit();
             

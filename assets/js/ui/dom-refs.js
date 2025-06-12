@@ -6,7 +6,7 @@
 
 export const domRefs = {
     notesContainer: document.getElementById('notes-container'),
-    pagePropertiesContainer: document.getElementById('page-properties'),
+    pagePropertiesContainer: document.getElementById('page-properties-container'),
     pageListContainer: document.getElementById('page-list'),
     addRootNoteBtn: document.getElementById('add-root-note-btn'),
     toggleLeftSidebarBtn: document.getElementById('toggle-left-sidebar-btn'),
