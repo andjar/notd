@@ -12,12 +12,53 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--ls-space-3);
+    /* **IMPROVEMENT**: Add gap and wrapping for better responsiveness */
+    gap: var(--ls-space-3);
+    flex-wrap: wrap;
 }
 
 .month-year-display {
     font-weight: bold;
     font-size: var(--ls-font-size-m);
     color: var(--ls-primary-text-color);
+}
+
+/* **NEW**: Wrapper for all navigation controls for a clean layout. */
+.calendar-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-1);
+}
+
+.arrow-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--ls-primary-text-color);
+    padding: var(--ls-space-1);
+    border-radius: var(--ls-border-radius-small);
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1; /* Ensure consistent height */
+}
+
+.arrow-btn:hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+.arrow-btn svg {
+    stroke: var(--ls-primary-text-color);
+    width: 20px;
+    height: 20px;
+}
+
+/* **NEW**: Specific styling for the today button. */
+.today-btn {
+    padding: var(--ls-space-1) var(--ls-space-2);
+    font-size: var(--ls-font-size-s);
+    font-weight: 600;
 }
 
 .calendar-grid {
@@ -115,31 +156,3 @@
         box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7));
     }
 }
-
-.arrow-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--ls-primary-text-color);
-    padding: var(--ls-space-1);
-    border-radius: var(--ls-border-radius-small);
-    transition: background-color 0.2s ease;
-}
-
-.arrow-btn:hover {
-    background-color: var(--ls-tertiary-background-color);
-}
-
-.arrow-btn svg {
-    stroke: var(--ls-primary-text-color);
-    width: 20px; /* Adjust size as needed */
-    height: 20px; /* Adjust size as needed */
-}
-
-/* Theme specific overrides for light/dark mode if necessary */
-/* Example:
-.theme-dark .calendar-day.today {
-    background-color: var(--ls-accent-8);
-    color: var(--ls-light-text-color);
-}
-*/
