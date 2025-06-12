@@ -50,18 +50,18 @@ class PropertiesApiTest extends BaseTestCase
     }
 
     // --- Helper Methods ---
-    private function addPropertyDirectly(string $entityType, int $entityId, string $name, string $value, int $internal = 0)
+    private function addPropertyDirectly(string $entityType, int $entityId, string $name, string $value, int $colonCount = 2)
     {
         $idColumn = ($entityType === 'page') ? 'page_id' : 'note_id';
         $otherIdColumn = ($entityType === 'page') ? 'note_id' : 'page_id';
 
-        $sql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, internal) VALUES (:entityId, NULL, :name, :value, :internal)";
+        $sql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, colon_count) VALUES (:entityId, NULL, :name, :value, :colon_count)";
         $stmt = self::$pdo->prepare($sql);
         $stmt->execute([
             ':entityId' => $entityId,
             ':name' => $name,
             ':value' => $value,
-            ':internal' => $internal
+            ':colon_count' => $colonCount
         ]);
     }
 
@@ -74,13 +74,13 @@ class PropertiesApiTest extends BaseTestCase
         return $stmt->fetchAll(PDO::FETCH_ASSOC); // Fetch all in case of multi-value, though this helper might be for single
     }
     
-    private function createPropertyDefinitionDirectly(string $name, int $internalStatus, int $autoApply = 1, string $description = '')
+    private function createPropertyDefinitionDirectly(string $name, int $colonCountStatus, int $autoApply = 1, string $description = '')
     {
-        $sql = "INSERT INTO PropertyDefinitions (name, internal, auto_apply, description) VALUES (:name, :internal, :auto_apply, :description)";
+        $sql = "INSERT INTO PropertyDefinitions (name, colon_count, auto_apply, description) VALUES (:name, :colon_count, :auto_apply, :description)";
         $stmt = self::$pdo->prepare($sql);
         $stmt->execute([
             ':name' => $name,
-            ':internal' => $internalStatus,
+            ':colon_count' => $colonCountStatus,
             ':auto_apply' => $autoApply,
             ':description' => $description
         ]);
@@ -90,13 +90,13 @@ class PropertiesApiTest extends BaseTestCase
 
     public function testGetPropertiesForNote()
     {
-        $this->addPropertyDirectly('note', self::$testNoteId, 'color', 'blue', 0);
-        $this->addPropertyDirectly('note', self::$testNoteId, 'internal_code', 'xyz123', 1);
-        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'urgent', 0);
-        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'important', 0);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'color', 'blue', 2);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'internal_code', 'xyz123', 3);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'urgent', 2);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'important', 2);
 
 
-        // Default (include_internal=false)
+        // Default (include_internal=false) - should filter out colon_count=3
         $responseDefault = $this->request('GET', '/v1/api/properties.php', ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'include_internal' => '0']);
         $this->assertEquals('success', $responseDefault['status']);
         $this->assertIsArray($responseDefault['data']);
@@ -104,7 +104,7 @@ class PropertiesApiTest extends BaseTestCase
         $this->assertIsArray($responseDefault['data']['color']);
         $this->assertCount(1, $responseDefault['data']['color']);
         $this->assertEquals('blue', $responseDefault['data']['color'][0]['value']);
-        $this->assertEquals(0, $responseDefault['data']['color'][0]['internal']);
+        $this->assertEquals(2, $responseDefault['data']['color'][0]['colon_count']);
         
         $this->assertArrayHasKey('tags', $responseDefault['data']);
         $this->assertIsArray($responseDefault['data']['tags']);
@@ -112,8 +112,8 @@ class PropertiesApiTest extends BaseTestCase
         // Order might not be guaranteed, so check for presence
         $foundUrgent = false; $foundImportant = false;
         foreach($responseDefault['data']['tags'] as $tag) {
-            if ($tag['value'] === 'urgent') { $foundUrgent = true; $this->assertEquals(0, $tag['internal']); }
-            if ($tag['value'] === 'important') { $foundImportant = true; $this->assertEquals(0, $tag['internal']); }
+            if ($tag['value'] === 'urgent') { $foundUrgent = true; $this->assertEquals(2, $tag['colon_count']); }
+            if ($tag['value'] === 'important') { $foundImportant = true; $this->assertEquals(2, $tag['colon_count']); }
         }
         $this->assertTrue($foundUrgent, "Tag 'urgent' not found or incorrect structure.");
         $this->assertTrue($foundImportant, "Tag 'important' not found or incorrect structure.");
@@ -126,11 +126,11 @@ class PropertiesApiTest extends BaseTestCase
         
         $this->assertArrayHasKey('color', $responseInternal['data']);
         $this->assertEquals('blue', $responseInternal['data']['color'][0]['value']);
-        $this->assertEquals(0, $responseInternal['data']['color'][0]['internal']);
+        $this->assertEquals(2, $responseInternal['data']['color'][0]['colon_count']);
         
         $this->assertArrayHasKey('internal_code', $responseInternal['data']);
         $this->assertEquals('xyz123', $responseInternal['data']['internal_code'][0]['value']);
-        $this->assertEquals(1, $responseInternal['data']['internal_code'][0]['internal']);
+        $this->assertEquals(3, $responseInternal['data']['internal_code'][0]['colon_count']);
         
         $this->assertArrayHasKey('tags', $responseInternal['data']);
         $this->assertIsArray($responseInternal['data']['tags']);
@@ -138,8 +138,8 @@ class PropertiesApiTest extends BaseTestCase
         // Re-check for presence due to order for tags
         $foundUrgentInternal = false; $foundImportantInternal = false;
         foreach($responseInternal['data']['tags'] as $tag) {
-            if ($tag['value'] === 'urgent') { $foundUrgentInternal = true; $this->assertEquals(0, $tag['internal']); }
-            if ($tag['value'] === 'important') { $foundImportantInternal = true; $this->assertEquals(0, $tag['internal']); }
+            if ($tag['value'] === 'urgent') { $foundUrgentInternal = true; $this->assertEquals(2, $tag['colon_count']); }
+            if ($tag['value'] === 'important') { $foundImportantInternal = true; $this->assertEquals(2, $tag['colon_count']); }
         }
         $this->assertTrue($foundUrgentInternal, "Tag 'urgent' not found or incorrect structure in internal response.");
         $this->assertTrue($foundImportantInternal, "Tag 'important' not found or incorrect structure in internal response.");
@@ -147,8 +147,8 @@ class PropertiesApiTest extends BaseTestCase
     
     public function testGetPropertiesForPage()
     {
-        $this->addPropertyDirectly('page', self::$testPageId, 'status', 'draft', 0);
-        $this->addPropertyDirectly('page', self::$testPageId, 'internal_ref', 'ref456', 1);
+        $this->addPropertyDirectly('page', self::$testPageId, 'status', 'draft', 2);
+        $this->addPropertyDirectly('page', self::$testPageId, 'internal_ref', 'ref456', 3);
 
         // Default (include_internal=false)
         $responseDefault = $this->request('GET', '/v1/api/properties.php', ['entity_type' => 'page', 'entity_id' => self::$testPageId, 'include_internal' => '0']);
@@ -156,7 +156,7 @@ class PropertiesApiTest extends BaseTestCase
         $this->assertIsArray($responseDefault['data']);
         $this->assertArrayHasKey('status', $responseDefault['data']);
         $this->assertEquals('draft', $responseDefault['data']['status'][0]['value']);
-        $this->assertEquals(0, $responseDefault['data']['status'][0]['internal']);
+        $this->assertEquals(2, $responseDefault['data']['status'][0]['colon_count']);
         $this->assertArrayNotHasKey('internal_ref', $responseDefault['data']);
 
         // include_internal=true
@@ -165,10 +165,10 @@ class PropertiesApiTest extends BaseTestCase
         $this->assertIsArray($responseInternal['data']);
         $this->assertArrayHasKey('status', $responseInternal['data']);
         $this->assertEquals('draft', $responseInternal['data']['status'][0]['value']);
-        $this->assertEquals(0, $responseInternal['data']['status'][0]['internal']);
+        $this->assertEquals(2, $responseInternal['data']['status'][0]['colon_count']);
         $this->assertArrayHasKey('internal_ref', $responseInternal['data']);
         $this->assertEquals('ref456', $responseInternal['data']['internal_ref'][0]['value']);
-        $this->assertEquals(1, $responseInternal['data']['internal_ref'][0]['internal']);
+        $this->assertEquals(3, $responseInternal['data']['internal_ref'][0]['colon_count']);
     }
 
     public function testGetPropertiesFailureCases()
@@ -203,7 +203,7 @@ class PropertiesApiTest extends BaseTestCase
         // Assuming response returns the set property in the new format
         $this->assertArrayHasKey('size', $responseCreate['data']);
         $this->assertEquals('M', $responseCreate['data']['size'][0]['value']);
-        $this->assertEquals(0, $responseCreate['data']['size'][0]['internal']);
+        $this->assertEquals(2, $responseCreate['data']['size'][0]['colon_count']);
 
         $dbProp = $this->getPropertyDirectly('note', self::$testNoteId, 'size');
         $this->assertEquals('M', $dbProp[0]['value']);
@@ -215,7 +215,7 @@ class PropertiesApiTest extends BaseTestCase
         $this->assertEquals('success', $responseUpdate['status']);
         $this->assertArrayHasKey('size', $responseUpdate['data']);
         $this->assertEquals('L', $responseUpdate['data']['size'][0]['value']);
-        $this->assertEquals(0, $responseUpdate['data']['size'][0]['internal']);
+        $this->assertEquals(2, $responseUpdate['data']['size'][0]['colon_count']);
         
         $dbPropUpdated = $this->getPropertyDirectly('note', self::$testNoteId, 'size');
         $this->assertEquals('L', $dbPropUpdated[0]['value']);
@@ -238,47 +238,50 @@ class PropertiesApiTest extends BaseTestCase
     public function testPostPropertyExplicitInternalStatusForNote()
     {
         // Explicitly internal
-        $dataInternal = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'secret_key', 'value' => 'abc', 'internal' => 1];
+        $dataInternal = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'secret_key', 'value' => 'abc', 'colon_count' => 3];
         $payloadInternal = ['action' => 'set', 'data' => $dataInternal];
         $responseInternal = $this->request('POST', '/v1/api/properties.php', [], [], json_encode($payloadInternal));
         $this->assertEquals('success', $responseInternal['status']);
         $this->assertArrayHasKey('secret_key', $responseInternal['data']);
-        $this->assertEquals(1, $responseInternal['data']['secret_key'][0]['internal']);
+        $this->assertEquals(3, $responseInternal['data']['secret_key'][0]['colon_count']);
         $dbPropInternal = $this->getPropertyDirectly('note', self::$testNoteId, 'secret_key');
-        $this->assertEquals(1, $dbPropInternal[0]['internal']);
+        $this->assertEquals(3, $dbPropInternal[0]['colon_count']);
 
         // Explicitly public
-        $dataPublic = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'public_key', 'value' => 'def', 'internal' => 0];
+        $dataPublic = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'public_key', 'value' => 'def', 'colon_count' => 2];
         $payloadPublic = ['action' => 'set', 'data' => $dataPublic];
         $responsePublic = $this->request('POST', '/v1/api/properties.php', [], [], json_encode($payloadPublic));
         $this->assertEquals('success', $responsePublic['status']);
         $this->assertArrayHasKey('public_key', $responsePublic['data']);
-        $this->assertEquals(0, $responsePublic['data']['public_key'][0]['internal']);
+        $this->assertEquals(2, $responsePublic['data']['public_key'][0]['colon_count']);
+        
         $dbPropPublic = $this->getPropertyDirectly('note', self::$testNoteId, 'public_key');
-        $this->assertEquals(0, $dbPropPublic[0]['internal']);
+        $this->assertEquals(2, $dbPropPublic[0]['colon_count']);
     }
     
     public function testPostPropertyInteractionWithDefinition()
     {
-        // Define "defined_prop" as internal
-        $this->createPropertyDefinitionDirectly('defined_prop', 1, 1);
+        // Define "defined_prop" as internal (colon_count = 3)
+        $this->createPropertyDefinitionDirectly('defined_prop', 3);
         
-        // Post without explicit internal status - should pick up from definition
+        // Post without explicit colon_count status - should pick up from definition
         $data = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'defined_prop', 'value' => 'val1'];
         $payload = ['action' => 'set', 'data' => $data];
         $response = $this->request('POST', '/v1/api/properties.php', [], [], json_encode($payload));
         $this->assertEquals('success', $response['status']);
         $this->assertArrayHasKey('defined_prop', $response['data']);
-        $this->assertEquals(1, $response['data']['defined_prop'][0]['internal'], "Should be internal due to definition.");
+        $this->assertEquals('val1', $response['data']['defined_prop'][0]['value']);
+        $this->assertEquals(3, $response['data']['defined_prop'][0]['colon_count'], "Should be internal due to definition.");
 
-        // Post with explicit internal=0 - should override definition if allowed by property_auto_internal.php logic
+        // Post with explicit colon_count=2 - should override definition if allowed by property_auto_internal.php logic
         // Current property_auto_internal.php: $explicitInternal takes precedence.
-        $dataOverride = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'defined_prop', 'value' => 'val2', 'internal' => 0];
+        $dataOverride = ['entity_type' => 'note', 'entity_id' => self::$testNoteId, 'name' => 'defined_prop', 'value' => 'val2', 'colon_count' => 2];
         $payloadOverride = ['action' => 'set', 'data' => $dataOverride];
         $responseOverride = $this->request('POST', '/v1/api/properties.php', [], [], json_encode($payloadOverride));
         $this->assertEquals('success', $responseOverride['status']);
         $this->assertArrayHasKey('defined_prop', $responseOverride['data']);
-        $this->assertEquals(0, $responseOverride['data']['defined_prop'][0]['internal'], "Explicit internal=0 should override definition.");
+        $this->assertEquals('val2', $responseOverride['data']['defined_prop'][0]['value']);
+        $this->assertEquals(2, $responseOverride['data']['defined_prop'][0]['colon_count'], "Explicit colon_count=2 should override definition.");
     }
 
 
@@ -290,7 +293,7 @@ class PropertiesApiTest extends BaseTestCase
         $this->assertEquals('success', $response['status']);
         $this->assertArrayHasKey('page_status', $response['data']);
         $this->assertEquals('published', $response['data']['page_status'][0]['value']);
-        $this->assertEquals(0, $response['data']['page_status'][0]['internal']);
+        $this->assertEquals(2, $response['data']['page_status'][0]['colon_count']);
         $dbProp = $this->getPropertyDirectly('page', self::$testPageId, 'page_status');
         $this->assertEquals('published', $dbProp[0]['value']);
     }
@@ -430,9 +433,9 @@ class PropertiesApiTest extends BaseTestCase
     public function testPostDeleteSpecificPropertyValue()
     {
         // Add multiple values for a 'tags' property on a note
-        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'tag1', 0);
-        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'tag2', 0);
-        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'tag3', 0);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'tag1', 2);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'tag2', 2);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'tags', 'tag3', 2);
 
         $initialProps = $this->getPropertyDirectly('note', self::$testNoteId, 'tags');
         $this->assertCount(3, $initialProps, "Should have 3 tag values initially.");
@@ -457,7 +460,7 @@ class PropertiesApiTest extends BaseTestCase
         $this->assertContains('tag3', $values);
 
         // Test deleting the last value of a property
-        $this->addPropertyDirectly('note', self::$testNoteId, 'single_prop', 'only_value', 0);
+        $this->addPropertyDirectly('note', self::$testNoteId, 'single_prop', 'only_value', 2);
         $deleteSingleData = [
             'entity_type' => 'note',
             'entity_id' => self::$testNoteId,

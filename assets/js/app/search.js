@@ -1,29 +1,25 @@
-// Import UI module
+// FILE: assets/js/app/search.js
+
 import { ui } from '../ui.js';
-
-// Import page management
-import { loadPage, fetchAndDisplayPages } from './page-loader.js';
-
-// Import utilities
 import { debounce, safeAddEventListener } from '../utils.js';
-
-// Import API clients
 import { searchAPI, pagesAPI } from '../api_client.js';
 
-// --- Variables ---
+// --- Global Variables for Page Search Modal ---
 let allPagesForSearch = [];
-let selectedSearchResultIndex = -1; // Specific to page search modal
+let selectedSearchResultIndex = -1;
 
-// --- Global Search Logic ---
+// --- Global Search (Sidebar) Logic ---
 
 function highlightSearchTerms(text, searchTerm) {
     if (!searchTerm || !text) return text;
-    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, `<span class="search-result-highlight">$1</span>`);
+    // Escape special regex characters in the search term
+    const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedTerm})`, 'gi');
+    return text.replace(regex, `<mark class="search-highlight">$1</mark>`);
 }
 
-function displaySearchResults(results) {
-    const searchResultsEl = ui.domRefs.searchResults; // Use ui.domRefs
+function displayGlobalSearchResults(results) {
+    const searchResultsEl = ui.domRefs.searchResults;
     if (!searchResultsEl) return;
 
     if (!results || results.length === 0) {
@@ -42,34 +38,25 @@ function displaySearchResults(results) {
     searchResultsEl.innerHTML = html;
     searchResultsEl.classList.add('has-results');
 
+    // Add a one-time click listener to the container for this set of results
     searchResultsEl.addEventListener('click', (e) => {
         const resultItem = e.target.closest('.search-result-item');
         if (resultItem) {
             const pageName = resultItem.dataset.pageName;
-            const noteId = resultItem.dataset.noteId;
             
             if (ui.domRefs.globalSearchInput) ui.domRefs.globalSearchInput.value = '';
             searchResultsEl.classList.remove('has-results');
             searchResultsEl.innerHTML = '';
             
-            loadPage(pageName).then(() => {
-                if (noteId) {
-                    const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
-                    if (noteElement) {
-                        noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        const contentDiv = noteElement.querySelector('.note-content');
-                        if (contentDiv) {
-                            setTimeout(() => contentDiv.focus(), 100);
-                        }
-                    }
-                }
-            });
+            // Use the globally available loadPage function
+            window.loadPage(pageName);
+            // Focusing the specific note will be handled by loadPage or a future enhancement
         }
-    });
+    }, { once: true }); // Use once to avoid multiple listeners
 }
 
-const debouncedSearch = debounce(async (query) => {
-    const searchResultsEl = ui.domRefs.searchResults; // Use ui.domRefs
+const debouncedGlobalSearch = debounce(async (query) => {
+    const searchResultsEl = ui.domRefs.searchResults;
     if (!searchResultsEl) return;
 
     if (!query.trim()) {
@@ -79,16 +66,11 @@ const debouncedSearch = debounce(async (query) => {
     }
     
     try {
-        const response = await searchAPI.search(query); // Assumes searchAPI is global
-        if (response && Array.isArray(response.results)) {
-            displaySearchResults(response.results);
-        } else {
-            console.warn('Search API returned unexpected format:', response);
-            displaySearchResults([]);
-        }
+        const response = await searchAPI.search(query);
+        displayGlobalSearchResults(response.results || []);
     } catch (error) {
-        console.error('Search error:', error);
-        searchResultsEl.innerHTML = '<div class="search-result-item">Error performing search</div>';
+        console.error('Global search error:', error);
+        searchResultsEl.innerHTML = '<div class="search-result-item">Error during search.</div>';
         searchResultsEl.classList.add('has-results');
     }
 }, 300);
@@ -96,23 +78,23 @@ const debouncedSearch = debounce(async (query) => {
 export function initGlobalSearch() {
     if (ui.domRefs.globalSearchInput) {
         safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => {
-            debouncedSearch(e.target.value);
+            debouncedGlobalSearch(e.target.value);
         }, 'globalSearchInput');
     }
 }
 
+
 // --- Page Search Modal Logic ---
 
 async function openSearchOrCreatePageModal() {
-    if (!ui.domRefs.pageSearchModal || !ui.domRefs.pageSearchModalInput || !ui.domRefs.pageSearchModalResults || !ui.domRefs.pageSearchModalCancel) {
-        console.error('Page search modal elements not found!');
-        return;
-    }
+    if (!ui.domRefs.pageSearchModal) return;
     try {
-        allPagesForSearch = await pagesAPI.getPages({ excludeJournal: true }); // Assumes pagesAPI is global
+        // Fetch all pages for the search list
+        const { pages } = await pagesAPI.getPages({ excludeJournal: true });
+        allPagesForSearch = pages || [];
     } catch (error) {
         console.error('Failed to fetch pages for search modal:', error);
-        allPagesForSearch = []; 
+        allPagesForSearch = [];
     }
     ui.domRefs.pageSearchModalInput.value = '';
     renderPageSearchResults('');
@@ -124,40 +106,40 @@ function closeSearchOrCreatePageModal() {
     if (ui.domRefs.pageSearchModal) {
         ui.domRefs.pageSearchModal.classList.remove('active');
     }
-    selectedSearchResultIndex = -1; 
+    selectedSearchResultIndex = -1;
 }
 
 function renderPageSearchResults(query) {
-    if (!ui.domRefs.pageSearchModalResults) return;
-    ui.domRefs.pageSearchModalResults.innerHTML = '';
-    selectedSearchResultIndex = -1; 
+    const resultsEl = ui.domRefs.pageSearchModalResults;
+    if (!resultsEl) return;
+    resultsEl.innerHTML = '';
+    selectedSearchResultIndex = -1;
 
+    const lowerCaseQuery = query.toLowerCase();
     const filteredPages = allPagesForSearch.filter(page => 
-        page.name.toLowerCase().includes(query.toLowerCase())
+        page.name.toLowerCase().includes(lowerCaseQuery)
     );
 
     filteredPages.forEach(page => {
         const li = document.createElement('li');
         li.textContent = page.name;
         li.dataset.pageName = page.name;
-        li.addEventListener('click', () => selectAndActionPageSearchResult(page.name, false));
-        ui.domRefs.pageSearchModalResults.appendChild(li);
+        resultsEl.appendChild(li);
     });
 
-    const exactMatch = allPagesForSearch.some(page => page.name.toLowerCase() === query.toLowerCase());
+    const exactMatch = allPagesForSearch.some(page => page.name.toLowerCase() === lowerCaseQuery);
     if (query.trim() !== '' && !exactMatch) {
         const li = document.createElement('li');
         li.classList.add('create-new-option');
         li.innerHTML = `Create page: <span>"${query}"</span>`;
-        li.dataset.pageName = query; 
+        li.dataset.pageName = query;
         li.dataset.isCreate = 'true';
-        li.addEventListener('click', () => selectAndActionPageSearchResult(query, true));
-        ui.domRefs.pageSearchModalResults.appendChild(li);
+        resultsEl.appendChild(li);
     }
     
-    if (ui.domRefs.pageSearchModalResults.children.length > 0) {
+    if (resultsEl.children.length > 0) {
         selectedSearchResultIndex = 0;
-        ui.domRefs.pageSearchModalResults.children[0].classList.add('selected');
+        resultsEl.children[0].classList.add('selected');
     }
 }
 
@@ -165,29 +147,30 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
     closeSearchOrCreatePageModal();
     if (isCreate) {
         try {
-            const newPage = await pagesAPI.createPage(pageName); // Pass pageName directly as string
+            // The API handles creation on getPageByName if it doesn't exist
+            // but calling createPage is more explicit.
+            const newPage = await pagesAPI.createPage(pageName);
             if (newPage && newPage.id) {
-                await fetchAndDisplayPages(newPage.name); 
-                await loadPage(newPage.name, true); 
-            } else {
-                alert(`Failed to create page: ${pageName}`);
+                // Refresh the page list in the sidebar
+                if (window.fetchAndDisplayPages) window.fetchAndDisplayPages(newPage.name);
+                // Load the new page
+                window.loadPage(newPage.name, true);
             }
         } catch (error) {
             console.error('Error creating page from search modal:', error);
             alert(`Error creating page: ${error.message}`);
         }
     } else {
-        await loadPage(pageName, true);
+        window.loadPage(pageName, true);
     }
 }
 
 export function initPageSearchModal() {
-    if (ui.domRefs.openPageSearchModalBtn) {
-        safeAddEventListener(ui.domRefs.openPageSearchModalBtn, 'click', openSearchOrCreatePageModal, 'openPageSearchModalBtn');
-    }
-    if (ui.domRefs.pageSearchModalCancel) {
-        safeAddEventListener(ui.domRefs.pageSearchModalCancel, 'click', closeSearchOrCreatePageModal, 'pageSearchModalCancel');
-    }
+    safeAddEventListener(ui.domRefs.openPageSearchModalBtn, 'click', openSearchOrCreatePageModal, 'openPageSearchModalBtn');
+    safeAddEventListener(ui.domRefs.pageSearchModalCancel, 'click', closeSearchOrCreatePageModal, 'pageSearchModalCancel');
+    
+    const closeXBtn = ui.domRefs.pageSearchModal?.querySelector('.modal-close-x');
+    safeAddEventListener(closeXBtn, 'click', closeSearchOrCreatePageModal, 'pageSearchModalCloseX');
 
     if (ui.domRefs.pageSearchModalInput) {
         ui.domRefs.pageSearchModalInput.addEventListener('input', (e) => {
@@ -200,24 +183,19 @@ export function initPageSearchModal() {
 
             switch (e.key) {
                 case 'ArrowDown':
-                    e.preventDefault();
-                    if (selectedSearchResultIndex < items.length - 1) {
-                        items[selectedSearchResultIndex]?.classList.remove('selected');
-                        selectedSearchResultIndex++;
-                        items[selectedSearchResultIndex]?.classList.add('selected');
-                    }
-                    break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    if (selectedSearchResultIndex > 0) {
-                        items[selectedSearchResultIndex]?.classList.remove('selected');
-                        selectedSearchResultIndex--;
-                        items[selectedSearchResultIndex]?.classList.add('selected');
+                    items[selectedSearchResultIndex]?.classList.remove('selected');
+                    if (e.key === 'ArrowDown') {
+                        selectedSearchResultIndex = (selectedSearchResultIndex + 1) % items.length;
+                    } else {
+                        selectedSearchResultIndex = (selectedSearchResultIndex - 1 + items.length) % items.length;
                     }
+                    items[selectedSearchResultIndex]?.classList.add('selected');
                     break;
                 case 'Enter':
                     e.preventDefault();
-                    if (selectedSearchResultIndex !== -1 && items[selectedSearchResultIndex]) {
+                    if (selectedSearchResultIndex > -1 && items[selectedSearchResultIndex]) {
                         const selectedItem = items[selectedSearchResultIndex];
                         selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
                     } else if (ui.domRefs.pageSearchModalInput.value.trim() !== '') {
@@ -231,9 +209,21 @@ export function initPageSearchModal() {
         });
     }
 
-    // Global Ctrl+Space listener
+    // Add delegated click listener for the results list
+    if (ui.domRefs.pageSearchModalResults) {
+        ui.domRefs.pageSearchModalResults.addEventListener('click', (e) => {
+            const selectedItem = e.target.closest('li');
+            if (selectedItem) {
+                selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
+            }
+        });
+    }
+
+    // Global shortcut to open the modal
     document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.code === 'Space') {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.isContentEditable);
+        if (e.ctrlKey && e.code === 'Space' && !isInputFocused) {
             e.preventDefault();
             openSearchOrCreatePageModal();
         }

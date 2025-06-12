@@ -1,78 +1,49 @@
-/**
- * Application Initializer
- * Handles the main setup and DOMContentLoaded event.
- */
+// FILE: assets/js/app/app-init.js (Now Correct)
 
-// State imports
-import { notesForCurrentPage, currentPageName, saveStatus, setSaveStatus } from './state.js';
-import { debounce } from '../utils.js';
-
-// Module initializers and core functions
-import { sidebarState } from './sidebar.js';
-import { loadPage, prefetchRecentPagesData, getInitialPage, fetchAndDisplayPages } from './page-loader.js';
+import { fetchAndProcessPageData, getInitialPage } from './page-loader.js';
+import { ui } from '../ui.js'; // This import is correct
 import { initGlobalEventListeners } from './event-handlers.js';
 import { initGlobalSearch, initPageSearchModal } from './search.js';
-import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js';
+import { fetchAllPages } from '../ui/page-link-suggestions.js';
+import { sidebarState } from './sidebar.js';
 
-// Import UI module
-import { ui } from '../ui.js';
-
-async function initializeApp() {
+/**
+ * Initializes the entire application.
+ */
+export async function initializeApp() {
     const splashScreen = document.getElementById('splash-screen');
-    if (splashScreen) splashScreen.classList.remove('hidden'); 
-    
+    if (splashScreen) splashScreen.classList.remove('hidden');
+
     try {
-        sidebarState.init(); 
+        // This call will now succeed because ui.init is a function
+        ui.init(); 
         
-        // Initialize UI components
-        if (typeof ui !== 'undefined') {
-            ui.initPagePropertiesModal();
-            ui.updateSaveStatusIndicator('saved');
-        } else {
-            console.error("UI module not loaded. Please check script loading order.");
-            return;
-        }
-        
+        initGlobalEventListeners();
+        sidebarState.init();
         initGlobalSearch();
         initPageSearchModal();
-        initGlobalEventListeners();
-        
-        // Initialize page link suggestions
-        initSuggestionUI();
-        fetchAllPages(); // Asynchronously fetch page names
-        
+
+        await fetchAllPages();
+
         const urlParams = new URLSearchParams(window.location.search);
-        const initialPageName = urlParams.get('page') || getInitialPage(); 
+        const pageNameFromUrl = urlParams.get('page');
+        const initialPageName = pageNameFromUrl || getInitialPage();
         
-        await loadPage(initialPageName, false); 
-        await fetchAndDisplayPages(initialPageName);
-        
-        await prefetchRecentPagesData(); 
-        
-        const initialSaveIndicator = document.getElementById('save-status-indicator');
-        if (initialSaveIndicator) {
-            initialSaveIndicator.classList.add('status-hidden'); 
-        }
-        
+        await window.loadPage(initialPageName, false);
+
         if (splashScreen) {
             if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
                 window.splashAnimations.stop();
             }
             splashScreen.classList.add('hidden');
         }
-        console.log('App initialized successfully');
-        
-    } catch (error) { 
+        console.log('App initialized successfully.');
+
+    } catch (error) {
         console.error('Failed to initialize application:', error);
-        if (splashScreen && typeof window.splashAnimations !== 'undefined' && typeof window.splashAnimations.stop === 'function') {
-            window.splashAnimations.stop(); 
+        if (splashScreen) {
+            splashScreen.classList.add('hidden');
         }
-        if(splashScreen) splashScreen.classList.add('hidden');
-        if (document.body) {
-            document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>' + error.message + '</p>Check console for details.</div>';
-        }
+        document.body.innerHTML = `<div style="text-align: center; padding: 2rem; color: #a04040;"><h1>Application Failed to Start</h1><p>${error.message}</p><p>Please check the console for more details.</p></div>`;
     }
 }
-
-// Export the initializeApp function
-export { initializeApp };

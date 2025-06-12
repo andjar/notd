@@ -55,33 +55,10 @@ function run_database_setup(PDO $pdo) {
             throw $e;
         }
 
-        // Apply property definitions to existing properties
-        log_setup_local("Applying property definitions to existing properties...");
-        $stmt = $pdo->prepare("SELECT name, internal FROM PropertyDefinitions WHERE auto_apply = 1");
-        $stmt->execute();
-        $definitions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $totalUpdated = 0;
-        foreach ($definitions as $definition) {
-            $updateStmt = $pdo->prepare("UPDATE Properties SET internal = ? WHERE name = ? AND internal != ?");
-            $updateStmt->execute([$definition['internal'], $definition['name'], $definition['internal']]);
-            $updated = $updateStmt->rowCount();
-            $totalUpdated += $updated;
-            if ($updated > 0) {
-                log_setup_local("Applied '{$definition['name']}' definition to {$updated} properties");
-            }
-        }
-        
-        if ($totalUpdated === 0) {
-            log_setup_local("No existing properties needed updating");
-        } else {
-            log_setup_local("Total properties updated: {$totalUpdated}");
-        }
-
         log_setup_local("Database setup completed successfully!");
 
     } catch (Exception $e) {
         log_setup_local("Database setup failed: " . $e->getMessage());
-        throw $e; // Re-throw to be handled by the caller
+        throw $e;
     }
 }

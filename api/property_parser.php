@@ -1,13 +1,15 @@
 <?php
 require_once __DIR__ . '/../config.php'; // Ensure config is loaded for PROPERTY_BEHAVIORS_BY_COLON_COUNT
-require_once 'db_connect.php';
-require_once 'response_utils.php';
+require_once __DIR__ . '/db_connect.php';
+require_once __DIR__ . '/property_trigger_service.php'; // Triggers will be handled by a different service now
 
 class PropertyParser {
     private $pdo;
+    private $propertyTriggerService;
 
-    public function __construct($pdo) {
+    public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->propertyTriggerService = new PropertyTriggerService($pdo);
     }
 
     public function parsePropertiesFromContent($content) {
@@ -41,107 +43,78 @@ class PropertyParser {
         return $parsedProperties;
     }
 
+    private function updateNoteInternalFlag($noteId) {
+        $stmt = $this->pdo->prepare("SELECT 1 FROM Properties WHERE note_id = ? AND name = 'internal' AND value = 'true' AND active = 1 AND colon_count >= 3 LIMIT 1");
+        $stmt->execute([$noteId]);
+        $isInternal = $stmt->fetchColumn() !== false;
+
+        $updateStmt = $this->pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
+        $updateStmt->execute([(int)$isInternal, $noteId]);
+    }
+
     public function syncNotePropertiesFromContent($noteId, $content) {
         try {
             $this->pdo->beginTransaction();
-            
-            // Fetch all active properties for the note, including their colon_count
+
             $stmt = $this->pdo->prepare("SELECT id, name, value, colon_count FROM Properties WHERE note_id = ? AND active = 1");
             $stmt->execute([$noteId]);
             $existingDbProperties = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            $existingPropsMap = [];
-            foreach ($existingDbProperties as $prop) {
-                // Group by name, and then by value, to handle potential duplicate name-value pairs if any exist (though less common)
-                // For this logic, primarily grouping by name is important for finding if *any* property with that name exists.
-                // Storing the full prop allows access to its ID and colon_count for deletion logic.
-                $existingPropsMap[$prop['name']][] = $prop; 
-            }
-            
-            // Parse properties from content (will now include colon_count)
+
             $parsedContentProperties = $this->parsePropertiesFromContent($content);
-            
             $propertiesToAdd = [];
-            $propertiesToDeactivateIds = []; // Renamed for clarity, as we deactivate
+            $propertiesToDeactivateIds = [];
+            $propertiesToKeepIds = [];
 
-            // Identify properties to add
             foreach ($parsedContentProperties as $parsedProp) {
-                $foundInDb = false;
-                if (isset($existingPropsMap[$parsedProp['name']])) {
-                    foreach ($existingPropsMap[$parsedProp['name']] as $dbProp) {
-                        // A property is considered "existing" if its name, value, AND colon_count match.
-                        // This means changing colon count for an existing name/value is treated as add new + remove old.
-                        if ($dbProp['value'] === $parsedProp['value'] && (int)$dbProp['colon_count'] === (int)$parsedProp['colon_count']) {
-                            $foundInDb = true;
-                            break; 
-                        }
-                    }
-                }
-                if (!$foundInDb) {
-                    $propertiesToAdd[] = [
-                        'name' => $parsedProp['name'],
-                        'value' => $parsedProp['value'],
-                        'colon_count' => $parsedProp['colon_count']
-                    ];
-                }
-            }
-
-            // Identify properties to deactivate based on update_behavior
-            foreach ($existingDbProperties as $dbProp) {
-                $foundInContent = false;
-                foreach ($parsedContentProperties as $parsedProp) {
-                    if ($dbProp['name'] === $parsedProp['name'] && 
-                        $dbProp['value'] === $parsedProp['value'] &&
-                        (int)$dbProp['colon_count'] === (int)$parsedProp['colon_count']) {
-                        $foundInContent = true;
+                $foundMatch = false;
+                foreach ($existingDbProperties as $dbProp) {
+                    if ($dbProp['name'] === $parsedProp['name'] && $dbProp['value'] === $parsedProp['value'] && (int)$dbProp['colon_count'] === (int)$parsedProp['colon_count']) {
+                        $propertiesToKeepIds[] = $dbProp['id'];
+                        $foundMatch = true;
                         break;
                     }
                 }
-
-                if (!$foundInContent) {
-                    $dbColonCount = (int)$dbProp['colon_count'];
-                    // Default to behavior of 2 colons if specific count not defined, or if PROPERTY_BEHAVIORS_BY_COLON_COUNT is missing (defensive)
-                    $defaultBehavior = defined('PROPERTY_BEHAVIORS_BY_COLON_COUNT') && isset(PROPERTY_BEHAVIORS_BY_COLON_COUNT[2]) 
-                                       ? PROPERTY_BEHAVIORS_BY_COLON_COUNT[2] 
-                                       : ['update_behavior' => 'replace']; // Fallback default
-
-                    $behavior = defined('PROPERTY_BEHAVIORS_BY_COLON_COUNT') && isset(PROPERTY_BEHAVIORS_BY_COLON_COUNT[$dbColonCount])
-                                ? PROPERTY_BEHAVIORS_BY_COLON_COUNT[$dbColonCount]
-                                : $defaultBehavior;
-                    
-                    $updateBehavior = $behavior['update_behavior'] ?? 'replace'; // Default to 'replace' if not specified in behavior
-
-                    if ($updateBehavior !== 'append') {
+                if (!$foundMatch) {
+                    $propertiesToAdd[] = $parsedProp;
+                }
+            }
+            
+            foreach ($existingDbProperties as $dbProp) {
+                if (!in_array($dbProp['id'], $propertiesToKeepIds)) {
+                    $behavior = PROPERTY_BEHAVIORS_BY_COLON_COUNT[$dbProp['colon_count']] ?? PROPERTY_BEHAVIORS_BY_COLON_COUNT[2];
+                    if (($behavior['update_behavior'] ?? 'replace') !== 'append') {
                         $propertiesToDeactivateIds[] = $dbProp['id'];
                     }
                 }
             }
-            
-            // Add new properties
+
             if (!empty($propertiesToAdd)) {
                 $insertStmt = $this->pdo->prepare(
                     "INSERT INTO Properties (note_id, name, value, colon_count, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
                 );
                 foreach ($propertiesToAdd as $prop) {
                     $insertStmt->execute([$noteId, $prop['name'], $prop['value'], $prop['colon_count']]);
+                    $this->propertyTriggerService->dispatch('note', $noteId, $prop['name'], $prop['value']);
                 }
             }
-            
-            // Deactivate properties that are no longer in content and are not append-only based on their behavior
+
             if (!empty($propertiesToDeactivateIds)) {
-                $deactivateStmt = $this->pdo->prepare("UPDATE Properties SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                foreach ($propertiesToDeactivateIds as $propId) {
-                    $deactivateStmt->execute([$propId]);
-                }
+                $placeholders = rtrim(str_repeat('?,', count($propertiesToDeactivateIds)), ',');
+                $deactivateStmt = $this->pdo->prepare("UPDATE Properties SET active = 0, updated_at = CURRENT_TIMESTAMP WHERE id IN ($placeholders)");
+                $deactivateStmt->execute($propertiesToDeactivateIds);
             }
-            
+
+            // After syncing, update the note's internal flag
+            $this->updateNoteInternalFlag($noteId);
+
             $this->pdo->commit();
             return true;
-        } catch (PDOException $e) {
+
+        } catch (Exception $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            error_log("Error syncing note properties: " . $e->getMessage() . " in file " . $e->getFile() . " on line " . $e->getLine());
+            error_log("Error in syncNotePropertiesFromContent: " . $e->getMessage());
             return false;
         }
     }
