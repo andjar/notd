@@ -102,7 +102,7 @@ ZenPen.ui = (function() {
 		overlay = document.querySelector( '.overlay' );
 		overlay.onclick = onOverlayClick;
 
-		article = document.querySelector( '.content' );
+		article = document.querySelector( '.markdown-editor' );
 		article.onkeyup = onArticleKeyUp;
 
 		wordCountBox = overlay.querySelector( '.wordcount' );
@@ -115,8 +115,6 @@ ZenPen.ui = (function() {
 		wordCounter = document.querySelector( '.word-counter' );
 		wordCounterProgress = wordCounter.querySelector( '.progress' );
 
-		header = document.querySelector( '.header' );
-		header.onkeypress = onHeaderKeyPress;
 	}
 
 	function onScreenSizeClick( event ) {
@@ -160,25 +158,12 @@ ZenPen.ui = (function() {
 		if (typeof saveFormat != 'undefined' && saveFormat != '') {
 			var blob = new Blob([textToWrite], {type: "text/plain;charset=utf-8"});
 			/* remove tabs and line breaks from header */
-			var headerText = header.innerHTML.replace(/(\t|\n|\r)/gm,"");
-			if (headerText === "") {
-			    headerText = "ZenPen";
-			}
-			saveAs(blob, headerText + '.txt');
+			saveAs(blob, 'ZenNote.txt');
 		} else {
 			document.querySelector('.saveoverlay h1').style.color = '#FC1E1E';
 		}
 	}
 	
-	/* Allows the user to press enter to tab from the title */
-	function onHeaderKeyPress( event ) {
-
-		if ( event.keyCode === 13 ) {
-			event.preventDefault();
-			article.focus();
-		}
-	}
-
 	/* Allows the user to press enter to tab from the word count modal */
 	function onWordCountKeyUp( event ) {
 		
@@ -258,13 +243,10 @@ ZenPen.ui = (function() {
 		
 		saveFormat = targ.getAttribute('data-format');
 		
-		var header = document.querySelector('header.header');
-		var headerText = header.innerHTML.replace(/(\r\n|\n|\r)/gm,"") + "\n";
-		
-		var body = document.querySelector('article.content');
-		var bodyText = body.innerHTML;
+		var body = document.querySelector('article.markdown-editor');
+		var bodyText = body.innerHTML; // Keep innerHTML for now as per reasoning in prompt
 			
-		textToWrite = formatText(saveFormat,headerText,bodyText);
+		textToWrite = formatText(saveFormat, bodyText);
 		
 		var textArea = document.querySelector('.hiddentextbox');
 		textArea.value = textToWrite;
@@ -273,23 +255,22 @@ ZenPen.ui = (function() {
 
 	}
 
-	function formatText( type, header, body ) {
+	function formatText( type, content ) {
 		
 		var text;
 		switch( type ) {
 
 			case 'html':
-				header = "<h1>" + header + "</h1>";
-				text = header + body;
-				text = text.replace(/\t/g, '');
+				if (typeof marked === 'function') {
+					text = marked(content); // Use marked.js if available
+				} else {
+					// Fallback if marked.js somehow isn't loaded - treat as pre-formatted HTML
+					text = content.replace(/	/g, ''); 
+				}
 			break;
 
 			case 'markdown':
-				header = header.replace(/\t/g, '');
-				header = header.replace(/\n$/, '');
-				header = "#" + header + "#";
-			
-				text = body.replace(/\t/g, '');
+				text = content.replace(/\t/g, ''); // content here is innerHTML from the editor
 			
 				text = text.replace(/<b>|<\/b>/g,"**")
 					.replace(/\r\n+|\r+|\n+|\t+/ig,"")
@@ -314,22 +295,16 @@ ZenPen.ui = (function() {
                                                 text = text.replace(links[i],'['+linktext+']('+href+')');
                                         }
                                 }
-				
-				text = header +"\n\n"+ text;
 			break;
 
 			case 'plain':
-				header = header.replace(/\t/g, '');
-			
 				var tmp = document.createElement('div');
-				tmp.innerHTML = body;
+				tmp.innerHTML = content;
 				text = tmp.textContent || tmp.innerText || "";
 				
 				text = text.replace(/\t/g, '')
 					.replace(/\n{3}/g,"\n")
 					.replace(/\n/,""); //replace the opening line break
-				
-				text = header + text;
 			break;
 			default:
 			break;

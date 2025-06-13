@@ -2,8 +2,12 @@
 ZenPen = window.ZenPen || {};
 ZenPen.editor = (function() {
 
+	const ZEN_PAGE_ID = 1; // Placeholder for the page ID where the Zen note is stored
+	const ZEN_NOTE_TITLE = "Zen Writer Content"; // Placeholder for identifying the Zen note
+	let zenNoteId = null; // To store the ID of our note once loaded/created
+
 	// Editor elements
-	var headerField, contentField, lastType, currentNodeList, lastSelection;
+	var contentField, lastType, currentNodeList, lastSelection;
 
 	// Editor Bubble elements
 	var textOptions, optionsBox, boldButton, italicButton, quoteButton, urlButton, urlInput;
@@ -18,32 +22,18 @@ ZenPen.editor = (function() {
 		createEventBindings();
 
 		// Load state if storage is supported
-		if ( ZenPen.util.supportsHtmlStorage() ) {
-			loadState();
-		} else {
-			loadDefault();
-		}
+		loadNoteFromDB();
 		// Set cursor position
-		var range = document.createRange();
-		var selection = window.getSelection();
-		range.setStart(headerField, 1);
-		selection.removeAllRanges();
-		selection.addRange(range);
+		contentField.focus();
 
 	}
 
 	function createEventBindings() {
 
 		// Key up bindings
-		if ( ZenPen.util.supportsHtmlStorage() ) {
-
-			document.onkeyup = function( event ) {
-				checkTextHighlighting( event );
-				saveState();
-			}
-
-		} else {
-			document.onkeyup = checkTextHighlighting;
+		document.onkeyup = function( event ) {
+			checkTextHighlighting( event );
+			saveNoteToDB(); // Call the new save function
 		}
 
 		// Mouse bindings
@@ -76,8 +66,7 @@ ZenPen.editor = (function() {
 
 	function bindElements() {
 
-		headerField = document.querySelector( '.header' );
-		contentField = document.querySelector( '.content' );
+		contentField = document.querySelector( '.markdown-editor' );
 		textOptions = document.querySelector( '.text-options' );
 
 		optionsBox = textOptions.querySelector( '.options' );
@@ -220,30 +209,94 @@ ZenPen.editor = (function() {
 		return !!nodeList[ name ];
 	}
 
-	function saveState( event ) {
-		
-		localStorage[ 'header' ] = headerField.innerHTML;
-		localStorage[ 'content' ] = contentField.innerHTML;
-	}
+	async function saveNoteToDB() {
+		if (!contentField) return; // Make sure contentField is initialized
+		const currentContent = contentField.innerHTML;
+		let operation;
 
-	function loadState() {
-
-		if ( localStorage[ 'header' ] ) {
-			headerField.innerHTML = localStorage[ 'header' ];
-		} else {
-			headerField.innerHTML = defaultTitle; // in default.js
+		// Ensure API client is available
+		if (!window.parent || !window.parent.notesAPI || !window.parent.notesAPI.batchUpdateNotes) {
+			console.error("notesAPI not found on parent window. Cannot save.");
+			return;
 		}
 
-		if ( localStorage[ 'content' ] ) {
-			contentField.innerHTML = localStorage[ 'content' ];
-		} else {
-			loadDefaultContent()
+		if (zenNoteId) { // If note exists, update it
+			operation = {
+				type: 'update',
+				payload: {
+					id: zenNoteId,
+					content: currentContent
+				}
+			};
+		} else { // If note doesn't exist, create it
+			// Ensure the title is part of the content for new notes
+			const newContentWithTitle = (currentContent.startsWith("# " + ZEN_NOTE_TITLE) ? currentContent : "# " + ZEN_NOTE_TITLE + "\n" + currentContent);
+			operation = {
+				type: 'create',
+				payload: {
+					page_id: ZEN_PAGE_ID,
+					content: newContentWithTitle,
+					// order_index: 0 // Optional: set an order_index
+				}
+			};
+		}
+
+		try {
+			console.log("Attempting to save note:", operation);
+			const response = await window.parent.notesAPI.batchUpdateNotes([operation]);
+			if (response && response.results && response.results.length > 0) {
+				const result = response.results[0];
+				if (result.status === 'success') {
+					if (result.type === 'create' && result.note && result.note.id) {
+						zenNoteId = result.note.id; // Store new note ID
+						console.log('Zen note created with ID:', zenNoteId);
+						// If the title was added, and the editor doesn't reflect it, update it.
+						// This depends on whether innerHTML reflects the exact saved content immediately.
+						if (!contentField.innerHTML.startsWith("# " + ZEN_NOTE_TITLE)) {
+							 contentField.innerHTML = operation.payload.content;
+						}
+					} else if (result.type === 'update') {
+						console.log('Zen note updated successfully:', zenNoteId);
+					}
+				} else {
+					console.error('Failed to save note, API returned error:', result.message, result);
+				}
+			} else {
+				 console.error('Failed to save note, unexpected response:', response);
+			}
+		} catch (error) {
+			console.error("Error saving note to DB:", error);
 		}
 	}
 
-	function loadDefault() {
-		headerField.innerHTML = defaultTitle; // in default.js
-		loadDefaultContent();
+	async function loadNoteFromDB() {
+		try {
+			// Ensure API client is available
+			if (!window.parent || !window.parent.notesAPI || !window.parent.notesAPI.getPageData) {
+				console.error("notesAPI not found on parent window.");
+				loadDefaultContent(); // Fallback to default content
+				return;
+			}
+
+			const notes = await window.parent.notesAPI.getPageData(ZEN_PAGE_ID);
+			// Attempt to find the note. For this implementation, we'll assume the Zen
+			// note is the *only* note on that page or the first one that somewhat matches.
+			// A more robust solution would use a specific property on the note.
+			// Let's look for a note whose content *starts with* our expected title.
+			const existingNote = notes.find(note => note.content && note.content.startsWith("# " + ZEN_NOTE_TITLE));
+
+			if (existingNote) {
+				zenNoteId = existingNote.id;
+				contentField.innerHTML = existingNote.content; // Load the raw content
+				console.log('Zen note loaded:', zenNoteId);
+			} else {
+				console.log('Zen note not found on page ' + ZEN_PAGE_ID + '. Initializing with default content. It will be created on first save.');
+				loadDefaultContent(); // Uses defaultContent from default.js
+			}
+		} catch (error) {
+			console.error("Error loading note from DB:", error);
+			loadDefaultContent(); // Fallback to default content
+		}
 	}
 
 	function loadDefaultContent() {
@@ -370,7 +423,7 @@ ZenPen.editor = (function() {
 
 	return {
 		init: init,
-		saveState: saveState,
+		saveNoteToDB: saveNoteToDB,
 		getWordCount: getWordCount
 	}
 
