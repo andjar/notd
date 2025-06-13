@@ -130,6 +130,12 @@ const pagesAPI = {
     },
     getPageById: (id) => apiRequest(`pages.php?id=${id}`),
     getPageByName: (name) => apiRequest(`pages.php?name=${encodeURIComponent(name)}`),
+    /**
+     * Get child pages for a namespace
+     * @param {string} namespace - The namespace to get child pages for
+     * @returns {Promise<Array>} Array of child page objects
+     */
+    getChildPages: (namespace) => apiRequest(`child_pages.php?namespace=${encodeURIComponent(namespace)}`),
     createPage: (pageName, content = null) => {
         const payload = { name: pageName };
         if (content !== null) {

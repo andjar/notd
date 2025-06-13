@@ -37,14 +37,27 @@ function updatePageTitle(pageName) {
     document.title = `${pageName} - notd`;
     if (!domRefs.pageTitleContainer) return;
 
+    // Create the page title element
+    const pageTitle = document.createElement('h1');
+    pageTitle.id = 'page-title';
+    pageTitle.className = 'page-title';
+    
+    // Clear the container and append the title element
     domRefs.pageTitleContainer.innerHTML = '';
+    domRefs.pageTitleContainer.appendChild(pageTitle);
 
+    // Create a span for the title content
+    const titleContent = document.createElement('span');
+    titleContent.className = 'page-title-content';
+    pageTitle.appendChild(titleContent);
+
+    // Add the page name parts with links for namespaces
     const pageNameParts = pageName.split('/');
     let currentPath = '';
 
     pageNameParts.forEach((part, index) => {
         if (index > 0) {
-            domRefs.pageTitleContainer.appendChild(document.createTextNode(' / '));
+            titleContent.appendChild(document.createTextNode(' / '));
         }
         currentPath += (index > 0 ? '/' : '') + part;
 
@@ -53,24 +66,25 @@ function updatePageTitle(pageName) {
             link.href = '#';
             link.textContent = part;
             link.dataset.pageName = currentPath;
-            // **FIX**: Removed onclick, the new global handler will manage this.
-            domRefs.pageTitleContainer.appendChild(link);
+            titleContent.appendChild(link);
         } else {
-            domRefs.pageTitleContainer.appendChild(document.createTextNode(part));
+            titleContent.appendChild(document.createTextNode(part));
         }
     });
     
+    // Add the gear icon to the page-title element
     const gearIcon = document.createElement('i');
     gearIcon.dataset.feather = 'settings';
     gearIcon.id = 'page-properties-gear';
     gearIcon.className = 'page-title-gear';
     gearIcon.title = 'Page Properties';
-    domRefs.pageTitleContainer.appendChild(gearIcon);
+    pageTitle.appendChild(gearIcon);
+
     if (typeof feather !== 'undefined') {
         try {
             feather.replace();
         } catch (error) {
-            console.warn("Feather icons could not be rendered in page title:", error);
+            console.error('Error rendering feather icon:', error);
         }
     }
 }
@@ -85,25 +99,61 @@ function updatePageList(pages, activePageName) {
     domRefs.pageListContainer.innerHTML = '';
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
-        domRefs.pageListContainer.innerHTML = '<li>No pages found.</li>';
+        domRefs.pageListContainer.innerHTML = '<div class="no-pages-message">No recent pages</div>';
         return;
     }
 
-    pages
-        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-        .slice(0, 10)
-        .forEach(page => {
-            const li = document.createElement('li');
-            const link = document.createElement('a');
-            link.href = `#`;
-            link.dataset.pageName = page.name;
-            link.textContent = page.name;
-            if (page.name === activePageName) {
-                link.classList.add('active');
-            }
-            li.appendChild(link);
-            domRefs.pageListContainer.appendChild(li);
-        });
+    // Sort pages by last updated
+    pages.sort((a, b) => {
+        if (a.updated_at > b.updated_at) return -1;
+        if (a.updated_at < b.updated_at) return 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    // Take only the most recent pages
+    const recentPages = pages.slice(0, 7);
+
+    // Create a list container
+    const listContainer = document.createElement('ul');
+    listContainer.className = 'recent-pages-list';
+
+    recentPages.forEach(page => {
+        const listItem = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = '#';
+        link.dataset.pageName = page.name;
+        link.className = 'recent-page-link';
+        
+        // Add active class if this is the current page
+        if (page.name === activePageName) {
+            link.classList.add('active');
+        }
+
+        // Create the link content with icon and name
+        const icon = document.createElement('i');
+        icon.dataset.feather = 'file-text';
+        icon.className = 'recent-page-icon';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'recent-page-name';
+        nameSpan.textContent = page.name;
+
+        link.appendChild(icon);
+        link.appendChild(nameSpan);
+        listItem.appendChild(link);
+        listContainer.appendChild(listItem);
+    });
+
+    domRefs.pageListContainer.appendChild(listContainer);
+
+    // Initialize Feather icons
+    if (typeof feather !== 'undefined') {
+        try {
+            feather.replace();
+        } catch (error) {
+            console.error('Error rendering feather icons:', error);
+        }
+    }
 }
 
 /**
@@ -496,6 +546,277 @@ export function promptForPagePassword() {
     });
 }
 
+function displayChildPages(pageName) {
+    const container = document.getElementById('child-pages-container');
+    if (!container) return;
+
+    // Hide container by default
+    container.style.display = 'none';
+
+    // Use the API client to fetch child pages
+    window.pagesAPI.getChildPages(pageName)
+        .then(childPages => {
+            if (!childPages || childPages.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            // Show container only if there are child pages
+            container.style.display = 'block';
+            
+            // Create header
+            const header = document.createElement('h3');
+            header.textContent = 'Child Pages';
+            container.innerHTML = '';
+            container.appendChild(header);
+
+            // Create list
+            const list = document.createElement('ul');
+            list.className = 'child-page-list';
+
+            childPages.forEach(page => {
+                const item = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = '#';
+                link.dataset.pageName = page.name;
+                link.className = 'child-page-link';
+                link.textContent = page.name;
+                item.appendChild(link);
+                list.appendChild(item);
+            });
+
+            container.appendChild(list);
+        })
+        .catch(error => {
+            console.error('Error fetching child pages:', error);
+            container.style.display = 'none';
+        });
+}
+
+function displayChildPagesInSidebar(pageName) {
+    const container = document.getElementById('child-pages-sidebar');
+    if (!container) return;
+
+    // Hide container by default
+    container.style.display = 'none';
+
+    // Use the API client to fetch child pages
+    window.pagesAPI.getChildPages(pageName)
+        .then(childPages => {
+            if (!childPages || childPages.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            // Show container only if there are child pages
+            container.style.display = 'block';
+            
+            // Create header
+            const header = document.createElement('h3');
+            header.textContent = 'Child Pages';
+            container.innerHTML = '';
+            container.appendChild(header);
+
+            // Create list
+            const list = document.createElement('ul');
+            list.className = 'child-pages-sidebar-list';
+
+            childPages.forEach(page => {
+                const item = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = '#';
+                link.dataset.pageName = page.name;
+                link.className = 'child-page-sidebar-link';
+                
+                // Create the link content with icon and name
+                const icon = document.createElement('i');
+                icon.dataset.feather = 'file-text';
+                icon.className = 'child-page-sidebar-icon';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'child-page-sidebar-name';
+                // Show only the last part of the name if it contains a namespace
+                nameSpan.textContent = page.name.includes('/') ? 
+                    page.name.substring(page.name.lastIndexOf('/') + 1) : 
+                    page.name;
+
+                link.appendChild(icon);
+                link.appendChild(nameSpan);
+                item.appendChild(link);
+                list.appendChild(item);
+            });
+
+            container.appendChild(list);
+
+            // Initialize Feather icons
+            if (typeof feather !== 'undefined') {
+                try {
+                    feather.replace();
+                } catch (error) {
+                    console.error('Error rendering feather icons:', error);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching child pages:', error);
+            container.style.display = 'none';
+        });
+}
+
+function displayFavorites() {
+    const container = document.getElementById('favorites-container');
+    if (!container) return;
+
+    // Get favorites from localStorage
+    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+    
+    // Find or create the list container
+    let listContainer = container.querySelector('.favorites-list');
+    if (!listContainer) {
+        // If list container doesn't exist, create the proper structure
+        container.innerHTML = `
+            <h4>Favorites</h4>
+            <div class="favorites-list"></div>
+        `;
+        listContainer = container.querySelector('.favorites-list');
+    }
+    
+    // Clear only the list content
+    listContainer.innerHTML = '';
+    
+    if (favorites.length === 0) {
+        listContainer.innerHTML = '<p>No favorite pages yet.</p>';
+        return;
+    }
+
+    favorites.forEach(pageName => {
+        const item = document.createElement('a');
+        item.href = '#';
+        item.className = 'favorite-item';
+        item.dataset.pageName = pageName;
+        
+        // Add active class if this is the current page
+        if (pageName === window.currentPageName) {
+            item.classList.add('active');
+        }
+
+        // Create the link content with icon and name
+        const icon = document.createElement('i');
+        icon.dataset.feather = 'star';
+        icon.className = 'favorite-icon';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'favorite-name';
+        nameSpan.textContent = pageName;
+
+        item.appendChild(icon);
+        item.appendChild(nameSpan);
+        listContainer.appendChild(item);
+    });
+
+    // Initialize Feather icons
+    if (typeof feather !== 'undefined') {
+        try {
+            feather.replace();
+        } catch (error) {
+            console.error('Error rendering feather icons:', error);
+        }
+    }
+}
+
+function toggleFavorite(pageName) {
+    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+    const index = favorites.indexOf(pageName);
+    
+    if (index === -1) {
+        favorites.push(pageName);
+    } else {
+        favorites.splice(index, 1);
+    }
+    
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+    displayFavorites();
+}
+
+function displayBacklinksInSidebar(pageName) {
+    const container = document.getElementById('backlinks-container');
+    if (!container) return;
+
+    // Find or create the list container
+    let listContainer = container.querySelector('.backlinks-list');
+    if (!listContainer) {
+        // If list container doesn't exist, create the proper structure
+        container.innerHTML = `
+            <h4>Backlinks</h4>
+            <div class="backlinks-list"></div>
+        `;
+        listContainer = container.querySelector('.backlinks-list');
+    }
+
+    // Clear only the list content
+    listContainer.innerHTML = '';
+
+    // Fetch backlinks with correct parameter
+    fetch(`api/v1/search.php?backlinks_for_page_name=${encodeURIComponent(pageName)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const backlinks = data.results || [];
+            
+            if (backlinks.length === 0) {
+                listContainer.innerHTML = '<p>No backlinks found.</p>';
+                return;
+            }
+
+            backlinks.forEach(link => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'backlink-item';
+                item.dataset.pageName = link.page_name;
+                
+                // Create the link content with icon and name
+                const icon = document.createElement('i');
+                icon.dataset.feather = 'link';
+                icon.className = 'backlink-icon';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'backlink-content';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'backlink-name';
+                nameSpan.textContent = link.page_name;
+                
+                const snippetSpan = document.createElement('span');
+                snippetSpan.className = 'backlink-snippet';
+                snippetSpan.textContent = link.content_snippet || '';
+
+                contentDiv.appendChild(nameSpan);
+                contentDiv.appendChild(snippetSpan);
+                
+                item.appendChild(icon);
+                item.appendChild(contentDiv);
+                listContainer.appendChild(item);
+            });
+
+            // Initialize Feather icons
+            if (typeof feather !== 'undefined') {
+                try {
+                    feather.replace();
+                } catch (error) {
+                    console.error('Error rendering feather icons:', error);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching backlinks:', error);
+            listContainer.innerHTML = '<p>Error loading backlinks.</p>';
+        });
+}
+
 // Export the main UI object
 export const ui = {
     displayNotes,
@@ -527,7 +848,12 @@ export const ui = {
     getNestingLevel,
     getNoteAncestors,
     promptForPassword,
-    calendarWidget
+    calendarWidget,
+    displayChildPages,
+    displayChildPagesInSidebar,
+    displayFavorites,
+    toggleFavorite,
+    displayBacklinksInSidebar
 };
 
 // Make ui available globally

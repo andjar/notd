@@ -145,12 +145,25 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
             <div id="right-sidebar" class="sidebar right-sidebar">
                 <div class="sidebar-content">
                     <div class="sidebar-section">
-                        <h4>Favorites</h4>
-                        <div id="favorites-container"></div>
+                        <div id="favorites-container" class="favorites-sidebar">
+                            <h4>Favorites</h4>
+                            <div id="favorites-list" class="favorites-list">
+                                <!-- Favorites will be populated by JavaScript -->
+                            </div>
+                        </div>
                     </div>
-                    <div class="sidebar-section backlinks-section">
-                        <h4>Backlinks</h4>
-                        <div id="backlinks-container"></div>
+                    <div class="sidebar-section">
+                        <div id="backlinks-container" class="backlinks-sidebar">
+                            <h4>Backlinks</h4>
+                            <div id="backlinks-list" class="backlinks-list">
+                                <!-- Backlinks will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sidebar-section">
+                        <div id="child-pages-sidebar" class="child-pages-sidebar">
+                            <!-- Child pages will be populated by JavaScript -->
+                        </div>
                     </div>
                     <div class="sidebar-section extensions-section">
                         <h4>Extensions</h4>

@@ -64,10 +64,11 @@ export async function handleTransclusions() {
 }
 
 async function displayBacklinks(pageName) {
+    // Only try to display backlinks if the container exists
     if (!ui.domRefs.backlinksContainer) {
-        console.warn('Backlinks container DOM element not found.');
-        return;
+        return; // Silently return if container doesn't exist
     }
+
     try {
         const response = await searchAPI.getBacklinks(pageName);
         const backlinksData = response.results || [];
@@ -84,18 +85,22 @@ async function displayBacklinks(pageName) {
         ui.domRefs.backlinksContainer.innerHTML = html;
     } catch (error) {
         console.error("Error fetching backlinks:", error);
-        ui.domRefs.backlinksContainer.innerHTML = '<p>Error loading backlinks.</p>';
+        if (ui.domRefs.backlinksContainer) {
+            ui.domRefs.backlinksContainer.innerHTML = '<p>Error loading backlinks.</p>';
+        }
     }
 }
 
 async function displayChildPages(namespace) {
     const container = document.getElementById('child-pages-container');
     if (!container) return;
+
     try {
-        const childPages = await apiRequest(`child_pages.php?namespace=${encodeURIComponent(namespace)}`);
-        
+        const childPages = await window.pagesAPI.getChildPages(namespace);
         container.innerHTML = '';
+        
         if (childPages && childPages.length > 0) {
+            container.style.display = 'block';
             container.innerHTML = '<h3>Child Pages</h3>';
             const list = document.createElement('ul');
             list.className = 'child-page-list';
@@ -103,7 +108,9 @@ async function displayChildPages(namespace) {
                 const item = document.createElement('li');
                 const link = document.createElement('a');
                 link.href = '#';
-                const displayName = page.name.includes('/') ? page.name.substring(page.name.lastIndexOf('/') + 1) : page.name;
+                const displayName = page.name.includes('/') ? 
+                    page.name.substring(page.name.lastIndexOf('/') + 1) : 
+                    page.name;
                 link.textContent = displayName;
                 link.className = 'child-page-link';
                 link.dataset.pageName = page.name;
@@ -111,10 +118,12 @@ async function displayChildPages(namespace) {
                 list.appendChild(item);
             });
             container.appendChild(list);
+        } else {
+            container.style.display = 'none';
         }
     } catch (error) {
         console.error('Error fetching or displaying child pages:', error);
-        container.innerHTML = '';
+        container.style.display = 'none';
     }
 }
 
@@ -184,9 +193,14 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     // Render properties
     ui.renderPageInlineProperties(pageProperties, pagePropertiesContainer);
 
-    // Render main content
-    const contentWithoutProperties = cleanProperties(pageData.content);
-    pageContentDiv.innerHTML = parseContent(contentWithoutProperties); // Renders non-note content
+    // Render main content - clean properties from content before rendering
+    const contentWithoutProperties = pageData.content ? pageData.content.replace(/\{[^}]+\}/g, '').trim() : '';
+    pageContentDiv.innerHTML = contentWithoutProperties ? parseContent(contentWithoutProperties) : '';
+
+    // Update sidebars
+    ui.displayFavorites();
+    ui.displayBacklinksInSidebar(pageData.name);
+    ui.displayChildPagesInSidebar(pageData.name);
 
     // Render notes
     if (pageData.notes && pageData.notes.length > 0) {
@@ -304,6 +318,13 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     console.log('[DEBUG] Starting prefetch of linked pages');
     prefetchLinkedPagesData();
     console.log('[DEBUG] _renderPageContent complete');
+
+    if (notesForCurrentPage.length === 0 && pageData.id) {
+        await handleCreateAndFocusFirstNote();
+    } else if (focusFirstNote && ui.domRefs.notesContainer) {
+        const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
+        if (firstNoteContent) ui.switchToEditMode(firstNoteContent);
+    }
 }
 
 async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
