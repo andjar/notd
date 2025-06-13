@@ -3431,7 +3431,7 @@ a[href^="https://"]:visited {
 
 /* Right Sidebar Favorites */
 #favorites-container {
-    padding: 0 10px 10px 10px; /* Add some padding */
+    padding-top: 25px;
     display: flex;
     flex-direction: column; /* Stack items vertically */
     gap: 8px; /* Space between favorite links and button */
@@ -3544,11 +3544,10 @@ a[href^="https://"]:visited {
 #extension-icons-container {
     display: flex; /* Arrange icons in a row */
     flex-wrap: wrap; /* Allow icons to wrap if space is limited */
-    justify-content: center; /* Center icons if they don't fill the space */
+    justify-content: left;
     gap: var(--ls-space-3, 12px); /* Space between icons, with fallback */
     padding: var(--ls-space-3, 12px) 0; /* Padding top/bottom */
     margin-top: var(--ls-space-3, 12px); /* Margin above the container */
-    border-top: 1px solid var(--ls-secondary-border-color, #eee); /* Separator line */
 }
 
 .sidebar-extension-icon {
