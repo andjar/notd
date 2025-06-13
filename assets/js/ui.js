@@ -761,31 +761,41 @@ async function toggleFavorite(pageName) {
 
 function displayBacklinksInSidebar(pageName) {
     const container = document.getElementById('backlinks-container');
-    if (!container) return;
-
-    // Find or create the list container
-    let listContainer = container.querySelector('.backlinks-list');
-    if (!listContainer) {
-        // If list container doesn't exist, create the proper structure
-        container.innerHTML = `
-            <h4>Backlinks</h4>
-            <div class="backlinks-list"></div>
-        `;
-        listContainer = container.querySelector('.backlinks-list');
+    if (!container) {
+        console.log('Backlinks container not found');
+        return;
     }
 
-    // Clear only the list content
-    listContainer.innerHTML = '';
+    console.log('Starting backlinks display for page:', pageName);
+    
+    // Clear the entire container first to avoid duplicate headers
+    container.innerHTML = '';
+
+    // Create header
+    const header = document.createElement('h3');
+    header.textContent = 'Backlinks';
+    container.appendChild(header);
+
+    // Create list container
+    const listContainer = document.createElement('div');
+    listContainer.className = 'backlinks-list';
+    container.appendChild(listContainer);
 
     // Use searchAPI instead of direct fetch
     window.searchAPI.getBacklinks(pageName)
         .then(backlinks => {
-            if (!backlinks || backlinks.length === 0) {
+            console.log('Received backlinks:', backlinks);
+            
+            // Handle both array and object formats
+            const backlinksArray = Array.isArray(backlinks) ? backlinks : 
+                                 (backlinks.results || backlinks.data || []);
+            
+            if (!backlinksArray || backlinksArray.length === 0) {
                 listContainer.innerHTML = '<p>No backlinks found.</p>';
                 return;
             }
 
-            backlinks.forEach(link => {
+            backlinksArray.forEach(link => {
                 const item = document.createElement('a');
                 item.href = '#';
                 item.className = 'backlink-item';
@@ -826,6 +836,7 @@ function displayBacklinksInSidebar(pageName) {
         })
         .catch(error => {
             console.error('Error fetching backlinks:', error);
+            console.log('Container after error:', container.innerHTML);
             listContainer.innerHTML = '<p>Error loading backlinks.</p>';
         });
 }

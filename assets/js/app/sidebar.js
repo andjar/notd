@@ -18,8 +18,8 @@ export const sidebarState = {
         },
         updateButtonVisuals() {
             if (this.button) {
-                // **FIX**: Use innerHTML to render Feather icons correctly
-                this.button.innerHTML = this.isCollapsed ? '<i data-feather="menu"></i>' : '<i data-feather="x"></i>';
+                // Show X when collapsed (to expand), hamburger when expanded (to collapse)
+                this.button.innerHTML = this.isCollapsed ? '<i data-feather="chevron-right"></i>' : '<i data-feather="chevron-left"></i>';
                 if (typeof feather !== 'undefined') feather.replace({ width: '20px', height: '20px' });
             }
         }
@@ -37,80 +37,142 @@ export const sidebarState = {
         },
         updateButtonVisuals() {
             if (this.button) {
-                this.button.innerHTML = this.isCollapsed ? '<i data-feather="menu"></i>' : '<i data-feather="x"></i>';
+                // Show X when collapsed (to expand), hamburger when expanded (to collapse)
+                this.button.innerHTML = this.isCollapsed ? '<i data-feather="chevron-left"></i>' : '<i data-feather="chevron-right"></i>';
                 if (typeof feather !== 'undefined') feather.replace({ width: '20px', height: '20px' });
             }
         },
         async renderFavorites() {
-            // ... (The renderFavorites function from the previous response was correct, no changes needed here)
-             const favoritesContainer = document.getElementById('favorites-container');
-            const displayLimit = 5;
+            const favoritesContainer = document.getElementById('favorites-container');
+            const displayLimit = 7; // Match Recent Pages limit
             if (!favoritesContainer) {
                 console.error("Favorites container not found");
                 return;
             }
-            favoritesContainer.innerHTML = 'Loading favorites...';
-    
+            favoritesContainer.innerHTML = '';
+
             try {
                 const { pages } = await pagesAPI.getPages({ per_page: 500 });
 
                 if (!Array.isArray(pages)) {
-                    favoritesContainer.innerHTML = 'Could not load favorites.';
+                    favoritesContainer.innerHTML = '<div class="no-items-message">Could not load favorites.</div>';
                     return;
                 }
-    
+
                 const favoritePages = pages.filter(
                     page => page.properties?.favorite?.some(prop => String(prop.value).toLowerCase() === 'true')
                 );
-    
-                favoritesContainer.innerHTML = '';
-    
+
                 if (favoritePages.length === 0) {
-                    favoritesContainer.textContent = 'No favorite pages yet.';
+                    favoritesContainer.innerHTML = '<div class="no-items-message">No favorite pages yet.</div>';
                     return;
                 }
-    
+
+                // Sort pages by last updated
+                favoritePages.sort((a, b) => {
+                    if (a.updated_at > b.updated_at) return -1;
+                    if (a.updated_at < b.updated_at) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
                 const showMoreNeeded = favoritePages.length > displayLimit;
                 const pagesToDisplay = showMoreNeeded ? favoritePages.slice(0, displayLimit) : favoritePages;
-    
+
+                // Create a list container
+                const listContainer = document.createElement('ul');
+                listContainer.className = 'favorites-list';
+
                 pagesToDisplay.forEach(page => {
+                    const listItem = document.createElement('li');
                     const link = document.createElement('a');
-                    link.href = `?page=${encodeURIComponent(page.name)}`;
-                    link.textContent = page.name;
-                    link.classList.add('favorite-page-link');
+                    link.href = '#';
+                    link.dataset.pageName = page.name;
+                    link.className = 'favorite-page-link';
+                    
+                    // Add active class if this is the current page
+                    if (page.name === window.currentPageName) {
+                        link.classList.add('active');
+                    }
+
+                    // Create the link content with icon and name
+                    const icon = document.createElement('i');
+                    icon.dataset.feather = 'star';
+                    icon.className = 'favorite-page-icon';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'favorite-page-name';
+                    nameSpan.textContent = page.name;
+
+                    link.appendChild(icon);
+                    link.appendChild(nameSpan);
+                    listItem.appendChild(link);
+                    listContainer.appendChild(listItem);
+
+                    // Add click handler
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
                         window.loadPage(page.name);
                     });
-                    favoritesContainer.appendChild(link);
                 });
-    
+
+                favoritesContainer.appendChild(listContainer);
+
                 if (showMoreNeeded) {
                     const showMoreBtn = document.createElement('button');
                     showMoreBtn.textContent = `Show more (${favoritePages.length - displayLimit})`;
-                    showMoreBtn.classList.add('show-more-favorites-btn');
+                    showMoreBtn.className = 'show-more-favorites-btn';
                     showMoreBtn.addEventListener('click', () => {
                         favoritesContainer.innerHTML = '';
+                        const fullList = document.createElement('ul');
+                        fullList.className = 'favorites-list';
+                        
                         favoritePages.forEach(page => {
+                            const listItem = document.createElement('li');
                             const link = document.createElement('a');
-                            link.href = `?page=${encodeURIComponent(page.name)}`;
-                            link.textContent = page.name;
-                            link.classList.add('favorite-page-link');
+                            link.href = '#';
+                            link.dataset.pageName = page.name;
+                            link.className = 'favorite-page-link';
+                            
+                            if (page.name === window.currentPageName) {
+                                link.classList.add('active');
+                            }
+
+                            const icon = document.createElement('i');
+                            icon.dataset.feather = 'star';
+                            icon.className = 'favorite-page-icon';
+                            
+                            const nameSpan = document.createElement('span');
+                            nameSpan.className = 'favorite-page-name';
+                            nameSpan.textContent = page.name;
+
+                            link.appendChild(icon);
+                            link.appendChild(nameSpan);
+                            listItem.appendChild(link);
+                            fullList.appendChild(listItem);
+
                             link.addEventListener('click', (e) => {
                                 e.preventDefault();
                                 window.loadPage(page.name);
                             });
-                            favoritesContainer.appendChild(link);
                         });
-                    }, { once: true });
+
+                        favoritesContainer.appendChild(fullList);
+                    });
                     favoritesContainer.appendChild(showMoreBtn);
                 }
-    
+
+                // Initialize Feather icons
+                if (typeof feather !== 'undefined') {
+                    try {
+                        feather.replace();
+                    } catch (error) {
+                        console.error('Error rendering feather icons:', error);
+                    }
+                }
+
             } catch (error) {
                 console.error("Error rendering favorites:", error);
-                if (favoritesContainer) {
-                    favoritesContainer.innerHTML = 'Error loading favorites.';
-                }
+                favoritesContainer.innerHTML = '<div class="no-items-message">Error loading favorites.</div>';
             }
         },
         async renderExtensionIcons() {
@@ -163,14 +225,14 @@ export const sidebarState = {
             this.left.isCollapsed = localStorage.getItem('leftSidebarCollapsed') === 'true';
             document.body.classList.toggle('left-sidebar-collapsed', this.left.isCollapsed);
             this.left.updateButtonVisuals();
-            // **FIX**: The event listener is now correctly part of the init logic.
             this.left.button.addEventListener('click', () => this.left.toggle());
         }
         if (this.right.element && this.right.button) {
-            this.right.isCollapsed = localStorage.getItem('rightSidebarCollapsed') !== 'false';
+            const storedState = localStorage.getItem('rightSidebarCollapsed');
+            this.right.isCollapsed = storedState === null ? true : storedState === 'true';
+            this.right.element.classList.toggle('collapsed', this.right.isCollapsed);
             document.body.classList.toggle('right-sidebar-collapsed', this.right.isCollapsed);
             this.right.updateButtonVisuals();
-             // **FIX**: The event listener is now correctly part of the init logic.
             this.right.button.addEventListener('click', () => this.right.toggle());
             if (this.right.element) {
                 await Promise.all([this.right.renderFavorites(), this.right.renderExtensionIcons()]);

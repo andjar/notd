@@ -103,9 +103,11 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                         <input type="text" id="global-search-input" placeholder="Search..." class="search-input">
                         <div id="search-results" class="search-results"></div>
                     </div>
-                    <div class="recent-pages">
-                        <h3>Recent Pages</h3>
-                        <div id="page-list"></div>
+                    <div class="sidebar-section">
+                        <div class="recent-pages">
+                            <h3>Recent Pages</h3>
+                            <div id="page-list"></div>
+                        </div>
                     </div>
                     <div class="sidebar-footer">
                         <button id="open-page-search-modal-btn" class="action-button full-width-button">
@@ -145,11 +147,9 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
             <div id="right-sidebar" class="sidebar right-sidebar">
                 <div class="sidebar-content">
                     <div class="sidebar-section">
-                        <div id="favorites-container" class="favorites-sidebar">
-                            <h4>Favorites</h4>
-                            <div id="favorites-list" class="favorites-list">
-                                <!-- Favorites will be populated by JavaScript -->
-                            </div>
+                        <div class="favorites">
+                            <h3>Favorites</h3>
+                            <div id="favorites-container"></div>
                         </div>
                     </div>
                     <div class="sidebar-section">
