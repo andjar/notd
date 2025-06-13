@@ -20,7 +20,7 @@ class TemplateProcessor {
             throw new Exception("Invalid template type: $type");
         }
 
-        $this->template_dir = __DIR__ . '/assets/template/' . $type;
+        $this->template_dir = __DIR__ . '/../assets/template/' . $type;
         
         // Log directory creation attempt
         error_log("Template directory path: " . $this->template_dir);
