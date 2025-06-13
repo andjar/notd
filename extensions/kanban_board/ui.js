@@ -185,10 +185,10 @@ export function displayKanbanBoard(containerElement, notes) {
                 if (match) {
                     const newStatusUpper = newStatus.toUpperCase();
                     // Replace prefix and keep the rest of the content
-                    newContent = newStatusUpper + ": " + note.content.substring(match[0].length);
+                    newContent = newStatusUpper + " " + note.content.substring(match[0].length);
                 } else if (oldStatus !== newStatus) { // If no prefix matched and status changed
                     const newStatusUpper = newStatus.toUpperCase();
-                    newContent = newStatusUpper + ": " + note.content;
+                    newContent = newStatusUpper + " " + note.content;
                 }
                 
                 console.log(`Updating note ${noteId}: from status '${oldStatus}' to '${newStatus}'. New content will be: "${newContent}"`);

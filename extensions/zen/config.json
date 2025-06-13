@@ -1,6 +1,6 @@
 {
     "featherIcon": "edit-3",
     "name": "Zen Writer",
-    "entrypoint": "zen.html"
+    "entrypoint": "index.html"
   }
   

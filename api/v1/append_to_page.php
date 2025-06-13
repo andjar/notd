@@ -134,18 +134,12 @@ try {
     // Process batch operations directly
     if (!empty($batch_operations)) {
         try {
-            // Start output buffering to capture the response
-            ob_start();
-            _handleBatchOperations($pdo, $dataManager, $batch_operations);
-            $batch_response = ob_get_clean();
-            
-            // Parse the batch response
-            $batch_result = json_decode($batch_response, true);
-            if (!$batch_result || !isset($batch_result['status']) || $batch_result['status'] !== 'success') {
-                throw new Exception('Failed to process batch operations: ' . ($batch_result['message'] ?? 'Unknown error'));
-            }
+            $appended_notes_results = _handleBatchOperations($pdo, $dataManager, $batch_operations);
 
-            // If we get here, the batch operations were successful
+            // If we get here, the batch operations were successful (or at least did not throw an exception)
+            // The _handleBatchOperations function now returns results directly or throws an exception.
+            // Individual operations within the batch might have failed, this is reflected in $appended_notes_results.
+
             $pdo->commit();
 
             // Re-fetch page_data to include any new properties
@@ -154,13 +148,16 @@ try {
             ApiResponse::success([
                 'message' => ($page_data ? 'Page retrieved' : 'Page created') . ' and notes appended successfully.',
                 'page' => $final_page_data,
-                'appended_notes' => $batch_result['data']['results'] ?? []
+                'appended_notes' => $appended_notes_results
             ]);
         } catch (Exception $e) {
+            // This catch block now primarily catches exceptions from _handleBatchOperations
+            // or issues with committing the transaction.
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            throw new Exception('Failed to process batch operations: ' . $e->getMessage());
+            // It's good to preserve the original error message if possible, or a more specific one.
+            throw new Exception('Failed during batch operations or commit: ' . $e->getMessage());
         }
     } else {
         throw new Exception('No valid notes to append.');

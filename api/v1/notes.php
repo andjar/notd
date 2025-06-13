@@ -5,6 +5,10 @@ require_once __DIR__ . '/../pattern_processor.php';
 require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../response_utils.php';
 
+// Add debug logging
+error_log("Notes API Request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
+error_log("Input data: " . json_encode($input ?? []));
+
 $pdo = get_db_connection();
 $dataManager = new DataManager($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
@@ -257,10 +261,8 @@ if (!function_exists('_handleBatchOperations')) {
         $results = [];
         $tempIdMap = [];
         
-        $pdo->beginTransaction();
-        try {
-            // Process operations in a safe order: Delete -> Create -> Update
-            $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
+        // Process operations in a safe order: Delete -> Create -> Update
+        $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
             $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
             $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
 
@@ -268,18 +270,7 @@ if (!function_exists('_handleBatchOperations')) {
             foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
             foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
             
-            $pdo->commit();
-
-            ApiResponse::success([
-                'message' => 'Batch operations completed. Check individual results for status.',
-                'results' => $results
-            ]);
-
-        } catch (Exception $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            error_log("Batch operation critical error: " . $e->getMessage());
-            ApiResponse::error('An internal server error occurred during batch processing.', 500, ['details' => $e->getMessage()]);
-        }
+            return $results;
     }
 }
 
@@ -311,7 +302,8 @@ if ($method === 'GET') {
     }
 } elseif ($method === 'POST') {
     if (isset($input['action']) && $input['action'] === 'batch') {
-        _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? []);
+        $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? []);
+        ApiResponse::success(['results' => $results]);
         return;
     }
     ApiResponse::error('This endpoint now primarily uses batch operations. Please use the batch action.', 400);
