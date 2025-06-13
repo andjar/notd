@@ -123,13 +123,8 @@ try {
         ];
     }
 
-    // Include notes.php and use its functions directly
-    require_once __DIR__ . '/notes.php';
-    
-    // Ensure the batch operations handler is available
-    if (!function_exists('_handleBatchOperations')) {
-        throw new Exception('Required batch operations handler not available');
-    }
+    // Include batch operations utility file
+    require_once __DIR__ . '/batch_operations.php';
     
     // Process batch operations directly
     if (!empty($batch_operations)) {

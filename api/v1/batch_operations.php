@@ -1,91 +1,9 @@
 <?php
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
-require_once __DIR__ . '/../pattern_processor.php';
-require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../response_utils.php';
-require_once __DIR__ . '/batch_operations.php';
-
-// Add debug logging
-error_log("Notes API Request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
-error_log("Input data: " . json_encode($input ?? []));
-
-$pdo = get_db_connection();
-$dataManager = new DataManager($pdo);
-$method = $_SERVER['REQUEST_METHOD'];
-$input = json_decode(file_get_contents('php://input'), true);
-
-if ($method === 'POST' && isset($input['_method'])) {
-    $overrideMethod = strtoupper($input['_method']);
-    if ($overrideMethod === 'PUT' || $overrideMethod === 'DELETE') {
-        $method = $overrideMethod;
-    }
-}
-
-// New "Smart Property Indexer"
-// This function is the single source of truth for processing properties from content.
-if (!function_exists('_indexPropertiesFromContent')) {
-    function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
-        // For notes, check if encrypted. If so, do not process properties from content.
-        if ($entityType === 'note') {
-            $encryptedStmt = $pdo->prepare("SELECT 1 FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND value = 'true' LIMIT 1");
-            $encryptedStmt->execute([':note_id' => $entityId]);
-            if ($encryptedStmt->fetch()) {
-                // error_log("_indexPropertiesFromContent: Note {$entityId} is encrypted. Skipping property processing from content.");
-                return; // Note is encrypted, do not parse/modify properties from its content.
-            }
-        }
-
-        // Instantiate the pattern processor. It gets PDO from get_db_connection()
-        $patternProcessor = getPatternProcessor();
-
-        // Process the content to extract properties and potentially modified content
-        // Pass $pdo in context for handlers that might need it directly.
-        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
-        
-        $parsedProperties = $processedData['properties'];
-
-        // Save all extracted/generated properties using the processor's save method
-        // This method should handle deleting old 'replaceable' properties and inserting/updating new ones.
-        // It will also handle property triggers.
-        if (!empty($parsedProperties)) {
-            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
-        } else {
-            // If no properties are parsed from content, we might still need to clear existing replaceable ones.
-            // The saveProperties method (or a new dedicated method) in PatternProcessor should handle this.
-            // For now, we assume saveProperties with an empty array might be a no-op or needs enhancement.
-            // Let's ensure existing replaceable properties are cleared if no new ones are found.
-            // This is a conceptual point; actual implementation is in PatternProcessor.saveProperties.
-            // For now, we rely on saveProperties to manage this. If it doesn't, this is a gap.
-            // A simple way:
-            // $patternProcessor->clearReplaceableProperties($entityType, $entityId);
-            // For now, assuming saveProperties handles it.
-        }
-        
-        // Update the note's 'internal' flag based on the final set of properties applied.
-        $hasInternalTrue = false;
-        if (!empty($parsedProperties)) {
-            foreach ($parsedProperties as $prop) {
-                if (isset($prop['name']) && strtolower($prop['name']) === 'internal' && 
-                    isset($prop['value']) && strtolower((string)$prop['value']) === 'true') {
-                    $hasInternalTrue = true;
-                    break;
-                }
-            }
-        }
-
-        if ($entityType === 'note') {
-             try {
-                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
-                $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
-            } catch (PDOException $e) {
-                // Log error but don't let it break the entire process if just this update fails
-                error_log("Could not update Notes.internal flag for note {$entityId}. Error: " . $e->getMessage());
-            }
-        }
-    }
-}
-
+require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../pattern_processor.php';
 
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
@@ -189,7 +107,7 @@ if (!function_exists('_updateNoteInBatch')) {
             if (isset($payload['collapsed'])) { $setClauses[] = "collapsed = ?"; $executeParams[] = (int)$payload['collapsed']; }
             if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = (int)$payload['page_id']; }
 
-            if (empty($setClauses) && !$contentWasUpdated) { // Check content update flag as well
+            if (empty($setClauses) && !$contentWasUpdated) {
                 return ['type' => 'update', 'status' => 'warning', 'message' => 'No updatable fields provided for note.', 'id' => $noteId];
             }
             
@@ -255,8 +173,7 @@ if (!function_exists('_deleteNoteInBatch')) {
 if (!function_exists('_handleBatchOperations')) {
     function _handleBatchOperations($pdo, $dataManager, $operations) {
         if (!is_array($operations)) {
-            ApiResponse::error('Batch request validation failed: "operations" must be an array.', 400);
-            return;
+            throw new Exception('Batch request validation failed: "operations" must be an array.');
         }
 
         $results = [];
@@ -264,55 +181,13 @@ if (!function_exists('_handleBatchOperations')) {
         
         // Process operations in a safe order: Delete -> Create -> Update
         $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
-            $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
-            $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
+        $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
+        $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
 
-            foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
-            foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
-            foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
-            
-            return $results;
+        foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
+        foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+        foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+        
+        return $results;
     }
-}
-
-if ($method === 'GET') {
-    // **FIX**: Cast the result of filter_input to a boolean.
-    // If 'include_internal' is not set, filter_input returns null, which (bool)null casts to false.
-    // This prevents the TypeError in the DataManager.
-    $includeInternal = (bool)filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
-    
-    try {
-        if (isset($_GET['id'])) {
-            $noteId = (int)$_GET['id'];
-            $note = $dataManager->getNoteById($noteId, $includeInternal);
-            if ($note) {
-                ApiResponse::success($note);
-            } else {
-                ApiResponse::error('Note not found', 404);
-            }
-        } elseif (isset($_GET['page_id'])) {
-            $pageId = (int)$_GET['page_id'];
-            $notes = $dataManager->getNotesByPageId($pageId, $includeInternal);
-            ApiResponse::success($notes);
-        } else {
-             ApiResponse::error('Missing required parameter: id or page_id', 400);
-        }
-    } catch (Exception $e) {
-        error_log("API Error in notes.php (GET): " . $e->getMessage());
-        ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
-    }
-} elseif ($method === 'POST') {
-    if (isset($input['action']) && $input['action'] === 'batch') {
-        $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? []);
-        ApiResponse::success(['results' => $results]);
-        return;
-    }
-    ApiResponse::error('This endpoint now primarily uses batch operations. Please use the batch action.', 400);
-
-} elseif ($method === 'PUT') {
-    ApiResponse::error('PUT is deprecated. Please use POST with batch operations for updates.', 405);
-} elseif ($method === 'DELETE') {
-    ApiResponse::error('DELETE is deprecated. Please use POST with batch operations for deletions.', 405);
-} else {
-    ApiResponse::error('Method not allowed', 405);
-}
+} 
