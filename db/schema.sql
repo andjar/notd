@@ -148,10 +148,11 @@ CREATE TRIGGER IF NOT EXISTS Notes_after_update AFTER UPDATE ON Notes BEGIN
 END;
 
 -- Add unique constraints to the Properties table
-CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_note_unique
-  ON Properties(note_id, name, weight)
-  WHERE note_id IS NOT NULL;
+-- Removing these constraints as they're too restrictive and handled by application logic
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_note_unique
+--   ON Properties(note_id, name, weight)
+--   WHERE note_id IS NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_page_unique
-  ON Properties(page_id, name, weight)
-  WHERE page_id IS NOT NULL;
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_page_unique
+--   ON Properties(page_id, name, weight)
+--   WHERE page_id IS NOT NULL;

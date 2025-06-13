@@ -417,7 +417,7 @@ class PatternProcessor {
                     // For each property, check if it exists
                     foreach ($propertyGroup as $property) {
                         // Check if property exists
-                        $checkSql = "SELECT id, value FROM Properties WHERE {$idColumn} = ? AND name = ? AND weight = ?";
+                        $checkSql = "SELECT id, value, created_at FROM Properties WHERE {$idColumn} = ? AND name = ? AND weight = ?";
                         $checkStmt = $this->pdo->prepare($checkSql);
                         $checkStmt->execute([$entityId, $property['name'], $weight]);
                         $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -430,11 +430,16 @@ class PatternProcessor {
                                 error_log("[PATTERN_PROCESSOR_DEBUG] Updated property '{$name}' (id={$existing['id']}) value to '{$property['value']}'");
                             }
                         } else {
-                            // Insert new property
-                            $insertSql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+                            // Insert new property - use INSERT OR IGNORE to handle race conditions
+                            $insertSql = "INSERT OR IGNORE INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight, created_at, updated_at) 
+                                        VALUES (?, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
                             $insertStmt = $this->pdo->prepare($insertSql);
                             $insertStmt->execute([$entityId, $property['name'], $property['value'], $weight]);
-                            error_log("[PATTERN_PROCESSOR_DEBUG] Inserted new property '{$name}'");
+                            if ($insertStmt->rowCount() > 0) {
+                                error_log("[PATTERN_PROCESSOR_DEBUG] Inserted new property '{$name}'");
+                            } else {
+                                error_log("[PATTERN_PROCESSOR_DEBUG] Property '{$name}' already exists (race condition handled)");
+                            }
                         }
                         if ($property === reset($propertyGroup)) {
                             error_log("[PATTERN_PROCESSOR_DEBUG] Dispatching trigger for {$name}");
