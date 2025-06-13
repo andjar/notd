@@ -1190,6 +1190,7 @@ input[type="search"],
 input[type="email"],
 input[type="password"],
 textarea {
+    width: 600px;
     padding: var(--ls-space-2) var(--ls-space-3);
     border: 1px solid var(--ls-border-color);
     border-radius: var(--ls-border-radius-medium);
@@ -1433,11 +1434,13 @@ textarea:focus {
     padding: var(--ls-space-1);
     border-radius: var(--ls-border-radius-low);
     transition: all var(--ls-transition-fast);
-    opacity: 0;
+    opacity: 0; /* Back to original: invisible by default */
+    width: 20px;
+    height: 20px;
 }
 
 .page-title:hover .page-title-gear {
-    opacity: 1;
+    opacity: 1; /* Only visible on hover */
 }
 
 .page-title-gear:hover {
@@ -3856,13 +3859,13 @@ ul.child-page-list li:last-child {
     padding: var(--ls-space-1);
     border-radius: var(--ls-border-radius-low);
     transition: all var(--ls-transition-fast);
-    opacity: 0;
+    opacity: 0; /* Back to original: invisible by default */
     width: 20px;
     height: 20px;
 }
 
 .page-title:hover .page-title-gear {
-    opacity: 1;
+    opacity: 1; /* Only visible on hover */
 }
 
 .page-title-gear:hover {

@@ -4,6 +4,7 @@ export const domRefs = {
     notesContainer: document.getElementById('notes-container'),
     pageContent: document.getElementById('page-content'),
     pageTitle: document.getElementById('page-title'),
+    pageTitleContainer: document.querySelector('.page-title-container'),
     pagePropertiesContainer: document.getElementById('page-properties-container'),
     pageListContainer: document.getElementById('page-list'),
     addRootNoteBtn: document.getElementById('add-root-note-btn'),

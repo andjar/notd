@@ -72,14 +72,18 @@ function updatePageTitle(pageName) {
         }
     });
     
-    // Add the gear icon to the page-title element
+    // Add the gear icon to the titleContent span instead of pageTitle
     const gearIcon = document.createElement('i');
     gearIcon.dataset.feather = 'settings';
     gearIcon.id = 'page-properties-gear';
     gearIcon.className = 'page-title-gear';
     gearIcon.title = 'Page Properties';
-    pageTitle.appendChild(gearIcon);
+    gearIcon.style.display = 'inline-block';
+    gearIcon.style.marginLeft = '8px';
+    gearIcon.style.cursor = 'pointer';
+    titleContent.appendChild(gearIcon); // Changed from pageTitle to titleContent
 
+    // Initialize Feather icons
     if (typeof feather !== 'undefined') {
         try {
             feather.replace();
