@@ -407,6 +407,15 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
     
     pageName = pageName || getInitialPage();
 
+    // Hide splash screen at the start of page load
+    const splashScreen = document.getElementById('splash-screen');
+    if (splashScreen) {
+        splashScreen.classList.add('hidden');
+        if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
+            window.splashAnimations.stop();
+        }
+    }
+
     try {
         let pageData = providedPageData;
         const cachedPage = getPageCache(pageName);
