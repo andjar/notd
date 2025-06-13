@@ -887,11 +887,6 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
         // So, we should append items directly to `container` or manage `attachmentsContainer` carefully.
         // For now, let's assume `container` is the one to be styled and filled.
         // Re-evaluating: The original code appends `attachmentsContainer` to `container`. This is fine.
-        attachmentsContainer.className = 'note-attachments-inner-list'; // Use a different class if container itself is 'note-attachments'
-                                                                    // Or, ensure `container` is just a placeholder.
-                                                                    // Given the original structure, `container` is `.note-attachments`.
-                                                                    // So, we populate `container` directly or clear and add `attachmentsContainer`.
-                                                                    // The original code *appends* `attachmentsContainer` to `container`. Let's stick to that.
 
         container.appendChild(attachmentsContainer); // This was the original structure.
 
@@ -1093,10 +1088,16 @@ async function handleDelegatedCollapseArrowClick(targetElement) {
     targetElement.dataset.collapsed = isCurrentlyCollapsed.toString();
 
     try {
-        await notesAPI.updateNote(noteId, { 
-            page_id: window.currentPageId, // Assuming window.currentPageId is accessible
-            collapsed: isCurrentlyCollapsed 
-        });
+        // Use the notesAPI.batchUpdateNotes function
+        const result = await notesAPI.batchUpdateNotes([{
+            type: 'update',
+            payload: {
+                id: noteId,
+                page_id: window.currentPageId,
+                collapsed: isCurrentlyCollapsed ? 1 : 0
+            }
+        }]);
+
         // Update local cache
         if (window.notesForCurrentPage) {
             const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
@@ -1107,6 +1108,13 @@ async function handleDelegatedCollapseArrowClick(targetElement) {
     } catch (error) {
         const errorMessage = error.message || 'Please try again.';
         console.error(`handleDelegatedCollapseArrowClick: Error saving collapse state for note ${noteId}. Error:`, error);
+        console.error('Full error details:', {
+            noteId,
+            isCurrentlyCollapsed,
+            currentPageId: window.currentPageId,
+            error
+        });
+        
         // Revert UI changes on error
         noteItem.classList.toggle('collapsed'); // Toggle back
         if (childrenContainer) childrenContainer.classList.toggle('collapsed'); // Toggle back
