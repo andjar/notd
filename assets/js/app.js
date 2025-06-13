@@ -21,6 +21,9 @@ import {
     debouncedSaveNote
 } from './app/note-actions.js';
 
+// Template handling
+import { initializeTemplateHandling } from './app/template-handler.js';
+
 // API clients for global exposure if needed
 import { notesAPI, propertiesAPI, attachmentsAPI, searchAPI, pagesAPI, templatesAPI } from './api_client.js';
 window.notesAPI = notesAPI;
@@ -163,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initializeApp();
         initPropertyEditor(); // Initialize listeners for the property modal
         ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
+        initializeTemplateHandling(); // Initialize template functionality
         feather.replace(); // Initialize feather icons after DOM is ready
         // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.
     } catch (error) {

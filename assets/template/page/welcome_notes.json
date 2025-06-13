@@ -5,6 +5,6 @@
     "## Properties ✨\nAdd properties to your notes to organize them further. For example, you can add a {priority::high} property to important notes, set a {favorite::true} or add a {tag::tag}.",
     "## Templates 🎨\nUse templates to quickly create notes with a consistent format. Just write `/` to get started.",
     "## Encryption 🔒\nEnable encryption for your notes through page properties. Note that this is an experimental feature. After enabling encryption, you'll need to reload the page before adding new notes.",
-    "## SQL Queries 🔍\nYou can run SQL queries to get data from your database. Just write `SQL {SELECT * FROM notes}` (remove space after `SQL`) to get started."
+    "## SQL Queries 🔍\nYou can run SQL queries to get data from your database. Just write `SQL {SELECT * FROM Notes WHERE page_id = 1}` (remove space after `SQL`) to get started."
 ]
   
