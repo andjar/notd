@@ -182,7 +182,7 @@ function renderNote(note, nestingLevel = 0) {
         const password = getCurrentPagePassword();
         if (password) {
             try {
-                const decryptedContent = decrypt(note.content, password);
+                const decryptedContent = decrypt(password, note.content);
                 if (decryptedContent !== null) {
                     displayContent = decryptedContent;
                     noteItemEl.classList.add('decrypted-note');
