@@ -88,8 +88,18 @@ if ($method === 'GET') {
             $results = $stmt->fetchAll();
             foreach ($results as &$result) $result['content_snippet'] = get_content_snippet($result['content'], '{status::' . $status . '}');
 
+        } elseif (isset($_GET['favorites'])) {
+            // Get pages that have a favorite property
+            $count_stmt = $pdo->prepare("SELECT COUNT(DISTINCT P.id) FROM Pages P JOIN Properties Prop ON P.id = Prop.page_id WHERE Prop.name = 'favorite' AND Prop.value = 'true'");
+            $count_stmt->execute();
+            $total = (int)$count_stmt->fetchColumn();
+
+            $stmt = $pdo->prepare("SELECT DISTINCT P.id as page_id, P.name as page_name FROM Pages P JOIN Properties Prop ON P.id = Prop.page_id WHERE Prop.name = 'favorite' AND Prop.value = 'true' ORDER BY P.updated_at DESC LIMIT ? OFFSET ?");
+            $stmt->execute([$per_page, $offset]);
+            $results = $stmt->fetchAll();
+
         } else {
-            ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, or tasks', 400);
+            ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, tasks, or favorites', 400);
         }
 
         // Attach properties to all results, regardless of search type

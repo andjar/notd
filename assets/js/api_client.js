@@ -201,7 +201,8 @@ const searchAPI = {
         if (options.per_page) params.append('per_page', options.per_page.toString());
         return apiRequest(`search.php?${params.toString()}`);
     },
-    getBacklinks: (pageName) => apiRequest(`search.php?backlinks_for_page_name=${encodeURIComponent(pageName)}`)
+    getBacklinks: (pageName) => apiRequest(`search.php?backlinks_for_page_name=${encodeURIComponent(pageName)}`),
+    getFavorites: () => apiRequest('search.php?favorites=1')
 };
 
 /**
@@ -225,6 +226,16 @@ const queryAPI = {
     }
 };
 
+/**
+ * API functions for managing favorites
+ * @namespace favoritesAPI
+ */
+const favoritesAPI = {
+    getFavorites: () => apiRequest('favorites.php'),
+    addFavorite: (pageName) => apiRequest('favorites.php', 'POST', { page_name: pageName }),
+    removeFavorite: (pageName) => apiRequest('favorites.php', 'POST', { _method: 'DELETE', page_name: pageName })
+};
+
 export {
     pagesAPI,
     notesAPI,
@@ -233,5 +244,6 @@ export {
     searchAPI,
     templatesAPI,
     queryAPI,
+    favoritesAPI,
     apiRequest
 };

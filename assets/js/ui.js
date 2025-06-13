@@ -671,9 +671,6 @@ function displayFavorites() {
     const container = document.getElementById('favorites-container');
     if (!container) return;
 
-    // Get favorites from localStorage
-    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-    
     // Find or create the list container
     let listContainer = container.querySelector('.favorites-list');
     if (!listContainer) {
@@ -688,58 +685,78 @@ function displayFavorites() {
     // Clear only the list content
     listContainer.innerHTML = '';
     
-    if (favorites.length === 0) {
-        listContainer.innerHTML = '<p>No favorite pages yet.</p>';
-        return;
-    }
+    // Use searchAPI instead of localStorage
+    window.searchAPI.getFavorites()
+        .then(data => {
+            const favorites = data.results || [];
+            if (favorites.length === 0) {
+                listContainer.innerHTML = '<p>No favorite pages yet.</p>';
+                return;
+            }
 
-    favorites.forEach(pageName => {
-        const item = document.createElement('a');
-        item.href = '#';
-        item.className = 'favorite-item';
-        item.dataset.pageName = pageName;
-        
-        // Add active class if this is the current page
-        if (pageName === window.currentPageName) {
-            item.classList.add('active');
-        }
+            favorites.forEach(page => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'favorite-item';
+                item.dataset.pageName = page.page_name;
+                
+                // Add active class if this is the current page
+                if (page.page_name === window.currentPageName) {
+                    item.classList.add('active');
+                }
 
-        // Create the link content with icon and name
-        const icon = document.createElement('i');
-        icon.dataset.feather = 'star';
-        icon.className = 'favorite-icon';
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'favorite-name';
-        nameSpan.textContent = pageName;
+                // Create the link content with icon and name
+                const icon = document.createElement('i');
+                icon.dataset.feather = 'star';
+                icon.className = 'favorite-icon';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'favorite-name';
+                nameSpan.textContent = page.page_name;
 
-        item.appendChild(icon);
-        item.appendChild(nameSpan);
-        listContainer.appendChild(item);
-    });
+                item.appendChild(icon);
+                item.appendChild(nameSpan);
+                listContainer.appendChild(item);
+            });
 
-    // Initialize Feather icons
-    if (typeof feather !== 'undefined') {
-        try {
-            feather.replace();
-        } catch (error) {
-            console.error('Error rendering feather icons:', error);
-        }
-    }
+            // Initialize Feather icons
+            if (typeof feather !== 'undefined') {
+                try {
+                    feather.replace();
+                } catch (error) {
+                    console.error('Error rendering feather icons:', error);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching favorites:', error);
+            listContainer.innerHTML = '<p>Error loading favorites.</p>';
+        });
 }
 
-function toggleFavorite(pageName) {
-    const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-    const index = favorites.indexOf(pageName);
-    
-    if (index === -1) {
-        favorites.push(pageName);
-    } else {
-        favorites.splice(index, 1);
+async function toggleFavorite(pageName) {
+    try {
+        // Get current page data to check favorite status
+        const pageData = await window.pagesAPI.getPageByName(pageName);
+        if (!pageData) throw new Error('Page not found');
+
+        const isFavorited = pageData.properties?.some(p => p.name === 'favorite' && p.value === 'true');
+        
+        // Use propertiesAPI to update the favorite status
+        if (isFavorited) {
+            // Remove favorite property
+            await window.propertiesAPI.deleteProperty('page', pageData.id, 'favorite');
+        } else {
+            // Add favorite property
+            await window.propertiesAPI.setProperty('page', pageData.id, 'favorite', 'true');
+        }
+        
+        // Refresh the display
+        displayFavorites();
+    } catch (error) {
+        console.error('Error toggling favorite:', error);
+        alert('Error updating favorite status. Please try again.');
     }
-    
-    localStorage.setItem('favorites', JSON.stringify(favorites));
-    displayFavorites();
 }
 
 function displayBacklinksInSidebar(pageName) {
@@ -760,18 +777,10 @@ function displayBacklinksInSidebar(pageName) {
     // Clear only the list content
     listContainer.innerHTML = '';
 
-    // Fetch backlinks with correct parameter
-    fetch(`api/v1/search.php?backlinks_for_page_name=${encodeURIComponent(pageName)}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            const backlinks = data.results || [];
-            
-            if (backlinks.length === 0) {
+    // Use searchAPI instead of direct fetch
+    window.searchAPI.getBacklinks(pageName)
+        .then(backlinks => {
+            if (!backlinks || backlinks.length === 0) {
                 listContainer.innerHTML = '<p>No backlinks found.</p>';
                 return;
             }
