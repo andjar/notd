@@ -291,24 +291,52 @@ Manages notes and their content. All property modifications are now done by upda
     ```
 
 #### **`GET /api/v1/notes.php?id={id}`**
-*   **Description**: Retrieves a single note, including its properties derived from its content.
-*   **Response (200 OK)**:
+*   **Description**: Retrieves a single note, including its properties derived from its content. Accepts an optional boolean GET parameter `include_internal` (defaults to `false`). If `true`, internal properties (weight >= 3) are included. Otherwise, they are excluded.
+*   **Response (200 OK) - Example when `include_internal=true` or not specified and all properties are shown by default in this example**:
     ```json
     {
         "status": "success",
         "data": {
             "id": 42,
             "page_id": 10,
-            "content": "This is an updated task.\n{status::::DONE}\n{priority::High}",
+            "content": "This is an updated task.\n{status::::DONE}\n{priority::High}\n{internal_marker:::secret info}",
             "parent_note_id": null,
             "order_index": 0,
             "collapsed": 0,
             "created_at": "2023-10-27 10:30:00",
-            "updated_at": "2023-10-27 10:31:00",
+            "updated_at": "2023-10-27 10:32:00",
             "properties": {
                 "status": [
                     { "value": "TODO", "weight": 2, "created_at": "2023-10-27 10:30:00" },
-                    { "value": "DONE", "weight": 4, "created_at": "2023-10-27 10:31:00" }
+                    { "value": "DONE", "weight": 4, "created_at": "2023-10-27 10:31:00" } 
+                ],
+                "priority": [
+                    { "value": "High", "weight": 2, "created_at": "2023-10-27 10:30:00" }
+                ],
+                "internal_marker": [
+                    { "value": "secret info", "weight": 3, "created_at": "2023-10-27 10:32:00"}
+                ]
+            }
+        }
+    }
+    ```
+*   If `GET /api/v1/notes.php?id=42` or `GET /api/v1/notes.php?id=42&include_internal=false` is called, internal properties are excluded:
+    ```json
+    // Response (200 OK) - Example when include_internal=false (default)
+    {
+        "status": "success",
+        "data": {
+            "id": 42,
+            "page_id": 10,
+            "content": "This is an updated task.\n{status::::DONE}\n{priority::High}\n{internal_marker:::secret info}",
+            "parent_note_id": null,
+            "order_index": 0,
+            "collapsed": 0,
+            "created_at": "2023-10-27 10:30:00",
+            "updated_at": "2023-10-27 10:32:00",
+            "properties": {
+                "status": [
+                    { "value": "TODO", "weight": 2, "created_at": "2023-10-27 10:30:00" }
                 ],
                 "priority": [
                     { "value": "High", "weight": 2, "created_at": "2023-10-27 10:30:00" }
@@ -319,27 +347,43 @@ Manages notes and their content. All property modifications are now done by upda
     ```
 
 #### **`GET /api/v1/notes.php?page_id={id}`**
-*   **Description**: Retrieves all notes for a specific page.
-*   **Response (200 OK)**:
+*   **Description**: Retrieves all notes for a specific page. Properties for each note are derived from its content. Accepts an optional boolean GET parameter `include_internal` (defaults to `false`). If `true`, internal properties (weight >= 3) for each note are included. Otherwise, they are excluded.
+*   **Example response for `GET /api/v1/notes.php?page_id=10&include_internal=true`**:
     ```json
     {
         "status": "success",
         "data": [
             {
                 "id": 42,
-                "content": "First note...",
-                "properties": { "...": "..." },
-                "...": "..."
+                "page_id": 10,
+                "content": "First note with {secret:::shhh} and {public::data}",
+                "parent_note_id": null,
+                "order_index": 0,
+                "collapsed": 0,
+                "created_at": "2023-10-28 11:00:00",
+                "updated_at": "2023-10-28 11:05:00",
+                "properties": {
+                    "secret": [{"value": "shhh", "weight": 3, "created_at": "2023-10-28 11:05:00"}],
+                    "public": [{"value": "data", "weight": 2, "created_at": "2023-10-28 11:05:00"}]
+                }
             },
             {
                 "id": 43,
-                "content": "Second note...",
-                "properties": { "...": "..." },
-                "...": "..."
+                "page_id": 10,
+                "content": "Second note with {visible::info}",
+                "parent_note_id": null,
+                "order_index": 1,
+                "collapsed": 0,
+                "created_at": "2023-10-28 11:10:00",
+                "updated_at": "2023-10-28 11:10:00",
+                "properties": {
+                    "visible": [{"value": "info", "weight": 2, "created_at": "2023-10-28 11:10:00"}]
+                }
             }
         ]
     }
     ```
+*   If `GET /api/v1/notes.php?page_id=10` or `GET /api/v1/notes.php?page_id=10&include_internal=false` is called, the `properties` for note `42` would only include `public`.
 
 ---
 
@@ -417,6 +461,38 @@ Manages pages, which now also have a `content` field to drive their properties.
     }
     ```
 
+#### **`GET /api/v1/pages.php?name={page_name}`**
+*   **Description**: Retrieves a page by its exact name. If the page does not exist, it will be created with null content.
+*   **Request example**: `GET /api/v1/pages.php?name=My%20New%20Page`
+*   **Response example for an existing page (200 OK)**:
+    ```json
+    {
+        "status": "success",
+        "data": {
+            "id": 26,
+            "name": "My New Page",
+            "content": "Some existing content.",
+            "created_at": "2023-10-28 10:00:00",
+            "updated_at": "2023-10-28 10:05:00",
+            "properties": {}
+        }
+    }
+    ```
+*   **Response example for a newly created page (200 OK)**:
+    ```json
+    {
+        "status": "success",
+        "data": {
+            "id": 27,
+            "name": "My New Page",
+            "content": null,
+            "created_at": "2023-10-28 10:10:00",
+            "updated_at": "2023-10-28 10:10:00",
+            "properties": {}
+        }
+    }
+    ```
+
 #### **`GET /api/v1/pages.php?id={id}`**
 *   **Description**: Retrieves a single page by its ID.
 *   **Response (200 OK)**:
@@ -435,6 +511,39 @@ Manages pages, which now also have a `content` field to drive their properties.
                 "status": [{"value": "Active", "weight": 2, "created_at": "2023-10-27 10:40:00"}]
             }
         }
+    }
+    ```
+
+#### **`GET /api/v1/pages.php?date={YYYY-MM-DD}`**
+*   **Description**: Retrieves a list of pages that have a property 'date' matching the specified date. The date must be in YYYY-MM-DD format.
+*   **Request example**: `GET /api/v1/pages.php?date=2023-11-15`
+*   **Response example (200 OK)**:
+    ```json
+    {
+        "status": "success",
+        "data": [
+            {
+                "id": 30,
+                "name": "Meeting Notes 2023-11-15",
+                "content": "Discussed project milestones.\n{date::2023-11-15}",
+                "alias": null,
+                "updated_at": "2023-11-15 14:00:00"
+            },
+            {
+                "id": 31,
+                "name": "Daily Log 2023-11-15",
+                "content": "Logged daily activities.\n{date::2023-11-15}",
+                "alias": "today-log",
+                "updated_at": "2023-11-15 16:30:00"
+            }
+        ]
+    }
+    ```
+*   If no pages match the date, an empty array will be returned in the `data` field.
+    ```json
+    {
+        "status": "success",
+        "data": []
     }
     ```
 
