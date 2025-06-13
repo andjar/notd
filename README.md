@@ -1,6 +1,6 @@
 # notd - A Note-Taking Application
 
-Welcome to **notd**, a simple and flexible outliner! **notd** is designed to help you effortlessly organize your thoughts, tasks, and information. Dive in and discover a more intuitive way to keep your digital life in order! Built with robust technology, focusing on longevity. The data are saved as clear text (unless specifically encrypted) in a sqlite database.
+Welcome to **notd**, a simple and flexible outliner! **notd** is designed to help you effortlessly organize your thoughts, tasks, and information. Dive in and discover a more intuitive way to keep your digital life in order! Built with robust technology, focusing on longevity. The data are saved as clear text (unless specifically encrypted) in a sqlite database. Heavily inspired by [LogSeq](https://logseq.com/)
 
 ## Main Features
 
@@ -16,7 +16,7 @@ Welcome to **notd**, a simple and flexible outliner! **notd** is designed to hel
 
 ## Plan Forward / Roadmap
 
-**notd** is under active development. For a detailed list of planned features and future considerations, please refer to the [ROADMAP.md](ROADMAP.md) file.
+**notd** is under active development.
 
 ## Getting Started / Installation
 
@@ -32,7 +32,5 @@ The application is also designed with [phpdesktop](https://github.com/cztomczak/
 ## Contributing
 
 We warmly welcome contributions to **notd**! Whether you have ideas for new features, bug fixes, or general improvements, your help is appreciated.
-
-Before you start, you might want to check our [ROADMAP.md](ROADMAP.md) for planned features and take a look at existing issues to see if your idea is already being discussed.
 
 Ready to contribute? Feel free to open an issue to share your thoughts or submit a pull request with your changes. We're excited to see what you come up with!
