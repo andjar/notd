@@ -1,0 +1,33 @@
+/* Template Autocomplete Styles */
+.template-autocomplete-dropdown {
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    min-width: 200px;
+}
+
+.template-autocomplete-dropdown ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.template-autocomplete-dropdown li {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.template-autocomplete-dropdown li:hover,
+.template-autocomplete-dropdown li.selected {
+    background-color: #f0f0f0;
+}
+
+.template-autocomplete-dropdown li:not(:last-child) {
+    border-bottom: 1px solid #eee;
+} 

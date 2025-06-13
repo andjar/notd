@@ -7,9 +7,9 @@
 import { saveNoteImmediately } from '../app/note-actions.js';
 import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
-// The path to api_client.js is ../../api_client.js if note-renderer.js is in assets/js/ui/
-// Adjust if api_client.js is elsewhere, e.g. assets/js/api_client.js
 import { attachmentsAPI, notesAPI } from '../api_client.js';
+import { decrypt } from '../utils.js';
+import { getCurrentPagePassword } from '../app/state.js';
 import {
     showSuggestions,
     hideSuggestions,
@@ -119,6 +119,9 @@ function renderNote(note, nestingLevel = 0) {
     if (note.collapsed) {
         noteItemEl.classList.add('collapsed');
     }
+    if (note.is_encrypted) {
+        noteItemEl.classList.add('encrypted-note');
+    }
 
     // Controls section (drag handle and bullet)
     const controlsEl = document.createElement('div');
@@ -167,25 +170,50 @@ function renderNote(note, nestingLevel = 0) {
     contentEl.dataset.placeholder = 'Type to add content...';
     contentEl.dataset.noteId = note.id;
 
-    // Modified logic for dataset.rawContent initialization
-    let effectiveContentForDataset = note.content || '';
-    if (window.decryptionPassword && window.currentPageEncryptionKey && (note.content || '').trim()) {
-        try {
-            // Check if it's potentially encrypted (SJCL usually produces JSON strings)
-            if (note.content.startsWith('{') && note.content.endsWith('}')) {
-                JSON.parse(note.content); // Verify it's valid JSON
-                const decrypted = sjcl.decrypt(window.decryptionPassword, note.content);
-                effectiveContentForDataset = decrypted;
+    // Handle encrypted content
+    let displayContent = note.content || '';
+    
+    // First check if content is already decrypted (not a JSON string)
+    const isAlreadyDecrypted = typeof note.content === 'string' && !note.content.startsWith('{');
+    
+    if (note.is_encrypted && note.content && !isAlreadyDecrypted) {
+        // Only attempt decryption if the note is marked as encrypted
+        // and the content is still in encrypted format (JSON string)
+        const password = getCurrentPagePassword();
+        if (password) {
+            try {
+                const decryptedContent = decrypt(password, note.content);
+                if (decryptedContent !== null) {
+                    displayContent = decryptedContent;
+                    noteItemEl.classList.add('decrypted-note');
+                } else {
+                    displayContent = '[DECRYPTION FAILED]';
+                    noteItemEl.classList.add('decryption-failed');
+                }
+            } catch (e) {
+                console.error(`Decryption failed for note ${note.id}:`, e);
+                displayContent = '[DECRYPTION FAILED]';
+                noteItemEl.classList.add('decryption-failed');
             }
-        } catch (e) {
-            // Not encrypted with current key, or not valid SJCL/JSON format
-            // Use original content for dataset.rawContent
+        } else {
+            displayContent = '[ENCRYPTED CONTENT - Enter password to view]';
+            noteItemEl.classList.add('needs-password');
+        }
+    } else if (isAlreadyDecrypted) {
+        // Content is already decrypted, just use it
+        displayContent = note.content;
+        if (note.is_encrypted) {
+            noteItemEl.classList.add('decrypted-note');
         }
     }
-    contentEl.dataset.rawContent = effectiveContentForDataset;
 
-    if (note.content && note.content.trim()) {
-        contentEl.innerHTML = parseAndRenderContent(note.content);
+    contentEl.dataset.rawContent = displayContent;
+
+    if (displayContent && displayContent.trim()) {
+        contentEl.innerHTML = parseAndRenderContent(displayContent);
+        if (typeof feather !== 'undefined') {
+            feather.replace({ width: '18px', height: '18px' });
+        }
     }
 
     contentWrapperEl.appendChild(contentEl);
@@ -647,28 +675,8 @@ function switchToRenderedMode(contentEl) {
  * @returns {string} HTML string for display
  */
 function parseAndRenderContent(rawContent) {
-    if (window.decryptionPassword && window.currentPageEncryptionKey && rawContent && typeof rawContent === 'string') {
-        try {
-            // Attempt to parse rawContent as JSON, as SJCL encrypted strings are JSON strings.
-            // If it's not JSON, it's likely not an encrypted string or it's corrupted.
-            JSON.parse(rawContent); // This will throw an error if rawContent is not valid JSON
-
-            const decrypted = sjcl.decrypt(window.decryptionPassword, rawContent);
-            if (decrypted) {
-                rawContent = decrypted; // Use decrypted content for the rest of the function
-                // console.log('Note content decrypted successfully.');
-            } else {
-                // This case might not be hit if sjcl.decrypt throws an error for non-encrypted content.
-                // console.warn('Decryption returned empty, content might not be encrypted or is corrupted.');
-            }
-        } catch (e) {
-            // This error means sjcl.decrypt failed, or rawContent was not valid JSON.
-            // It's likely the content was not encrypted or was encrypted with a different key/format.
-            // We should proceed with the original rawContent (which will appear as ciphertext or plain text).
-            // console.warn('Decryption failed or content not encrypted:', e.message);
-            // console.warn('Original rawContent:', rawContent.substring(0, 100) + "..."); // Log a snippet
-        }
-    }
+    // rawContent is now assumed to be plaintext if it was meant to be decrypted.
+    // Decryption is handled by page-loader.js before this function is called.
     let html = rawContent || '';
 
     // Handle task markers with checkboxes - don't show the TODO/DONE prefix in content
@@ -793,7 +801,7 @@ function parseAndRenderContent(rawContent) {
         const sqlQueryRegex = /SQL\{([^}]+)\}/g;
         html = html.replace(sqlQueryRegex, (match, sqlQuery) => {
             // Ensure quotes within the SQL query are properly escaped for the HTML attribute
-            const escapedSqlQuery = sqlQuery.replace(/"/g, '&quot;');
+            const escapedSqlQuery = sqlQuery.replace(/"/g, '"');
             return `<div class="sql-query-placeholder" data-sql-query="${escapedSqlQuery}">Loading SQL Query...</div>`;
         });
 
@@ -844,30 +852,43 @@ function parseAndRenderContent(rawContent) {
  * @param {boolean|number|undefined} has_attachments_flag - Flag indicating if attachments exist
  */
 async function renderAttachments(container, noteId, has_attachments_flag) {
-    // If the flag is explicitly false or 0, clear and return.
-    // If undefined or null or true or 1, proceed to fetch.
-    if (has_attachments_flag === false || has_attachments_flag === 0) {
+    // If has_attachments_flag is explicitly false, clear container, hide, and return.
+    if (has_attachments_flag === false) {
         container.innerHTML = ''; // Clear any existing content
-        // container.style.display = 'none'; // Optional: hide if needed
+        container.style.display = 'none'; // Hide the container
         return;
     }
-    // container.style.display = ''; // Optional: ensure visible
+
+    // If has_attachments_flag is true, proceed to fetch and render.
+    // If undefined (e.g. legacy calls or error states), also proceed to fetch as a fallback.
+    // This means an API call will be made if has_attachments_flag is true or undefined.
+    
+    // Ensure container is visible before attempting to fetch, in case it was previously hidden.
+    // We will hide it again if no attachments are found after fetching.
+    container.style.display = ''; // Reset display style
 
     try {
-        // Fetch attachments for this note if flag suggests they might exist or is undefined
         const noteAttachments = await attachmentsAPI.getNoteAttachments(noteId);
         
-        container.innerHTML = ''; // Clear previous content before rendering new, or if no attachments found
+        container.innerHTML = ''; // Clear previous content
 
         if (!noteAttachments || noteAttachments.length === 0) {
-            // container.style.display = 'none'; // Optional: hide if no attachments
+            container.style.display = 'none'; // Hide if no attachments are found
             return;
         }
-        // container.style.display = ''; // Optional: ensure visible if attachments are found
+        
+        // If attachments are found, ensure the main container is visible (it was reset above)
+        // and the inner attachmentsContainer will be 'flex'
 
         const attachmentsContainer = document.createElement('div');
-        attachmentsContainer.className = 'note-attachments';
-        container.appendChild(attachmentsContainer);
+        // The class 'note-attachments' might already be on the 'container' element itself.
+        // If 'container' is just a generic div, then adding this class to a child is appropriate.
+        // Based on existing code, `container` IS the element with class `note-attachments`.
+        // So, we should append items directly to `container` or manage `attachmentsContainer` carefully.
+        // For now, let's assume `container` is the one to be styled and filled.
+        // Re-evaluating: The original code appends `attachmentsContainer` to `container`. This is fine.
+
+        container.appendChild(attachmentsContainer); // This was the original structure.
 
         noteAttachments.forEach(attachment => {
             const attachmentEl = document.createElement('div');
@@ -904,21 +925,27 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
 
             attachmentsContainer.appendChild(attachmentEl);
 
-            // Event listeners for image click and delete button will be handled by delegation.
-            // Ensure necessary data attributes are present on the elements for the delegated handlers.
             if (isImage) {
                 const imageLink = attachmentEl.querySelector('.attachment-name');
                 if (imageLink) {
-                    imageLink.dataset.attachmentUrl = attachment.url; // For delegated image view
-                    imageLink.classList.add('delegated-attachment-image'); // Class for easier selection
+                    imageLink.dataset.attachmentUrl = attachment.url;
+                    imageLink.classList.add('delegated-attachment-image');
                 }
             }
         });
 
         if (attachmentsContainer.children.length > 0) {
-            attachmentsContainer.style.display = 'flex';
+            // The main `container` should be visible (already set by `container.style.display = '';`)
+            // The `attachmentsContainer` (inner list) can be flex if it has items.
+            attachmentsContainer.style.display = 'flex'; // This was on attachmentsContainer before
+            container.style.display = 'flex'; // Ensure the main container is also flex if it wasn't.
+                                               // Or, if `container` is already styled by CSS, this might be redundant
+                                               // or conflict. Let's assume `container`'s display is managed by its parent or CSS.
+                                               // The original code set `attachmentsContainer.style.display = 'flex'`.
         } else {
-            attachmentsContainer.style.display = 'none'; // Explicitly hide if no attachments rendered
+            // This case should be caught by `if (!noteAttachments || noteAttachments.length === 0)` above.
+            // If somehow it's reached, hide the main container.
+            container.style.display = 'none';
         }
 
         if (typeof feather !== 'undefined' && feather.replace) {
@@ -927,6 +954,7 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
     } catch (error) {
         console.error('Error rendering attachments:', error);
         container.innerHTML = '<small>Could not load attachments.</small>';
+        container.style.display = 'block'; // Ensure error message is visible
     }
 }
 
@@ -1016,6 +1044,36 @@ export {
 
 // --- Delegated Event Handler Functions ---
 
+/**
+ * Opens a modal to display an image.
+ * @param {string} imageUrl The URL of the image to display.
+ */
+function openImageViewerModal(imageUrl) {
+    if (!imageUrl) return;
+
+    if (domRefs.imageViewerModal && domRefs.imageViewerModalImg && domRefs.imageViewerModalClose) {
+        domRefs.imageViewerModalImg.src = imageUrl;
+        domRefs.imageViewerModal.classList.add('active');
+
+        const closeImageModal = () => {
+            domRefs.imageViewerModal.classList.remove('active');
+            domRefs.imageViewerModalImg.src = '';
+        };
+
+        const outsideClickHandlerForModal = (event) => {
+            if (event.target === domRefs.imageViewerModal) {
+                closeImageModal();
+            }
+        };
+
+        domRefs.imageViewerModalClose.addEventListener('click', closeImageModal, { once: true });
+        domRefs.imageViewerModal.addEventListener('click', outsideClickHandlerForModal, { once: true });
+    } else {
+        console.error('Image viewer modal elements not found.');
+        window.open(imageUrl, '_blank');
+    }
+}
+
 async function handleDelegatedCollapseArrowClick(targetElement) {
     const noteItem = targetElement.closest('.note-item');
     const noteId = noteItem?.dataset.noteId;
@@ -1030,10 +1088,16 @@ async function handleDelegatedCollapseArrowClick(targetElement) {
     targetElement.dataset.collapsed = isCurrentlyCollapsed.toString();
 
     try {
-        await notesAPI.updateNote(noteId, { 
-            page_id: window.currentPageId, // Assuming window.currentPageId is accessible
-            collapsed: isCurrentlyCollapsed 
-        });
+        // Use the notesAPI.batchUpdateNotes function
+        const result = await notesAPI.batchUpdateNotes([{
+            type: 'update',
+            payload: {
+                id: noteId,
+                page_id: window.currentPageId,
+                collapsed: isCurrentlyCollapsed ? 1 : 0
+            }
+        }]);
+
         // Update local cache
         if (window.notesForCurrentPage) {
             const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
@@ -1044,6 +1108,13 @@ async function handleDelegatedCollapseArrowClick(targetElement) {
     } catch (error) {
         const errorMessage = error.message || 'Please try again.';
         console.error(`handleDelegatedCollapseArrowClick: Error saving collapse state for note ${noteId}. Error:`, error);
+        console.error('Full error details:', {
+            noteId,
+            isCurrentlyCollapsed,
+            currentPageId: window.currentPageId,
+            error
+        });
+        
         // Revert UI changes on error
         noteItem.classList.toggle('collapsed'); // Toggle back
         if (childrenContainer) childrenContainer.classList.toggle('collapsed'); // Toggle back
@@ -1093,6 +1164,9 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
         </div>
         <div class="menu-item" data-action="upload" data-note-id="${noteId}" data-page-id="${notePageId || window.currentPageId}">
             <i data-feather="upload"></i> Upload attachment
+        </div>
+        <div class="menu-item" data-action="open-zen" data-note-id="${noteId}">
+            <i data-feather="edit-3"></i> Open in Zen Writer
         </div>
     `;
     menu.style.position = 'fixed';
@@ -1234,40 +1308,138 @@ async function handleDelegatedAttachmentDelete(targetElement) {
 }
 
 function handleDelegatedAttachmentImageView(targetElement) {
-    const attachmentUrl = targetElement.dataset.attachmentUrl;
-    if (!attachmentUrl) { // Might be the img itself, not the link
+    let attachmentUrl = targetElement.dataset.attachmentUrl;
+    if (!attachmentUrl) {
+        // This logic handles clicking the <img> preview instead of the <a> link.
         const imgPreview = targetElement.closest('.attachment-preview-image');
         if (imgPreview) {
            const attachmentItem = imgPreview.closest('.note-attachment-item');
+           // Find the sibling link that holds the data
            const linkElement = attachmentItem?.querySelector('.attachment-name[data-attachment-url]');
-           if(linkElement) handleDelegatedAttachmentImageView(linkElement); // Recurse with the link
+           if (linkElement) {
+               attachmentUrl = linkElement.dataset.attachmentUrl;
+           }
         }
+    }
+
+    if (attachmentUrl) {
+        openImageViewerModal(attachmentUrl);
+    }
+}
+
+async function handleDelegatedTaskCheckboxClick(checkbox) {
+    const noteItem = checkbox.closest('.note-item');
+    const contentEl = noteItem?.querySelector('.note-content');
+    if (!noteItem || !contentEl) return;
+
+    const noteId = noteItem.dataset.noteId;
+    if (!noteId || noteId.startsWith('temp-')) return;
+    
+    let rawContent = contentEl.dataset.rawContent;
+    const currentMarker = checkbox.dataset.markerType.toUpperCase();
+    let newContent;
+    let newMarker;
+
+    // Logic based on current state and the new checked status of the box
+    const isChecked = checkbox.checked;
+
+    if (isChecked) { // The user is checking the box (moving to a "done" state)
+        if (['TODO', 'DOING', 'WAITING', 'SOMEDAY'].includes(currentMarker)) {
+            newMarker = 'DONE';
+        }
+    } else { // The user is un-checking the box (moving to an "active" state)
+        if (currentMarker === 'DONE') {
+            newMarker = 'TODO';
+        }
+    }
+    
+    // If no state change is defined, or for un-clickable types, revert the checkbox and exit
+    if (!newMarker) {
+        checkbox.checked = !isChecked; // Revert visual change
         return;
     }
 
+    // Find the original content part by stripping the old marker
+    let contentPart = '';
+    const prefixes = ['TODO ', 'DONE ', 'DOING ', 'SOMEDAY ', 'WAITING ', 'CANCELLED ', 'NLR '];
+    for (const prefix of prefixes) {
+        if (rawContent.startsWith(prefix)) {
+            contentPart = rawContent.substring(prefix.length);
+            break;
+        }
+    }
+    // Fallback if no prefix found
+    if (contentPart === '' && rawContent.includes(' ')) {
+        contentPart = rawContent.substring(rawContent.indexOf(' ') + 1);
+    } else if (contentPart === '') {
+        contentPart = rawContent;
+    }
 
-    if (domRefs.imageViewerModal && domRefs.imageViewerModalImg && domRefs.imageViewerModalClose) {
-        domRefs.imageViewerModalImg.src = attachmentUrl;
-        domRefs.imageViewerModal.classList.add('active');
+    newContent = `${newMarker} ${contentPart}`;
+    
+    // Update the raw content dataset for the next save
+    contentEl.dataset.rawContent = newContent;
+    
+    // The visual state of the checkbox is already correct from the user click.
+    // Now, update the rest of the UI optimistically.
+    const taskContainer = checkbox.closest('.task-container');
+    if (taskContainer) {
+        taskContainer.classList.remove(currentMarker.toLowerCase());
+        taskContainer.classList.add(newMarker.toLowerCase());
+        
+        const badge = taskContainer.querySelector('.task-status-badge');
+        badge.className = `task-status-badge ${newMarker.toLowerCase()}`;
+        badge.textContent = newMarker;
 
-        const closeImageModal = () => {
-            domRefs.imageViewerModal.classList.remove('active');
-            domRefs.imageViewerModalImg.src = ''; 
-            domRefs.imageViewerModalClose.removeEventListener('click', closeImageModal);
-            domRefs.imageViewerModal.removeEventListener('click', outsideClickHandlerForModal);
-        };
+        const taskContentDiv = taskContainer.querySelector('.task-content');
+        taskContentDiv.classList.toggle('done-text', newMarker === 'DONE');
+        
+        checkbox.dataset.markerType = newMarker;
+    }
 
-        const outsideClickHandlerForModal = (event) => {
-            if (event.target === domRefs.imageViewerModal) { 
-                closeImageModal();
-            }
-        };
+    // Save the change
+    try {
+        await saveNoteImmediately(noteItem);
+    } catch (error) {
+        console.error(`Error saving task state for note ${noteId}:`, error);
+        alert('Failed to save the task state change. Please refresh the page.');
+    }
+}
 
-        domRefs.imageViewerModalClose.addEventListener('click', closeImageModal, { once: true });
-        domRefs.imageViewerModal.addEventListener('click', outsideClickHandlerForModal, { once: true });
-    } else {
-        console.error('Image viewer modal elements not found.');
-        window.open(attachmentUrl, '_blank');
+/**
+ * Renders the content of a fetched transclusion into its placeholder.
+ * @param {HTMLElement} placeholderEl - The placeholder element to be replaced.
+ * @param {string} noteContent - The raw content of the note to be rendered inside the placeholder.
+ * @param {string} noteId - The ID of the transcluded note, for creating a link.
+ */
+export function renderTransclusion(placeholderEl, noteContent, noteId) {
+    if (!placeholderEl) return;
+
+    // Create a container for the transcluded content
+    const contentEl = document.createElement('div');
+    contentEl.className = 'transcluded-content';
+    
+    // Parse the fetched note content into HTML
+    const renderedHTML = parseAndRenderContent(noteContent);
+
+    // Create a header with a link to the original note
+    const headerEl = document.createElement('div');
+    headerEl.className = 'transclusion-header';
+    headerEl.innerHTML = `<a href="#" class="transclusion-link" data-note-id="${noteId}" title="Go to original note"><i data-feather="corner-up-left"></i></a>`;
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'transclusion-body';
+    bodyEl.innerHTML = renderedHTML;
+
+    contentEl.appendChild(headerEl);
+    contentEl.appendChild(bodyEl);
+    
+    // Replace the placeholder with the new content element
+    placeholderEl.replaceWith(contentEl);
+
+    // Re-run Feather icons for the new link icon
+    if (typeof feather !== 'undefined') {
+        feather.replace({ width: '1em', height: '1em' });
     }
 }
 
@@ -1302,6 +1474,14 @@ function initializeDelegatedNoteEventListeners(notesContainerEl) {
             return;
         }
 
+        // Task checkbox click
+        const checkbox = target.closest('.task-checkbox');
+        if (checkbox) {
+            event.stopPropagation();
+            handleDelegatedTaskCheckboxClick(checkbox);
+            return;
+        }
+
         // Content click to edit
         const contentArea = target.closest('.note-content.rendered-mode');
         if (contentArea) {
@@ -1317,22 +1497,28 @@ function initializeDelegatedNoteEventListeners(notesContainerEl) {
             return;
         }
 
+        // Markdown-embedded content image click
+        const contentImage = target.closest('.content-image');
+        if (contentImage) {
+            event.preventDefault();
+            const imageUrl = contentImage.dataset.originalSrc;
+            openImageViewerModal(imageUrl);
+            return;
+        }
+
         // Attachment image view (delegated from .attachment-name or .attachment-preview-image)
-        const imageLink = target.closest('.attachment-name.delegated-attachment-image');
+        const imageLink = target.closest('.attachment-name.delegated-attachment-image, .attachment-preview-image');
         if (imageLink) {
             event.preventDefault();
             handleDelegatedAttachmentImageView(imageLink);
             return;
         }
-        const imagePreview = target.closest('.attachment-preview-image');
-        if(imagePreview){
-            // The preview itself might not have the URL, find the associated link
-            const attachmentItem = imagePreview.closest('.note-attachment-item');
-            const actualLink = attachmentItem?.querySelector('.attachment-name.delegated-attachment-image');
-            if(actualLink) {
-                 event.preventDefault();
-                 handleDelegatedAttachmentImageView(actualLink);
-            }
+
+        // Page link click
+        const pageLink = target.closest('a.page-link');
+        if (pageLink && pageLink.dataset.pageName) {
+            event.preventDefault();
+            window.loadPage(pageLink.dataset.pageName);
             return;
         }
     });

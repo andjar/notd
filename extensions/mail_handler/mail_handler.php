@@ -104,55 +104,10 @@ if (empty($email_body)) {
     // $email_body will be an empty string, which is acceptable for note creation
 }
 
-// --- 6. Determine Target Page (Today's Page) ---
+// --- 6. Determine Target Page Name (Today's Date) ---
 $todays_date_string = date('Y-m-d');
-$page_api_url = API_BASE_URL . '/pages.php?name=' . urlencode($todays_date_string);
-$page_id = null;
-
-error_log("Attempting to get page ID for date: " . $todays_date_string . " from URL: " . $page_api_url);
-
-try {
-    $page_response_json = file_get_contents($page_api_url);
-    if ($page_response_json === false) {
-        throw new Exception("Failed to fetch page data from API. URL: " . $page_api_url);
-    }
-
-    $page_response_data = json_decode($page_response_json, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new Exception("Failed to decode JSON response from pages API. Error: " . json_last_error_msg() . ". Response: " . $page_response_json);
-    }
-
-    // Check for success indicator in the response
-    $is_successful_response = (isset($page_response_data['success']) && $page_response_data['success'] === true) ||
-                              (isset($page_response_data['status']) && $page_response_data['status'] === 'success');
-
-    if ($is_successful_response) {
-        if (isset($page_response_data['data']['id'])) {
-            $page_id = $page_response_data['data']['id'];
-            error_log("Successfully retrieved page ID: " . $page_id . " for page name: " . $todays_date_string);
-        } elseif (isset($page_response_data['data'][0]['id'])) { // Handle array case
-            $page_id = $page_response_data['data'][0]['id'];
-            error_log("Successfully retrieved page ID (from array): " . $page_id . " for page name: " . $todays_date_string);
-        } else {
-            error_log("Warning: Page ID not found in successful API response for '{$todays_date_string}'. Response: " . $page_response_json);
-            // This case implies success was true, but data.id was missing, which is an API contract issue.
-        }
-    } else {
-        // API indicated failure or did not provide a clear success status
-        error_log("Error: Pages API call for '{$todays_date_string}' did not indicate success or returned an error. Response: " . $page_response_json);
-        // No exception thrown here, $page_id will remain null and handled later.
-    }
-} catch (Exception $e) {
-    error_log("Error fetching page ID during file_get_contents or JSON decode: " . $e->getMessage());
-    // Decide if to exit or try to post to a default/error page
-    // For now, exiting if page_id cannot be determined.
-    exit(1);
-}
-
-if (empty($page_id)) {
-    error_log("Error: Could not determine page ID for '{$todays_date_string}'. Cannot create note. Exiting.");
-    exit(1);
-}
+// $page_id logic removed. $todays_date_string will be used as page_name.
+error_log("Target page name for note: " . $todays_date_string);
 
 // --- 7. Prepare Note Content ---
 $note_title = "Email: " . $subject;
@@ -175,13 +130,14 @@ if (!empty($to_email)) {
 $note_content .= "email_subject:: " . $subject . "\n";
 
 // --- 8. Create Note via API ---
-$notes_api_url = API_BASE_URL . '/notes.php';
+// Changed to use append_to_page.php
+$notes_api_url = API_BASE_URL . '/append_to_page.php'; 
 $post_data = [
-    'page_id' => $page_id,
-    'content' => $note_content
+    'page_name' => $todays_date_string, // Use the date string as the page name
+    'notes'     => $note_content      // The 'notes' key should contain the actual content
 ];
 
-error_log("Attempting to create note on page ID: " . $page_id . " via URL: " . $notes_api_url);
+error_log("Attempting to append note to page: " . $todays_date_string . " via URL: " . $notes_api_url);
 
 try {
     $options = [
@@ -203,21 +159,26 @@ try {
     if ($status_code >= 200 && $status_code < 300) { // Success codes (200, 201, etc.)
         $note_response_data = json_decode($note_response_json, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception("Failed to decode JSON response from notes API. Error: " . json_last_error_msg() . ". Response: " . $note_response_json);
+            throw new Exception("Failed to decode JSON response from append_to_page API. Error: " . json_last_error_msg() . ". Response: " . $note_response_json);
         }
-        if (isset($note_response_data['success']) && $note_response_data['success'] === true) {
-            $note_id = $note_response_data['data']['id'] ?? 'N/A';
-            error_log("Successfully created note. Note ID: " . $note_id . ". Subject: '" . $subject . "'");
-            echo "Email processed and note created successfully. Note ID: " . $note_id . "\n";
+        // Updated success check for append_to_page.php response structure
+        if (isset($note_response_data['status']) && $note_response_data['status'] === 'success') {
+            $appended_note_id = 'N/A';
+            if (!empty($note_response_data['data']['appended_notes']) && isset($note_response_data['data']['appended_notes'][0]['id'])) {
+                $appended_note_id = $note_response_data['data']['appended_notes'][0]['id'];
+            }
+            error_log("Successfully appended note. Appended Note ID: " . $appended_note_id . ". Subject: '" . $subject . "'");
+            echo "Email processed and note created successfully. Appended Note ID: " . $appended_note_id . "\n";
         } else {
-            throw new Exception("Notes API returned success=false or unexpected response. Response: " . $note_response_json);
+            $api_message = $note_response_data['message'] ?? ($note_response_data['data']['message'] ?? 'No specific message');
+            throw new Exception("Append_to_page API returned status not 'success' or unexpected response. Status: " . ($note_response_data['status'] ?? 'N/A') . ". Message: " . $api_message . ". Response: " . $note_response_json);
         }
     } else {
-         throw new Exception("Notes API request failed with HTTP status: {$status_code}. Response: " . $note_response_json);
+         throw new Exception("Append_to_page API request failed with HTTP status: {$status_code}. Response: " . $note_response_json);
     }
 
 } catch (Exception $e) {
-    error_log("Error creating note: " . $e->getMessage());
+    error_log("Error appending note: " . $e->getMessage());
     // In a real system, might attempt to retry or save the email to a failed queue
     exit(1); // Exit with error
 }

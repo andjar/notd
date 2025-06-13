@@ -1,563 +1,171 @@
 <?php
+// api/v1/pages.php
+
+/**
+ * Endpoint for all Page-related operations.
+ * This file acts as a router, delegating all logic to the DataManager.
+ */
+
 require_once __DIR__ . '/../db_connect.php';
-require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
-require_once __DIR__ . '/../data_manager.php';   // Include the new DataManager
-require_once __DIR__ . '/../validator_utils.php'; // Include the new Validator
+require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../pattern_processor.php';
+require_once __DIR__ . '/../response_utils.php';
 
-// header('Content-Type: application/json'); // Will be handled by ApiResponse
-$pdo = get_db_connection();
-$dataManager = new DataManager($pdo); // Instantiate DataManager
+if (!function_exists('_indexPropertiesFromContent')) {
+    function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
+        // For pages, we don't have the 'encrypted' property check or 'internal' flag update as for notes.
+
+        // Instantiate the pattern processor. It gets PDO from get_db_connection()
+        $patternProcessor = getPatternProcessor();
+
+        // Process the content to extract properties and potentially modified content
+        // Pass $pdo in context for handlers that might need it directly.
+        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
+        
+        $parsedProperties = $processedData['properties'];
+
+        // Save all extracted/generated properties using the processor's save method
+        // This method should handle deleting old 'replaceable' properties and inserting/updating new ones.
+        // It will also handle property triggers.
+        if (!empty($parsedProperties)) {
+            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
+        } else {
+            // If no properties are parsed from content, we might still need to clear existing replaceable ones.
+            // This relies on PatternProcessor.saveProperties (or a dedicated method there)
+            // to handle clearing properties when an empty set is passed.
+            // For now, assuming saveProperties handles this.
+            // A potential explicit call: $patternProcessor->clearReplaceableProperties($entityType, $entityId);
+        }
+        // Note: No 'internal' flag update logic here as it's specific to Notes.
+    }
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
-$rawInput = file_get_contents('php://input');
-$input = json_decode($rawInput, true);
+$input = json_decode(file_get_contents('php://input'), true) ?? [];
 
-if (!class_exists('PageManager')) {
-    class PageManager {
-        private $pdo;
-        private $dataManager;
+if ($method === 'POST' && isset($input['_method'])) {
+    $method = strtoupper($input['_method']);
+}
 
-    public function __construct($pdo) {
-        $this->pdo = $pdo;
-        $this->dataManager = new DataManager($pdo);
-    }
+$pdo = get_db_connection();
+$dataManager = new DataManager($pdo);
+// $propertyParser = new PropertyParser($pdo); // Removed global instantiation
 
-    public function isJournalPage($name) {
-        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $name) || strtolower($name) === 'journal';
-    }
-
-    private function addJournalProperty($pageId) {
-        $stmt = $this->pdo->prepare("
-            INSERT INTO Properties (page_id, name, value)
-            VALUES (?, 'type', 'journal')
-        ");
-        $stmt->execute([$pageId]);
-    }
-
-    private function resolvePageAlias($pageData, $followAliases = true) {
-        if (!$followAliases || !$pageData || empty($pageData['alias'])) {
-            return $pageData;
-        }
-        
-        try {
-            $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-            $stmt->execute([$pageData['alias']]);
-            $aliasedPage = $stmt->fetch();
-            
-            if ($aliasedPage) {
-                return $this->resolvePageAlias($aliasedPage, true);
-            }
-        } catch (PDOException $e) {
-            error_log("Error resolving alias for page {$pageData['id']}: " . $e->getMessage());
-        }
-        
-        return $pageData;
-    }
-
-    public function handleRequest() {
-        $method = $_SERVER['REQUEST_METHOD'];
-        $rawInput = file_get_contents('php://input');
-        $input = json_decode($rawInput, true);
-
-        // Debug logging
-        error_log("[PageManager] Raw input: " . $rawInput);
-        error_log("[PageManager] Parsed input: " . json_encode($input));
-        error_log("[PageManager] JSON decode error: " . json_last_error_msg());
-
-        // Handle POST with _method for REST compatibility
-        if ($method === 'POST' && isset($input['_method'])) {
-            switch (strtoupper($input['_method'])) {
-                case 'PUT':
-                    $this->handlePostUpdate($input);
-                    break;
-                case 'DELETE':
-                    $this->handlePostDelete($input);
-                    break;
-                default:
-                    ApiResponse::error('Invalid _method specified', 400);
-            }
-            return;
-        }
-
-        // Handle standard HTTP methods
-        switch ($method) {
-            case 'GET':
-                $this->handleGetRequest();
-                break;
-            case 'POST':
-                $this->handlePostRequest($input);
-                break;
-            default:
-                ApiResponse::error('Method Not Allowed', 405);
-        }
-    }
-
-    private function handleGetRequest() {
-        $followAliases = !isset($_GET['follow_aliases']) || $_GET['follow_aliases'] !== '0';
-        $include_details = isset($_GET['include_details']) && $_GET['include_details'] === '1';
-        $include_internal = filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
-
-        if (isset($_GET['id'])) {
-            $this->handleGetById($followAliases, $include_details, $include_internal);
-        } elseif (isset($_GET['name'])) {
-            $this->handleGetByName($followAliases, $include_details, $include_internal);
-        } else {
-            $this->handleGetAll($followAliases, $include_details, $include_internal);
-        }
-    }
-
-    private function handleGetById($followAliases, $include_details, $include_internal) {
-        $validationRules = ['id' => 'required|isPositiveInteger'];
-        $errors = Validator::validate($_GET, $validationRules);
-        if (!empty($errors)) {
-            ApiResponse::error('Invalid page ID.', 400, $errors);
-            return;
-        }
-        
-        $pageId = (int)$_GET['id'];
-        $pageData = $include_details ? 
-            $this->dataManager->getPageWithNotes($pageId, $include_internal) :
-            $this->dataManager->getPageDetailsById($pageId, $include_internal);
-
-        if ($pageData) {
-            $pageToResolve = $include_details ? $pageData['page'] : $pageData;
-            
-            if ($followAliases && !empty($pageToResolve['alias'])) {
-                $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                $stmt->execute([$pageToResolve['alias']]);
-                $aliasedPageInfo = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($aliasedPageInfo) {
-                    $pageData = $include_details ?
-                        $this->dataManager->getPageWithNotes($aliasedPageInfo['id'], $include_internal) :
-                        $this->dataManager->getPageDetailsById($aliasedPageInfo['id'], $include_internal);
+try {
+    switch ($method) {
+        case 'GET':
+            if (isset($_GET['name'])) {
+                $pageName = $_GET['name'];
+                $page = $dataManager->getPageByName($pageName);
+                if (!$page) {
+                    // Page does not exist, so create it.
+                    $pdo->beginTransaction();
+                    $stmt = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (:name, :content)");
+                    $stmt->execute([':name' => $pageName, ':content' => null]);
+                    $pdo->commit();
+                    $page = $dataManager->getPageByName($pageName); // Re-fetch the newly created page
                 }
-            }
-
-            // Ensure consistent response format
-            if ($include_details) {
-                // For detailed view, wrap in data object to match list format
-                ApiResponse::success([
-                    'data' => $pageData,
-                    'pagination' => null // No pagination for single item
-                ]);
-            } else {
-                // For basic view, return the page directly
-                ApiResponse::success($pageData);
-            }
-        } else {
-            ApiResponse::error('Page not found', 404);
-        }
-    }
-
-    private function handleGetByName($followAliases, $include_details, $include_internal) {
-        $validationRules = ['name' => 'required|isNotEmpty'];
-        $errors = Validator::validate($_GET, $validationRules);
-        if (!empty($errors)) {
-            ApiResponse::error('Invalid page name.', 400, $errors);
-            return;
-        }
-
-        $pageName = Validator::sanitizeString($_GET['name']);
-
-        try {
-            $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-            $stmt->execute([$pageName]);
-            $page = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($page) {
-                $page['properties'] = $this->dataManager->getPageProperties($page['id'], $include_internal);
-                
-                if ($followAliases && !empty($page['alias'])) {
-                    $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                    $stmt->execute([$page['alias']]);
-                    $aliasedPageInfo = $stmt->fetch(PDO::FETCH_ASSOC);
-                    if ($aliasedPageInfo) {
-                        $aliasedPageInfo['properties'] = $this->dataManager->getPageProperties($aliasedPageInfo['id'], $include_internal);
-                        $page = $aliasedPageInfo;
-                    }
-                }
-                ApiResponse::success($page);
-            } else {
-                // Page not found, try to create it
-                try {
-                    $this->pdo->beginTransaction();
-
-                    // Insert the new page
-                    $insertStmt = $this->pdo->prepare("INSERT INTO Pages (name, alias, updated_at) VALUES (?, NULL, CURRENT_TIMESTAMP)");
-                    $insertStmt->execute([$pageName]);
-                    $pageId = $this->pdo->lastInsertId();
-
-                    // If it's a journal page, add the journal property
-                    if ($this->isJournalPage($pageName)) {
-                        $this->addJournalProperty($pageId);
-                    }
-
-                    // Fetch the newly created page
-                    $selectStmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
-                    $selectStmt->execute([$pageId]);
-                    $newPage = $selectStmt->fetch(PDO::FETCH_ASSOC);
-                    
-                    if ($newPage) {
-                        $newPage['properties'] = $this->dataManager->getPageProperties($newPage['id'], $include_internal);
-                    }
-
-                    $this->pdo->commit();
-                    ApiResponse::success($newPage, 201); // 201 Created
-                } catch (PDOException $e) {
-                    if ($this->pdo->inTransaction()) {
-                        $this->pdo->rollBack();
-                    }
-                    // Check for unique constraint violation, which might happen in a race condition
-                    // If so, try to fetch the page again as it might have been created by another request.
-                    if ($e->getCode() == 23000 || str_contains(strtolower($e->getMessage()), 'unique constraint failed')) {
-                        error_log("Unique constraint violation during page creation attempt for: " . $pageName . ". Attempting to re-fetch.");
-                        $retryStmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                        $retryStmt->execute([$pageName]);
-                        $existingPage = $retryStmt->fetch(PDO::FETCH_ASSOC);
-                        if ($existingPage) {
-                            $existingPage['properties'] = $this->dataManager->getPageProperties($existingPage['id'], $include_internal);
-                             if ($this->isJournalPage($pageName)) { // Ensure journal property if it was a journal page
-                                $stmt_check_prop = $this->pdo->prepare("
-                                    SELECT 1 FROM Properties 
-                                    WHERE page_id = ? 
-                                    AND name = 'type' 
-                                    AND value = 'journal'
-                                ");
-                                $stmt_check_prop->execute([$existingPage['id']]);
-                                if (!$stmt_check_prop->fetch()) {
-                                    $this->addJournalProperty($existingPage['id']);
-                                    // Re-fetch properties if a new one was added
-                                    $existingPage['properties'] = $this->dataManager->getPageProperties($existingPage['id'], $include_internal);
-                                }
-                            }
-                            ApiResponse::success($existingPage);
-                            return;
-                        }
-                    }
-                    ApiResponse::error('Failed to create page: ' . $e->getMessage(), 500, ['details' => $e->getMessage()]);
-                }
-            }
-        } catch (PDOException $e) {
-            ApiResponse::error('Database error.', 500, ['details' => $e->getMessage()]);
-        }
-    }
-
-    private function handleGetAll($followAliases, $include_details, $include_internal) {
-        $excludeJournal = isset($_GET['exclude_journal']) && $_GET['exclude_journal'] === '1';
-        
-        // Pagination parameters
-        $page = max(1, isset($_GET['page']) ? (int)$_GET['page'] : 1);
-        $perPage = max(1, min(100, isset($_GET['per_page']) ? (int)$_GET['per_page'] : 20));
-        $offset = ($page - 1) * $perPage;
-
-        // Get total count for pagination
-        $countSql = $excludeJournal ?
-            "SELECT COUNT(*) FROM Pages WHERE NOT (name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR LOWER(name) = 'journal')" :
-            "SELECT COUNT(*) FROM Pages";
-        
-        $totalCount = $this->pdo->query($countSql)->fetchColumn();
-        
-        // Get paginated results
-        $sql = $excludeJournal ?
-            "SELECT id, name, alias, updated_at FROM Pages WHERE NOT (name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' OR LOWER(name) = 'journal') ORDER BY updated_at DESC, name ASC LIMIT ? OFFSET ?" :
-            "SELECT id, name, alias, updated_at FROM Pages ORDER BY updated_at DESC, name ASC LIMIT ? OFFSET ?";
-        
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$perPage, $offset]);
-        $pages = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        if ($followAliases) {
-            $resolvedPages = [];
-            $seenIds = [];
-            foreach ($pages as $page) {
-                $resolvedPage = $this->resolvePageAlias($page, true);
-                if ($resolvedPage && !in_array($resolvedPage['id'], $seenIds)) {
-                    $resolvedPages[] = $resolvedPage;
-                    $seenIds[] = $resolvedPage['id'];
-                } elseif (!$resolvedPage && !in_array($page['id'], $seenIds)) {
-                    $resolvedPages[] = $page;
-                    $seenIds[] = $page['id'];
-                }
-            }
-            $pages = $resolvedPages;
-        }
-
-        if ($include_details) {
-            $detailedPages = [];
-            foreach ($pages as $page) {
-                $pageDetail = $this->dataManager->getPageWithNotes($page['id'], $include_internal);
-                if ($pageDetail) {
-                    $detailedPages[] = $pageDetail;
-                }
-            }
-            $pages = $detailedPages;
-        }
-        
-        // Prepare pagination metadata
-        $totalPages = ceil($totalCount / $perPage);
-        $pagination = [
-            'current_page' => $page,
-            'per_page' => $perPage,
-            'total_pages' => $totalPages,
-            'total_items' => $totalCount,
-            'has_next_page' => $page < $totalPages,
-            'has_prev_page' => $page > 1
-        ];
-        
-        ApiResponse::success([
-            'data' => $pages,
-            'pagination' => $pagination
-        ]);
-    }
-
-    private function handlePostRequest($input) {
-        // Debug logging
-        error_log("[PageManager] POST request input: " . json_encode($input));
-        
-        $validationRules = [
-            'name' => 'required|isNotEmpty',
-            'alias' => 'optional'
-        ];
-        $errors = Validator::validate($input, $validationRules);
-        if (!empty($errors)) {
-            error_log("[PageManager] Validation errors: " . json_encode($errors));
-            ApiResponse::error('Invalid input for creating page.', 400, [
-                'validation_errors' => $errors,
-                'received_input' => $input,
-                'input_type' => gettype($input)
-            ]);
-            return;
-        }
-
-        $name = Validator::sanitizeString($input['name']);
-        $alias = isset($input['alias']) ? Validator::sanitizeString($input['alias']) : null;
-        
-        try {
-            $this->pdo->beginTransaction();
-            
-            $stmt_check = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-            $stmt_check->execute([$name]);
-            $existing_page = $stmt_check->fetch();
-
-            if ($existing_page) {
-                if ($this->isJournalPage($name)) {
-                    $stmt_check_prop = $this->pdo->prepare("
-                        SELECT 1 FROM Properties 
-                        WHERE page_id = ? 
-                        AND name = 'type' 
-                        AND value = 'journal'
-                    ");
-                    $stmt_check_prop->execute([$existing_page['id']]);
-                    if (!$stmt_check_prop->fetch()) {
-                        $this->addJournalProperty($existing_page['id']);
-                    }
-                }
-                $this->pdo->commit();
-                ApiResponse::success($existing_page);
-                return;
-            }
-
-            // If it's a journal page and doesn't exist, create it
-            if ($this->isJournalPage($name)) {
-                $stmt = $this->pdo->prepare("INSERT INTO Pages (name, alias, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
-                $stmt->execute([$name, $alias]);
-                $page_id = $this->pdo->lastInsertId();
-                $this->addJournalProperty($page_id);
-                
-                $stmt_new = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
-                $stmt_new->execute([$page_id]);
-                $newPage = $stmt_new->fetch();
-                
-                $this->pdo->commit();
-                ApiResponse::success($newPage, 201);
-                return;
-            }
-
-            // For non-journal pages, proceed with normal creation
-            $stmt = $this->pdo->prepare("INSERT INTO Pages (name, alias, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
-            $stmt->execute([$name, $alias]);
-            $page_id = $this->pdo->lastInsertId();
-            
-            $stmt_new = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
-            $stmt_new->execute([$page_id]);
-            $newPage = $stmt_new->fetch();
-            
-            $this->pdo->commit();
-            ApiResponse::success($newPage, 201);
-        } catch (PDOException $e) {
-            $this->pdo->rollBack();
-            ApiResponse::error('Failed to create page: ' . $e->getMessage(), 500);
-        }
-    }
-
-    private function handlePostUpdate($input) {
-        // Get page ID from either URL parameter or request body
-        $pageId = isset($_GET['id']) ? (int)$_GET['id'] : (isset($input['id']) ? (int)$_input['id'] : null);
-        
-        if (!$pageId) {
-            ApiResponse::error('Page ID is required for update', 400);
-            return;
-        }
-
-        // Remove action/_method from input before validation
-        unset($input['action'], $input['_method']);
-
-        if (!isset($input['name']) && !array_key_exists('alias', $input)) {
-            ApiResponse::error('Either name or alias must be provided for update.', 400);
-            return;
-        }
-
-        $validationRulesPUT = [
-            'name' => 'optional|isNotEmpty',
-            'alias' => 'optional'
-        ];
-        $errorsPUT = Validator::validate($input, $validationRulesPUT);
-        if (!empty($errorsPUT)) {
-            ApiResponse::error('Invalid input for updating page.', 400, $errorsPUT);
-            return;
-        }
-
-        // Rest of the update logic remains the same as handlePutRequest
-        $fields_to_update = [];
-        $params = [];
-        
-        if (isset($input['name'])) {
-            $name = Validator::sanitizeString($input['name']);
-            $fields_to_update[] = "name = ?";
-            $params[] = $name;
-        }
-        
-        if (array_key_exists('alias', $input)) {
-            $alias = $input['alias'] !== null ? Validator::sanitizeString($input['alias']) : null;
-            $fields_to_update[] = "alias = ?";
-            $params[] = $alias;
-        }
-        
-        if (empty($fields_to_update)) {
-            ApiResponse::error('No valid fields to update provided (name or alias).', 400);
-            return;
-        }
-        
-        try {
-            $this->pdo->beginTransaction();
-            
-            $stmt_check = $this->pdo->prepare("SELECT name FROM Pages WHERE id = ? FOR UPDATE");
-            $stmt_check->execute([$pageId]);
-            $current_page = $stmt_check->fetch();
-            
-            if (!$current_page) {
-                $this->pdo->rollBack();
-                ApiResponse::error('Page not found', 404);
-                return;
-            }
-            
-            if (isset($input['name']) && $input['name'] !== $current_page['name']) {
-                $stmt_unique = $this->pdo->prepare("SELECT id FROM Pages WHERE LOWER(name) = LOWER(?) AND id != ?");
-                $stmt_unique->execute([$name, $pageId]);
-                if ($stmt_unique->fetch()) {
-                    $this->pdo->rollBack();
-                    ApiResponse::error('Page name already exists', 409);
-                    return;
-                }
-            }
-            
-            $fields_to_update[] = "updated_at = CURRENT_TIMESTAMP";
-            $sql = "UPDATE Pages SET " . implode(', ', $fields_to_update) . " WHERE id = ?";
-            $params[] = $pageId;
-            
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            
-            $stmt_updated = $this->pdo->prepare("SELECT * FROM Pages WHERE id = ?");
-            $stmt_updated->execute([$pageId]);
-            $updated_page = $stmt_updated->fetch();
-
-            if ($updated_page) {
-                $newName = $updated_page['name'];
-                if ($this->isJournalPage($newName)) {
-                    $stmt_check_prop = $this->pdo->prepare("SELECT 1 FROM Properties WHERE page_id = ? AND name = 'type' AND value = 'journal'");
-                    $stmt_check_prop->execute([$pageId]);
-                    if (!$stmt_check_prop->fetch()) {
-                        $this->addJournalProperty($pageId);
-                    }
-                }
-            }
-            
-            $this->pdo->commit();
-            ApiResponse::success($updated_page);
-        } catch (PDOException $e) {
-            $this->pdo->rollBack();
-            ApiResponse::error('Failed to update page: ' . $e->getMessage(), 500);
-        }
-    }
-
-    private function handlePostDelete($input) {
-        // Get page ID from either URL parameter or request body
-        $pageId = isset($_GET['id']) ? (int)$_GET['id'] : (isset($input['id']) ? (int)$_input['id'] : null);
-        
-        if (!$pageId) {
-            ApiResponse::error('Page ID is required for deletion', 400);
-            return;
-        }
-
-        try {
-            $this->pdo->beginTransaction();
-            
-            $stmt_check = $this->pdo->prepare("SELECT id FROM Pages WHERE id = ? FOR UPDATE");
-            $stmt_check->execute([$pageId]);
-            if (!$stmt_check->fetch()) {
-                $this->pdo->rollBack();
-                ApiResponse::error('Page not found', 404);
-                return;
-            }
-            
-            $stmt = $this->pdo->prepare("DELETE FROM Pages WHERE id = ?");
-            $stmt->execute([$pageId]);
-            
-            $this->pdo->commit();
-            ApiResponse::success(['deleted_page_id' => $pageId]);
-        } catch (PDOException $e) {
-            $this->pdo->rollBack();
-            ApiResponse::error('Failed to delete page: ' . $e->getMessage(), 500);
-        }
-    }
-
-    private function createJournalPage($pageName, $include_internal) {
-        try {
-            $this->pdo->beginTransaction();
-            
-            $insert_stmt = $this->pdo->prepare("INSERT INTO Pages (name, updated_at) VALUES (?, CURRENT_TIMESTAMP)");
-            $insert_stmt->execute([$pageName]);
-            $pageId = $this->pdo->lastInsertId();
-            
-            $this->addJournalProperty($pageId);
-            
-            $this->pdo->commit();
-            
-            $newPage = $this->dataManager->getPageDetailsById($pageId, $include_internal);
-            ApiResponse::success($newPage);
-        } catch (PDOException $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            if ($e->getCode() == 23000 || str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
-                $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?)");
-                $stmt->execute([$pageName]);
-                $page = $stmt->fetch(PDO::FETCH_ASSOC);
+                ApiResponse::success($page, 200);
+            } elseif (isset($_GET['id'])) {
+                $page = $dataManager->getPageById((int)$_GET['id']);
                 if ($page) {
-                    $page['properties'] = $this->dataManager->getPageProperties($page['id'], $include_internal);
                     ApiResponse::success($page);
                 } else {
-                    ApiResponse::error('Failed to resolve page creation race condition.', 500, ['details' => $e->getMessage()]);
+                    ApiResponse::error('Page not found', 404);
                 }
+            } elseif (isset($_GET['date'])) {
+                $pages = $dataManager->getPagesByDate($_GET['date']);
+                ApiResponse::success($pages);
             } else {
-                ApiResponse::error('Database error.', 500, ['details' => $e->getMessage()]);
+                $page = $_GET['page'] ?? 1;
+                $per_page = $_GET['per_page'] ?? 20;
+                $options = [
+                    'exclude_journal' => isset($_GET['exclude_journal'])
+                ];
+                $result = $dataManager->getPages((int)$page, (int)$per_page, $options);
+                
+                // This now returns the correct, non-double-wrapped structure
+                ApiResponse::success($result['data'], 200, ['pagination' => $result['pagination']]);
             }
-        }
+            break;
+
+        case 'POST': // Create
+            $name = $input['name'] ?? null;
+            $content = $input['content'] ?? null;
+
+            if (!$name) {
+                ApiResponse::error('Page name is required.', 400);
+            }
+            if ($dataManager->getPageByName($name)) {
+                ApiResponse::error('Page with this name already exists.', 409);
+            }
+
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (:name, :content)");
+            $stmt->execute([':name' => $name, ':content' => $content]);
+            $pageId = $pdo->lastInsertId();
+            
+            if ($content) {
+                _indexPropertiesFromContent($pdo, 'page', $pageId, $content);
+            }
+            $pdo->commit();
+
+            $newPage = $dataManager->getPageById($pageId);
+            ApiResponse::success($newPage, 201);
+            break;
+
+        case 'PUT': // Update
+            $pageId = $input['id'] ?? null;
+            if (!$pageId) {
+                ApiResponse::error('Page ID is required for update.', 400);
+            }
+
+            // Fetch existing page to ensure it exists
+            $page = $dataManager->getPageById($pageId);
+            if (!$page) {
+                ApiResponse::error('Page not found.', 404);
+            }
+
+            $newName = $input['name'] ?? $page['name'];
+            $newContent = $input['content'] ?? $page['content'];
+            
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("UPDATE Pages SET name = :name, content = :content, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
+            $stmt->execute([':name' => $newName, ':content' => $newContent, ':id' => $pageId]);
+
+            // Re-index properties if content changed
+            if (array_key_exists('content', $input)) {
+                _indexPropertiesFromContent($pdo, 'page', $pageId, $newContent);
+            }
+            $pdo->commit();
+            
+            $updatedPage = $dataManager->getPageById($pageId);
+            ApiResponse::success($updatedPage);
+            break;
+
+        case 'DELETE':
+            $pageId = $input['id'] ?? null;
+            if (!$pageId) {
+                ApiResponse::error('Page ID is required for deletion.', 400);
+            }
+            $stmt = $pdo->prepare("DELETE FROM Pages WHERE id = :id");
+            $stmt->execute([':id' => $pageId]);
+
+            if ($stmt->rowCount() > 0) {
+                ApiResponse::success(['deleted_page_id' => $pageId]);
+            } else {
+                ApiResponse::error('Page not found.', 404);
+            }
+            break;
+
+        default:
+            ApiResponse::error('Method not supported.', 405);
+            break;
     }
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    // Let the global exception handler in config.php format the error
+    throw $e;
 }
-}
-// Initialize and handle the request
-$pdo = get_db_connection();
-$pageManager = new PageManager($pdo);
-$pageManager->handleRequest();

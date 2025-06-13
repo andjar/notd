@@ -1,117 +1,50 @@
 <?php
-require_once 'db_connect.php';
-require_once 'response_utils.php';
 
-if (!class_exists('PropertyUtils')) {
-    class PropertyUtils {
-        private $pdo;
+/**
+ * Utility class for handling application-wide properties and configurations.
+ */
+class PropertyUtils {
 
-        public static function getActiveExtensionDetails() {
-            if (!defined('ACTIVE_EXTENSIONS')) {
-                return [];
-            }
+    /**
+     * Finds all available extensions by scanning the extensions directory,
+     * then filters them based on the ACTIVE_EXTENSIONS constant from config.php.
+     *
+     * @return array An array of active extension details, each containing 'name' and 'featherIcon'.
+     */
+    public static function getActiveExtensionDetails() {
+        // Ensure the ACTIVE_EXTENSIONS constant is defined and is an array.
+        if (!defined('ACTIVE_EXTENSIONS') || !is_array(ACTIVE_EXTENSIONS)) {
+            return [];
+        }
 
-            $extensionDetails = [];
-            foreach (ACTIVE_EXTENSIONS as $extensionFolderName) {
-                $configPath = __DIR__ . '/../extensions/' . $extensionFolderName . '/config.json';
-                if (file_exists($configPath) && is_readable($configPath)) {
-                    $configContent = file_get_contents($configPath);
-                    $decodedConfig = json_decode($configContent);
+        $active_extensions_list = ACTIVE_EXTENSIONS;
+        $extensions_dir = __DIR__ . '/../extensions';
+        $found_extensions = [];
 
-                    if ($decodedConfig && isset($decodedConfig->featherIcon)) {
-                        $extensionDetails[] = [
-                            'name' => $extensionFolderName,
-                            'featherIcon' => $decodedConfig->featherIcon
+        // Scan the extensions directory for subdirectories.
+        if (is_dir($extensions_dir)) {
+            $subdirectories = glob($extensions_dir . '/*', GLOB_ONLYDIR);
+
+            foreach ($subdirectories as $dir) {
+                $extension_name = basename($dir);
+                $config_path = $dir . '/config.json';
+
+                // Check if the discovered extension is in the active list.
+                if (in_array($extension_name, $active_extensions_list) && file_exists($config_path)) {
+                    $config_content = file_get_contents($config_path);
+                    $config_data = json_decode($config_content, true);
+
+                    // If the config is valid and contains a featherIcon, add it to our list.
+                    if (json_last_error() === JSON_ERROR_NONE && isset($config_data['featherIcon'])) {
+                        $found_extensions[] = [
+                            'name' => $extension_name,
+                            'featherIcon' => $config_data['featherIcon']
                         ];
                     }
                 }
             }
-            return $extensionDetails;
         }
 
-        public function __construct(PDO $pdo) {
-        $this->pdo = $pdo;
-    }
-
-    public function getPropertyValue($entityType, $entityId, $propertyName) {
-        $table = $this->getTableForEntityType($entityType);
-        $idColumn = $this->getIdColumnForEntityType($entityType);
-        
-        $stmt = $this->pdo->prepare("SELECT value FROM Properties WHERE {$idColumn} = ? AND name = ?");
-        $stmt->execute([$entityId, $propertyName]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        return $result ? $result['value'] : null;
-    }
-
-    public function setPropertyValue($entityType, $entityId, $propertyName, $propertyValue) {
-        $table = $this->getTableForEntityType($entityType);
-        $idColumn = $this->getIdColumnForEntityType($entityType);
-        
-        // Check if property exists
-        $stmt = $this->pdo->prepare("SELECT id FROM Properties WHERE {$idColumn} = ? AND name = ?");
-        $stmt->execute([$entityId, $propertyName]);
-        $existing = $stmt->fetch();
-        
-        if ($existing) {
-            // Update existing property
-            $stmt = $this->pdo->prepare("UPDATE Properties SET value = ? WHERE {$idColumn} = ? AND name = ?");
-            $stmt->execute([$propertyValue, $entityId, $propertyName]);
-        } else {
-            // Insert new property
-            $stmt = $this->pdo->prepare("INSERT INTO Properties ({$idColumn}, name, value) VALUES (?, ?, ?)");
-            $stmt->execute([$entityId, $propertyName, $propertyValue]);
-        }
-        
-        return true;
-    }
-
-    public function deleteProperty($entityType, $entityId, $propertyName) {
-        $table = $this->getTableForEntityType($entityType);
-        $idColumn = $this->getIdColumnForEntityType($entityType);
-        
-        $stmt = $this->pdo->prepare("DELETE FROM Properties WHERE {$idColumn} = ? AND name = ?");
-        $stmt->execute([$entityId, $propertyName]);
-        
-        return true;
-    }
-
-    public function getAllProperties($entityType, $entityId) {
-        $table = $this->getTableForEntityType($entityType);
-        $idColumn = $this->getIdColumnForEntityType($entityType);
-        
-        $stmt = $this->pdo->prepare("SELECT name, value FROM Properties WHERE {$idColumn} = ?");
-        $stmt->execute([$entityId]);
-        $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $result = [];
-        foreach ($properties as $prop) {
-            $result[$prop['name']] = $prop['value'];
-        }
-        
-        return $result;
-    }
-
-    private function getTableForEntityType($entityType) {
-        $tables = [
-            'note' => 'Notes',
-            'page' => 'Pages'
-        ];
-        
-        return $tables[$entityType] ?? null;
-    }
-
-    private function getIdColumnForEntityType($entityType) {
-        $columns = [
-            'note' => 'note_id',
-            'page' => 'page_id'
-        ];
-        
-        return $columns[$entityType] ?? null;
-        }
+        return $found_extensions;
     }
 }
-
-// Initialize and handle the request
-$pdo = get_db_connection();
-$propertyUtils = new PropertyUtils($pdo); 

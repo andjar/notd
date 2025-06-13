@@ -1,29 +1,19 @@
-// Import UI module
-import { ui } from '../ui.js';
-
-// Import page management
+import { pagesAPI, searchAPI } from '../api_client.js';
 import { loadPage, fetchAndDisplayPages } from './page-loader.js';
+import { debounce, safeAddEventListener, decrypt } from '../utils.js';
+import { ui } from '../ui.js';
+import { getCurrentPagePassword } from './state.js';
 
-// Import utilities
-import { debounce, safeAddEventListener } from '../utils.js';
-
-// Import API clients
-import { searchAPI, pagesAPI } from '../api_client.js';
-
-// --- Variables ---
-let allPagesForSearch = [];
-let selectedSearchResultIndex = -1; // Specific to page search modal
-
-// --- Global Search Logic ---
+// --- Global Search (Sidebar) ---
 
 function highlightSearchTerms(text, searchTerm) {
     if (!searchTerm || !text) return text;
     const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, `<span class="search-result-highlight">$1</span>`);
+    return text.replace(regex, '<span class="search-result-highlight">$1</span>');
 }
 
 function displaySearchResults(results) {
-    const searchResultsEl = ui.domRefs.searchResults; // Use ui.domRefs
+    const searchResultsEl = ui.domRefs.searchResults;
     if (!searchResultsEl) return;
 
     if (!results || results.length === 0) {
@@ -32,44 +22,66 @@ function displaySearchResults(results) {
         return;
     }
 
-    const html = results.map(result => `
-        <div class="search-result-item" data-page-name="${result.page_name}" data-note-id="${result.note_id}">
-            <div class="search-result-title">${result.page_name}</div>
-            <div class="search-result-snippet">${highlightSearchTerms(result.content_snippet, ui.domRefs.globalSearchInput.value)}</div>
-        </div>
-    `).join('');
+    const html = results.map(result => {
+        let snippet = result.content_snippet;
+        let isEncrypted = false;
+
+        // Check if the page has an 'encrypted' property set to 'true'
+        if (result.properties && Array.isArray(result.properties.encrypted)) {
+            isEncrypted = result.properties.encrypted.some(p => String(p.value).toLowerCase() === 'true');
+        }
+
+        if (isEncrypted) {
+            const password = getCurrentPagePassword();
+            if (password) {
+                try {
+                    snippet = decrypt(snippet, password);
+                    if (snippet === null) {
+                        snippet = '[DECRYPTION FAILED]';
+                    }
+                } catch (e) {
+                    console.error('Failed to decrypt search result snippet:', e);
+                    snippet = '[DECRYPTION FAILED]';
+                }
+            } else {
+                snippet = '[ENCRYPTED CONTENT - Enter password to view]';
+            }
+        }
+
+        const encryptedIcon = isEncrypted ? '<i data-feather="lock" class="encrypted-icon"></i> ' : '';
+        
+        return `
+            <div class="search-result-item" data-page-name="${result.page_name}">
+                <div class="search-result-title">${encryptedIcon}${result.page_name}</div>
+                <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.globalSearchInput.value)}</div>
+            </div>
+        `;
+    }).join('');
 
     searchResultsEl.innerHTML = html;
     searchResultsEl.classList.add('has-results');
+
+    // Ensure Feather icons are rendered after new HTML is added
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
 
     searchResultsEl.addEventListener('click', (e) => {
         const resultItem = e.target.closest('.search-result-item');
         if (resultItem) {
             const pageName = resultItem.dataset.pageName;
-            const noteId = resultItem.dataset.noteId;
             
             if (ui.domRefs.globalSearchInput) ui.domRefs.globalSearchInput.value = '';
             searchResultsEl.classList.remove('has-results');
             searchResultsEl.innerHTML = '';
             
-            loadPage(pageName).then(() => {
-                if (noteId) {
-                    const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
-                    if (noteElement) {
-                        noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        const contentDiv = noteElement.querySelector('.note-content');
-                        if (contentDiv) {
-                            setTimeout(() => contentDiv.focus(), 100);
-                        }
-                    }
-                }
-            });
+            loadPage(pageName);
         }
     });
 }
 
 const debouncedSearch = debounce(async (query) => {
-    const searchResultsEl = ui.domRefs.searchResults; // Use ui.domRefs
+    const searchResultsEl = ui.domRefs.searchResults;
     if (!searchResultsEl) return;
 
     if (!query.trim()) {
@@ -79,7 +91,7 @@ const debouncedSearch = debounce(async (query) => {
     }
     
     try {
-        const response = await searchAPI.search(query); // Assumes searchAPI is global
+        const response = await searchAPI.search(query);
         if (response && Array.isArray(response.results)) {
             displaySearchResults(response.results);
         } else {
@@ -95,21 +107,22 @@ const debouncedSearch = debounce(async (query) => {
 
 export function initGlobalSearch() {
     if (ui.domRefs.globalSearchInput) {
-        safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => {
-            debouncedSearch(e.target.value);
-        }, 'globalSearchInput');
+        safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => debouncedSearch(e.target.value), 'globalSearchInput');
     }
 }
 
-// --- Page Search Modal Logic ---
+
+// --- Page Search Modal ---
+
+let allPagesForSearch = [];
+let selectedSearchResultIndex = -1;
 
 async function openSearchOrCreatePageModal() {
-    if (!ui.domRefs.pageSearchModal || !ui.domRefs.pageSearchModalInput || !ui.domRefs.pageSearchModalResults || !ui.domRefs.pageSearchModalCancel) {
-        console.error('Page search modal elements not found!');
-        return;
-    }
+    if (!ui.domRefs.pageSearchModal) return;
     try {
-        allPagesForSearch = await pagesAPI.getPages({ excludeJournal: true }); // Assumes pagesAPI is global
+        // **FIXED**: Destructure the `pages` array from the response object.
+        const { pages } = await pagesAPI.getPages({ excludeJournal: true, per_page: 5000 });
+        allPagesForSearch = pages || [];
     } catch (error) {
         console.error('Failed to fetch pages for search modal:', error);
         allPagesForSearch = []; 
@@ -121,10 +134,8 @@ async function openSearchOrCreatePageModal() {
 }
 
 function closeSearchOrCreatePageModal() {
-    if (ui.domRefs.pageSearchModal) {
-        ui.domRefs.pageSearchModal.classList.remove('active');
-    }
-    selectedSearchResultIndex = -1; 
+    if (ui.domRefs.pageSearchModal) ui.domRefs.pageSearchModal.classList.remove('active');
+    selectedSearchResultIndex = -1;
 }
 
 function renderPageSearchResults(query) {
@@ -132,11 +143,12 @@ function renderPageSearchResults(query) {
     ui.domRefs.pageSearchModalResults.innerHTML = '';
     selectedSearchResultIndex = -1; 
 
+    const lowerCaseQuery = query.toLowerCase();
     const filteredPages = allPagesForSearch.filter(page => 
-        page.name.toLowerCase().includes(query.toLowerCase())
+        page.name.toLowerCase().includes(lowerCaseQuery)
     );
 
-    filteredPages.forEach(page => {
+    filteredPages.slice(0, 10).forEach(page => {
         const li = document.createElement('li');
         li.textContent = page.name;
         li.dataset.pageName = page.name;
@@ -144,12 +156,12 @@ function renderPageSearchResults(query) {
         ui.domRefs.pageSearchModalResults.appendChild(li);
     });
 
-    const exactMatch = allPagesForSearch.some(page => page.name.toLowerCase() === query.toLowerCase());
+    const exactMatch = allPagesForSearch.some(page => page.name.toLowerCase() === lowerCaseQuery);
     if (query.trim() !== '' && !exactMatch) {
         const li = document.createElement('li');
         li.classList.add('create-new-option');
         li.innerHTML = `Create page: <span>"${query}"</span>`;
-        li.dataset.pageName = query; 
+        li.dataset.pageName = query;
         li.dataset.isCreate = 'true';
         li.addEventListener('click', () => selectAndActionPageSearchResult(query, true));
         ui.domRefs.pageSearchModalResults.appendChild(li);
@@ -165,7 +177,7 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
     closeSearchOrCreatePageModal();
     if (isCreate) {
         try {
-            const newPage = await pagesAPI.createPage(pageName); // Pass pageName directly as string
+            const newPage = await pagesAPI.createPage(pageName);
             if (newPage && newPage.id) {
                 await fetchAndDisplayPages(newPage.name); 
                 await loadPage(newPage.name, true); 
@@ -177,7 +189,7 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
             alert(`Error creating page: ${error.message}`);
         }
     } else {
-        await loadPage(pageName, true);
+        await loadPage(pageName);
     }
 }
 
@@ -190,13 +202,11 @@ export function initPageSearchModal() {
     }
 
     if (ui.domRefs.pageSearchModalInput) {
-        ui.domRefs.pageSearchModalInput.addEventListener('input', (e) => {
-            renderPageSearchResults(e.target.value);
-        });
+        ui.domRefs.pageSearchModalInput.addEventListener('input', (e) => renderPageSearchResults(e.target.value));
 
         ui.domRefs.pageSearchModalInput.addEventListener('keydown', (e) => {
             const items = ui.domRefs.pageSearchModalResults.children;
-            if (items.length === 0) return;
+            if (e.key !== 'Enter' && items.length === 0) return;
 
             switch (e.key) {
                 case 'ArrowDown':
@@ -217,11 +227,24 @@ export function initPageSearchModal() {
                     break;
                 case 'Enter':
                     e.preventDefault();
-                    if (selectedSearchResultIndex !== -1 && items[selectedSearchResultIndex]) {
+                    const pageName = ui.domRefs.pageSearchModalInput.value.trim();
+                    if (!pageName) {
+                        closeSearchOrCreatePageModal();
+                        return;
+                    }
+                    
+                    if (selectedSearchResultIndex > -1 && items[selectedSearchResultIndex]) {
                         const selectedItem = items[selectedSearchResultIndex];
-                        selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
-                    } else if (ui.domRefs.pageSearchModalInput.value.trim() !== '') {
-                        selectAndActionPageSearchResult(ui.domRefs.pageSearchModalInput.value.trim(), true);
+                        if (pageName.toLowerCase() === selectedItem.dataset.pageName.toLowerCase()) {
+                           selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
+                           return;
+                        }
+                    }
+                    const exactMatch = allPagesForSearch.find(p => p.name.toLowerCase() === pageName.toLowerCase());
+                    if (exactMatch) {
+                        selectAndActionPageSearchResult(exactMatch.name, false);
+                    } else {
+                        selectAndActionPageSearchResult(pageName, true);
                     }
                     break;
                 case 'Escape':
@@ -231,7 +254,6 @@ export function initPageSearchModal() {
         });
     }
 
-    // Global Ctrl+Space listener
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.code === 'Space') {
             e.preventDefault();

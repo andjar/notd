@@ -1,76 +1,125 @@
 <?php
-if (!defined('DB_PATH')) { define('DB_PATH', __DIR__ . '/db/database.sqlite'); }
-if (!defined('UPLOADS_DIR')) { define('UPLOADS_DIR', __DIR__ . '/uploads'); }
+
+// --- Core Paths and URLs ---
+if (!defined('DB_PATH')) {
+    define('DB_PATH', __DIR__ . '/db/database.sqlite');
+}
+if (!defined('UPLOADS_DIR')) {
+    define('UPLOADS_DIR', __DIR__ . '/uploads');
+}
 if (!defined('APP_BASE_URL')) {
-    define('APP_BASE_URL', ''); // Set this if your app is in a subdirectory, e.g., /notetaker
+    // Set this if your app is in a subdirectory, e.g., /notetaker
+    // For a root domain, leave it empty.
+    define('APP_BASE_URL', '');
 }
 
-define('ACTIVE_THEME', 'flatly'); // Defines the active theme file (e.g., 'default' for 'default.css')
-define('WEBHOOKS_ENABLED', true); // Option to disable webhooks
+// --- Application Features ---
+define('ACTIVE_THEME', 'flatly'); // Defines the active theme CSS file.
+define('WEBHOOKS_ENABLED', true); // Master switch to enable or disable all webhook dispatches.
 define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
-define('TASK_STATES', ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING']);
+define('TASK_STATES', ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING', 'CANCELLED']); // Allowed task states for the task status parser.
 
-// Property Visibility Configuration
-if (!defined('RENDER_INTERNAL_PROPERTIES')) {
-    define('RENDER_INTERNAL_PROPERTIES', false); // Default: true (internal properties are rendered)
-}
-if (!defined('SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE')) {
-    define('SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE', true); // Default: true (internal properties are visible as text in edit mode)
-}
+define('SPECIAL_STATE_WEIGHTS', [
+    'SQL' => 3,
+    'TASK' => 4,
+    'DONE_AT' => 3,
+    'TRANSCLUSION' => 3,
+    'LINK' => 3
+]);
 
-// Error reporting (for development)
+// --- Property System Configuration ---
+// This array defines the behavior of properties based on their 'weight', which
+// is determined by the number of colons used in the property syntax.
+// This configuration is primarily interpreted by the FRONTEND to control rendering.
+// The backend uses 'update_behavior' to manage how the Properties table is updated.
+define('PROPERTY_WEIGHTS', [
+    // Default Public Property (e.g., {key::value})
+    2 => [
+        'label' => 'Public',
+        'description' => 'Standard properties visible in all views.',
+        'update_behavior' => 'replace', // On update, the old value in the DB is replaced with the new one.
+        'visible_in_view_mode' => true,   // Frontend should show this in read-only views.
+        'visible_in_edit_mode' => true    // Frontend should show this in editable views.
+    ],
+    // Internal Property (e.g., {key:::value})
+    3 => [
+        'label' => 'Internal',
+        'description' => 'Properties for internal logic, hidden by default.',
+        'update_behavior' => 'replace', // Replace the value on update.
+        'visible_in_view_mode' => false,  // Changed from false to true
+        'visible_in_edit_mode' => true    // Frontend should SHOW this in editable views.
+    ],
+    // System/Log Property (e.g., {key::::value})
+    4 => [
+        'label' => 'System Log',
+        'description' => 'Properties that act as an immutable log or history.',
+        'update_behavior' => 'append',  // On update, a NEW row is added to the DB, preserving the old one.
+        'visible_in_view_mode' => false,  // Frontend should HIDE this in read-only views.
+        'visible_in_edit_mode' => false   // Frontend should HIDE this in editable views.
+    ]
+    // You can add more weights here, e.g., weight 5 for "Archived" properties.
+]);
+
+// --- Development and Debugging ---
+// WARNING: Do not use these settings in a production environment.
 ini_set('display_errors', 1); // Enable error display
 ini_set('display_startup_errors', 1); // Enable startup error display
-error_reporting(E_ALL); // Log all errors
+error_reporting(E_ALL); // Report all PHP errors
 
-// Timezone
-date_default_timezone_set('UTC'); // Or your preferred timezone
+// --- Timezone ---
+// Set a consistent timezone to avoid issues with DATETIME functions.
+date_default_timezone_set('UTC');
 
-// Set error handler to return JSON responses
+// --- Global Error and Exception Handling ---
+// These handlers ensure that if a fatal error occurs, the API returns a
+// structured JSON error response instead of a blank page or HTML error dump.
+
+// Set custom error handler
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // Respect the error_reporting level.
     if (!(error_reporting() & $errno)) {
-        // This error code is not included in error_reporting
         return false;
     }
-    
-    // Only handle errors if headers haven't been sent yet
+
+    // Only handle errors if headers haven't been sent yet.
     if (!headers_sent()) {
-        header('Content-Type: application/json', true, 500);
+        http_response_code(500);
+        header('Content-Type: application/json');
         echo json_encode([
-            'success' => false,
-            'error' => 'Internal Server Error',
+            'status' => 'error',
+            'message' => 'An internal server error occurred.',
             'details' => [
+                'type' => 'PHP Error',
                 'message' => $errstr,
                 'file' => $errfile,
-                'line' => $errline,
-                'type' => 'error',
-                'errno' => $errno
+                'line' => $errline
             ]
         ]);
     } else {
-        // Log the error if we can't send JSON
+        // Log the error if we can't send JSON.
         error_log("PHP Error: [$errno] $errstr in $errfile on line $errline");
     }
     exit(1);
 });
 
-// Set exception handler to return JSON responses
+// Set custom exception handler
 set_exception_handler(function($e) {
     if (!headers_sent()) {
-        header('Content-Type: application/json', true, 500);
+        http_response_code(500);
+        header('Content-Type: application/json');
         echo json_encode([
-            'success' => false,
-            'error' => 'Internal Server Error',
+            'status' => 'error',
+            'message' => 'An uncaught exception occurred.',
             'details' => [
+                'type' => get_class($e),
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'type' => 'exception',
-                'trace' => $e->getTraceAsString()
+                'trace' => explode("\n", $e->getTraceAsString()) // More JSON-friendly trace
             ]
         ]);
     } else {
-        // Log the exception if we can't send JSON
+        // Log the exception if we can't send JSON.
         error_log("Uncaught Exception: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
     }
     exit(1);

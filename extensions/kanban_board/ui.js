@@ -159,10 +159,7 @@ export function displayKanbanBoard(containerElement, notes) {
                 }
                 const newStatus = targetColumnEl.dataset.statusMatcher; // e.g. "doing"
 
-                // console.log(`Card moved: Note ID ${noteId}, From Status: ${oldStatus}, To Status: ${newStatus}`);
-
                 if (newStatus === oldStatus && evt.oldIndex === evt.newIndex && evt.from === evt.to) {
-                     // console.log('No actual change in status or order within the same column.');
                     return;
                 }
 
@@ -188,53 +185,66 @@ export function displayKanbanBoard(containerElement, notes) {
                 if (match) {
                     const newStatusUpper = newStatus.toUpperCase();
                     // Replace prefix and keep the rest of the content
-                    newContent = newStatusUpper + ": " + note.content.substring(match[0].length);
+                    newContent = newStatusUpper + " " + note.content.substring(match[0].length);
+                } else if (oldStatus !== newStatus) { // If no prefix matched and status changed
+                    const newStatusUpper = newStatus.toUpperCase();
+                    newContent = newStatusUpper + " " + note.content;
                 }
                 
-                console.log(`Updating note ${noteId}: from status '${oldStatus}' to '${newStatus}'.`);
+                console.log(`Updating note ${noteId}: from status '${oldStatus}' to '${newStatus}'. New content will be: "${newContent}"`);
 
                 try {
-                    if (!notesAPI || typeof notesAPI.updateNote !== 'function') {
-                        console.error('notesAPI.updateNote is not available. Cannot save changes.');
+                    if (!notesAPI || typeof notesAPI.batchUpdateNotes !== 'function') {
+                        console.error('notesAPI.batchUpdateNotes is not available. Cannot save changes.');
                         alert('Error: Cannot save changes to the server. API is not configured.');
                         evt.from.appendChild(itemEl); // Revert
                         return;
                     }
 
-                    const updatePayload = {
-                        properties_explicit: {
-                            status: newStatus 
+                    // Use batch operations to update the note
+                    const batchOperation = {
+                        type: 'update',
+                        payload: {
+                            id: parseInt(noteId),
+                            content: newContent
                         }
                     };
 
-                    if (newContent !== note.content) {
-                        updatePayload.content = newContent;
-                    }
-
-                    await notesAPI.updateNote(parseInt(noteId), updatePayload);
+                    const response = await notesAPI.batchUpdateNotes([batchOperation]);
                     
-                    // Update local note object
-                    if (!note.properties) {
-                        note.properties = {};
+                    if (response.status === 'success' && response.data && response.data.results) {
+                        const updateResult = response.data.results.find(r => r.type === 'update' && r.note && r.note.id === parseInt(noteId));
+                        if (updateResult && updateResult.status === 'success') {
+                            // Update local note object with the server response
+                            const updatedNote = updateResult.note;
+                            notesById.set(String(noteId), updatedNote);
+                            
+                            // Update card's dataset for future drags
+                            itemEl.dataset.currentStatus = newStatus;
+                            
+                            // Update card content visually
+                            itemEl.innerHTML = updatedNote.content;
+                            
+                            console.log(`Note ${noteId} updated successfully to status ${newStatus} with new content.`);
+                        } else {
+                            throw new Error('Update operation did not return success status');
+                        }
+                    } else {
+                        throw new Error('Batch operation did not return success status');
                     }
-                    note.properties.status = newStatus; 
-                    if (newContent !== note.content) {
-                        note.content = newContent;
-                        itemEl.innerHTML = newContent; // Update card content visually
-                    }
-                    notesById.set(String(noteId), note); // Update the map entry
-
-                    // Update card's dataset for future drags
-                    itemEl.dataset.currentStatus = newStatus;
-                    
-                    console.log(`Note ${noteId} updated successfully to status ${newStatus}.`);
 
                 } catch (error) {
-                    console.error(`Failed to update note ${noteId} (status to ${newStatus}) via API:`, error);
-                    // Attempt to get some part of the content for the alert, assuming itemEl.textContent is simple
+                    console.error(`Failed to update note ${noteId} (content to "${newContent}") via API:`, error);
+                    // Attempt to get some part of the content for the alert
                     const cardContentPreview = itemEl.textContent.trim().substring(0,20);
                     alert(`Error updating task "${cardContentPreview}...". Please check console and refresh.`);
-                    evt.from.appendChild(itemEl); 
+                    // Revert optimistic UI changes if API call fails
+                    note.content = notesById.get(String(noteId)).content; // Revert content change
+                    itemEl.innerHTML = note.content; // Revert visual change
+                    if (note.properties) note.properties.status = oldStatus; // Revert status if it was changed
+                    itemEl.dataset.currentStatus = oldStatus; // Revert dataset
+
+                    evt.from.appendChild(itemEl); // Send item back to original column
                 }
             }
         });

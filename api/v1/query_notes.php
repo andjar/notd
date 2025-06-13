@@ -1,62 +1,26 @@
 <?php
 /**
  * Query Notes API - Enhanced to support property-based queries
- * 
- * This API allows executing safe, predefined SQL queries to find notes by various criteria.
- * 
- * Allowed Query Patterns:
- * 1. Direct Notes table queries:
- *    SELECT id FROM Notes WHERE [conditions]
- *    
- * 2. Notes with Properties JOIN:
- *    SELECT [DISTINCT] N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE [conditions]
- *    
- * 3. Notes with Properties subquery:
- *    SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE [conditions])
- *    
- * Example Usage:
- * - Find notes with a specific property: 
- *   SELECT DISTINCT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'status' AND P.value = 'TODO'
- *   
- * - Find notes with any property starting with 'tag::':
- *   SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE name LIKE 'tag::%')
- *   
- * - Find notes on a specific page with properties:
- *   SELECT DISTINCT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE N.page_id = 1 AND P.name = 'priority'
- *   
- * Security: Only SELECT queries are allowed, limited to Notes, Properties, and Pages tables.
+ * This API allows executing safe, predefined SQL queries to find notes.
  */
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
-require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
-
-// header('Content-Type: application/json'); // Will be handled by ApiResponse
+require_once __DIR__ . '/../response_utils.php';
+require_once __DIR__ . '/../data_manager.php';
 
 $pdo = get_db_connection();
 $input = json_decode(file_get_contents('php://input'), true);
 
-// Validate required and optional parameters
 if (!isset($input['sql_query'])) {
     ApiResponse::error('Missing sql_query parameter.', 400);
-    exit;
 }
 
-// Set default pagination values
-$page = isset($input['page']) ? max(1, intval($input['page'])) : 1;
-$perPage = isset($input['per_page']) ? max(1, min(100, intval($input['per_page']))) : 20;
-$includeProperties = isset($input['include_properties']) ? (bool)$input['include_properties'] : false;
-
-$sqlQuery = trim($input['sql_query']);
-
 // --- SQL Validation ---
-
-// Security Check 1: Basic Structure
-// Allow multiple query patterns for Notes and Properties
+$sqlQuery = trim($input['sql_query']);
 $allowedPatterns = [
-    '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+/i',  // Original pattern
-    '/^SELECT\s+DISTINCT\s+N\.id\s+FROM\s+Notes\s+N\s+JOIN\s+Properties\s+P\s+ON\s+N\.id\s*=\s*P\.note_id\s+WHERE\s+/i', // JOIN with Properties
-    '/^SELECT\s+N\.id\s+FROM\s+Notes\s+N\s+JOIN\s+Properties\s+P\s+ON\s+N\.id\s*=\s*P\.note_id\s+WHERE\s+/i', // JOIN without DISTINCT
-    '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+id\s+IN\s*\(\s*SELECT\s+note_id\s+FROM\s+Properties\s+WHERE\s+/i' // Subquery pattern
+    '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+/i',
+    '/^SELECT\s+(DISTINCT\s+)?N\.id\s+FROM\s+Notes\s+N\s+JOIN\s+Properties\s+P\s+ON\s+N\.id\s*=\s*P\.note_id\s+WHERE\s+/i',
+    '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+id\s+IN\s*\(\s*SELECT\s+note_id\s+FROM\s+Properties\s+WHERE\s+/i'
 ];
 
 $patternMatched = false;
@@ -68,148 +32,86 @@ foreach ($allowedPatterns as $pattern) {
 }
 
 if (!$patternMatched) {
-    ApiResponse::error('Query must be one of the allowed patterns: SELECT id FROM Notes WHERE..., SELECT [DISTINCT] N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE..., or SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE...). Invalid query: ' . substr($sqlQuery, 0, 100), 400);
-    exit;
+    ApiResponse::error('Query must be one of the allowed patterns.', 400);
 }
 
-// Security Check 2: Forbidden Keywords/Characters
-$forbiddenKeywords = [
-    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'EXEC', 
-    'CREATE', 'UNION', 'ATTACH', 'DETACH', 'HANDLER', 'CALL', 'LOCK', 'REPLACE'
-    // Leaving out 'SELECT' from this list as it's part of the allowed prefix, but context is important.
-    // 'INTO', 'VALUES' might be part of subqueries or specific functions, but for now, let's be strict.
-];
-// Also check for '--' and '/*' to prevent comments that could hide malicious code
-$forbiddenPatterns = [
-    '/\b(' . implode('|', $forbiddenKeywords) . ')\b/i', // Whole word match for keywords
-    '/--/', // SQL comment
-    '/\/\*/', // SQL block comment start
-    '/\*\//'  // SQL block comment end
-];
-
-// Check for semicolons not at the very end of the query
-if (strpos($sqlQuery, ';') !== false && strpos($sqlQuery, ';') !== strlen($sqlQuery) - 1) {
-    ApiResponse::error('Semicolons are only allowed at the very end of the query.', 400);
-    exit;
-}
-// Remove trailing semicolon if present, for consistency before further checks
-if (substr($sqlQuery, -1) === ';') {
-    $sqlQuery = substr($sqlQuery, 0, -1);
+if (strpos($sqlQuery, ';') !== false) {
+    ApiResponse::error('Query must not contain semicolons.', 400);
 }
 
-foreach ($forbiddenPatterns as $pattern) {
-    if (preg_match($pattern, $sqlQuery)) {
-        ApiResponse::error('Query contains forbidden SQL keywords/characters or comments. Pattern: ' . $pattern, 400);
-        exit;
+$forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'EXEC', 'CREATE', 'ATTACH', 'DETACH'];
+foreach ($forbiddenKeywords as $keyword) {
+    if (preg_match('/\b' . $keyword . '\b/i', $sqlQuery)) {
+        ApiResponse::error('Query contains forbidden SQL keywords.', 400);
     }
 }
 
-// Security Check 3: Table/Column Validation
-// Ensure only allowed tables and columns are referenced
-$allowedTables = ['Notes', 'Properties', 'Pages'];
-$allowedNotesColumns = ['id', 'content', 'page_id', 'parent_note_id', 'created_at', 'updated_at', 'order_index', 'collapsed', 'internal', 'active'];
-$allowedPropertiesColumns = ['note_id', 'page_id', 'name', 'value', 'internal', 'active', 'created_at', 'updated_at'];
-$allowedPagesColumns = ['id', 'name', 'alias', 'active', 'created_at', 'updated_at'];
-
-// Basic table reference validation (prevent access to unauthorized tables)
-// This regex looks for table names that are not in our allowed list
-if (preg_match('/\bFROM\s+(?!(?:Notes|Properties|Pages)\b)\w+/i', $sqlQuery) ||
-    preg_match('/\bJOIN\s+(?!(?:Notes|Properties|Pages)\b)\w+/i', $sqlQuery)) {
-    ApiResponse::error('Query references unauthorized tables. Only Notes, Properties, and Pages are allowed.', 400);
-    exit;
+// Check for allowed columns to prevent data leakage from other columns.
+// This is a simple text-based check and not a full AST parser, but provides a good layer of security.
+$allowedColumnsRegex = '/\b(N|P|Notes|Properties)\.(id|content|page_id|parent_note_id|created_at|updated_at|order_index|collapsed|active|note_id|name|value|weight)\b/i';
+$strippedQuery = preg_replace($allowedColumnsRegex, '', $sqlQuery);
+if (preg_match('/(N|P|Notes|Properties)\.\w+/', $strippedQuery)) {
+     ApiResponse::error('Query references unauthorized columns.', 400);
 }
+
 
 // --- Query Execution ---
 try {
-    // Step 1: Execute the provided query to get total count and paginated note IDs
-    // First, get total count by wrapping the original query
-    $countQuery = "SELECT COUNT(*) FROM (" . $sqlQuery . ") as count_query";
-    $stmtCount = $pdo->prepare($countQuery);
-    $stmtCount->execute();
-    $totalCount = (int)$stmtCount->fetchColumn();
-
-    // Calculate pagination
-    $totalPages = ceil($totalCount / $perPage);
+    $page = max(1, intval($input['page'] ?? 1));
+    $perPage = max(1, min(100, intval($input['per_page'] ?? 20)));
+    $includeProperties = (bool)($input['include_properties'] ?? true);
     $offset = ($page - 1) * $perPage;
 
-    // Modify the original query to include LIMIT and OFFSET
-    // We need to handle different query patterns
-    if (preg_match('/^SELECT\s+DISTINCT\s+N\.id\s+FROM\s+Notes\s+N\s+JOIN/i', $sqlQuery)) {
-        // For JOIN queries, we need to wrap in a subquery to apply pagination
-        $sqlQuery = "SELECT id FROM (" . $sqlQuery . ") as paginated_query LIMIT ? OFFSET ?";
-    } else {
-        // For simple queries, we can just append LIMIT and OFFSET
-        $sqlQuery .= " LIMIT ? OFFSET ?";
-    }
+    // Get total count by wrapping the user's query
+    $countQuery = "SELECT COUNT(*) FROM (" . $sqlQuery . ") as count_query";
+    $totalCount = (int)$pdo->query($countQuery)->fetchColumn();
+    $totalPages = ceil($totalCount / $perPage);
 
-    $stmtGetIds = $pdo->prepare($sqlQuery);
+    // Get the paginated list of note IDs
+    $paginatedQuery = $sqlQuery . " LIMIT ? OFFSET ?";
+    $stmtGetIds = $pdo->prepare($paginatedQuery);
     $stmtGetIds->execute([$perPage, $offset]);
     $noteIds = $stmtGetIds->fetchAll(PDO::FETCH_COLUMN, 0);
 
     if (empty($noteIds)) {
-        ApiResponse::success([
-            'data' => [],
-            'pagination' => [
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total_count' => $totalCount,
-                'total_pages' => $totalPages
-            ]
-        ]);
+        ApiResponse::success(
+            [], 200, ['pagination' => ['current_page' => $page, 'per_page' => $perPage, 'total_items' => $totalCount, 'total_pages' => $totalPages]]
+        );
         exit;
     }
 
-    // Step 2: Fetch full note data for the retrieved IDs
+    // Fetch full note data for the retrieved IDs
     $placeholders = implode(',', array_fill(0, count($noteIds), '?'));
     $sqlFetchNotes = "SELECT * FROM Notes WHERE id IN ({$placeholders})";
-    
     $stmtFetchNotes = $pdo->prepare($sqlFetchNotes);
     $stmtFetchNotes->execute($noteIds);
     $notes = $stmtFetchNotes->fetchAll(PDO::FETCH_ASSOC);
 
-    // Step 3: If properties are requested, fetch them for all notes
+    // If properties are requested, fetch and format them using the DataManager
     if ($includeProperties && !empty($notes)) {
-        $sqlFetchProperties = "SELECT * FROM Properties WHERE note_id IN ({$placeholders})";
-        $stmtFetchProperties = $pdo->prepare($sqlFetchProperties);
-        $stmtFetchProperties->execute($noteIds);
-        $properties = $stmtFetchProperties->fetchAll(PDO::FETCH_ASSOC);
+        $dataManager = new DataManager($pdo);
+        // Pass 'true' to include properties that are normally hidden in view mode
+        $propertiesByNoteId = $dataManager->getPropertiesForNoteIds($noteIds, true);
 
-        // Group properties by note_id
-        $propertiesByNoteId = [];
-        foreach ($properties as $property) {
-            $noteId = $property['note_id'];
-            if (!isset($propertiesByNoteId[$noteId])) {
-                $propertiesByNoteId[$noteId] = [];
-            }
-            $propertiesByNoteId[$noteId][] = $property;
-        }
-
-        // Attach properties to their respective notes
         foreach ($notes as &$note) {
             $note['properties'] = $propertiesByNoteId[$note['id']] ?? [];
         }
     }
 
-    ApiResponse::success([
-        'data' => $notes,
-        'pagination' => [
-            'current_page' => $page,
-            'per_page' => $perPage,
-            'total_count' => $totalCount,
-            'total_pages' => $totalPages
+    ApiResponse::success(
+        $notes,
+        200,
+        [
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total_items' => $totalCount,
+                'total_pages' => $totalPages
+            ]
         ]
-    ]);
+    );
 
 } catch (PDOException $e) {
-    // Log the detailed error to server logs for debugging
-    error_log("Database error in query_notes.php: " . $e->getMessage());
-    error_log("Offending SQL (potentially): " . $sqlQuery);
-
-    // Provide a generic error message to the client
-    ApiResponse::error('A database error occurred.', 500);
-} catch (Exception $e) {
-    error_log("General error in query_notes.php: " . $e->getMessage());
-    ApiResponse::error('An unexpected error occurred.', 500);
+    error_log("Database error in query_notes.php: " . $e->getMessage() . " SQL: " . $sqlQuery);
+    ApiResponse::error('A database error occurred during query execution.', 500);
 }
-
-?>

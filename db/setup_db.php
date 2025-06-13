@@ -8,7 +8,7 @@ if (!function_exists('log_setup_local')) {
 }
 
 /**
- * Runs the entire database schema and initial data setup.
+ * Runs the entire database schema setup.
  * This function requires a valid PDO connection to be passed to it.
  *
  * @param PDO $pdo The database connection object.
@@ -21,31 +21,13 @@ function run_database_setup(PDO $pdo) {
             throw new Exception("Could not read schema.sql file.");
         }
 
-        log_setup_local("Applying database schema...");
+        log_setup_local("Applying database schema from schema.sql...");
         
         $pdo->beginTransaction();
         try {
-            // Remove comments and execute statements one by one.
-            $schemaSql = preg_replace('/--.*$/m', '', $schemaSql);
-            $triggers = [];
-            $schemaWithoutTriggers = preg_replace_callback(
-                '/(CREATE TRIGGER.*?END;)/si',
-                function($matches) use (&$triggers) {
-                    $triggers[] = trim($matches[0]);
-                    return ''; // Remove trigger from main SQL string
-                },
-                $schemaSql
-            );
-            $statements = explode(';', $schemaWithoutTriggers);
-            
-            foreach ($statements as $statement) {
-                if (!empty(trim($statement))) {
-                    $pdo->exec($statement);
-                }
-            }
-            foreach ($triggers as $trigger) {
-                $pdo->exec($trigger);
-            }
+            // The 'exec' command can handle multiple statements separated by semicolons.
+            // This is simpler and more robust for applying a full schema.
+            $pdo->exec($schemaSql);
             
             $pdo->commit();
             log_setup_local("Database schema applied successfully.");
@@ -54,30 +36,6 @@ function run_database_setup(PDO $pdo) {
             log_setup_local("Database setup failed during schema application: " . $e->getMessage());
             throw $e;
         }
-
-        // Apply property definitions to existing properties
-        log_setup_local("Applying property definitions to existing properties...");
-        $stmt = $pdo->prepare("SELECT name, internal FROM PropertyDefinitions WHERE auto_apply = 1");
-        $stmt->execute();
-        $definitions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $totalUpdated = 0;
-        foreach ($definitions as $definition) {
-            $updateStmt = $pdo->prepare("UPDATE Properties SET internal = ? WHERE name = ? AND internal != ?");
-            $updateStmt->execute([$definition['internal'], $definition['name'], $definition['internal']]);
-            $updated = $updateStmt->rowCount();
-            $totalUpdated += $updated;
-            if ($updated > 0) {
-                log_setup_local("Applied '{$definition['name']}' definition to {$updated} properties");
-            }
-        }
-        
-        if ($totalUpdated === 0) {
-            log_setup_local("No existing properties needed updating");
-        } else {
-            log_setup_local("Total properties updated: {$totalUpdated}");
-        }
-
         log_setup_local("Database setup completed successfully!");
 
     } catch (Exception $e) {
