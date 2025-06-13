@@ -2,6 +2,7 @@ import { pagesAPI, searchAPI } from '../api_client.js';
 import { loadPage, fetchAndDisplayPages } from './page-loader.js';
 import { debounce, safeAddEventListener, decrypt } from '../utils.js';
 import { ui } from '../ui.js';
+import { getCurrentPagePassword } from './state.js';
 
 // --- Global Search (Sidebar) ---
 
@@ -31,9 +32,10 @@ function displaySearchResults(results) {
         }
 
         if (isEncrypted) {
-            if (window.decryptionPassword) {
+            const password = getCurrentPagePassword();
+            if (password) {
                 try {
-                    snippet = decrypt(snippet, window.decryptionPassword);
+                    snippet = decrypt(snippet, password);
                     if (snippet === null) {
                         snippet = '[DECRYPTION FAILED]';
                     }

@@ -167,24 +167,11 @@ function renderNote(note, nestingLevel = 0) {
     contentEl.dataset.placeholder = 'Type to add content...';
     contentEl.dataset.noteId = note.id;
 
-    // Modified logic for dataset.rawContent initialization
-    let effectiveContentForDataset = note.content || '';
-    if (window.decryptionPassword && (note.content || '').trim()) {
-        try {
-            // Check if it's potentially encrypted (SJCL usually produces JSON strings)
-            if (note.content.startsWith('{') && note.content.endsWith('}')) {
-                JSON.parse(note.content); // Verify it's valid JSON
-                const decrypted = sjcl.decrypt(window.decryptionPassword, note.content);
-                effectiveContentForDataset = decrypted;
-            }
-        } catch (e) {
-            // Not encrypted with current key, or not valid SJCL/JSON format
-            // Use original content for dataset.rawContent
-        }
-    }
-    contentEl.dataset.rawContent = effectiveContentForDataset;
+    // contentEl.dataset.rawContent should be plaintext if decrypted by page-loader.js
+    contentEl.dataset.rawContent = note.content || '';
 
     if (note.content && note.content.trim()) {
+        // Pass note.content directly, which is now plaintext if it was decrypted
         contentEl.innerHTML = parseAndRenderContent(note.content);
         if (typeof feather !== 'undefined') {
             feather.replace({ width: '18px', height: '18px' });
@@ -650,28 +637,8 @@ function switchToRenderedMode(contentEl) {
  * @returns {string} HTML string for display
  */
 function parseAndRenderContent(rawContent) {
-    if (window.decryptionPassword && rawContent && typeof rawContent === 'string') {
-        try {
-            // Attempt to parse rawContent as JSON, as SJCL encrypted strings are JSON strings.
-            // If it's not JSON, it's likely not an encrypted string or it's corrupted.
-            JSON.parse(rawContent); // This will throw an error if rawContent is not valid JSON
-
-            const decrypted = sjcl.decrypt(window.decryptionPassword, rawContent);
-            if (decrypted) {
-                rawContent = decrypted; // Use decrypted content for the rest of the function
-                // console.log('Note content decrypted successfully.');
-            } else {
-                // This case might not be hit if sjcl.decrypt throws an error for non-encrypted content.
-                // console.warn('Decryption returned empty, content might not be encrypted or is corrupted.');
-            }
-        } catch (e) {
-            // This error means sjcl.decrypt failed, or rawContent was not valid JSON.
-            // It's likely the content was not encrypted or was encrypted with a different key/format.
-            // We should proceed with the original rawContent (which will appear as ciphertext or plain text).
-            // console.warn('Decryption failed or content not encrypted:', e.message);
-            // console.warn('Original rawContent:', rawContent.substring(0, 100) + "..."); // Log a snippet
-        }
-    }
+    // rawContent is now assumed to be plaintext if it was meant to be decrypted.
+    // Decryption is handled by page-loader.js before this function is called.
     let html = rawContent || '';
 
     // Handle task markers with checkboxes - don't show the TODO/DONE prefix in content

@@ -124,6 +124,9 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                 </h1>
                 <div id="page-properties-container" class="page-properties-inline"></div>
             </div>
+            <div id="page-content" class="page-content">
+                <!-- Page content will be rendered here -->
+            </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner">
                 <!-- Notes will be rendered here by JavaScript -->

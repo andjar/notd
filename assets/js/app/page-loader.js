@@ -158,11 +158,25 @@ async function handleCreateAndFocusFirstNote() {
 }
 
 async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
+    console.log('[DEBUG] Starting _renderPageContent with:', { 
+        pageName: pageData.name, 
+        hasNotes: Boolean(pageData.notes?.length),
+        hasProperties: Boolean(pageProperties),
+        focusFirstNote 
+    });
+
     const pageContentDiv = ui.domRefs.pageContent;
     const pageTitleDiv = ui.domRefs.pageTitle;
     const pagePropertiesContainer = ui.domRefs.pagePropertiesContainer;
 
-    if (!pageContentDiv || !pageTitleDiv || !pagePropertiesContainer) return;
+    if (!pageContentDiv || !pageTitleDiv || !pagePropertiesContainer) {
+        console.error('[DEBUG] Missing required DOM elements:', { 
+            hasPageContent: Boolean(pageContentDiv),
+            hasPageTitle: Boolean(pageTitleDiv),
+            hasPropertiesContainer: Boolean(pagePropertiesContainer)
+        });
+        return;
+    }
 
     // Set page title
     pageTitleDiv.textContent = pageData.name;
@@ -176,21 +190,37 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
 
     // Render notes
     if (pageData.notes && pageData.notes.length > 0) {
+        console.log('[DEBUG] Processing notes for rendering:', { 
+            noteCount: pageData.notes.length,
+            hasEncryptProperty: Boolean(pageProperties.encrypt)
+        });
+
         let notesToRender = pageData.notes;
         const pageEncryptProperty = pageProperties.encrypt && Array.isArray(pageProperties.encrypt) && pageProperties.encrypt.length > 0
             ? pageProperties.encrypt[0]
             : null;
 
         if (pageEncryptProperty) {
+            console.log('[DEBUG] Page has encryption property:', { 
+                hasValue: Boolean(pageEncryptProperty.value),
+                valueLength: pageEncryptProperty.value?.length
+            });
+
             let password = getCurrentPagePassword();
             const pageHash = pageEncryptProperty.value;
 
             if (!password) {
+                console.log('[DEBUG] No stored password, prompting user');
                 try {
                     password = await promptForPagePassword();
+                    console.log('[DEBUG] Password received from prompt');
                     const passwordHash = sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(password));
 
                     if (passwordHash !== pageHash) {
+                        console.error('[DEBUG] Password hash mismatch:', {
+                            providedHash: passwordHash,
+                            expectedHash: pageHash
+                        });
                         alert("Wrong password!");
                         setCurrentPagePassword(null);
                         pageContentDiv.innerHTML = '<p>Decryption failed: Incorrect password.</p>';
@@ -198,9 +228,10 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                         ui.displayNotes([], currentPageId);
                         return; // Stop rendering
                     }
+                    console.log('[DEBUG] Password verified, setting current password');
                     setCurrentPagePassword(password);
                 } catch (error) {
-                    console.error("Password prompt cancelled or failed.", error);
+                    console.error("[DEBUG] Password prompt failed:", error);
                     pageContentDiv.innerHTML = '<p>Password entry cancelled. Cannot display page.</p>';
                     setNotesForCurrentPage([]);
                     ui.displayNotes([], currentPageId);
@@ -212,6 +243,10 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
             const currentPasswordHash = currentPassword ? sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(currentPassword)) : null;
 
             if (currentPasswordHash !== pageHash) {
+                console.error('[DEBUG] Stored password hash mismatch:', {
+                    storedHash: currentPasswordHash,
+                    expectedHash: pageHash
+                });
                 setCurrentPagePassword(null);
                 pageContentDiv.innerHTML = '<p>Decryption failed: Stored password is incorrect for this page. Please reload.</p>';
                 setNotesForCurrentPage([]);
@@ -220,30 +255,39 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
             }
 
             // Decrypt notes
-            try {
-                notesToRender = notesToRender.map(note => {
-                    if (note.is_encrypted) {
-                        return { ...note, content: decrypt(currentPassword, note.content) };
+            console.log('[DEBUG] Starting note decryption');
+            const decryptedNotes = [];
+            let decryptionErrorOccurred = false;
+            for (const note of notesToRender) {
+                if (note.is_encrypted && note.content) {
+                    try {
+                        console.log('[DEBUG] Decrypting note:', { noteId: note.id });
+                        const decryptedContent = decrypt(currentPassword, note.content);
+                        decryptedNotes.push({ ...note, content: decryptedContent, is_encrypted: false });
+                    } catch (e) {
+                        console.error(`[DEBUG] Decryption failed for note ${note.id}:`, e);
+                        decryptedNotes.push({ ...note, content: "[DECRYPTION FAILED]", is_corrupted: true });
+                        decryptionErrorOccurred = true;
                     }
-                    return note;
-                });
-            } catch (error) {
-                console.error("Decryption failed for one or more notes:", error);
-                alert("Decryption failed. The password may be incorrect or the data corrupted.");
-                setCurrentPagePassword(null);
-                pageContentDiv.innerHTML = '<p>Decryption failed. Data may be corrupted.</p>';
-                setNotesForCurrentPage([]);
-                ui.displayNotes([], currentPageId);
-                return;
+                } else {
+                    decryptedNotes.push(note);
+                }
             }
+            notesToRender = decryptedNotes;
+            console.log('[DEBUG] Note decryption complete:', { 
+                totalNotes: notesToRender.length,
+                decryptionErrors: decryptionErrorOccurred
+            });
         }
         
+        console.log('[DEBUG] Setting notes for current page and displaying');
         setNotesForCurrentPage(notesToRender);
         ui.displayNotes(notesToRender, currentPageId);
         if (focusFirstNote && pageData.notes[0]) {
             handleNoteAction('focus', pageData.notes[0].id);
         }
     } else {
+        console.log('[DEBUG] No notes to render');
         setNotesForCurrentPage([]);
         ui.displayNotes([], currentPageId); // Clear notes view
         if (focusFirstNote) {
@@ -251,12 +295,15 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
         }
     }
 
+    console.log('[DEBUG] Rendering additional page elements');
     displayBacklinks(pageData.name);
     displayChildPages(pageData.name);
     handleTransclusions();
     handleSqlQueries();
     
+    console.log('[DEBUG] Starting prefetch of linked pages');
     prefetchLinkedPagesData();
+    console.log('[DEBUG] _renderPageContent complete');
 }
 
 async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {

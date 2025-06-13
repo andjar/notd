@@ -2,6 +2,8 @@
 
 export const domRefs = {
     notesContainer: document.getElementById('notes-container'),
+    pageContent: document.getElementById('page-content'),
+    pageTitle: document.getElementById('page-title'),
     pagePropertiesContainer: document.getElementById('page-properties-container'),
     pageListContainer: document.getElementById('page-list'),
     addRootNoteBtn: document.getElementById('add-root-note-btn'),
@@ -11,7 +13,6 @@ export const domRefs = {
     rightSidebar: document.getElementById('right-sidebar'),
     globalSearchInput: document.getElementById('global-search-input'),
     searchResults: document.getElementById('search-results'),
-    pageTitleContainer: document.getElementById('page-title'),
     noteFocusBreadcrumbsContainer: document.getElementById('note-focus-breadcrumbs-container'),
     // **FIX**: Corrected the ID to match the HTML
     extensionIconsContainer: document.getElementById('extension-icons-container'),

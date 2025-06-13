@@ -3501,3 +3501,17 @@ ul.child-page-list li:last-child {
     border-radius: var(--ls-border-radius-medium);
     padding: var(--ls-space-3);
 }
+
+/* Page Content */
+.page-content {
+    margin: var(--ls-space-4) 0;
+    padding: var(--ls-space-4);
+    background-color: var(--ls-primary-background-color);
+    border-radius: var(--ls-border-radius-medium);
+    border: 1px solid var(--ls-border-color);
+    min-height: 100px;
+}
+
+.page-content:empty {
+    display: none;
+}
