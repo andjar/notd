@@ -98,6 +98,11 @@ class DataManager {
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($note) {
+            // Check for attachments
+            $attachmentStmt = $this->pdo->prepare("SELECT EXISTS(SELECT 1 FROM Attachments WHERE note_id = :note_id AND active = 1 LIMIT 1)");
+            $attachmentStmt->execute([':note_id' => $noteId]);
+            $note['has_attachments'] = (bool) $attachmentStmt->fetchColumn();
+
             $note['properties'] = $this->getNoteProperties($noteId, $includeInternal);
         }
         return $note ?: null;
@@ -108,7 +113,19 @@ class DataManager {
      * Retrieves all notes for a page, with properties embedded.
      */
     public function getNotesByPageId(int $pageId, bool $includeInternal = false): array {
-        $notesStmt = $this->pdo->prepare("SELECT * FROM Notes WHERE page_id = :pageId AND active = 1 ORDER BY order_index ASC");
+        // First check if the active column exists
+        $checkColumnStmt = $this->pdo->query("PRAGMA table_info(Notes)");
+        $columns = $checkColumnStmt->fetchAll(PDO::FETCH_COLUMN, 1);
+        $hasActiveColumn = in_array('active', $columns);
+
+        // Build the SQL query based on whether active column exists
+        $sql = "SELECT * FROM Notes WHERE page_id = :pageId";
+        if ($hasActiveColumn) {
+            $sql .= " AND active = 1";
+        }
+        $sql .= " ORDER BY order_index ASC";
+        
+        $notesStmt = $this->pdo->prepare($sql);
         $notesStmt->execute([':pageId' => $pageId]);
         $notes = $notesStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -117,8 +134,27 @@ class DataManager {
         $noteIds = array_column($notes, 'id');
         $propertiesByNoteId = $this->getPropertiesForNoteIds($noteIds, $includeInternal);
 
+        // Fetch attachment status for all notes in this page
+        $notesWithAttachmentsMap = [];
+        if (!empty($noteIds)) {
+            $placeholders = implode(',', array_fill(0, count($noteIds), '?'));
+            $attachmentSql = "SELECT note_id FROM Attachments WHERE note_id IN ($placeholders)";
+            if ($hasActiveColumn) {
+                $attachmentSql .= " AND active = 1";
+            }
+            $attachmentSql .= " GROUP BY note_id";
+            
+            $attachmentStmt = $this->pdo->prepare($attachmentSql);
+            // Bind each note ID as an integer
+            $params = array_map('intval', $noteIds);
+            $attachmentStmt->execute($params);
+            $notesWithAttachments = $attachmentStmt->fetchAll(PDO::FETCH_COLUMN);
+            $notesWithAttachmentsMap = array_flip($notesWithAttachments);
+        }
+
         foreach ($notes as &$note) {
             $note['properties'] = $propertiesByNoteId[$note['id']] ?? [];
+            $note['has_attachments'] = isset($notesWithAttachmentsMap[$note['id']]);
         }
 
         return $notes;

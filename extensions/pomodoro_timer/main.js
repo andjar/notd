@@ -263,49 +263,8 @@ async function logSession(sessionType, durationMinutes, customProperties) {
 
   const today = new Date();
   const pageTitle = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
-  let pageId = null;
 
-  // 1. Get/Create Today's Page ID
-  // The API endpoint `../../api/pages.php?name=YYYY-MM-DD` is expected to:
-  // - Return the page details if it exists.
-  // - Create the page if it doesn't exist and then return its details.
-  // - Return an array of pages, so we typically expect one page or an empty array if error.
-  try {
-    const response = await fetch(`../../api/v1/pages.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: pageTitle })
-    });
-    if (response.ok) {
-      const responseData = await response.json();
-      if (responseData && responseData.status === 'success' && responseData.data) {
-        const pageData = responseData.data; // Use responseData.data
-        if (pageData && pageData.id) {
-          pageId = pageData.id;
-          console.log(`Successfully fetched/created page for today: '${pageTitle}', ID ${pageId}`);
-        } else {
-          console.error('Failed to get page ID: API response did not contain expected page ID in data.', responseData);
-          return; // Abort if no valid page data/ID
-        }
-      } else {
-        console.error('Failed to get page ID: API response error or invalid data.', responseData);
-        return; // Abort if no valid page data/ID
-      }
-    } else {
-      console.error(`Failed to fetch/create page for '${pageTitle}':`, response.status, await response.text());
-      return; // Don't proceed if API request fails
-    }
-  } catch (error) {
-    console.error(`Error during fetch/create page for '${pageTitle}':`, error);
-    return;
-  }
-
-  if (!pageId) {
-    console.error('Could not obtain page ID. Aborting note creation.');
-    return;
-  }
-
-  // 2. Construct Note Content
+  // Construct Note Content
   const now = new Date();
   const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
   let noteTitle = '';
@@ -331,29 +290,29 @@ async function logSession(sessionType, durationMinutes, customProperties) {
     content += `${key}: ${customProperties[key]}\n`;
   }
 
-  // 3. Create Note
+  // Append Note to Today's Page
   try {
-    const noteResponse = await fetch(`../../api/v1/notes.php`, {
+    const response = await fetch(`../../api/v1/append_to_page.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        page_id: pageId,
-        content: content.trim()
+        page_name: pageTitle,
+        notes: content.trim() // API can handle single string for notes
       })
     });
 
-    if (noteResponse.ok) {
-      const newNote = await noteResponse.json();
-      if (newNote && newNote.status === 'success' && newNote.data) {
-        console.log('Pomodoro session logged successfully:', newNote.data);
+    if (response.ok) {
+      const responseData = await response.json();
+      if (responseData && responseData.status === 'success' && responseData.data && responseData.data.appended_notes) {
+        console.log('Pomodoro session logged successfully to page:', pageTitle, responseData.data.appended_notes);
       } else {
-        console.error('Failed to create note: API response error or invalid data.', newNote);
+        console.error('Failed to log session: API response error or invalid data structure.', responseData);
       }
     } else {
-      console.error('Failed to create note:', noteResponse.status, await noteResponse.text());
+      console.error('Failed to log session:', response.status, await response.text());
     }
   } catch (error) {
-    console.error('Error creating note:', error);
+    console.error('Error logging session:', error);
   }
 }
 

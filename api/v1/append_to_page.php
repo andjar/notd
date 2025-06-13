@@ -3,10 +3,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../data_manager.php';
-require_once __DIR__ . '/../pattern_processor.php';
 require_once __DIR__ . '/../validator_utils.php';
-require_once __DIR__ . '/../property_auto_internal.php'; // Still needed for determinePropertyInternalStatus for response
-// require_once __DIR__ . '/properties.php'; // _updateOrAddPropertyAndDispatchTriggers is removed
 
 // New "Smart Property Indexer"
 // This function is the single source of truth for processing properties from content.
@@ -14,79 +11,57 @@ if (!function_exists('_indexPropertiesFromContent')) {
     function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
         // For notes, check if encrypted. If so, do not process properties from content.
         if ($entityType === 'note') {
-            $encryptedStmt = $pdo->prepare("SELECT 1 FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND value = 'true' AND internal = 1 LIMIT 1");
+            $encryptedStmt = $pdo->prepare("SELECT 1 FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND value = 'true' LIMIT 1");
             $encryptedStmt->execute([':note_id' => $entityId]);
             if ($encryptedStmt->fetch()) {
-                return []; // Note is encrypted, do not parse/modify properties from its content.
+                return; // Note is encrypted, do not parse/modify properties from its content.
             }
         }
 
-        // Instantiate the pattern processor
+        // Instantiate the pattern processor. It gets PDO from get_db_connection()
         $patternProcessor = getPatternProcessor();
 
-        // Process the content to extract properties
+        // Process the content to extract properties and potentially modified content
         // Pass $pdo in context for handlers that might need it directly.
         $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
-        $parsedProperties = $processedData['properties']; // These are the properties extracted by handlers
+        
+        $parsedProperties = $processedData['properties'];
 
-        // Save all extracted/generated properties using the processor's save method.
-        // This method handles deleting old 'replaceable' properties and inserting/updating new ones,
-        // as well as dispatching property triggers.
+        // Save all extracted/generated properties using the processor's save method
+        // This method should handle deleting old 'replaceable' properties and inserting/updating new ones.
+        // It will also handle property triggers.
         if (!empty($parsedProperties)) {
             $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
-        } else {
-            // If no properties are parsed, PatternProcessor.saveProperties should ideally handle
-            // clearing any existing replaceable properties.
-            // For now, we rely on its implementation.
         }
         
-        // Logic to update the Notes.internal flag (if $entityType === 'note')
+        // Update the note's 'internal' flag based on the final set of properties applied.
         $hasInternalTrue = false;
-        if ($entityType === 'note') {
-            if (!empty($parsedProperties)) {
-                foreach ($parsedProperties as $prop) {
-                    // Note: 'internal' status for the flag comes from the name/value,
-                    // not necessarily prop['internal'] which is about DB storage visibility.
-                    if (isset($prop['name']) && strtolower($prop['name']) === 'internal' &&
-                        isset($prop['value']) && strtolower((string)$prop['value']) === 'true') {
-                        $hasInternalTrue = true;
-                        break;
-                    }
+        if (!empty($parsedProperties)) {
+            foreach ($parsedProperties as $prop) {
+                if (isset($prop['name']) && strtolower($prop['name']) === 'internal' && 
+                    isset($prop['value']) && strtolower((string)$prop['value']) === 'true') {
+                    $hasInternalTrue = true;
+                    break;
                 }
             }
-            try {
+        }
+
+        if ($entityType === 'note') {
+             try {
                 $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
                 $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
             } catch (PDOException $e) {
-                error_log("Could not update Notes.internal flag in append_to_page.php for note {$entityId}. Error: " . $e->getMessage());
+                // Log error but don't let it break the entire process if just this update fails
+                error_log("Could not update Notes.internal flag for note {$entityId}. Error: " . $e->getMessage());
             }
         }
-
-        // Adapt the return value for the API response
-        $finalPropertiesForResponse = [];
-        if (!empty($parsedProperties)) {
-            foreach ($parsedProperties as $prop) {
-                $name = $prop['name'];
-                $value = (string)($prop['value'] ?? ''); // Ensure value is a string
-
-                // Determine internal status for response using the existing utility function.
-                // This is for the client's information, distinct from how 'internal' property for the flag is checked.
-                $isInternalForResponse = determinePropertyInternalStatus($name, $value);
-
-                if (!isset($finalPropertiesForResponse[$name])) {
-                    $finalPropertiesForResponse[$name] = [];
-                }
-                $finalPropertiesForResponse[$name][] = ['value' => $value, 'internal' => (int)$isInternalForResponse];
-            }
-        }
-        
-        return $finalPropertiesForResponse;
     }
 }
 
 
 header('Content-Type: application/json');
 $pdo = get_db_connection();
+$dataManager = new DataManager($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -102,17 +77,10 @@ if (!isset($input['page_name']) || !is_string($input['page_name']) || empty(trim
 }
 $page_name = Validator::sanitizeString($input['page_name']);
 
-$page_id = null;
-$page_data = null;
-$created_page = false;
-$created_notes_list = [];
-$temp_id_map = [];
-
 try {
     $pdo->beginTransaction();
 
     // 2. Page Handling (Retrieve or Create)
-    $dataManager = new DataManager($pdo);
     $page_data = $dataManager->getPageDetailsByName($page_name, true);
 
     if ($page_data) {
@@ -124,16 +92,9 @@ try {
         if (!$page_id) {
             throw new Exception('Failed to create page.');
         }
-        $created_page = true;
     }
     
-    // Ensure journal property for journal-like pages
-    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $page_name) || strtolower($page_name) === 'journal') {
-        $propStmt = $pdo->prepare("INSERT INTO Properties (page_id, name, value, internal) VALUES (?, 'type', 'journal', 0) ON CONFLICT(page_id, name) DO NOTHING");
-        $propStmt->execute([$page_id]);
-    }
-
-    // 3. Note Handling
+    // 3. Note Handling - Convert to batch operations format
     if (!isset($input['notes'])) {
         throw new Exception('notes field is required.');
     }
@@ -142,61 +103,68 @@ try {
         throw new Exception('notes field must be a string or an array of note objects.');
     }
 
-    foreach ($notes_input as $index => $note_item) {
+    // Convert notes to batch operations format
+    $batch_operations = [];
+    foreach ($notes_input as $note_item) {
         if (!is_array($note_item) || !isset($note_item['content']) || !is_string($note_item['content'])) {
-            throw new Exception("Each note item must be an object with a 'content' string. Error at index {$index}.");
+            throw new Exception("Each note item must be an object with a 'content' string.");
         }
 
-        $content = $note_item['content'];
-        $client_temp_id = $note_item['client_temp_id'] ?? null;
-        $order_index = (int)($note_item['order_index'] ?? 0);
-        $collapsed = (int)($note_item['collapsed'] ?? 0);
-        
-        $final_parent_note_id = null;
-        if (isset($note_item['parent_note_id'])) {
-            $parent_id = $note_item['parent_note_id'];
-            if (is_string($parent_id) && isset($temp_id_map[$parent_id])) {
-                $final_parent_note_id = $temp_id_map[$parent_id];
-            } elseif (is_numeric($parent_id)) {
-                $final_parent_note_id = (int)$parent_id;
-            }
-        }
-
-        $sql = "INSERT INTO Notes (page_id, content, parent_note_id, order_index, collapsed) VALUES (?, ?, ?, ?, ?)";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$page_id, $content, $final_parent_note_id, $order_index, $collapsed]);
-        $note_id = $pdo->lastInsertId();
-
-        if (!$note_id) {
-            throw new Exception("Failed to create note entry for item at index {$index}.");
-        }
-
-        if ($client_temp_id) {
-            $temp_id_map[$client_temp_id] = $note_id;
-        }
-
-        // Use the new centralized indexer
-        $note_properties = _indexPropertiesFromContent($pdo, 'note', $note_id, $content);
-
-        $stmt_new_note = $pdo->prepare("SELECT * FROM Notes WHERE id = :id");
-        $stmt_new_note->execute([':id' => $note_id]);
-        $new_note_data = $stmt_new_note->fetch(PDO::FETCH_ASSOC);
-        if ($new_note_data) {
-            $new_note_data['properties'] = $note_properties;
-            $created_notes_list[] = $new_note_data;
-        }
+        $batch_operations[] = [
+            'type' => 'create',
+            'payload' => [
+                'page_id' => $page_id,
+                'content' => $note_item['content'],
+                'parent_note_id' => $note_item['parent_note_id'] ?? null,
+                'order_index' => $note_item['order_index'] ?? 0,
+                'collapsed' => $note_item['collapsed'] ?? 0,
+                'client_temp_id' => $note_item['client_temp_id'] ?? null
+            ]
+        ];
     }
 
-    $pdo->commit();
+    // Include notes.php and use its functions directly
+    require_once __DIR__ . '/notes.php';
+    
+    // Ensure the batch operations handler is available
+    if (!function_exists('_handleBatchOperations')) {
+        throw new Exception('Required batch operations handler not available');
+    }
+    
+    // Process batch operations directly
+    if (!empty($batch_operations)) {
+        try {
+            // Start output buffering to capture the response
+            ob_start();
+            _handleBatchOperations($pdo, $dataManager, $batch_operations);
+            $batch_response = ob_get_clean();
+            
+            // Parse the batch response
+            $batch_result = json_decode($batch_response, true);
+            if (!$batch_result || !isset($batch_result['status']) || $batch_result['status'] !== 'success') {
+                throw new Exception('Failed to process batch operations: ' . ($batch_result['message'] ?? 'Unknown error'));
+            }
 
-    // Re-fetch page_data to include any new properties
-    $final_page_data = $dataManager->getPageDetailsById($page_id, true);
+            // If we get here, the batch operations were successful
+            $pdo->commit();
 
-    ApiResponse::success([
-        'message' => ($created_page ? 'Page created' : 'Page retrieved') . ' and notes appended successfully.',
-        'page' => $final_page_data,
-        'appended_notes' => $created_notes_list
-    ]);
+            // Re-fetch page_data to include any new properties
+            $final_page_data = $dataManager->getPageDetailsById($page_id, true);
+
+            ApiResponse::success([
+                'message' => ($page_data ? 'Page retrieved' : 'Page created') . ' and notes appended successfully.',
+                'page' => $final_page_data,
+                'appended_notes' => $batch_result['data']['results'] ?? []
+            ]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw new Exception('Failed to process batch operations: ' . $e->getMessage());
+        }
+    } else {
+        throw new Exception('No valid notes to append.');
+    }
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {

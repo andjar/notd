@@ -159,10 +159,7 @@ export function displayKanbanBoard(containerElement, notes) {
                 }
                 const newStatus = targetColumnEl.dataset.statusMatcher; // e.g. "doing"
 
-                // console.log(`Card moved: Note ID ${noteId}, From Status: ${oldStatus}, To Status: ${newStatus}`);
-
                 if (newStatus === oldStatus && evt.oldIndex === evt.newIndex && evt.from === evt.to) {
-                     // console.log('No actual change in status or order within the same column.');
                     return;
                 }
 
@@ -197,34 +194,48 @@ export function displayKanbanBoard(containerElement, notes) {
                 console.log(`Updating note ${noteId}: from status '${oldStatus}' to '${newStatus}'. New content will be: "${newContent}"`);
 
                 try {
-                    if (!notesAPI || typeof notesAPI.updateNote !== 'function') {
-                        console.error('notesAPI.updateNote is not available. Cannot save changes.');
+                    if (!notesAPI || typeof notesAPI.batchUpdateNotes !== 'function') {
+                        console.error('notesAPI.batchUpdateNotes is not available. Cannot save changes.');
                         alert('Error: Cannot save changes to the server. API is not configured.');
                         evt.from.appendChild(itemEl); // Revert
                         return;
                     }
 
-                    // The API call now only sends the content
-                    await notesAPI.updateNote(parseInt(noteId), { content: newContent });
-                    
-                    // Update local note object
-                    if (!note.properties) {
-                        note.properties = {};
-                    }
-                    note.properties.status = newStatus; // Still useful to update the local JS representation of status
-                    note.content = newContent; // Update local content
-                    itemEl.innerHTML = newContent; // Update card content visually
-                    
-                    notesById.set(String(noteId), note); // Update the map entry
+                    // Use batch operations to update the note
+                    const batchOperation = {
+                        type: 'update',
+                        payload: {
+                            id: parseInt(noteId),
+                            content: newContent
+                        }
+                    };
 
-                    // Update card's dataset for future drags
-                    itemEl.dataset.currentStatus = newStatus;
+                    const response = await notesAPI.batchUpdateNotes([batchOperation]);
                     
-                    console.log(`Note ${noteId} updated successfully to status ${newStatus} with new content.`);
+                    if (response.status === 'success' && response.data && response.data.results) {
+                        const updateResult = response.data.results.find(r => r.type === 'update' && r.note && r.note.id === parseInt(noteId));
+                        if (updateResult && updateResult.status === 'success') {
+                            // Update local note object with the server response
+                            const updatedNote = updateResult.note;
+                            notesById.set(String(noteId), updatedNote);
+                            
+                            // Update card's dataset for future drags
+                            itemEl.dataset.currentStatus = newStatus;
+                            
+                            // Update card content visually
+                            itemEl.innerHTML = updatedNote.content;
+                            
+                            console.log(`Note ${noteId} updated successfully to status ${newStatus} with new content.`);
+                        } else {
+                            throw new Error('Update operation did not return success status');
+                        }
+                    } else {
+                        throw new Error('Batch operation did not return success status');
+                    }
 
                 } catch (error) {
                     console.error(`Failed to update note ${noteId} (content to "${newContent}") via API:`, error);
-                    // Attempt to get some part of the content for the alert, assuming itemEl.textContent is simple
+                    // Attempt to get some part of the content for the alert
                     const cardContentPreview = itemEl.textContent.trim().substring(0,20);
                     alert(`Error updating task "${cardContentPreview}...". Please check console and refresh.`);
                     // Revert optimistic UI changes if API call fails

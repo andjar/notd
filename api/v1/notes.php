@@ -307,7 +307,7 @@ if ($method === 'GET') {
         }
     } catch (Exception $e) {
         error_log("API Error in notes.php (GET): " . $e->getMessage());
-        ApiResponse::error('An error occurred while fetching data.', 500);
+        ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
     }
 } elseif ($method === 'POST') {
     if (isset($input['action']) && $input['action'] === 'batch') {

@@ -671,52 +671,53 @@ function displayFavorites() {
     const container = document.getElementById('favorites-container');
     if (!container) return;
 
-    // Find or create the list container
-    let listContainer = container.querySelector('.favorites-list');
+    // Get or create the UL for the list items
+    let listContainer = container.querySelector('ul.favorites-list');
     if (!listContainer) {
-        // If list container doesn't exist, create the proper structure
-        container.innerHTML = `
-            <h4>Favorites</h4>
-            <div class="favorites-list"></div>
-        `;
-        listContainer = container.querySelector('.favorites-list');
+        // If #favorites-container was empty or didn't have the UL, create it.
+        // This avoids wiping out the H3 title if it's outside #favorites-container but inside div.favorites
+        container.innerHTML = ''; // Clear #favorites-container before adding UL
+        listContainer = document.createElement('ul');
+        listContainer.className = 'favorites-list';
+        container.appendChild(listContainer);
+    } else {
+        // If UL exists, just clear its content
+        listContainer.innerHTML = '';
     }
-    
-    // Clear only the list content
-    listContainer.innerHTML = '';
     
     // Use searchAPI instead of localStorage
     window.searchAPI.getFavorites()
         .then(data => {
             const favorites = data.results || [];
             if (favorites.length === 0) {
-                listContainer.innerHTML = '<p>No favorite pages yet.</p>';
+                listContainer.innerHTML = '<p>No favorite pages yet.</p>'; // Or some other appropriate message
                 return;
             }
 
             favorites.forEach(page => {
-                const item = document.createElement('a');
-                item.href = '#';
-                item.className = 'favorite-item';
-                item.dataset.pageName = page.page_name;
+                const listItem = document.createElement('li'); // Create LI
+
+                const link = document.createElement('a'); // Create A
+                link.href = '#';
+                link.className = 'favorite-page-link'; // Correct class
+                link.dataset.pageName = page.page_name;
                 
-                // Add active class if this is the current page
                 if (page.page_name === window.currentPageName) {
-                    item.classList.add('active');
+                    link.classList.add('active');
                 }
 
-                // Create the link content with icon and name
                 const icon = document.createElement('i');
                 icon.dataset.feather = 'star';
-                icon.className = 'favorite-icon';
+                icon.className = 'favorite-page-icon'; // Correct class
                 
                 const nameSpan = document.createElement('span');
-                nameSpan.className = 'favorite-name';
+                nameSpan.className = 'favorite-page-name'; // Correct class
                 nameSpan.textContent = page.page_name;
 
-                item.appendChild(icon);
-                item.appendChild(nameSpan);
-                listContainer.appendChild(item);
+                link.appendChild(icon);
+                link.appendChild(nameSpan);
+                listItem.appendChild(link); // Append A to LI
+                listContainer.appendChild(listItem); // Append LI to UL (listContainer)
             });
 
             // Initialize Feather icons
@@ -774,6 +775,7 @@ function displayBacklinksInSidebar(pageName) {
     // Create header
     const header = document.createElement('h3');
     header.textContent = 'Backlinks';
+    header.className = 'sidebar-section-header'; // Ensure this line is added/correct
     container.appendChild(header);
 
     // Create list container

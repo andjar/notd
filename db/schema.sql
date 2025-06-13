@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS Attachments (
     path TEXT NOT NULL UNIQUE,
     type TEXT,
     size INTEGER,
+    active INTEGER NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (note_id) REFERENCES Notes(id) ON DELETE SET NULL
 );
@@ -146,13 +147,3 @@ CREATE TRIGGER IF NOT EXISTS Notes_after_update AFTER UPDATE ON Notes BEGIN
   DELETE FROM Notes_fts WHERE docid=old.id;
   INSERT INTO Notes_fts(rowid, content) VALUES (new.id, new.content);
 END;
-
--- Add unique constraints to the Properties table
--- Removing these constraints as they're too restrictive and handled by application logic
--- CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_note_unique
---   ON Properties(note_id, name, weight)
---   WHERE note_id IS NOT NULL;
-
--- CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_page_unique
---   ON Properties(page_id, name, weight)
---   WHERE page_id IS NOT NULL;

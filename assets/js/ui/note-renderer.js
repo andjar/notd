@@ -852,30 +852,48 @@ function parseAndRenderContent(rawContent) {
  * @param {boolean|number|undefined} has_attachments_flag - Flag indicating if attachments exist
  */
 async function renderAttachments(container, noteId, has_attachments_flag) {
-    // If the flag is explicitly false or 0, clear and return.
-    // If undefined or null or true or 1, proceed to fetch.
-    if (has_attachments_flag === false || has_attachments_flag === 0) {
+    // If has_attachments_flag is explicitly false, clear container, hide, and return.
+    if (has_attachments_flag === false) {
         container.innerHTML = ''; // Clear any existing content
-        // container.style.display = 'none'; // Optional: hide if needed
+        container.style.display = 'none'; // Hide the container
         return;
     }
-    // container.style.display = ''; // Optional: ensure visible
+
+    // If has_attachments_flag is true, proceed to fetch and render.
+    // If undefined (e.g. legacy calls or error states), also proceed to fetch as a fallback.
+    // This means an API call will be made if has_attachments_flag is true or undefined.
+    
+    // Ensure container is visible before attempting to fetch, in case it was previously hidden.
+    // We will hide it again if no attachments are found after fetching.
+    container.style.display = ''; // Reset display style
 
     try {
-        // Fetch attachments for this note if flag suggests they might exist or is undefined
         const noteAttachments = await attachmentsAPI.getNoteAttachments(noteId);
         
-        container.innerHTML = ''; // Clear previous content before rendering new, or if no attachments found
+        container.innerHTML = ''; // Clear previous content
 
         if (!noteAttachments || noteAttachments.length === 0) {
-            // container.style.display = 'none'; // Optional: hide if no attachments
+            container.style.display = 'none'; // Hide if no attachments are found
             return;
         }
-        // container.style.display = ''; // Optional: ensure visible if attachments are found
+        
+        // If attachments are found, ensure the main container is visible (it was reset above)
+        // and the inner attachmentsContainer will be 'flex'
 
         const attachmentsContainer = document.createElement('div');
-        attachmentsContainer.className = 'note-attachments';
-        container.appendChild(attachmentsContainer);
+        // The class 'note-attachments' might already be on the 'container' element itself.
+        // If 'container' is just a generic div, then adding this class to a child is appropriate.
+        // Based on existing code, `container` IS the element with class `note-attachments`.
+        // So, we should append items directly to `container` or manage `attachmentsContainer` carefully.
+        // For now, let's assume `container` is the one to be styled and filled.
+        // Re-evaluating: The original code appends `attachmentsContainer` to `container`. This is fine.
+        attachmentsContainer.className = 'note-attachments-inner-list'; // Use a different class if container itself is 'note-attachments'
+                                                                    // Or, ensure `container` is just a placeholder.
+                                                                    // Given the original structure, `container` is `.note-attachments`.
+                                                                    // So, we populate `container` directly or clear and add `attachmentsContainer`.
+                                                                    // The original code *appends* `attachmentsContainer` to `container`. Let's stick to that.
+
+        container.appendChild(attachmentsContainer); // This was the original structure.
 
         noteAttachments.forEach(attachment => {
             const attachmentEl = document.createElement('div');
@@ -912,21 +930,27 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
 
             attachmentsContainer.appendChild(attachmentEl);
 
-            // Event listeners for image click and delete button will be handled by delegation.
-            // Ensure necessary data attributes are present on the elements for the delegated handlers.
             if (isImage) {
                 const imageLink = attachmentEl.querySelector('.attachment-name');
                 if (imageLink) {
-                    imageLink.dataset.attachmentUrl = attachment.url; // For delegated image view
-                    imageLink.classList.add('delegated-attachment-image'); // Class for easier selection
+                    imageLink.dataset.attachmentUrl = attachment.url;
+                    imageLink.classList.add('delegated-attachment-image');
                 }
             }
         });
 
         if (attachmentsContainer.children.length > 0) {
-            attachmentsContainer.style.display = 'flex';
+            // The main `container` should be visible (already set by `container.style.display = '';`)
+            // The `attachmentsContainer` (inner list) can be flex if it has items.
+            attachmentsContainer.style.display = 'flex'; // This was on attachmentsContainer before
+            container.style.display = 'flex'; // Ensure the main container is also flex if it wasn't.
+                                               // Or, if `container` is already styled by CSS, this might be redundant
+                                               // or conflict. Let's assume `container`'s display is managed by its parent or CSS.
+                                               // The original code set `attachmentsContainer.style.display = 'flex'`.
         } else {
-            attachmentsContainer.style.display = 'none'; // Explicitly hide if no attachments rendered
+            // This case should be caught by `if (!noteAttachments || noteAttachments.length === 0)` above.
+            // If somehow it's reached, hide the main container.
+            container.style.display = 'none';
         }
 
         if (typeof feather !== 'undefined' && feather.replace) {
@@ -935,6 +959,7 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
     } catch (error) {
         console.error('Error rendering attachments:', error);
         container.innerHTML = '<small>Could not load attachments.</small>';
+        container.style.display = 'block'; // Ensure error message is visible
     }
 }
 

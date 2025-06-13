@@ -127,8 +127,9 @@ function check_duplicate($api_url, $item_hash) {
     }
 }
 
-function create_note($api_url, $page_id, $title, $content_markdown, $feed_url, $item_link, $item_hash, $item_date) {
-    $notes_endpoint = rtrim($api_url, '/') . '/v1/notes.php';
+function create_note($api_url, $page_name, $title, $content_markdown, $feed_url, $item_link, $item_hash, $item_date) {
+    // Changed $page_id to $page_name
+    $append_endpoint = rtrim($api_url, '/') . '/v1/append_to_page.php'; // Changed endpoint
 
     // Append internal properties to content_markdown
     // Note: $content_markdown might already contain the title and basic structure.
@@ -142,26 +143,41 @@ function create_note($api_url, $page_id, $title, $content_markdown, $feed_url, $
 
     $final_content = $content_markdown . $properties_markdown;
 
-    $note_data = [
-        'page_id' => (int)$page_id, // Ensure page_id is an integer
-        'content' => $final_content
+    // Payload for append_to_page.php
+    $payload = [
+        'page_name' => $page_name,
+        'notes'     => $final_content // API handles string as single note content
     ];
 
-    $response = make_api_request($notes_endpoint, 'POST', $note_data);
+    $response = make_api_request($append_endpoint, 'POST', $payload);
 
-    if ($response['error'] || $response['http_code'] >= 300) { // Typically 201 for created, but accept 2xx
-        log_message('ERROR', "API request failed during note creation for '$title'. HTTP Code: {$response['http_code']}. Error: {$response['error']}. Body: {$response['body']}");
+    // Handle response from append_to_page.php
+    // Expected success: { "status": "success", "data": { "message": "...", "appended_notes": [...] } }
+    if ($response['error'] || $response['http_code'] >= 300) {
+        log_message('ERROR', "API request failed during note append for '$title' to page '$page_name'. HTTP Code: {$response['http_code']}. Error: {$response['error']}. Body: {$response['body']}");
         return false;
     }
-    log_message('INFO', "Successfully created note: $title");
-    return true;
+
+    $responseData = json_decode($response['body'], true);
+    if (json_last_error() !== JSON_ERROR_NONE || !isset($responseData['status'])) {
+        log_message('ERROR', "Failed to decode JSON response or status missing for note append '$title' to page '$page_name'. Body: {$response['body']}");
+        return false;
+    }
+
+    if ($responseData['status'] === 'success' && isset($responseData['data']['appended_notes']) && !empty($responseData['data']['appended_notes'])) {
+        log_message('INFO', "Successfully appended note for '$title' to page '$page_name'.");
+        return true;
+    } else {
+        log_message('ERROR', "API call to append note for '$title' to page '$page_name' did not report success or appended_notes missing/empty. Status: " . ($responseData['status'] ?? 'N/A') . ". Message: " . ($responseData['message'] ?? $responseData['data']['message'] ?? 'N/A') . ". Body: {$response['body']}");
+        return false;
+    }
 }
 
-function fetch_and_process_feed($api_url, $feed_url, $page_id_for_feed) { // Added $page_id_for_feed
-    log_message('INFO', "Fetching RSS feed: $feed_url for page ID: $page_id_for_feed");
+function fetch_and_process_feed($api_url, $feed_url, $page_name_for_feed) { // Changed $page_id_for_feed to $page_name_for_feed
+    log_message('INFO', "Fetching RSS feed: $feed_url for page name: $page_name_for_feed");
 
-    if (empty($page_id_for_feed)) {
-        log_message('ERROR', "No page_id provided for feed $feed_url. Skipping.");
+    if (empty($page_name_for_feed)) {
+        log_message('ERROR', "No page_name provided for feed $feed_url. Skipping.");
         return ['processed' => 0, 'errors' => 1];
     }
 
@@ -213,8 +229,8 @@ function fetch_and_process_feed($api_url, $feed_url, $page_id_for_feed) { // Add
         $cleaned_html = strip_tags($content_html, '<p><br><a><h1><h2><h3><h4><h5><h6><strong><em><ul><ol><li><blockquote><code><pre><img>');
         $content_markdown .= $cleaned_html; 
 
-        // Pass page_id_for_feed, title is now part of content_markdown
-        if (create_note($api_url, $page_id_for_feed, $item_title, $content_markdown, $feed_url, $item_link, $item_hash, $item_date)) {
+        // Pass page_name_for_feed, title is now part of content_markdown
+        if (create_note($api_url, $page_name_for_feed, $item_title, $content_markdown, $feed_url, $item_link, $item_hash, $item_date)) {
             $processed_items++;
         } else {
             $errors++;
@@ -258,18 +274,21 @@ function main() {
     }
 
     $api_url = $options['a'] ?? $options['api-url'] ?? $config['api_url'] ?? DEFAULT_API_URL;
-    $default_page_id = $config['default_page_id_for_rss'] ?? null; // Load default page_id
+    // Changed from default_page_id_for_rss to default_page_name_for_rss
+    $default_page_name = $config['default_page_name_for_rss'] ?? null; 
 
-    // Load feeds configuration: can be an array of URLs, or array of objects {url, page_id}
+    // Load feeds configuration: can be an array of URLs, or array of objects {url, page_name}
     $feeds_config_input = $config['feeds'] ?? [];
 
     // Command-line --feeds overrides config file's feeds.
-    // Command-line feeds are treated as simple URLs; they will use default_page_id.
+    // Command-line feeds are treated as simple URLs; they will use default_page_name.
     $cmd_feed_urls_override = $options['f'] ?? $options['feeds'] ?? null;
 
     if ($cmd_feed_urls_override) {
         $feeds_config_input = is_array($cmd_feed_urls_override) ? $cmd_feed_urls_override : [$cmd_feed_urls_override];
         log_message('INFO', "Feed list overridden by command line arguments.");
+        // Note: Command line feeds will use the default_page_name.
+        // If specific page names are needed for cmd line feeds, a more complex arg parsing is required.
     }
     
     if (empty($api_url)) {
@@ -284,8 +303,8 @@ function main() {
     }
 
     log_message('INFO', "Using API URL: $api_url");
-    if ($default_page_id) {
-        log_message('INFO', "Default Page ID for RSS items: $default_page_id");
+    if ($default_page_name) { // Changed from default_page_id
+        log_message('INFO', "Default Page Name for RSS items: $default_page_name");
     }
 
     $total_items_added = 0;
@@ -293,14 +312,16 @@ function main() {
 
     foreach ($feeds_config_input as $feed_entry) {
         $feed_url = null;
-        $page_id_for_feed = $default_page_id; // Start with default
+        $page_name_for_feed = $default_page_name; // Start with default, changed variable name
 
         if (is_string($feed_entry)) {
             $feed_url = $feed_entry; // Feed entry is a simple URL string
+            // It will use $default_page_name
         } elseif (is_array($feed_entry) && isset($feed_entry['url'])) {
             $feed_url = $feed_entry['url']; // Feed entry is an object with 'url'
-            if (isset($feed_entry['page_id'])) {
-                $page_id_for_feed = $feed_entry['page_id']; // Per-feed page_id overrides default
+            // Changed from page_id to page_name for per-feed config
+            if (isset($feed_entry['page_name'])) { 
+                $page_name_for_feed = $feed_entry['page_name']; // Per-feed page_name overrides default
             }
         }
 
@@ -309,14 +330,15 @@ function main() {
             continue;
         }
         
-        if (empty($page_id_for_feed)) {
-            log_message('ERROR', "No page_id specified for feed $feed_url and no default_page_id_for_rss is set. Skipping feed.");
+        // Check for page_name_for_feed, and use default_page_name_for_rss from config
+        if (empty($page_name_for_feed)) {
+            log_message('ERROR', "No page_name specified for feed $feed_url and no default_page_name_for_rss is set. Skipping feed.");
             $total_errors++;
             continue;
         }
         
-        log_message('INFO', "Processing feed URL: $feed_url (Target Page ID: $page_id_for_feed)");
-        $result = fetch_and_process_feed($api_url, $feed_url, $page_id_for_feed);
+        log_message('INFO', "Processing feed URL: $feed_url (Target Page Name: $page_name_for_feed)"); // Changed log
+        $result = fetch_and_process_feed($api_url, $feed_url, $page_name_for_feed); // Pass page_name
         $total_items_added += $result['processed'];
         $total_errors += $result['errors'];
     }
