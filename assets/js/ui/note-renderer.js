@@ -7,9 +7,9 @@
 import { saveNoteImmediately } from '../app/note-actions.js';
 import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
-// The path to api_client.js is ../../api_client.js if note-renderer.js is in assets/js/ui/
-// Adjust if api_client.js is elsewhere, e.g. assets/js/api_client.js
 import { attachmentsAPI, notesAPI } from '../api_client.js';
+import { decrypt } from '../utils.js';
+import { getCurrentPagePassword } from '../app/state.js';
 import {
     showSuggestions,
     hideSuggestions,
@@ -119,6 +119,9 @@ function renderNote(note, nestingLevel = 0) {
     if (note.collapsed) {
         noteItemEl.classList.add('collapsed');
     }
+    if (note.is_encrypted) {
+        noteItemEl.classList.add('encrypted-note');
+    }
 
     // Controls section (drag handle and bullet)
     const controlsEl = document.createElement('div');
@@ -167,12 +170,47 @@ function renderNote(note, nestingLevel = 0) {
     contentEl.dataset.placeholder = 'Type to add content...';
     contentEl.dataset.noteId = note.id;
 
-    // contentEl.dataset.rawContent should be plaintext if decrypted by page-loader.js
-    contentEl.dataset.rawContent = note.content || '';
+    // Handle encrypted content
+    let displayContent = note.content || '';
+    
+    // First check if content is already decrypted (not a JSON string)
+    const isAlreadyDecrypted = typeof note.content === 'string' && !note.content.startsWith('{');
+    
+    if (note.is_encrypted && note.content && !isAlreadyDecrypted) {
+        // Only attempt decryption if the note is marked as encrypted
+        // and the content is still in encrypted format (JSON string)
+        const password = getCurrentPagePassword();
+        if (password) {
+            try {
+                const decryptedContent = decrypt(note.content, password);
+                if (decryptedContent !== null) {
+                    displayContent = decryptedContent;
+                    noteItemEl.classList.add('decrypted-note');
+                } else {
+                    displayContent = '[DECRYPTION FAILED]';
+                    noteItemEl.classList.add('decryption-failed');
+                }
+            } catch (e) {
+                console.error(`Decryption failed for note ${note.id}:`, e);
+                displayContent = '[DECRYPTION FAILED]';
+                noteItemEl.classList.add('decryption-failed');
+            }
+        } else {
+            displayContent = '[ENCRYPTED CONTENT - Enter password to view]';
+            noteItemEl.classList.add('needs-password');
+        }
+    } else if (isAlreadyDecrypted) {
+        // Content is already decrypted, just use it
+        displayContent = note.content;
+        if (note.is_encrypted) {
+            noteItemEl.classList.add('decrypted-note');
+        }
+    }
 
-    if (note.content && note.content.trim()) {
-        // Pass note.content directly, which is now plaintext if it was decrypted
-        contentEl.innerHTML = parseAndRenderContent(note.content);
+    contentEl.dataset.rawContent = displayContent;
+
+    if (displayContent && displayContent.trim()) {
+        contentEl.innerHTML = parseAndRenderContent(displayContent);
         if (typeof feather !== 'undefined') {
             feather.replace({ width: '18px', height: '18px' });
         }

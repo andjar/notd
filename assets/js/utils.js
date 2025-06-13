@@ -268,6 +268,27 @@ export function encrypt(password, text) {
  * @throws An error if decryption fails (e.g., wrong password).
  */
 export function decrypt(password, encryptedJson) {
-    // sjcl.decrypt takes the password and the JSON string and handles the rest.
-    return sjcl.decrypt(password, encryptedJson);
+    console.log('[DEBUG] Decrypt function called with:', {
+        passwordLength: password?.length,
+        encryptedJsonLength: encryptedJson?.length,
+        encryptedJsonStartsWith: encryptedJson?.substring(0, 20) + '...'
+    });
+    
+    if (!password || !encryptedJson) {
+        console.warn('[DEBUG] Decrypt called with missing password or encryptedJson');
+        return null;
+    }
+
+    try {
+        // sjcl.decrypt takes the password and the JSON string and handles the rest.
+        const decrypted = sjcl.decrypt(password, encryptedJson);
+        console.log('[DEBUG] Decryption successful, result:', {
+            resultLength: decrypted?.length,
+            resultStartsWith: decrypted?.substring(0, 20) + '...'
+        });
+        return decrypted;
+    } catch (e) {
+        console.error('[DEBUG] Decryption failed:', e);
+        throw e;
+    }
 }

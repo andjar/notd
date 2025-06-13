@@ -88,7 +88,7 @@ async function handleEncryptPage() {
         textarea.value = newContent; // Update the textarea immediately
 
         // 2. Encrypt all notes for the current page
-        const { notes } = await notesAPI.getPageData(currentPageId);
+        const notes = await notesAPI.getPageData(currentPageId);
         const batchUpdates = notes.map(note => {
             if (note.is_encrypted) return null; // Already encrypted, skip
             return {

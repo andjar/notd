@@ -273,10 +273,26 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
             const decryptedNotes = [];
             let decryptionErrorOccurred = false;
             for (const note of notesToRender) {
-                if (note.is_encrypted && note.content) {
+                // Check if content is in encrypted JSON format
+                const isEncryptedContent = typeof note.content === 'string' && 
+                    note.content.startsWith('{') && 
+                    note.content.includes('"iv"') && 
+                    note.content.includes('"ct"');
+
+                if ((note.is_encrypted || isEncryptedContent) && note.content) {
                     try {
-                        console.log('[DEBUG] Decrypting note:', { noteId: note.id });
+                        console.log('[DEBUG] Before decryption:', { 
+                            noteId: note.id, 
+                            content: note.content,
+                            isEncrypted: note.is_encrypted,
+                            isEncryptedContent
+                        });
                         const decryptedContent = decrypt(currentPassword, note.content);
+                        console.log('[DEBUG] After decryption:', { 
+                            noteId: note.id, 
+                            decryptedContent,
+                            isEncrypted: false 
+                        });
                         decryptedNotes.push({ ...note, content: decryptedContent, is_encrypted: false });
                     } catch (e) {
                         console.error(`[DEBUG] Decryption failed for note ${note.id}:`, e);
@@ -284,13 +300,20 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                         decryptionErrorOccurred = true;
                     }
                 } else {
+                    console.log('[DEBUG] Note not encrypted:', { 
+                        noteId: note.id, 
+                        content: note.content,
+                        isEncrypted: note.is_encrypted,
+                        isEncryptedContent
+                    });
                     decryptedNotes.push(note);
                 }
             }
             notesToRender = decryptedNotes;
             console.log('[DEBUG] Note decryption complete:', { 
                 totalNotes: notesToRender.length,
-                decryptionErrors: decryptionErrorOccurred
+                decryptionErrors: decryptionErrorOccurred,
+                sampleNote: notesToRender[0] // Log first note to see its state
             });
         }
         
