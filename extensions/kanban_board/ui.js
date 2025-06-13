@@ -189,9 +189,12 @@ export function displayKanbanBoard(containerElement, notes) {
                     const newStatusUpper = newStatus.toUpperCase();
                     // Replace prefix and keep the rest of the content
                     newContent = newStatusUpper + ": " + note.content.substring(match[0].length);
+                } else if (oldStatus !== newStatus) { // If no prefix matched and status changed
+                    const newStatusUpper = newStatus.toUpperCase();
+                    newContent = newStatusUpper + ": " + note.content;
                 }
                 
-                console.log(`Updating note ${noteId}: from status '${oldStatus}' to '${newStatus}'.`);
+                console.log(`Updating note ${noteId}: from status '${oldStatus}' to '${newStatus}'. New content will be: "${newContent}"`);
 
                 try {
                     if (!notesAPI || typeof notesAPI.updateNote !== 'function') {
@@ -201,40 +204,36 @@ export function displayKanbanBoard(containerElement, notes) {
                         return;
                     }
 
-                    const updatePayload = {
-                        properties_explicit: {
-                            status: newStatus 
-                        }
-                    };
-
-                    if (newContent !== note.content) {
-                        updatePayload.content = newContent;
-                    }
-
-                    await notesAPI.updateNote(parseInt(noteId), updatePayload);
+                    // The API call now only sends the content
+                    await notesAPI.updateNote(parseInt(noteId), { content: newContent });
                     
                     // Update local note object
                     if (!note.properties) {
                         note.properties = {};
                     }
-                    note.properties.status = newStatus; 
-                    if (newContent !== note.content) {
-                        note.content = newContent;
-                        itemEl.innerHTML = newContent; // Update card content visually
-                    }
+                    note.properties.status = newStatus; // Still useful to update the local JS representation of status
+                    note.content = newContent; // Update local content
+                    itemEl.innerHTML = newContent; // Update card content visually
+                    
                     notesById.set(String(noteId), note); // Update the map entry
 
                     // Update card's dataset for future drags
                     itemEl.dataset.currentStatus = newStatus;
                     
-                    console.log(`Note ${noteId} updated successfully to status ${newStatus}.`);
+                    console.log(`Note ${noteId} updated successfully to status ${newStatus} with new content.`);
 
                 } catch (error) {
-                    console.error(`Failed to update note ${noteId} (status to ${newStatus}) via API:`, error);
+                    console.error(`Failed to update note ${noteId} (content to "${newContent}") via API:`, error);
                     // Attempt to get some part of the content for the alert, assuming itemEl.textContent is simple
                     const cardContentPreview = itemEl.textContent.trim().substring(0,20);
                     alert(`Error updating task "${cardContentPreview}...". Please check console and refresh.`);
-                    evt.from.appendChild(itemEl); 
+                    // Revert optimistic UI changes if API call fails
+                    note.content = notesById.get(String(noteId)).content; // Revert content change
+                    itemEl.innerHTML = note.content; // Revert visual change
+                    if (note.properties) note.properties.status = oldStatus; // Revert status if it was changed
+                    itemEl.dataset.currentStatus = oldStatus; // Revert dataset
+
+                    evt.from.appendChild(itemEl); // Send item back to original column
                 }
             }
         });

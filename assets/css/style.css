@@ -1190,7 +1190,6 @@ input[type="search"],
 input[type="email"],
 input[type="password"],
 textarea {
-    width: 600px;
     padding: var(--ls-space-2) var(--ls-space-3);
     border: 1px solid var(--ls-border-color);
     border-radius: var(--ls-border-radius-medium);
