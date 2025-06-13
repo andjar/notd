@@ -1157,6 +1157,9 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
         <div class="menu-item" data-action="upload" data-note-id="${noteId}" data-page-id="${notePageId || window.currentPageId}">
             <i data-feather="upload"></i> Upload attachment
         </div>
+        <div class="menu-item" data-action="open-zen" data-note-id="${noteId}">
+            <i data-feather="edit-3"></i> Open in Zen Writer
+        </div>
     `;
     menu.style.position = 'fixed';
     menu.style.left = `${event.pageX}px`;
