@@ -59,7 +59,7 @@ class DataManager {
     /**
      * Efficiently fetches properties for multiple note IDs.
      */
-    public function getPropertiesForNoteIds(array $noteIds, bool $includeInternal = false): array {
+    public function getPropertiesForNoteIds(array $noteIds, bool $includeInternal = false, bool $includeParentProperties = false): array {
         if (empty($noteIds)) {
             return [];
         }
@@ -74,10 +74,18 @@ class DataManager {
         $stmt->execute($noteIds);
         $allProps = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $results = array_fill_keys($noteIds, []);
+        $results = [];
+        foreach ($noteIds as $id) {
+            $results[$id] = ['parent_properties' => []]; // Initialize with parent_properties
+        }
+
         foreach ($allProps as $prop) {
             $noteId = $prop['note_id'];
             $key = $prop['name'];
+            // Ensure the base structure for the note exists, though it should by the loop above
+            if (!isset($results[$noteId])) {
+                $results[$noteId] = ['parent_properties' => []];
+            }
             if (!isset($results[$noteId][$key])) {
                 $results[$noteId][$key] = [];
             }
@@ -85,6 +93,61 @@ class DataManager {
                 'value' => $prop['value'],
                 'internal' => (int)($prop['weight'] ?? 2) > 2
             ];
+        }
+
+        if ($includeParentProperties) {
+            // Fetch parent_note_id for all relevant notes
+            $noteParentMap = [];
+            $notesToFetchParentsFor = $noteIds; // Initially, all notes
+            $currentLevelNotes = $notesToFetchParentsFor;
+
+            // Prepare a statement to get note details (specifically parent_note_id)
+            // This is done outside the loop for efficiency if fetching many notes' parents
+            $parentNoteIdStmt = $this->pdo->prepare("SELECT id, parent_note_id FROM Notes WHERE id = :id AND active = 1");
+
+            foreach ($noteIds as $noteId) {
+                $parentPropertiesData = [];
+                $currentParentId = null;
+
+                // Get the initial parent_note_id for the current noteId
+                // We need to fetch the note itself to find its parent_note_id first
+                $initialParentStmt = $this->pdo->prepare("SELECT parent_note_id FROM Notes WHERE id = :id AND active = 1");
+                $initialParentStmt->execute([':id' => $noteId]);
+                $noteDetails = $initialParentStmt->fetch(PDO::FETCH_ASSOC);
+                $currentParentId = $noteDetails ? $noteDetails['parent_note_id'] : null;
+
+                $visitedParentIds = []; // To prevent infinite loops
+
+                while ($currentParentId !== null && !isset($visitedParentIds[$currentParentId])) {
+                    $visitedParentIds[$currentParentId] = true;
+
+                    // Fetch details of the current parent note
+                    $parentNoteIdStmt->execute([':id' => $currentParentId]);
+                    $parentNode = $parentNoteIdStmt->fetch(PDO::FETCH_ASSOC);
+
+                    if ($parentNode) {
+                        // Fetch properties for this parent node
+                        $properties = $this->getNoteProperties($parentNode['id'], $includeInternal);
+                        foreach ($properties as $name => $valuesArray) {
+                            if (!isset($parentPropertiesData[$name])) {
+                                $parentPropertiesData[$name] = [];
+                            }
+                            foreach ($valuesArray as $propValueItem) {
+                                // Ensure uniqueness of property values directly
+                                if (!in_array($propValueItem['value'], array_column($parentPropertiesData[$name], 'value'))) {
+                                     $parentPropertiesData[$name][] = ['value' => $propValueItem['value']];
+                                }
+                            }
+                        }
+                        $currentParentId = $parentNode['parent_note_id'];
+                    } else {
+                        break;
+                    }
+                }
+                // Assign collected parent properties to the result for the current noteId
+                // The structure should be $parentPropertiesData['prop_name'] = [['value' => 'val1'], ['value' => 'val2']]
+                $results[$noteId]['parent_properties'] = $parentPropertiesData;
+            }
         }
         return $results;
     }

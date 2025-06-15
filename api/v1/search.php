@@ -29,18 +29,40 @@ function get_pagination_params() {
     return [$page, $per_page, $offset];
 }
 
-function attach_properties_to_results($dataManager, &$results) {
-    $noteIds = array_column($results, 'note_id');
+function attach_properties_to_results($dataManager, &$results, $includeParentProps = false) {
+    $noteIds = [];
+    // Collect note_ids only if they exist in the results (e.g. 'favorites' search might not have note_id)
+    foreach ($results as $result) {
+        if (isset($result['note_id'])) {
+            $noteIds[] = $result['note_id'];
+        }
+    }
+
     if (empty($noteIds)) return;
 
-    $propertiesByNoteId = $dataManager->getPropertiesForNoteIds($noteIds, true);
+    // Pass the $includeParentProps parameter to getPropertiesForNoteIds
+    $propertiesByNoteId = $dataManager->getPropertiesForNoteIds($noteIds, true, $includeParentProps);
+
     foreach ($results as &$result) {
-        $result['properties'] = $propertiesByNoteId[$result['note_id']] ?? [];
+        if (isset($result['note_id']) && isset($propertiesByNoteId[$result['note_id']])) {
+            // Direct properties are keys in $propertiesByNoteId[$result['note_id']] itself, excluding 'parent_properties'
+            $directProperties = $propertiesByNoteId[$result['note_id']];
+            unset($directProperties['parent_properties']); // Remove parent_properties from direct
+            $result['properties'] = $directProperties ?? [];
+
+            // Parent properties are under the 'parent_properties' key
+            $result['parent_properties'] = $propertiesByNoteId[$result['note_id']]['parent_properties'] ?? [];
+        } else {
+            // Ensure keys exist even if no properties were found or no note_id
+            $result['properties'] = [];
+            $result['parent_properties'] = [];
+        }
     }
 }
 
 if ($method === 'GET') {
     try {
+        $includeParentProps = filter_input(INPUT_GET, 'include_parent_properties', FILTER_VALIDATE_BOOLEAN);
         [$page, $per_page, $offset] = get_pagination_params();
         $total = 0;
         $results = [];
@@ -103,7 +125,7 @@ if ($method === 'GET') {
         }
 
         // Attach properties to all results, regardless of search type
-        attach_properties_to_results($dataManager, $results);
+        attach_properties_to_results($dataManager, $results, $includeParentProps);
 
         ApiResponse::success([
             'results' => $results,
