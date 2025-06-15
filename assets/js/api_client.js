@@ -199,9 +199,19 @@ const searchAPI = {
         const params = new URLSearchParams({ q: query });
         if (options.page) params.append('page', options.page.toString());
         if (options.per_page) params.append('per_page', options.per_page.toString());
+        if (options.includeParentProps) params.append('include_parent_properties', '0');
         return apiRequest(`search.php?${params.toString()}`);
     },
-    getBacklinks: (pageName) => apiRequest(`search.php?backlinks_for_page_name=${encodeURIComponent(pageName)}`),
+    getBacklinks: (pageName, options = {}) => {
+        const params = new URLSearchParams({ backlinks_for_page_name: pageName });
+        if (options.includeParentProps) params.append('include_parent_properties', '0');
+        return apiRequest(`search.php?${params.toString()}`);
+    },
+    getTasks: (status, options = {}) => {
+        const params = new URLSearchParams({ tasks: status });
+        if (options.includeParentProps) params.append('include_parent_properties', '1');
+        return apiRequest(`search.php?${params.toString()}`);
+    },
     getFavorites: () => apiRequest('search.php?favorites=1')
 };
 

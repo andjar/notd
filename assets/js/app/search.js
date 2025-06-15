@@ -27,9 +27,12 @@ function displaySearchResults(results) {
         let isEncrypted = false;
 
         // Check if the page has an 'encrypted' property set to 'true'
-        if (result.properties && Array.isArray(result.properties.encrypted)) {
-            isEncrypted = result.properties.encrypted.some(p => String(p.value).toLowerCase() === 'true');
-        }
+        // Check both direct properties and parent properties
+        const isEncryptedInProps = (props) => props && Array.isArray(props.encrypted) && 
+            props.encrypted.some(p => String(p.value).toLowerCase() === 'true');
+        
+        isEncrypted = isEncryptedInProps(result.properties) || 
+                     isEncryptedInProps(result.parent_properties);
 
         if (isEncrypted) {
             const password = getCurrentPagePassword();
@@ -50,9 +53,19 @@ function displaySearchResults(results) {
 
         const encryptedIcon = isEncrypted ? '<i data-feather="lock" class="encrypted-icon"></i> ' : '';
         
+        // Add parent properties display if they exist
+        const parentPropsHtml = result.parent_properties && Object.keys(result.parent_properties).length > 0 
+            ? `<div class="search-result-parent-props">
+                ${Object.entries(result.parent_properties).map(([key, values]) => 
+                    `<span class="parent-prop">${key}: ${values.map(v => v.value).join(', ')}</span>`
+                ).join('')}
+               </div>`
+            : '';
+        
         return `
             <div class="search-result-item" data-page-name="${result.page_name}">
                 <div class="search-result-title">${encryptedIcon}${result.page_name}</div>
+                ${parentPropsHtml}
                 <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.globalSearchInput.value)}</div>
             </div>
         `;
@@ -80,7 +93,7 @@ function displaySearchResults(results) {
     });
 }
 
-const debouncedSearch = debounce(async (query) => {
+const debouncedSearch = debounce(async (query, includeParentProps = false) => {
     const searchResultsEl = ui.domRefs.searchResults;
     if (!searchResultsEl) return;
 
@@ -91,7 +104,7 @@ const debouncedSearch = debounce(async (query) => {
     }
     
     try {
-        const response = await searchAPI.search(query);
+        const response = await searchAPI.search(query, { includeParentProps });
         if (response && Array.isArray(response.results)) {
             displaySearchResults(response.results);
         } else {
@@ -107,7 +120,29 @@ const debouncedSearch = debounce(async (query) => {
 
 export function initGlobalSearch() {
     if (ui.domRefs.globalSearchInput) {
-        safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => debouncedSearch(e.target.value), 'globalSearchInput');
+        // Add a checkbox for including parent properties
+        const searchContainer = ui.domRefs.globalSearchInput.closest('.search-container');
+        if (searchContainer && !searchContainer.querySelector('.include-parent-props')) {
+            const checkboxContainer = document.createElement('div');
+            checkboxContainer.className = 'include-parent-props';
+            checkboxContainer.innerHTML = `
+                <label>
+                    <input type="checkbox" id="includeParentProps">
+                    Include parent properties
+                </label>
+            `;
+            searchContainer.appendChild(checkboxContainer);
+            
+            const checkbox = checkboxContainer.querySelector('#includeParentProps');
+            safeAddEventListener(checkbox, 'change', (e) => {
+                debouncedSearch(ui.domRefs.globalSearchInput.value, e.target.checked);
+            }, 'includeParentPropsCheckbox');
+        }
+
+        safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => {
+            const includeParentProps = document.querySelector('#includeParentProps')?.checked || false;
+            debouncedSearch(e.target.value, includeParentProps);
+        }, 'globalSearchInput');
     }
 }
 

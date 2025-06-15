@@ -603,6 +603,30 @@ body {
     margin-bottom: var(--ls-space-1);
     font-size: var(--ls-font-size-sm);
 }
+.search-result-parent-props {
+    margin: var(--ls-space-1) 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ls-space-2);
+}
+
+.search-result-parent-props .parent-prop {
+    background-color: var(--ls-tertiary-background-color);
+    color: var(--ls-secondary-text-color);
+    padding: var(--ls-space-1) var(--ls-space-2);
+    border-radius: var(--ls-border-radius-low);
+    font-size: var(--ls-font-size-xs);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ls-space-1);
+}
+
+.search-result-parent-props .parent-prop::before {
+    content: '↑';
+    font-size: var(--ls-font-size-xs);
+    opacity: 0.7;
+}
+
 .search-result-snippet {
     color: var(--ls-secondary-text-color);
     font-size: var(--ls-font-size-xs);
@@ -2552,6 +2576,7 @@ h6 { font-size: var(--ls-font-size-xs); font-weight: var(--ls-font-weight-semibo
     transform: translateX(-2px);
 }
 
+/* Alternative: Real button for show all */
 .show-all-notes-btn {
     display: none;
     background: var(--ls-accent-10);
