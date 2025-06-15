@@ -113,7 +113,7 @@ function createKanbanCard(note) {
     }
     // ---- END MODIFICATION ----
 
-    cardElement.innerHTML = displayContent; // Use the cleaned content
+    cardElement.textContent = displayContent; // Use plain text to prevent XSS
 
     // console.log(`Creating card for note ID ${note.id}, status ${currentStatus}, display: "${displayContent}"`);
     return cardElement;
