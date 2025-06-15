@@ -199,7 +199,7 @@ const searchAPI = {
         const params = new URLSearchParams({ q: query });
         if (options.page) params.append('page', options.page.toString());
         if (options.per_page) params.append('per_page', options.per_page.toString());
-        if (options.includeParentProps) params.append('include_parent_properties', '0');
+        if (options.includeParentProps !== undefined) params.append('include_parent_properties', options.includeParentProps ? '1' : '0');
         return apiRequest(`search.php?${params.toString()}`);
     },
     getBacklinks: (pageName, options = {}) => {

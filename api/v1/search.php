@@ -62,7 +62,8 @@ function attach_properties_to_results($dataManager, &$results, $includeParentPro
 
 if ($method === 'GET') {
     try {
-        $includeParentProps = filter_input(INPUT_GET, 'include_parent_properties', FILTER_VALIDATE_BOOLEAN);
+        // Convert include_parent_properties to boolean, defaulting to false if not set
+        $includeParentProps = filter_input(INPUT_GET, 'include_parent_properties', FILTER_VALIDATE_BOOLEAN) ?? false;
         [$page, $per_page, $offset] = get_pagination_params();
         $total = 0;
         $results = [];
