@@ -31,7 +31,7 @@ require_once '../../config.php';
     </div>
 
     <script>
-      window.configuredKanbanStates = <?php echo defined('KANBAN_TASK_STATES') ? json_encode(KANBAN_TASK_STATES) : json_encode(['TODO', 'DOING', 'DONE']); ?>;
+      window.configuredKanbanStates = <?php echo defined('TASK_STATES') ? json_encode(TASK_STATES) : json_encode(['TODO', 'DOING', 'DONE']); ?>;
     </script>
 
     <!-- SCRIPTS -->
