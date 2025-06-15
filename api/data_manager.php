@@ -92,7 +92,7 @@ class DataManager {
     /**
      * Retrieves a single note by its ID, including its formatted properties.
      */
-    public function getNoteById(int $noteId, bool $includeInternal = false): ?array {
+    public function getNoteById(int $noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE id = :id AND active = 1");
         $stmt->execute([':id' => $noteId]);
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -104,6 +104,48 @@ class DataManager {
             $note['has_attachments'] = (bool) $attachmentStmt->fetchColumn();
 
             $note['properties'] = $this->getNoteProperties($noteId, $includeInternal);
+
+            if ($includeParentProperties) {
+                $parentPropertiesData = [];
+                $currentParentId = $note['parent_note_id'];
+                $visitedParentIds = []; // To prevent infinite loops in case of cyclic parentage
+
+                while ($currentParentId !== null && !isset($visitedParentIds[$currentParentId])) {
+                    $visitedParentIds[$currentParentId] = true; // Mark as visited
+                    $parentStmt = $this->pdo->prepare("SELECT id, parent_note_id FROM Notes WHERE id = :id AND active = 1");
+                    $parentStmt->execute([':id' => $currentParentId]);
+                    $parentNode = $parentStmt->fetch(PDO::FETCH_ASSOC);
+
+                    if ($parentNode) {
+                        $properties = $this->getNoteProperties($parentNode['id'], $includeInternal);
+                        foreach ($properties as $name => $valuesArray) {
+                            if (!isset($parentPropertiesData[$name])) {
+                                $parentPropertiesData[$name] = [];
+                            }
+                            foreach ($valuesArray as $propValueItem) {
+                                // Add value if not already present for this property name
+                                if (!in_array($propValueItem['value'], $parentPropertiesData[$name])) {
+                                    $parentPropertiesData[$name][] = $propValueItem['value'];
+                                }
+                            }
+                        }
+                        $currentParentId = $parentNode['parent_note_id'];
+                    } else {
+                        break; // Parent not found or not active, stop traversal
+                    }
+                }
+
+                // Format $parentPropertiesData into the desired structure
+                $formattedParentProperties = [];
+                foreach ($parentPropertiesData as $name => $values) {
+                    $formattedParentProperties[$name] = array_map(function($value) {
+                        return ['value' => $value];
+                    }, $values);
+                }
+                $note['parent_properties'] = $formattedParentProperties;
+            } else {
+                $note['parent_properties'] = null; // Or [] for an empty array
+            }
         }
         return $note ?: null;
     }
