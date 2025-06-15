@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../../config.php';
 
 $pdo = get_db_connection();
 $dataManager = new DataManager($pdo);
@@ -62,7 +63,8 @@ function attach_properties_to_results($dataManager, &$results, $includeParentPro
 
 if ($method === 'GET') {
     try {
-        $includeParentProps = filter_input(INPUT_GET, 'include_parent_properties', FILTER_VALIDATE_BOOLEAN);
+        // Convert include_parent_properties to boolean, defaulting to false if not set
+        $includeParentProps = filter_input(INPUT_GET, 'include_parent_properties', FILTER_VALIDATE_BOOLEAN) ?? false;
         [$page, $per_page, $offset] = get_pagination_params();
         $total = 0;
         $results = [];
@@ -99,16 +101,29 @@ if ($method === 'GET') {
 
         } elseif (isset($_GET['tasks'])) {
             $status = strtoupper(trim($_GET['tasks']));
-            if (!in_array($status, ['TODO', 'DONE'])) ApiResponse::error('Invalid task status. Use "todo" or "done"', 400);
+            if ($status !== 'ALL' && !in_array($status, TASK_STATES)) {
+                ApiResponse::error('Invalid task status. Use "all" or one of: ' . implode(', ', TASK_STATES), 400);
+            }
 
-            $count_stmt = $pdo->prepare("SELECT COUNT(DISTINCT N.id) FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id WHERE Prop.name = 'status' AND Prop.value = ?");
-            $count_stmt->execute([$status]);
-            $total = (int)$count_stmt->fetchColumn();
+            if ($status === 'ALL') {
+                $count_stmt = $pdo->prepare("SELECT COUNT(DISTINCT N.id) FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id WHERE Prop.name = 'status'");
+                $count_stmt->execute();
+                $total = (int)$count_stmt->fetchColumn();
 
-            $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, Pg.name as page_name FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages Pg ON N.page_id = Pg.id WHERE Prop.name = 'status' AND Prop.value = ? GROUP BY N.id ORDER BY N.updated_at DESC LIMIT ? OFFSET ?");
-            $stmt->execute([$status, $per_page, $offset]);
-            $results = $stmt->fetchAll();
-            foreach ($results as &$result) $result['content_snippet'] = get_content_snippet($result['content'], '{status::' . $status . '}');
+                $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, Pg.name as page_name, Prop.value as status FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages Pg ON N.page_id = Pg.id WHERE Prop.name = 'status' GROUP BY N.id ORDER BY N.updated_at DESC LIMIT ? OFFSET ?");
+                $stmt->execute([$per_page, $offset]);
+                $results = $stmt->fetchAll();
+                foreach ($results as &$result) $result['content_snippet'] = get_content_snippet($result['content'], '{status::' . $result['status'] . '}');
+            } else {
+                $count_stmt = $pdo->prepare("SELECT COUNT(DISTINCT N.id) FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id WHERE Prop.name = 'status' AND Prop.value = ?");
+                $count_stmt->execute([$status]);
+                $total = (int)$count_stmt->fetchColumn();
+
+                $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, Pg.name as page_name FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages Pg ON N.page_id = Pg.id WHERE Prop.name = 'status' AND Prop.value = ? GROUP BY N.id ORDER BY N.updated_at DESC LIMIT ? OFFSET ?");
+                $stmt->execute([$status, $per_page, $offset]);
+                $results = $stmt->fetchAll();
+                foreach ($results as &$result) $result['content_snippet'] = get_content_snippet($result['content'], '{status::' . $status . '}');
+            }
 
         } elseif (isset($_GET['favorites'])) {
             // Get pages that have a favorite property

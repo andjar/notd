@@ -1,5 +1,29 @@
 <?php
 
+if (!function_exists('send_json_response')) {
+    function send_json_response($data, $statusCode = 200) {
+        http_response_code($statusCode);
+        header('Content-Type: application/json');
+        echo json_encode($data);
+        exit;
+    }
+}
+
+if (!function_exists('send_json_error_response')) {
+    function send_json_error_response($message, $statusCode = 400, $details = null) {
+        $response = [
+            'status' => 'error',
+            'message' => $message
+        ];
+        
+        if ($details !== null) {
+            $response['details'] = $details;
+        }
+        
+        send_json_response($response, $statusCode);
+    }
+}
+
 class ApiResponse {
     public static function success($data, $statusCode = 200, $metadata = []) {
         http_response_code($statusCode);

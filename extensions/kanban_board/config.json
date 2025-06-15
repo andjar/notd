@@ -1,3 +1,31 @@
 {
-    "featherIcon": "trello"
+    "featherIcon": "trello",
+    "boards": [
+        {
+            "id": "all_tasks",
+            "label": "All Tasks",
+            "filters": []
+        },
+        {
+            "id": "work_tasks",
+            "label": "Work Tasks",
+            "filters": [
+                {"name": "type", "value": "work"}
+            ]
+        },
+        {
+            "id": "personal_tasks",
+            "label": "Personal Tasks",
+            "filters": [
+                {"name": "type", "value": "personal"}
+            ]
+        },
+        {
+            "id": "urgent_tasks",
+            "label": "Urgent Tasks",
+            "filters": [
+                {"name": "priority", "value": "high"}
+            ]
+        }
+    ]
 }

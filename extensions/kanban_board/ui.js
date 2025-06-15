@@ -34,6 +34,27 @@ const FALLBACK_COLUMN_ID = KANBAN_COLUMNS.length > 0 ? KANBAN_COLUMNS[0].id : 't
  */
 function getNoteStatus(note) {
     let status = FALLBACK_STATUS; // Default status from configured states or 'TODO'
+
+    // First check content prefix
+    if (note.content) {
+        // Dynamically generate statusKeywords from KANBAN_COLUMNS
+        let statusKeywords = [];
+        if (window.configuredKanbanStates && Array.isArray(window.configuredKanbanStates) && window.configuredKanbanStates.length > 0) {
+            statusKeywords = window.configuredKanbanStates.map(state => state.toUpperCase());
+        } else {
+            statusKeywords = KANBAN_COLUMNS.map(col => col.statusMatcher.toUpperCase());
+        }
+        
+        if (statusKeywords.length > 0) {
+            const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
+            const match = note.content.match(statusRegex);
+            if (match) {
+                return match[1].toUpperCase(); // Return the matched status
+            }
+        }
+    }
+
+    // If no status in content prefix, check properties
     if (note.properties && note.properties.status) {
         let rawStatus = '';
         if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
@@ -48,6 +69,7 @@ function getNoteStatus(note) {
             status = rawStatus.toUpperCase();
         }
     }
+
     return status;
 }
 
@@ -65,11 +87,35 @@ function createKanbanCard(note) {
     const currentStatus = getNoteStatus(note);
     cardElement.dataset.currentStatus = currentStatus;
     
-    // Render complex content if necessary, for now, just text.
-    // cardElement.innerHTML = parseAndRenderContent(note.content, note.id); // If complex rendering is needed
-    cardElement.innerHTML = note.content; // Simpler version for now
+    // ---- START MODIFICATION ----
+    let displayContent = note.content;
 
-    // console.log(`Creating card for note ID ${note.id}, status ${currentStatus}`);
+    // Dynamically generate statusKeywords from KANBAN_COLUMNS
+    let statusKeywords = [];
+    if (window.configuredKanbanStates && Array.isArray(window.configuredKanbanStates) && window.configuredKanbanStates.length > 0) {
+        statusKeywords = window.configuredKanbanStates.map(state => state.toUpperCase());
+    } else {
+        // Fallback if KANBAN_COLUMNS is somehow empty or not configured via window.configuredKanbanStates
+        // This uses the already defined KANBAN_COLUMNS which has its own fallback.
+        statusKeywords = KANBAN_COLUMNS.map(col => col.statusMatcher.toUpperCase());
+        if (statusKeywords.length === 0) { // True fallback if KANBAN_COLUMNS was also empty
+            console.warn('[Kanban Card] statusKeywords using default (TODO, DOING, DONE) in createKanbanCard because KANBAN_COLUMNS was empty.');
+            statusKeywords = ['TODO', 'DOING', 'DONE'];
+        }
+    }
+
+    if (statusKeywords.length > 0) {
+        const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
+        const match = note.content.match(statusRegex);
+        if (match) {
+            displayContent = note.content.substring(match[0].length);
+        }
+    }
+    // ---- END MODIFICATION ----
+
+    cardElement.textContent = displayContent; // Use plain text to prevent XSS
+
+    // console.log(`Creating card for note ID ${note.id}, status ${currentStatus}, display: "${displayContent}"`);
     return cardElement;
 }
 

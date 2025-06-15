@@ -253,7 +253,7 @@ if (!function_exists('_deleteNoteInBatch')) {
 }
 
 if (!function_exists('_handleBatchOperations')) {
-    function _handleBatchOperations($pdo, $dataManager, $operations) {
+    function _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties = false) {
         if (!is_array($operations)) {
             ApiResponse::error('Batch request validation failed: "operations" must be an array.', 400);
             return;
@@ -304,7 +304,8 @@ if ($method === 'GET') {
     }
 } elseif ($method === 'POST') {
     if (isset($input['action']) && $input['action'] === 'batch') {
-        $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? []);
+        $includeParentProperties = (bool)($input['include_parent_properties'] ?? false);
+        $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? [], $includeParentProperties);
         ApiResponse::success(['results' => $results]);
         return;
     }

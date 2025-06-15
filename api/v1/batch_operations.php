@@ -246,26 +246,28 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
 
 // --- Main Request Handling (for HTTP requests) ---
 // This part will only execute when the script is called directly via HTTP
-if (php_sapi_name() !== 'cli' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input = file_get_contents('php://input');
-    $requestData = json_decode($input, true);
+if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME']) === basename(__FILE__)) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = file_get_contents('php://input');
+        $requestData = json_decode($input, true);
 
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        send_json_error_response("Invalid JSON payload: " . json_last_error_msg(), 400);
-        // No exit here, allow script to terminate naturally for tests if json_decode fails
-    } elseif ($requestData === null && $input !== 'null') { // json_decode can return null for "null" input
-        send_json_error_response("Invalid JSON payload: Not decodable or empty.", 400);
-    } else {
-        // If $requestData is null here, it means json_decode failed for non-"null" input or input was "null"
-        // process_batch_request handles null $requestData['operations']
-        $response = process_batch_request($requestData ?? []); // Pass empty array if $requestData is null
-
-        if (isset($response['error'])) {
-            send_json_error_response($response['error'], $response['status_code'] ?? 500);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            send_json_error_response("Invalid JSON payload: " . json_last_error_msg(), 400);
+            // No exit here, allow script to terminate naturally for tests if json_decode fails
+        } elseif ($requestData === null && $input !== 'null') { // json_decode can return null for "null" input
+            send_json_error_response("Invalid JSON payload: Not decodable or empty.", 400);
         } else {
-            send_json_response($response);
+            // If $requestData is null here, it means json_decode failed for non-"null" input or input was "null"
+            // process_batch_request handles null $requestData['operations']
+            $response = process_batch_request($requestData ?? []); // Pass empty array if $requestData is null
+
+            if (isset($response['error'])) {
+                send_json_error_response($response['error'], $response['status_code'] ?? 500);
+            } else {
+                send_json_response($response);
+            }
         }
+    } else {
+        send_json_error_response("Invalid request method. Only POST is supported.", 405);
     }
-} elseif (php_sapi_name() !== 'cli' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
-    send_json_error_response("Invalid request method. Only POST is supported.", 405);
 }
