@@ -38,34 +38,7 @@ function initializeBoardSelector() {
     });
 }
 
-function filterNotesByBoard(notes, currentBoardId) {
-    const currentBoard = window.kanbanConfig.boards.find(b => b.id === currentBoardId);
-    if (!currentBoard) {
-        console.error(`Board configuration not found for ID: ${currentBoardId}`);
-        return [];
-    }
-
-    // Filter notes based on status, checking both note properties and parent properties
-    let filteredNotes = notes.filter(note => {
-        const statusProperty = note.properties?.status?.[0]?.value || 
-                             note.parent_properties?.status?.[0]?.value;
-        return statusProperty && currentBoard.statuses.includes(statusProperty.toUpperCase());
-    });
-
-    // Apply additional filters if any, checking both note properties and parent properties
-    if (currentBoard.filters && currentBoard.filters.length > 0) {
-        filteredNotes = filteredNotes.filter(note => {
-            return currentBoard.filters.every(filter => {
-                const noteProperty = note.properties?.[filter.name]?.[0]?.value;
-                const parentProperty = note.parent_properties?.[filter.name]?.[0]?.value;
-                return noteProperty === filter.value || parentProperty === filter.value;
-            });
-        });
-    }
-
-    return filteredNotes;
-}
-
+// Removed the standalone filterNotesByBoard function as its logic is now integrated into initializeKanban.
 export async function initializeKanban() {
     const kanbanRootElement = document.getElementById('kanban-root');
 
