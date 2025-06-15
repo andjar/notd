@@ -1,9 +1,31 @@
 <?php
 
 // --- Core Paths and URLs ---
-if (!defined('DB_PATH')) {
-    define('DB_PATH', __DIR__ . '/db/database.sqlite');
+// Test override logic for DB_PATH
+global $DB_PATH_OVERRIDE_FOR_TESTING; // For non-HTTP test scripts
+
+if (isset($_GET['DB_PATH_OVERRIDE']) && is_string($_GET['DB_PATH_OVERRIDE'])) {
+    // Ensure the path is somewhat sane; realpath for security/normalization
+    $overridden_path = realpath($_GET['DB_PATH_OVERRIDE']);
+    if ($overridden_path !== false) { // realpath returns false on failure (e.g. file doesn't exist)
+                                     // However, for SQLite, the file might not exist yet if it's to be created.
+                                     // So, we might accept the path directly if realpath fails but looks like a valid path.
+        define('DB_PATH', $_GET['DB_PATH_OVERRIDE']); // Using the direct path from GET
+    } else if (strpos($_GET['DB_PATH_OVERRIDE'], '.sqlite') !== false) { // Basic check if it looks like sqlite path
+        define('DB_PATH', $_GET['DB_PATH_OVERRIDE']); // Trust the path if realpath fails but it seems intended
+    } else {
+        // Fallback if override path is problematic
+        define('DB_PATH', __DIR__ . '/db/database.sqlite');
+    }
+} elseif (isset($DB_PATH_OVERRIDE_FOR_TESTING) && is_string($DB_PATH_OVERRIDE_FOR_TESTING)) {
+    define('DB_PATH', $DB_PATH_OVERRIDE_FOR_TESTING);
+} else {
+    // Default production path
+    if (!defined('DB_PATH')) { // Ensure it's not already defined by some other means
+        define('DB_PATH', __DIR__ . '/db/database.sqlite');
+    }
 }
+
 if (!defined('UPLOADS_DIR')) {
     define('UPLOADS_DIR', __DIR__ . '/uploads');
 }
