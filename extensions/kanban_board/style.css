@@ -18,9 +18,9 @@ body.kanban-page-body {
 }
 
 .kanban-header {
-    padding: 10px 20px;
-    background-color: var(--color-background-primary, #f8f9fa);
-    border-bottom: 1px solid var(--color-border, #dee2e6);
+    padding: 1rem;
+    background-color: var(--header-bg-color, #f8f9fa);
+    border-bottom: 1px solid var(--border-color, #ccc);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -29,8 +29,31 @@ body.kanban-page-body {
 
 .kanban-header h1 {
     margin: 0;
-    font-size: 1.5em;
-    color: var(--color-text-primary, #212529);
+    font-size: 1.5rem;
+    color: var(--text-color, #333);
+}
+
+.kanban-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+}
+
+.board-selector {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    background-color: var(--bg-color, #fff);
+    color: var(--text-color, #333);
+    font-size: 1rem;
+    min-width: 200px;
+}
+
+.board-selector:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 /* Styling for #kanban-root which gets .kanban-board-active */

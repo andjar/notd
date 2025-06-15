@@ -2,6 +2,64 @@ import { notesAPI, pagesAPI, queryAPI } from '../../assets/js/api_client.js'; //
 import { displayKanbanBoard } from './ui.js'; // Corrected path assuming ui.js is in the same directory
 import { setNotesForCurrentPage, notesForCurrentPage } from '../../assets/js/app/state.js'; // Corrected path
 
+let currentBoardId = 'all_tasks'; // Default board
+
+function initializeBoardSelector() {
+    const selector = document.getElementById('board-selector');
+    if (!selector || !window.kanbanConfig || !window.kanbanConfig.boards) {
+        console.error('Board selector or config not found');
+        return;
+    }
+
+    // Populate the selector with board options
+    window.kanbanConfig.boards.forEach(board => {
+        const option = document.createElement('option');
+        option.value = board.id;
+        option.textContent = board.label;
+        selector.appendChild(option);
+    });
+
+    // Set up change handler
+    selector.addEventListener('change', (e) => {
+        currentBoardId = e.target.value;
+        initializeKanban(); // Reinitialize with new board selection
+    });
+}
+
+function buildBoardSql(statusList) {
+    const currentBoard = window.kanbanConfig.boards.find(b => b.id === currentBoardId);
+    if (!currentBoard) {
+        console.error(`Board configuration not found for ID: ${currentBoardId}`);
+        return null;
+    }
+
+    let sql = `
+        SELECT DISTINCT N.id
+        FROM Notes N
+        JOIN Properties P ON N.id = P.note_id
+        WHERE P.name = 'status'
+        AND P.value IN (${statusList})
+    `;
+
+    // Add additional filters if any
+    if (currentBoard.filters && currentBoard.filters.length > 0) {
+        const additionalFilters = currentBoard.filters.map(filter => {
+            return `EXISTS (
+                SELECT 1 FROM Properties P2 
+                WHERE P2.note_id = N.id 
+                AND P2.name = '${filter.name}' 
+                AND P2.value = '${filter.value}'
+            )`;
+        });
+        
+        if (additionalFilters.length > 0) {
+            sql += ` AND ${additionalFilters.join(' AND ')}`;
+        }
+    }
+
+    return sql;
+}
+
 export async function initializeKanban() {
     const kanbanRootElement = document.getElementById('kanban-root');
 
@@ -30,10 +88,8 @@ export async function initializeKanban() {
         console.log('Attempting to fetch all notes for Kanban board...');
         let allNotes = [];
         try {
-            // Fetch notes using queryAPI with correct SQL for Kanban statuses
             console.log('Fetching task notes using queryAPI with SQL join on Properties...');
             
-            // Dynamically get KANBAN_STATUSES from global config
             let currentKanbanStatuses = [];
             if (window.configuredKanbanStates && Array.isArray(window.configuredKanbanStates) && window.configuredKanbanStates.length > 0) {
                 currentKanbanStatuses = window.configuredKanbanStates;
@@ -43,29 +99,26 @@ export async function initializeKanban() {
             }
             const statusList = currentKanbanStatuses.map(s => `'${s.toUpperCase()}'`).join(', ');
             
-            const sql = `
-                SELECT DISTINCT N.id
-                FROM Notes N
-                JOIN Properties P ON N.id = P.note_id
-                WHERE P.name = 'status'
-                AND P.value IN (${statusList})
-            `;
+            const sql = buildBoardSql(statusList);
+            if (!sql) {
+                throw new Error('Failed to build SQL query for current board');
+            }
+
             allNotes = await queryAPI.queryNotes(sql, { include_properties: true, per_page: 1000 });
 
             if (!allNotes || allNotes.length === 0) {
                 console.warn('No task notes found. Kanban board might be empty.');
-                allNotes = []; // Ensure it's an array in case of null/undefined response
+                allNotes = [];
             }
         } catch (fetchError) {
             console.error('Error fetching initial notes for Kanban:', fetchError);
-            allNotes = []; // Ensure it's an array on error
+            allNotes = [];
         }
         
-        setNotesForCurrentPage(allNotes); // Store globally
+        setNotesForCurrentPage(allNotes);
 
         if (kanbanRootElement) {
-            kanbanRootElement.innerHTML = ''; // Clear "Loading..." message
-            // notesForCurrentPage is an array that holds the notes from the state
+            kanbanRootElement.innerHTML = '';
             displayKanbanBoard(kanbanRootElement, notesForCurrentPage); 
         }
 
@@ -76,3 +129,9 @@ export async function initializeKanban() {
         }
     }
 }
+
+// Initialize the board selector when the module loads
+document.addEventListener('DOMContentLoaded', () => {
+    initializeBoardSelector();
+    initializeKanban();
+});

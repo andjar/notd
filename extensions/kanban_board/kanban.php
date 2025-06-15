@@ -21,8 +21,12 @@ require_once '../../config.php';
     <div class="app-container kanban-app-container">
         <header class="kanban-header">
             <h1>Kanban Task Board</h1>
-            <!-- Maybe a link back to the main app -->
-            <a href="/" class="action-button">Back to Main App</a>
+            <div class="kanban-controls">
+                <select id="board-selector" class="board-selector">
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+                <a href="/" class="action-button">Back to Main App</a>
+            </div>
         </header>
         <main id="kanban-root" class="kanban-root">
             <!-- Kanban board will be rendered here by JavaScript -->
@@ -31,6 +35,12 @@ require_once '../../config.php';
     </div>
 
     <script>
+      // Load board configurations from config.json
+      <?php
+      $configPath = __DIR__ . '/config.json';
+      $config = json_decode(file_get_contents($configPath), true);
+      ?>
+      window.kanbanConfig = <?php echo json_encode($config); ?>;
       window.configuredKanbanStates = <?php echo defined('TASK_STATES') ? json_encode(TASK_STATES) : json_encode(['TODO', 'DOING', 'DONE']); ?>;
     </script>
 
