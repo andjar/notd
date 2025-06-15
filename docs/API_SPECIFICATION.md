@@ -48,6 +48,18 @@ Properties are defined within content using a key, a variable number of colons (
 *   `key:::value` or `{key:::value}` -> **Weight 3** (Internal property)
 *   `key::::value` or `{key::::value}` -> **Weight 4** (System property, e.g., for logging)
 
+#### Special Properties
+
+The system automatically adds certain special properties with specific weights to track different types of content:
+
+*   **SQL Properties** (Weight 3): Added when SQL code blocks are detected in the content. Used to track and manage SQL queries.
+*   **Task Properties** (Weight 4): Added for task management, tracking task states like TODO, DOING, DONE, etc.
+*   **Done At Properties** (Weight 3): Automatically added when a task is marked as done, recording the completion timestamp.
+*   **Transclusion Properties** (Weight 3): Added when content from other notes is embedded (transcluded) into the current note.
+*   **Link Properties** (Weight 3): Added when the note contains links to other pages or notes.
+
+These special properties are managed by the system and should not be manually modified. They are used for internal tracking and functionality.
+
 #### Configuration (`config.php`)
 
 The behavior of properties based on their weight is defined in `config.php` and interpreted by the **frontend**. The API's role is simply to parse and return the properties with their weight.
@@ -714,7 +726,7 @@ The Search endpoint also supports other modes:
 *   **(Response structure similar to `q` search but `content_snippet` will highlight the link)**
 
 #### **`GET /api/v1/search.php?tasks={status}`**
-*   **Description**: Finds all notes with a `{status::TODO}` or `{status::DONE}` property. `status` can be `TODO` or `DONE`. Supports pagination and `include_parent_properties`.
+*   **Description**: Finds all notes with a `{status::TODO}` or `{status::DONE}` etc. property. `status` can be `TODO`, `DONE`, ..., or `ALL`. Supports pagination and `include_parent_properties`.
 *   **(Response structure similar to `q` search but `content_snippet` will highlight the status property)**
 
 #### **`GET /api/v1/search.php?favorites=true`**
