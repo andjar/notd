@@ -280,11 +280,12 @@ if ($method === 'GET') {
     // If 'include_internal' is not set, filter_input returns null, which (bool)null casts to false.
     // This prevents the TypeError in the DataManager.
     $includeInternal = (bool)filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
+    $includeParentProperties = (bool)filter_input(INPUT_GET, 'include_parent_properties', FILTER_VALIDATE_BOOLEAN);
     
     try {
         if (isset($_GET['id'])) {
             $noteId = (int)$_GET['id'];
-            $note = $dataManager->getNoteById($noteId, $includeInternal);
+            $note = $dataManager->getNoteById($noteId, $includeInternal, $includeParentProperties);
             if ($note) {
                 ApiResponse::success($note);
             } else {
