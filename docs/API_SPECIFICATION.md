@@ -57,6 +57,7 @@ The system automatically adds certain special properties with specific weights t
 *   **Done At Properties** (Weight 3): Automatically added when a task is marked as done, recording the completion timestamp.
 *   **Transclusion Properties** (Weight 3): Added when content from other notes is embedded (transcluded) into the current note.
 *   **Link Properties** (Weight 3): Added when the note contains links to other pages or notes.
+*   **URL Properties** (Weight 3): Added when the note contains urls.
 
 These special properties are managed by the system and should not be manually modified. They are used for internal tracking and functionality.
 
