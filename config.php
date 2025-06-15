@@ -46,7 +46,8 @@ define('SPECIAL_STATE_WEIGHTS', [
     'TASK' => 4,
     'DONE_AT' => 3,
     'TRANSCLUSION' => 3,
-    'LINK' => 3
+    'LINK' => 3,
+    'URL' => 3
 ]);
 
 // --- Property System Configuration ---

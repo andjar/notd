@@ -166,6 +166,16 @@ class PatternProcessor {
                 'modify_content' => false
             ]
         );
+
+        // External URL patterns: http:// or https:// URLs
+        $this->registerHandler('external_urls', '/(https?:\/\/[^\s<>"]+|www\.[^\s<>"]+)/',
+            [$this, 'handleExternalUrls'],
+            [
+                'priority' => 25,
+                'extract_properties' => true,
+                'modify_content' => false
+            ]
+        );
     }
     
     /**
@@ -341,6 +351,42 @@ class PatternProcessor {
         
         $result = ['properties' => $properties];
         error_log("[PATTERN_PROCESSOR_DEBUG] Returning SQL query properties: " . json_encode($result));
+        return $result;
+    }
+    
+    /**
+     * Handler for external URL patterns
+     * Matches URLs starting with http:// or https://
+     */
+    private function handleExternalUrls($matches, $content, $entityType, $entityId, $context, $pdo) {
+        error_log("[PATTERN_PROCESSOR_DEBUG] Processing external URL matches: " . json_encode($matches));
+        $properties = [];
+
+        foreach ($matches as $match) {
+            $url = trim($match[0]); // The full matched URL
+            
+            if (!empty($url)) {
+                // Ensure URL starts with http:// or https://
+                if (strpos($url, 'www.') === 0) {
+                    $url = 'https://' . $url;
+                }
+                
+                error_log("[PATTERN_PROCESSOR_DEBUG] Processing URL: " . $url);
+                $properties[] = [
+                    'name' => 'external_url',
+                    'value' => $url,
+                    'type' => 'url',
+                    'raw_match' => $match[0],
+                    'weight' => defined('SPECIAL_STATE_WEIGHTS') && isset(SPECIAL_STATE_WEIGHTS['URL']) ? SPECIAL_STATE_WEIGHTS['URL'] : 4
+                ];
+                error_log("[PATTERN_PROCESSOR_DEBUG] Stored URL property: " . json_encode(end($properties)));
+            } else {
+                error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty URL.");
+            }
+        }
+        
+        $result = ['properties' => $properties];
+        error_log("[PATTERN_PROCESSOR_DEBUG] Returning URL properties: " . json_encode($result));
         return $result;
     }
     
