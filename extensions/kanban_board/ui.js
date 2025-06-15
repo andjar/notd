@@ -258,8 +258,20 @@ export function displayKanbanBoard(containerElement, notes) {
 
                     const response = await notesAPI.batchUpdateNotes([batchOperation]);
                     
-                    if (response.status === 'success' && response.data && response.data.results) {
-                        const updateResult = response.data.results.find(r => r.type === 'update' && r.note && r.note.id === parseInt(noteId));
+                    console.log('Batch update response:', JSON.stringify(response, null, 2));
+                    
+                    // Handle both response formats: wrapped {status, data} and direct {results}
+                    const results = response.data?.results || response.results;
+                    console.log('Response validation:', {
+                        hasResults: !!results,
+                        resultsLength: results?.length,
+                        responseFormat: response.data ? 'wrapped' : 'direct'
+                    });
+
+                    if (results && Array.isArray(results)) {
+                        const updateResult = results.find(r => r.type === 'update' && r.note && r.note.id === parseInt(noteId));
+                        console.log('Update result:', updateResult);
+                        
                         if (updateResult && updateResult.status === 'success') {
                             // Update local note object with the server response
                             const updatedNote = updateResult.note;
