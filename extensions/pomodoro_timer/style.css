@@ -1,150 +1,260 @@
+/* Pomodoro Timer Styles - Using App Theme Variables */
+
+/* Using CSS variables for easier theming if needed later */
+:root {
+    /* Remove custom variables since we're using theme variables */
+    --pomodoro-bg-start: var(--ls-gray-1);
+    --pomodoro-bg-end: var(--ls-gray-3);
+    --pomodoro-orb-bg: rgba(231, 76, 60, 0.9); /* Pomodoro Red */
+    --pomodoro-orb-shadow: rgba(231, 76, 60, 0.3);
+    --pomodoro-text-color: #ecf0f1;
+    --pomodoro-dot-color: rgba(236, 240, 241, 0.7);
+    --pomodoro-bubble-color1: rgba(255, 100, 0, 0.35);
+    --pomodoro-bubble-color2: rgba(230, 50, 50, 0.35);
+}
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background-color: #2c3e50; /* Dark blue-grey, similar to a splash screen */
+    font-family: var(--ls-font-family);
     margin: 0;
-    color: #ecf0f1; /* Light text color */
-  }
-  
-  #pomodoro-container {
-    background-color: #34495e; /* Slightly lighter container background */
-    padding: 30px;
-    border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    text-align: center;
-    width: 400px;
-  }
-  
-  #timer-orb {
-    width: 200px;
-    height: 200px;
-    background-color: #e74c3c; /* Pomodoro red */
-    border-radius: 50%;
-    margin: 20px auto;
+    /* The background is handled by the #pomodoro-container overlay and the main style.css */
+    color: var(--ls-primary-text-color);
+    overflow: hidden;
+}
+
+#pomodoro-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    position: relative; /* For animation placeholders */
-    box-shadow: inset 0 0 15px rgba(0,0,0,0.3), 0 5px 10px rgba(0,0,0,0.2);
-  }
-  
-  #timer-display {
+    z-index: 1;
+    /* This background exactly matches the main #splash-screen background */
+    background: radial-gradient(ellipse at center, var(--ls-gray-1) 0%, var(--ls-gray-3) 70%, var(--ls-gray-4) 100%);
+}
+
+.time-date-container {
+    text-align: center;
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+.clock {
+    font-size: 2.5em;
+    font-weight: 300;
+    color: var(--ls-primary-text-color);
+    margin-bottom: 5px;
+}
+
+.date {
+    font-size: 1.2em;
+    color: var(--ls-secondary-text-color);
+}
+
+#pomodoro-background-bubbles-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 2;
+}
+
+.pomodoro-bubble {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0; /* JS will handle animation */
+    /* Background color will be set by JS using theme variables */
+}
+
+#pomodoro-orb-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+}
+
+#pomodoro-orb-inner-core {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    background-color: var(--ls-gray-8);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+#pomodoro-orb-perimeter-dots {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.pomodoro-orb-dot {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    background-color: var(--ls-splash-orb-dot-color);
+    border-radius: 50%;
+    opacity: 0;
+    transform: translate(-50%, -50%); /* Center the dot */
+}
+
+#timer-display {
     font-size: 3.5em;
-    color: white;
-    font-weight: bold;
-  }
-  
-  /* Basic animation placeholders - can be enhanced with JS */
-  .bubble {
-    width: 30px;
-    height: 30px;
-    background-color: rgba(236, 240, 241, 0.3); /* Light, semi-transparent */
-    border-radius: 50%;
-    position: absolute;
-    bottom: 10px;
-    left: 20px;
-    animation: bubble-float 5s infinite ease-in-out;
-  }
-  
-  .dot {
-    width: 10px;
-    height: 10px;
-    background-color: rgba(236, 240, 241, 0.5);
-    border-radius: 50%;
-    position: absolute;
-    top: 20px;
-    right: 30px;
-    animation: dot-pulse 2s infinite alternate;
-  }
-  
-  @keyframes bubble-float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-15px); }
-  }
-  
-  @keyframes dot-pulse {
-    0% { transform: scale(1); opacity: 0.7; }
-    100% { transform: scale(1.2); opacity: 1; }
-  }
-  
-  #controls button {
-    background-color: #3498db; /* Blue */
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    font-size: 1.1em;
-    margin: 10px 5px;
-    border-radius: 5px;
+    color: var(--ls-splash-orb-text-color);
+    font-weight: 300;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 11;
+    font-family: 'Ubuntu', var(--ls-header-font-family);
+    margin-top: -20px;
+}
+
+#controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    z-index: 11;
+}
+
+#controls button {
+    background-color: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 65%, 0.2);
+    color: var(--ls-gray-4);
+    border: 1px solid hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 65%, 0.5);
+    padding: 8px 16px;
+    font-size: 0.9em;
+    border-radius: 15px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  
-  #controls button:hover {
-    background-color: #2980b9;
-  }
-  
-  #controls button#pause {
-    background-color: #f39c12; /* Orange for pause */
-  }
-  #controls button#pause:hover {
-    background-color: #e67e22;
-  }
-  
-  #controls button#reset {
-    background-color: #95a5a6; /* Grey for reset */
-  }
-  #controls button#reset:hover {
-    background-color: #7f8c8d;
-  }
-  
-  #settings {
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+#controls button:hover {
+    background-color: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 65%, 0.4);
+    border-color: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 65%, 0.8);
+    transform: translateY(-2px);
+}
+
+#controls button:active {
+    transform: translateY(0);
+}
+
+/* Pause button uses Warning/Orange color from the theme */
+#controls button#pause {
+    /* Using a generic orange/warning color - assuming one exists or using a fallback */
+    background-color: hsla(39, 89%, 56%, 0.2); /* Approx. from --ls-task-keyword-later-bg */
+    border-color: hsla(39, 89%, 56%, 0.5);
+}
+
+#controls button#pause:hover {
+    background-color: hsla(39, 89%, 56%, 0.4);
+    border-color: hsla(39, 89%, 56%, 0.8);
+}
+
+/* Reset button uses Gray color from the theme */
+#controls button#reset {
+    background-color: hsla(200, 10%, 60%, 0.2); /* Approx. from --ls-gray-6 */
+    border-color: hsla(200, 10%, 60%, 0.5);
+}
+
+#controls button#reset:hover {
+    background-color: hsla(200, 10%, 60%, 0.4);
+    border-color: hsla(200, 10%, 60%, 0.8);
+}
+
+#notes-config {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 350px;
+    z-index: 11;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+#notes-config textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    background-color: transparent;
+    color: var(--ls-primary-text-color);
+    font-size: 0.9em;
+    min-height: 50px;
+    resize: vertical;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    text-align: center;
+}
+
+#notes-config textarea::placeholder {
+    color: var(--ls-tertiary-text-color);
+    text-align: center;
+}
+
+#settings {
     margin-top: 30px;
-    text-align: left;
-  }
-  
-  #settings div {
+    background-color: rgba(52, 73, 94, 0.8);
+    padding: 20px;
+    border-radius: 15px;
+    backdrop-filter: blur(5px);
+    width: 100%;
+}
+
+#settings div {
     margin-bottom: 15px;
-  }
-  
-  #settings label {
+}
+
+#settings label {
     display: block;
     margin-bottom: 5px;
-    color: #bdc3c7; /* Lighter grey for labels */
-  }
-  
-  #settings input[type="number"] {
+    color: #ecf0f1;
+}
+
+#settings input[type="number"] {
     width: 60px;
     padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #7f8c8d;
-    background-color: #ecf0f1;
-    color: #34495e;
+    border-radius: 20px;
+    border: 1px solid rgba(127, 140, 141, 0.3);
+    background-color: rgba(236, 240, 241, 0.9);
+    color: #2c3e50;
     font-size: 1em;
-  }
-  
-  #notes-config {
-    margin-top: 20px;
-    text-align: left;
-  }
-  
-  #notes-config label {
-    display: block;
-    margin-bottom: 5px;
-    color: #bdc3c7;
-  }
-  
-  #notes-config textarea {
-    width: calc(100% - 20px); /* Full width minus padding */
-    padding: 10px;
-    border-radius: 4px;
-    border: 1px solid #7f8c8d;
-    background-color: #ecf0f1;
-    color: #34495e;
-    font-size: 0.9em;
-    min-height: 60px;
-    resize: vertical;
-  }
+    text-align: center;
+}
+
+/* Add this script to your HTML to create bubbles dynamically */
+.bubble-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
   
