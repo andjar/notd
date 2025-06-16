@@ -30,6 +30,9 @@
                 </div>
             </div>
         </div>
+        <div id="notes-config">
+            <textarea id="note-properties" placeholder="key:value, key2:value2"></textarea>
+        </div>
     </div>
     
     <script src="animations.js"></script>
