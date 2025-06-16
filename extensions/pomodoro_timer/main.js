@@ -1,12 +1,22 @@
 // Pomodoro Timer Logic
 
-// --- Timer Core Functionality ---
-let workDuration = 25 * 60; // seconds
-let shortBreakDuration = 5 * 60; // seconds
-let longBreakDuration = 15 * 60; // seconds
-let pomodorosBeforeLongBreak = 4;
+// --- Configuration Store ---
+let config = {
+  workDurationMinutes: 25,
+  shortBreakDurationMinutes: 5,
+  longBreakDurationMinutes: 15,
+  pomodorosBeforeLongBreak: 4,
+  // Values in seconds, to be populated after fetching config.json
+  workDurationSeconds: 25 * 60,
+  shortBreakDurationSeconds: 5 * 60,
+  longBreakDurationSeconds: 15 * 60,
+};
 
-let currentTime = workDuration;
+// --- Timer Core Functionality ---
+// Durations will be loaded from config
+let pomodorosBeforeLongBreak = 4; // Will be updated from config
+
+let currentTime; // Will be initialized after config load
 let timerState = 'stopped'; // 'running', 'paused', 'stopped'
 let currentSessionType = 'work'; // 'work', 'shortBreak', 'longBreak'
 let pomodorosCompleted = 0;
@@ -15,11 +25,11 @@ let timerInterval = null;
 // DOM Elements
 const timerDisplay = document.getElementById('timer-display');
 const startButton = document.getElementById('start');
-const pauseButton = document.getElementById('pause');
-const resetButton = document.getElementById('reset');
-const workDurationInput = document.getElementById('work-duration');
-const shortBreakDurationInput = document.getElementById('short-break-duration');
-const longBreakDurationInput = document.getElementById('long-break-duration');
+// const pauseButton = document.getElementById('pause'); // Removed
+// const resetButton = document.getElementById('reset'); // Removed
+const workDurationInput = document.getElementById('work-duration'); // Element no longer in HTML
+const shortBreakDurationInput = document.getElementById('short-break-duration'); // Element no longer in HTML
+const longBreakDurationInput = document.getElementById('long-break-duration'); // Element no longer in HTML
 const notePropertiesTextarea = document.getElementById('note-properties');
 const timerOrb = document.getElementById('timer-orb'); // For animations
 
@@ -37,11 +47,11 @@ function startTimer() {
     if (timerState === 'stopped') {
         // Determine current time based on session type if starting fresh
         if (currentSessionType === 'work') {
-            currentTime = parseInt(workDurationInput.value) * 60;
+            currentTime = config.workDurationSeconds;
         } else if (currentSessionType === 'shortBreak') {
-            currentTime = parseInt(shortBreakDurationInput.value) * 60;
+            currentTime = config.shortBreakDurationSeconds;
         } else if (currentSessionType === 'longBreak') {
-            currentTime = parseInt(longBreakDurationInput.value) * 60;
+            currentTime = config.longBreakDurationSeconds;
         }
     }
     // If resuming, currentTime is already set from when it was paused.
@@ -49,9 +59,9 @@ function startTimer() {
 
 
   timerState = 'running';
-  startButton.textContent = 'Start'; // Or disable, or change to "Focusing..."
-  pauseButton.disabled = false;
-  resetButton.disabled = false;
+  startButton.textContent = 'Pause'; // Updated for single button UI
+  // pauseButton.disabled = false; // Removed
+  // resetButton.disabled = false; // Removed
 
   console.log(`Starting ${currentSessionType} session. Duration: ${currentTime}s. State: ${timerState}`);
 
@@ -72,7 +82,7 @@ function pauseTimer() {
   if (timerState === 'running') {
     clearInterval(timerInterval);
     timerState = 'paused';
-    startButton.textContent = 'Resume';
+    startButton.textContent = 'Resume'; // Updated for single button UI
     console.log('Timer paused');
   }
 }
@@ -82,11 +92,11 @@ function resetTimer() {
   timerState = 'stopped';
   // Reset to work session by default, or could be context-aware
   currentSessionType = 'work';
-  currentTime = parseInt(workDurationInput.value) * 60;
+  currentTime = config.workDurationSeconds;
   pomodorosCompleted = 0; // Reset pomodoro count on a full reset
   updateTimerDisplay();
-  startButton.textContent = 'Start';
-  pauseButton.disabled = true;
+  startButton.textContent = 'Start'; // Updated for single button UI
+  // pauseButton.disabled = true; // Removed
   console.log('Timer reset');
 }
 
@@ -98,7 +108,7 @@ function handleSessionEnd() {
 
   if (currentSessionType === 'work') {
     pomodorosCompleted++;
-    if (pomodorosCompleted % pomodorosBeforeLongBreak === 0) {
+    if (pomodorosCompleted % config.pomodorosBeforeLongBreak === 0) { // Use config value
       currentSessionType = 'longBreak';
     } else {
       currentSessionType = 'shortBreak';
@@ -107,13 +117,13 @@ function handleSessionEnd() {
     currentSessionType = 'work';
   }
 
-  // Update currentTime for the new session based on input fields
+  // Update currentTime for the new session based on config
   if (currentSessionType === 'work') {
-      currentTime = parseInt(workDurationInput.value) * 60;
+      currentTime = config.workDurationSeconds;
   } else if (currentSessionType === 'shortBreak') {
-      currentTime = parseInt(shortBreakDurationInput.value) * 60;
+      currentTime = config.shortBreakDurationSeconds;
   } else if (currentSessionType === 'longBreak') {
-      currentTime = parseInt(longBreakDurationInput.value) * 60;
+      currentTime = config.longBreakDurationSeconds;
   }
   // timerState = 'stopped'; // Ready for next start
   // updateTimerDisplay(); // Show new session's time
@@ -124,9 +134,10 @@ function handleSessionEnd() {
 }
 
 function getDurationForSessionType(sessionType) {
-    if (sessionType === 'work') return parseInt(workDurationInput.value);
-    if (sessionType === 'shortBreak') return parseInt(shortBreakDurationInput.value);
-    if (sessionType === 'longBreak') return parseInt(longBreakDurationInput.value);
+    // Returns duration in minutes from config
+    if (sessionType === 'work') return config.workDurationMinutes;
+    if (sessionType === 'shortBreak') return config.shortBreakDurationMinutes;
+    if (sessionType === 'longBreak') return config.longBreakDurationMinutes;
     return 0;
 }
 
@@ -318,49 +329,81 @@ async function logSession(sessionType, durationMinutes, customProperties) {
 
 // --- Event Listeners ---
 startButton.addEventListener('click', () => {
-    if (timerState === 'paused') { // If paused, resume
-        timerState = 'stopped'; // To allow startTimer to pick up current session type correctly
-    }
+  if (timerState === 'running') {
+    pauseTimer();
+  } else { // 'stopped' or 'paused'
     startTimer();
-});
-pauseButton.addEventListener('click', pauseTimer);
-resetButton.addEventListener('click', resetTimer);
-
-workDurationInput.addEventListener('change', () => {
-  if (timerState === 'stopped' && currentSessionType === 'work') {
-    currentTime = parseInt(workDurationInput.value) * 60;
-    updateTimerDisplay();
   }
 });
+// pauseButton.addEventListener('click', pauseTimer); // Removed
+// resetButton.addEventListener('click', resetTimer); // Removed
 
-shortBreakDurationInput.addEventListener('change', () => {
-  if (timerState === 'stopped' && currentSessionType === 'shortBreak') {
-    currentTime = parseInt(shortBreakDurationInput.value) * 60;
-    updateTimerDisplay();
-  }
-});
+// workDurationInput.addEventListener('change', () => {
+//   if (timerState === 'stopped' && currentSessionType === 'work') {
+//     currentTime = parseInt(workDurationInput.value) * 60;
+//     updateTimerDisplay();
+//   }
+// });
 
-longBreakDurationInput.addEventListener('change', () => {
-  if (timerState === 'stopped' && currentSessionType === 'longBreak') {
-    currentTime = parseInt(longBreakDurationInput.value) * 60;
-    updateTimerDisplay();
-  }
-});
+// shortBreakDurationInput.addEventListener('change', () => {
+//   if (timerState === 'stopped' && currentSessionType === 'shortBreak') {
+//     currentTime = parseInt(shortBreakDurationInput.value) * 60;
+//     updateTimerDisplay();
+//   }
+// });
+
+// longBreakDurationInput.addEventListener('change', () => {
+//   if (timerState === 'stopped' && currentSessionType === 'longBreak') {
+//     currentTime = parseInt(longBreakDurationInput.value) * 60;
+//     updateTimerDisplay();
+//   }
+// });
 
 
 // --- Initialization ---
-function initializeTimer() {
-  // Set initial values from inputs
-  workDuration = parseInt(workDurationInput.value) * 60;
-  shortBreakDuration = parseInt(shortBreakDurationInput.value) * 60;
-  longBreakDuration = parseInt(longBreakDurationInput.value) * 60;
+async function initializeTimer() {
+  try {
+    const response = await fetch('./config.json');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const fetchedConfig = await response.json();
+
+    // Update global config object, providing defaults if keys are missing
+    config.workDurationMinutes = fetchedConfig.workDurationMinutes || 25;
+    config.shortBreakDurationMinutes = fetchedConfig.shortBreakDurationMinutes || 5;
+    config.longBreakDurationMinutes = fetchedConfig.longBreakDurationMinutes || 15;
+    config.pomodorosBeforeLongBreak = fetchedConfig.pomodorosBeforeLongBreak || 4;
+
+    // Calculate and store durations in seconds
+    config.workDurationSeconds = config.workDurationMinutes * 60;
+    config.shortBreakDurationSeconds = config.shortBreakDurationMinutes * 60;
+    config.longBreakDurationSeconds = config.longBreakDurationMinutes * 60;
+
+    // Update the standalone pomodorosBeforeLongBreak variable as well, as it's used directly in some places
+    // Though ideally, all usage should go via config object. For now, this maintains compatibility.
+    pomodorosBeforeLongBreak = config.pomodorosBeforeLongBreak;
+
+    console.log("Configuration loaded:", config);
+
+  } catch (error) {
+    console.error("Failed to load config.json. Using default values.", error);
+    // Default values are already set in the config object, so we can proceed.
+    // Ensure seconds are calculated based on default minutes
+    config.workDurationSeconds = config.workDurationMinutes * 60;
+    config.shortBreakDurationSeconds = config.shortBreakDurationMinutes * 60;
+    config.longBreakDurationSeconds = config.longBreakDurationMinutes * 60;
+    pomodorosBeforeLongBreak = config.pomodorosBeforeLongBreak; // Ensure this is also set
+  }
   
-  currentTime = workDuration; // Start with work session time
+  // currentTime = workDuration; // old: Start with work session time
+  currentTime = config.workDurationSeconds; // Start with work session time from config
   currentSessionType = 'work';
   timerState = 'stopped';
 
   updateTimerDisplay();
-  pauseButton.disabled = true; // Can't pause if not started
+  startButton.textContent = 'Start'; // Ensure initial button text is "Start"
+  // pauseButton.disabled = true; // Removed
 
   initPerimeterDots();
   initBackgroundBubbles();
@@ -368,9 +411,12 @@ function initializeTimer() {
   animationFrameId = requestAnimationFrame(animationLoop); // Start animations
 
   console.log("Pomodoro Timer Initialized");
-  console.log(`Initial settings: Work: ${workDurationInput.value}m, Short Break: ${shortBreakDurationInput.value}m, Long Break: ${longBreakDurationInput.value}m`);
+  console.log(`Initial settings from config: Work: ${config.workDurationMinutes}m, Short Break: ${config.shortBreakDurationMinutes}m, Long Break: ${config.longBreakDurationMinutes}m, Pomos: ${config.pomodorosBeforeLongBreak}`);
 }
 
 // Initialize when the script loads
-initializeTimer();
-console.log("Pomodoro Timer main.js loaded and initialized.");
+initializeTimer().then(() => {
+  console.log("Pomodoro Timer main.js loaded and initialized after config load.");
+}).catch(error => {
+  console.error("Error during async initialization:", error);
+});

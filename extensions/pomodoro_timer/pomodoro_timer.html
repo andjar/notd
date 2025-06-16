@@ -13,31 +13,17 @@
       <div class="dot"></div>
     </div>
 
-    <div id="controls">
+    <div id="main-controls"> <!-- Renamed from "controls" and restructured -->
       <button id="start">Start</button>
-      <button id="pause">Pause</button>
-      <button id="reset">Reset</button>
-    </div>
-
-    <div id="settings">
-      <div>
-        <label for="work-duration">Work Duration (minutes):</label>
-        <input type="number" id="work-duration" value="25" min="1">
-      </div>
-      <div>
-        <label for="short-break-duration">Short Break (minutes):</label>
-        <input type="number" id="short-break-duration" value="5" min="1">
-      </div>
-      <div>
-        <label for="long-break-duration">Long Break (minutes):</label>
-        <input type="number" id="long-break-duration" value="15" min="1">
+      <!-- Pause and Reset buttons removed -->
+      <div id="notes-config"> <!-- Moved inside main-controls -->
+        <label for="note-properties">Custom Note Properties (e.g., task_type:coding):</label>
+        <textarea id="note-properties" placeholder="key:value, key2:value2"></textarea>
       </div>
     </div>
 
-    <div id="notes-config">
-      <label for="note-properties">Custom Note Properties (e.g., task_type:coding):</label>
-      <textarea id="note-properties" placeholder="key:value, key2:value2"></textarea>
-    </div>
+    <!-- Settings div removed -->
+
   </div>
   <script src="main.js"></script>
 </body>

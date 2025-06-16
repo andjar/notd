@@ -1,3 +1,7 @@
 {
-    "featherIcon": "clock"
+    "featherIcon": "clock",
+    "workDurationMinutes": 25,
+    "shortBreakDurationMinutes": 5,
+    "longBreakDurationMinutes": 15,
+    "pomodorosBeforeLongBreak": 4
 }
