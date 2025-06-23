@@ -349,13 +349,129 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     // Logic from note-actions.js handleEnterKey goes here
                 }
             }));
+
+            Alpine.data('calendarWidget', () => ({
+                // --- State ---
+                currentDisplayDate: new Date(),
+                pagesCache: [], // Raw pages from API
+                dateToPageMap: new Map(), // O(1) lookup map for performance
+                weekdays: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+                
+                // --- Computed Properties (Getters) ---
+                get monthYearDisplay() {
+                    return this.currentDisplayDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                },
+
+                get calendarGrid() {
+                    const year = this.currentDisplayDate.getFullYear();
+                    const month = this.currentDisplayDate.getMonth();
+                    const todayFormatted = new Date().toISOString().split('T')[0];
+                    
+                    const firstDayOfMonth = new Date(year, month, 1);
+                    const lastDayOfMonth = new Date(year, month + 1, 0);
+
+                    // JS getDay() is 0 (Sun) - 6 (Sat). We want 0 (Mon) - 6 (Sun).
+                    const startDayOfWeek = firstDayOfMonth.getDay() === 0 ? 6 : firstDayOfMonth.getDay() - 1;
+
+                    const grid = [];
+                    
+                    // Add empty cells for the start of the month
+                    for (let i = 0; i < startDayOfWeek; i++) {
+                        grid.push({ type: 'empty' });
+                    }
+
+                    // Add day cells for the month
+                    for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+                        const date = new Date(year, month, day);
+                        const formattedDate = date.toISOString().split('T')[0];
+                        const pageForDate = this.dateToPageMap.get(formattedDate);
+                        const isCurrentPage = Alpine.store('app').currentPageName === (pageForDate?.name || formattedDate);
+
+                        grid.push({
+                            type: 'day',
+                            day: day,
+                            date: formattedDate,
+                            isToday: formattedDate === todayFormatted,
+                            hasContent: !!pageForDate,
+                            pageName: pageForDate?.name || formattedDate,
+                            isCurrentPage: isCurrentPage,
+                        });
+                    }
+                    return grid;
+                },
+
+                // --- Methods ---
+                async init() {
+                    console.log("Calendar widget initializing...");
+                    // Ensure weekdays is initialized
+                    this.weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                    await this.fetchAndProcessData();
+
+                    // Watch for page changes and refresh the calendar's "current page" highlight
+                    this.$watch('$store.app.currentPageName', () => {
+                        // No need to re-render the whole grid, Alpine's reactivity on `isCurrentPage` handles it.
+                        // This is just a log to show it's working.
+                        console.log('Calendar detected page change to:', Alpine.store('app').currentPageName);
+                    });
+                },
+
+                async fetchAndProcessData() {
+                    try {
+                        const { pages } = await pagesAPI.getPages({ per_page: 5000 });
+                        this.pagesCache = pages || [];
+                        this.processPageDataIntoMap();
+                    } catch (error) {
+                        console.error('Error fetching pages for calendar:', error);
+                    }
+                },
+                
+                processPageDataIntoMap() {
+                    this.dateToPageMap.clear();
+                    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+                    for (const page of this.pagesCache) {
+                        if (dateRegex.test(page.name)) {
+                            this.dateToPageMap.set(page.name, page);
+                        }
+                        if (page.properties?.date && Array.isArray(page.properties.date)) {
+                            for (const dateProp of page.properties.date) {
+                                if (dateProp.value && !this.dateToPageMap.has(dateProp.value)) {
+                                    this.dateToPageMap.set(dateProp.value, page);
+                                }
+                            }
+                        }
+                    }
+                },
+
+                goToPrevMonth() {
+                    this.currentDisplayDate.setMonth(this.currentDisplayDate.getMonth() - 1);
+                    // Force a re-render by creating a new Date object
+                    this.currentDisplayDate = new Date(this.currentDisplayDate);
+                },
+
+                goToNextMonth() {
+                    this.currentDisplayDate.setMonth(this.currentDisplayDate.getMonth() + 1);
+                    this.currentDisplayDate = new Date(this.currentDisplayDate);
+                },
+
+                goToToday() {
+                    this.currentDisplayDate = new Date();
+                },
+
+                onDayClick(day) {
+                    if (day.type === 'day' && day.pageName) {
+                        // Call the loadPage method on the parent appRoot component
+                        this.$dispatch('load-page', { pageName: day.pageName });
+                    }
+                }
+            }));
         });
     </script>
 
     <!-- Alpine.js Core (MUST be last among setup scripts) -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-<body x-data="appRoot" x-init="init()">
+<body x-data="appRoot" x-init="init()" @load-page.window="loadPage($event.detail.pageName)">
     <div id="splash-screen">
         <div class="time-date-container">
             <div id="clock" class="clock">12:00</div>
@@ -387,17 +503,45 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                         <a href="/" id="app-title" class="app-title">notd</a>
                     </div>
                     <div class="sidebar-section">
-                        <!-- Calendar Widget will be converted to Alpine component later -->
-                        <div id="calendar-widget" class="calendar-widget">
+                        <!-- Calendar Widget driven by Alpine.js -->
+                        <div id="calendar-widget" class="calendar-widget" 
+                             x-data="calendarWidget" 
+                             @load-page.window="loadPage($event.detail.pageName)">
                             <div class="calendar-header">
-                                <button id="prev-month-btn" class="arrow-btn"><i data-feather="chevron-left"></i></button>
-                                <span id="current-month-year" class="month-year-display"></span>
-                                <button id="next-month-btn" class="arrow-btn"><i data-feather="chevron-right"></i></button>
+                                <!-- The month/year display is now powered by a getter -->
+                                <span id="current-month-year" class="month-year-display" x-text="monthYearDisplay"></span>
+                                
+                                <!-- Navigation controls -->
+                                <div class="calendar-nav-controls">
+                                    <button @click="goToToday()" class="arrow-btn today-btn" title="Go to Today">Today</button>
+                                    <button @click="goToPrevMonth()" id="prev-month-btn" class="arrow-btn"><i data-feather="chevron-left"></i></button>
+                                    <button @click="goToNextMonth()" id="next-month-btn" class="arrow-btn"><i data-feather="chevron-right"></i></button>
+                                </div>
                             </div>
+                            
+                            <!-- Weekday headers -->
                             <div class="calendar-grid calendar-weekdays">
-                                <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+                                <template x-for="(weekday, index) in weekdays" :key="index">
+                                    <span x-text="weekday"></span>
+                                </template>
                             </div>
-                            <div id="calendar-days-grid" class="calendar-grid calendar-days"></div>
+
+                            <!-- The main calendar days grid, now rendered with a loop -->
+                            <div id="calendar-days-grid" class="calendar-grid calendar-days">
+                                <template x-for="(day, index) in calendarGrid" :key="index">
+                                    <div :class="{
+                                            'calendar-day': day.type === 'day',
+                                            'empty': day.type === 'empty',
+                                            'today': day.isToday,
+                                            'has-content': day.hasContent,
+                                            'current-page': day.isCurrentPage
+                                         }"
+                                         @click="onDayClick(day)"
+                                         :title="day.hasContent ? `Page: ${day.pageName}` : ''">
+                                        <span x-text="day.day"></span>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </div>
                     <div class="search-section">

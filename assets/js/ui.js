@@ -14,8 +14,7 @@ import {
     handleNoteDrop
 } from './ui/note-elements.js';
 
-// **FIX**: Import the new calendar widget
-import { calendarWidget } from './ui/calendar-widget.js';
+// Calendar widget is now handled by Alpine.js component in page.php
 
 import {
     renderNote,
@@ -874,7 +873,6 @@ export const ui = {
     getNestingLevel,
     getNoteAncestors,
     promptForPassword,
-    calendarWidget,
     displayChildPages,
     displayChildPagesInSidebar,
     displayFavorites,

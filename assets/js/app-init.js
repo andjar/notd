@@ -54,9 +54,7 @@ export async function initializeApp() {
         initGlobalSearch();
         initPageSearchModal();
         
-        if (ui.calendarWidget && typeof ui.calendarWidget.init === 'function') {
-            ui.calendarWidget.init();
-        }
+        // Calendar widget is now handled by Alpine.js component in page.php
         
         initGlobalEventListeners();
         initSuggestionUI();
