@@ -47,6 +47,11 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     <script src="assets/libs/feather.min.js"></script>
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     <script>
         // Pass server-side configuration to JavaScript
@@ -56,7 +61,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         };
     </script>
 </head>
-<body>
+<body x-data="appRoot" x-init="init()">
     <div id="splash-screen">
         <div class="time-date-container">
             <div id="clock" class="clock">12:00</div>
@@ -264,6 +269,87 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     <!-- Scripts -->
     <script src="assets/libs/sjcl.js"></script>
     <script src="assets/js/splash.js"></script>
+    <script src="assets/js/store.js"></script>
     <script type="module" src="assets/js/app.js"></script>
+    <script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('appRoot', () => ({
+            async init() {
+                console.log('Alpine root component initialized.');
+
+                // Get initial page name from URL (logic from app-init.js)
+                const urlParams = new URLSearchParams(window.location.search);
+                // Logic from getInitialPage() in page-loader.js (simplified here)
+                const initialPageName = urlParams.get('page') || new Date().toISOString().split('T')[0];
+
+                // Load initial page data
+                await this.loadPage(initialPageName, false);
+
+                // Initialize sidebars (basic state will be from store, complex logic later)
+                this.initSidebars();
+
+                // Fetch recent pages (logic from fetchAndDisplayPages in page-loader.js)
+                await this.fetchRecentPages();
+
+                // Other initializations from app-init.js can be added here gradually.
+                // For now, focus on core page load and essential UI state.
+                // Example: ui.updateSaveStatusIndicator('saved'); (from app-init.js)
+                //feather.replace(); // If icons are needed early
+            },
+
+            async loadPage(pageName, updateHistory = true) {
+                try {
+                    // Assuming pagesAPI and notesAPI are available globally or imported
+                    // These would be from assets/js/api_client.js
+                    const pageDetails = await window.pagesAPI.getPageByName(pageName);
+                    const notesData = await window.notesAPI.getPageData(pageDetails.id);
+
+                    Alpine.store('app').currentPageId = pageDetails.id;
+                    Alpine.store('app').currentPageName = pageDetails.name;
+                    Alpine.store('app').setNotes(notesData); // Populate the store
+
+                    if (updateHistory) {
+                        const newUrl = new URL(window.location);
+                        newUrl.searchParams.set('page', pageName);
+                        history.pushState({ pageName }, '', newUrl.toString());
+                    }
+                    document.title = `${pageName} - notd`;
+
+                } catch (error) {
+                    console.error(`Error loading page ${pageName}:`, error);
+                    // Handle error appropriately, maybe set an error state in the store
+                }
+            },
+
+            initSidebars() {
+                // This method will eventually replace sidebarState.init() from sidebar.js
+                // For now, it can be minimal or call parts of the old logic if needed,
+                // but the goal is to manage sidebar state (e.g., collapsed) via Alpine store.
+                // Example:
+                // const leftSidebarCollapsed = Alpine.store('app').isLeftSidebarCollapsed;
+                // const rightSidebarCollapsed = Alpine.store('app').isRightSidebarCollapsed;
+                // Apply these states to DOM elements if not handled by x-bind yet.
+                // The actual toggle logic will be on @click handlers in HTML later.
+                console.log('Initializing sidebars state from Alpine store.');
+            },
+
+            async fetchRecentPages() {
+                // This method will replace fetchAndDisplayPages() from page-loader.js
+                try {
+                    // Assuming pagesAPI is available
+                    const pages = await window.pagesAPI.getPages({ sort_by: 'last_accessed_at', sort_order: 'desc', per_page: 10 });
+                    if (pages && pages.pages) {
+                        Alpine.store('app').recentPages = pages.pages;
+                    } else {
+                        Alpine.store('app').recentPages = [];
+                    }
+                } catch (error) {
+                    console.error('Error fetching recent pages:', error);
+                    Alpine.store('app').recentPages = [];
+                }
+            }
+        }));
+    });
+    </script>
 </body>
 </html>
