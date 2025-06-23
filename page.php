@@ -200,6 +200,27 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         document.addEventListener('alpine:init', () => {
             console.log('Alpine initializing...');
             
+            // Simple content rendering function that doesn't depend on external modules
+            window.safeParseAndRenderContent = function(content) {
+                if (!content) return '';
+                
+                // Use marked library for markdown parsing if available
+                if (typeof marked !== 'undefined') {
+                    try {
+                        return marked.parse(content);
+                    } catch (error) {
+                        console.warn('Marked parsing failed, falling back to simple rendering:', error);
+                    }
+                }
+                
+                // Fallback: Basic HTML escaping and newline handling
+                return content
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\n/g, '<br>');
+            };
+            
             // 1. Define the store first
             defineStore();
 
@@ -265,11 +286,13 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                             return;
                         }
                         const notesData = await notesAPI.getPageData(pageDetails.id);
+                        console.log('Notes data received:', notesData);
 
                         const appStore = Alpine.store('app');
                         appStore.currentPageId = pageDetails.id;
                         appStore.currentPageName = pageDetails.name;
                         appStore.setNotes(notesData);
+                        console.log('Notes set in store:', appStore.notes);
 
                         if (updateHistory) {
                             const newUrl = new URL(window.location);
@@ -305,6 +328,27 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                         console.error('Error fetching recent pages:', error);
                         Alpine.store('app').recentPages = [];
                     }
+                },
+
+                async addRootNote() {
+                    try {
+                        const appStore = Alpine.store('app');
+                        const newNote = {
+                            id: 'temp-' + Date.now(),
+                            content: '',
+                            parent_id: null,
+                            page_id: appStore.currentPageId,
+                            children: [],
+                            collapsed: false
+                        };
+                        
+                        // Add to store
+                        appStore.notes.push(newNote);
+                        
+                        console.log('Added new root note:', newNote.id);
+                    } catch (error) {
+                        console.error('Error adding root note:', error);
+                    }
                 }
             }));
 
@@ -312,14 +356,28 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                 note: initialNote,
                 isEditing: false,
                 isCollapsed: initialNote.collapsed || false,
+                contentBuffer: '',
 
                 init() {
+                    this.contentBuffer = this.note.content || ''; // Initialize contentBuffer
                     // When a new note is created, it might not have content.
                     // If it's a new, temporary note with no content, enter edit mode immediately.
                     if (String(this.note.id).startsWith('temp-') && !this.note.content) {
                         this.isEditing = true;
+                        // contentBuffer is already initialized
                         // Focus the contenteditable element after it becomes visible
-                        this.$nextTick(() => this.$refs.content.focus());
+                        this.$nextTick(() => {
+                            if (this.$refs.content) {
+                                this.$refs.content.focus();
+                                // Ensure the cursor is at the end of the content
+                                const range = document.createRange();
+                                const sel = window.getSelection();
+                                range.selectNodeContents(this.$refs.content);
+                                range.collapse(false);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                            }
+                        });
                     }
                 },
 
@@ -334,19 +392,50 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     notesAPI.batchUpdateNotes([{ 
                         type: 'update', 
                         payload: { id: this.note.id, collapsed: this.isCollapsed ? 1 : 0 } 
-                    }]);
+                    }]).catch(error => console.error('Failed to save collapse state:', error));
                 },
 
-                // A placeholder for now, will be fleshed out
-                saveNote() {
-                    console.log("Saving note:", this.note.id);
-                    // Here you would call your debounced save function from note-actions.js
+                async saveNote() {
+                    if (this.contentBuffer !== this.note.content) {
+                        const oldContent = this.note.content;
+                        this.note.content = this.contentBuffer; // Update local state immediately for reactivity
+                        
+                        console.log("Saving note:", this.note.id, "New content:", this.note.content);
+                        try {
+                            await notesAPI.batchUpdateNotes([{ 
+                                type: 'update', 
+                                payload: { id: this.note.id, content: this.note.content } 
+                            }]);
+                            console.log("Note saved successfully:", this.note.id);
+                            // Optionally, re-render with x-html if parseAndRenderContent is crucial
+                            // For now, direct binding to note.content will update the display
+                        } catch (error) {
+                            console.error("Error saving note:", this.note.id, error);
+                            this.note.content = oldContent; // Revert on error
+                            this.contentBuffer = oldContent; // Also revert buffer
+                            // Consider showing an error to the user
+                        }
+                    } else {
+                        console.log("No changes to save for note:", this.note.id);
+                    }
                 },
 
-                // Placeholder for handling Enter key
-                handleEnter(event) {
-                    console.log("Enter pressed on note:", this.note.id);
-                    // Logic from note-actions.js handleEnterKey goes here
+                async handleEnter(event) {
+                    event.preventDefault();
+                    await this.saveNote();
+                    this.isEditing = false; 
+                    // Future: Add logic for creating new notes or splitting notes.
+                    // For example, dispatch an event to create a new note below this one.
+                    // this.$dispatch('new-note-after', { currentNoteId: this.note.id });
+                },
+
+                async handleTab(event) {
+                    event.preventDefault();
+                    await this.saveNote();
+                    // Future: Add logic for indenting/outdenting notes.
+                    // For example, determine if shift key is pressed for outdent.
+                    // this.$dispatch('indent-note', { noteId: this.note.id, direction: event.shiftKey ? 'out' : 'in' });
+                    console.log("Tab pressed on note:", this.note.id, "Shift:", event.shiftKey);
                 }
             }));
 
@@ -592,10 +681,82 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
             <div id="page-content" class="page-content"></div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner">
-                <!-- Notes will be an Alpine component next -->
+                <!-- Notes rendered by Alpine.js -->
+                <template x-if="!$store.app.notes || $store.app.notes.length === 0">
+                    <div class="no-notes-message">No notes on this page. Click the + button to add one.</div>
+                </template>
+                <template x-for="note in $store.app.notes" :key="note.id">
+                    <div class="note-item" x-data="noteItem(note)" x-init="init()" :data-note-id="note.id">
+                        <!-- Header: Bullet, Controls, Content -->
+                        <div class="note-header-row">
+                            <div class="note-controls">
+                                <!-- Collapse Arrow -->
+                                <template x-if="hasChildren">
+                                    <span class="note-collapse-arrow" @click="toggleCollapse" 
+                                          x-init="$watch('isCollapsed', () => $nextTick(() => window.updateNoteCollapseIcon($el)))">
+                                        <i :data-feather="isCollapsed ? 'chevron-right' : 'chevron-down'"></i>
+                                    </span>
+                                </template>
+                                <!-- Bullet -->
+                                <span class="note-bullet"></span>
+                            </div>
+
+                            <div class="note-content-wrapper">
+                                <!-- Rendered View -->
+                                <div class="note-content rendered-mode"
+                                     x-show="!isEditing"
+                                     @click="isEditing = true; contentBuffer = note.content; $nextTick(() => $refs.content.focus())"
+                                     x-html="window.safeParseAndRenderContent(note.content || '')">
+                                </div>
+                                <!-- Editing View -->
+                                <div class="note-content edit-mode"
+                                     x-ref="content"
+                                     x-show="isEditing"
+                                     x-text="note.content" 
+                                     contenteditable="true"
+                                     @input="contentBuffer = $event.target.innerText"
+                                     @keydown.enter.prevent="handleEnter($event)"
+                                     @keydown.tab.prevent="handleTab($event)"
+                                     @blur="isEditing = false; saveNote()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Children Notes (Simplified for now) -->
+                        <div class="note-children" x-show="!isCollapsed" x-transition>
+                            <template x-for="childNote in note.children" :key="childNote.id">
+                                <div class="note-item" x-data="noteItem(childNote)" x-init="init()" :data-note-id="childNote.id">
+                                    <div class="note-header-row">
+                                        <div class="note-controls">
+                                            <span class="note-bullet"></span>
+                                        </div>
+                                        <div class="note-content-wrapper">
+                                            <div class="note-content rendered-mode"
+                                                 x-show="!isEditing"
+                                                 @click="isEditing = true; contentBuffer = note.content; $nextTick(() => $refs.content.focus())"
+                                                 x-html="window.safeParseAndRenderContent(note.content || '')">
+                                            </div>
+                                            <div class="note-content edit-mode"
+                                                 x-ref="content"
+                                                 x-show="isEditing"
+                                                 x-text="note.content" 
+                                                 contenteditable="true"
+                                                 @input="contentBuffer = $event.target.innerText"
+                                                 @keydown.enter.prevent="handleEnter($event)"
+                                                 @keydown.tab.prevent="handleTab($event)"
+                                                 @blur="isEditing = false; saveNote()">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
             </div>
             <div id="child-pages-container"></div>
-            <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
+            <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page"
+                    @click="addRootNote()">
                 <i data-feather="plus"></i>
             </button>
         </div>
@@ -660,16 +821,18 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     <!-- Rendered View -->
                     <div class="note-content rendered-mode"
                          x-show="!isEditing"
-                         @click="isEditing = true; $nextTick(() => $refs.content.focus())"
-                         x-html="window.ui.parseAndRenderContent(note.content || '')">
+                         @click="isEditing = true; contentBuffer = note.content; $nextTick(() => $refs.content.focus())"
+                         x-html="window.safeParseAndRenderContent(note.content || '')">
                     </div>
                     <!-- Editing View -->
                     <div class="note-content edit-mode"
                          x-ref="content"
                          x-show="isEditing"
-                         x-text="note.content"
+                         x-text="note.content" 
                          contenteditable="true"
+                         @input="contentBuffer = $event.target.innerText"
                          @keydown.enter.prevent="handleEnter($event)"
+                         @keydown.tab.prevent="handleTab($event)"
                          @blur="isEditing = false; saveNote()">
                     </div>
                 </div>
