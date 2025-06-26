@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/tests/bootstrap.php';
 require_once __DIR__ . '/vendor/autoload.php'; // PHPUnit
+require_once __DIR__ . '/api/data_manager.php'; // Include DataManager class
 
 // Simple test classes without PHPUnit dependency
 class SimpleDataManagerTest {
@@ -9,7 +10,7 @@ class SimpleDataManagerTest {
 
     public function setUp() {
         $this->pdo = new PDO('sqlite:' . DB_PATH);
-        $this->dm = new \App\DataManager($this->pdo);
+        $this->dm = new DataManager($this->pdo);
     }
 
     public function testGetPageById() {
@@ -39,7 +40,7 @@ class SimplePageTest {
 
     public function setUp() {
         $this->pdo = new PDO('sqlite:' . DB_PATH);
-        $this->dm = new \App\DataManager($this->pdo);
+        $this->dm = new DataManager($this->pdo);
     }
 
     public function testGetPages() {
@@ -59,7 +60,7 @@ class SimplePropertyTest {
 
     public function setUp() {
         $this->pdo = new PDO('sqlite:' . DB_PATH);
-        $this->dm = new \App\DataManager($this->pdo);
+        $this->dm = new DataManager($this->pdo);
     }
 
     public function testPropertyWeightConfiguration() {

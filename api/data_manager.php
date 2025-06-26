@@ -1,7 +1,5 @@
 <?php
 
-namespace App;
-
 require_once __DIR__ . '/../config.php';
 
 class DataManager {
