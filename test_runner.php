@@ -3,9 +3,9 @@ require_once __DIR__ . '/tests/bootstrap.php';
 require_once __DIR__ . '/vendor/autoload.php'; // PHPUnit
 
 $testSuites = [
-    new DataManagerTest(),
-    new PageTest(),
-    new PropertyTest()
+    new \Tests\DataManagerTest(),
+    new \Tests\PageTest(),
+    new \Tests\PropertyTest()
 ];
 
 $results = [];

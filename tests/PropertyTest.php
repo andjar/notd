@@ -1,7 +1,10 @@
 <?php
 // tests/PropertyTest.php
 
+namespace Tests;
+
 use PHPUnit\Framework\TestCase;
+use App\DataManager;
 
 class PropertyTest extends TestCase
 {
@@ -10,7 +13,6 @@ class PropertyTest extends TestCase
 
     protected function setUp(): void
     {
-        require __DIR__ . '/bootstrap.php';
         $this->pdo = new PDO('sqlite:' . DB_PATH);
         $this->dm = new DataManager($this->pdo);
     }

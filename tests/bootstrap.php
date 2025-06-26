@@ -1,9 +1,9 @@
 <?php
 // Override database path for testing
-if (!defined('DB_PATH')) {
-    define('DB_PATH', __DIR__ . '/test_database.sqlite');
-}
-$GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = DB_PATH;
+$GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = getenv('DB_PATH') ?: __DIR__ . '/../db/test_database.sqlite';
+
+// Include config.php which will use the override
+require_once __DIR__ . '/../config.php';
 
 // Initialize test database
 if (file_exists(DB_PATH)) {
@@ -70,6 +70,3 @@ $noteId = $pdo->lastInsertId();
 
 $pdo->exec("INSERT INTO Properties (note_id, name, value, weight) VALUES ($noteId, 'status', 'TODO', 2)");
 $pdo->exec("INSERT INTO Properties (note_id, name, value, weight) VALUES ($noteId, 'internal', 'secret', 3)");
-
-// Include application classes
-require_once __DIR__ . '/../api/data_manager.php';
