@@ -67,6 +67,28 @@ if (!function_exists('_createNoteInBatch')) {
 }
 
 if (!function_exists('_updateNoteInBatch')) {
+
+    function reorderNotes(PDO $pdo, int $pageId, int $noteId, int $oldIndex, int $newIndex): void {
+    if ($newIndex === $oldIndex) return;
+
+    if ($newIndex < $oldIndex) {
+        $stmt = $pdo->prepare("
+            UPDATE Notes
+            SET order_index = order_index + 1
+            WHERE page_id = ? AND order_index >= ? AND order_index < ? AND id != ?
+        ");
+        $stmt->execute([$pageId, $newIndex, $oldIndex, $noteId]);
+    } else {
+        $stmt = $pdo->prepare("
+            UPDATE Notes
+            SET order_index = order_index - 1
+            WHERE page_id = ? AND order_index > ? AND order_index <= ? AND id != ?
+        ");
+        $stmt->execute([$pageId, $oldIndex, $newIndex, $noteId]);
+    }
+}
+
+
     function _updateNoteInBatch($pdo, $dataManager, $payload, $tempIdMap, $includeParentProperties) {
         $noteId = $payload['id'] ?? null;
         if ($noteId === null) return ['type' => 'update', 'status' => 'error', 'message' => 'Missing id for update operation'];
@@ -90,22 +112,46 @@ if (!function_exists('_updateNoteInBatch')) {
             $executeParams = [];
             $contentWasUpdated = false;
 
-            if (isset($payload['content'])) {
-                $setClauses[] = "content = ?";
-                $executeParams[] = $payload['content'];
-                $contentWasUpdated = true;
-            }
-            if (array_key_exists('parent_note_id', $payload)) {
-                $newParentNoteId = $payload['parent_note_id'];
-                if (is_string($newParentNoteId) && isset($tempIdMap[$newParentNoteId])) {
-                    $newParentNoteId = $tempIdMap[$newParentNoteId];
-                }
-                $setClauses[] = "parent_note_id = ?";
-                $executeParams[] = $newParentNoteId === null ? null : (int)$newParentNoteId;
-            }
-            if (isset($payload['order_index'])) { $setClauses[] = "order_index = ?"; $executeParams[] = (int)$payload['order_index']; }
-            if (isset($payload['collapsed'])) { $setClauses[] = "collapsed = ?"; $executeParams[] = (int)$payload['collapsed']; }
-            if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = (int)$payload['page_id']; }
+   if (isset($payload['content'])) {
+    $setClauses[] = "content = ?";
+    $executeParams[] = $payload['content'];
+    $contentWasUpdated = true;
+}
+if (array_key_exists('parent_note_id', $payload)) {
+    $newParentNoteId = $payload['parent_note_id'];
+    if (is_string($newParentNoteId) && isset($tempIdMap[$newParentNoteId])) {
+        $newParentNoteId = $tempIdMap[$newParentNoteId];
+    }
+    $setClauses[] = "parent_note_id = ?";
+    $executeParams[] = $newParentNoteId === null ? null : (int)$newParentNoteId;
+}
+
+if (isset($payload['order_index'])) {
+    $newIndex = (int)$payload['order_index'];
+
+    // Fetch current order_index and page_id
+    $metaStmt = $pdo->prepare("SELECT order_index, page_id FROM Notes WHERE id = ?");
+    $metaStmt->execute([$noteId]);
+    $meta = $metaStmt->fetch(PDO::FETCH_ASSOC);
+    $oldIndex = (int)$meta['order_index'];
+    $pageId = (int)$meta['page_id'];
+
+    reorderNotes($pdo, $pageId, $noteId, $oldIndex, $newIndex);
+
+    // Update this note's order_index
+    $setClauses[] = "order_index = ?";
+    $executeParams[] = $newIndex;
+}
+
+if (isset($payload['collapsed'])) {
+    $setClauses[] = "collapsed = ?";
+    $executeParams[] = (int)$payload['collapsed'];
+}
+
+if (isset($payload['page_id'])) {
+    $setClauses[] = "page_id = ?";
+    $executeParams[] = (int)$payload['page_id'];
+}
 
             if (empty($setClauses) && !$contentWasUpdated) {
                 return ['type' => 'update', 'status' => 'warning', 'message' => 'No updatable fields provided for note.', 'id' => $noteId];

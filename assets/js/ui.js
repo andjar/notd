@@ -121,32 +121,42 @@ function updatePageList(pages, activePageName) {
     const listContainer = document.createElement('ul');
     listContainer.className = 'recent-pages-list';
 
-    recentPages.forEach(page => {
-        const listItem = document.createElement('li');
-        const link = document.createElement('a');
-        link.href = '#';
-        link.dataset.pageName = page.name;
-        link.className = 'recent-page-link';
-        
-        // Add active class if this is the current page
-        if (page.name === activePageName) {
-            link.classList.add('active');
-        }
+   recentPages.forEach((page) => {
+    const listItem = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = "#";
+    link.dataset.pageName = page.name;
+    link.className = "recent-page-link";
 
-        // Create the link content with icon and name
-        const icon = document.createElement('i');
-        icon.dataset.feather = 'file-text';
-        icon.className = 'recent-page-icon';
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'recent-page-name';
-        nameSpan.textContent = page.name;
+    // Add active class if this is the current page
+    if (page.name === activePageName) {
+      link.classList.add("active");
+    }
 
-        link.appendChild(icon);
-        link.appendChild(nameSpan);
-        listItem.appendChild(link);
-        listContainer.appendChild(listItem);
+    // Create the link content with icon and name
+    const icon = document.createElement("i");
+    icon.dataset.feather = "file-text";
+    icon.className = "recent-page-icon";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "recent-page-name";
+    nameSpan.textContent = page.name;
+
+    link.appendChild(icon);
+    link.appendChild(nameSpan);
+    listItem.appendChild(link);
+    listContainer.appendChild(listItem);
+    // ✅ Add click handler here!
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      const pageName = event.currentTarget.dataset.pageName;
+
+      console.log("[DEBUG] Clicked recent page:", pageName);
+
+      updateActivePageLink(pageName); // Highlight the clicked link
+      // Load page content
     });
+  });
 
     domRefs.pageListContainer.appendChild(listContainer);
 

@@ -1,0 +1,42 @@
+name: PHP Tests
+
+on:
+  push:
+    branches: [ main, feat/impr ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: sqlite3, pdo_sqlite
+        coverage: none
+
+    - name: Install PHPUnit
+      run: |
+        composer require --dev phpunit/phpunit
+        composer install
+
+    - name: Create test database directory
+      run: mkdir -p db
+
+    - name: Run tests
+      run: |
+        php test_runner.php
+      env:
+        DB_PATH: ./db/test_database.sqlite
+
+    - name: Display test results
+      run: |
+        echo "Test execution completed"
+        if [ -f "test_results.json" ]; then
+          cat test_results.json
+        fi

@@ -36,7 +36,15 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         }
     }
 
+      console.log('API REQUEST BODY:', options.body);
+
     try {
+
+         console.log('Sending API request to:', API_BASE_URL + endpoint);
+    console.log('Method:', method);
+    console.log('Headers:', options.headers);
+    console.log('Body:', options.body);
+
         const response = await fetch(API_BASE_URL + endpoint, options);
         
         if (response.status === 204) {
@@ -184,10 +192,13 @@ const propertiesAPI = {
  */
 const attachmentsAPI = {
     getNoteAttachments: (noteId) => apiRequest(`attachments.php?note_id=${noteId}`),
-    uploadAttachment: (formData) => apiRequest('attachments.php', 'POST', formData),
-    deleteAttachment: (attachmentId) => {
-        return apiRequest('attachments.php', 'POST', { _method: 'DELETE', id: attachmentId });
-    }
+    uploadAttachment: (formData) => apiRequest('attachments.php', 'POST', formData),deleteAttachment: (attachmentId, noteId) => {
+    return apiRequest('attachments.php', 'POST', {
+        action: 'delete',
+        attachment_id: attachmentId,
+        note_id: noteId
+    });
+}
 };
 
 /**

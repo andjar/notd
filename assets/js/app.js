@@ -168,6 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
         initializeTemplateHandling(); // Initialize template functionality
         feather.replace(); // Initialize feather icons after DOM is ready
+        
         // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.
     } catch (error) {
         console.error('Failed to initialize application:', error);

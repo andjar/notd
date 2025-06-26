@@ -6,14 +6,43 @@ require_once 'config.php';
 // Get the page name from the URL.
 $pageName = isset($_GET['page']) ? trim($_GET['page']) : null;
 
-// If no page name is provided, this script was loaded directly without the
-// proper context. Redirect to the default journal page to ensure the
-// JavaScript application has a valid starting point.
+// If no page name is provided, redirect to default page
 if (empty($pageName)) {
     $default_page_name = date('Y-m-d');
     $redirect_url = 'page.php?page=' . urlencode($default_page_name);
     header('Location: ' . $redirect_url, true, 302);
     exit;
+}
+
+// --- Journal Page Creation ---
+// Only create journal pages for date-based pages that don't exist
+if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName)) {
+    try {
+        // Connect to SQLite database
+        $pdo = new PDO('sqlite:' . DB_PATH);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec('PRAGMA foreign_keys = ON;');
+
+        // Check if page exists
+        $stmt = $pdo->prepare("SELECT id FROM Pages WHERE name = ?");
+        $stmt->execute([$pageName]);
+        $pageId = $stmt->fetchColumn();
+        
+        if (!$pageId) {
+            // Create the date-based page
+            $pdo->beginTransaction();
+            $insertPage = $pdo->prepare("INSERT INTO Pages (name, created_at, updated_at) VALUES (?, datetime('now'), datetime('now'))");
+            $insertPage->execute([$pageName]);
+            $pageId = $pdo->lastInsertId();
+            
+            // Add journal type property
+            $insertProp = $pdo->prepare("INSERT INTO Properties (page_id, name, value, weight) VALUES (?, 'type', 'journal', 2)");
+            $insertProp->execute([$pageId]);
+            $pdo->commit();
+        }
+    } catch (PDOException $e) {
+        error_log("Error creating journal page: " . $e->getMessage());
+    }
 }
 
 // --- Frontend Configuration ---
@@ -23,7 +52,9 @@ $renderInternal = PROPERTY_WEIGHTS[3]['visible_in_view_mode'] ?? false;
 $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
 
 ?>
+
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -49,6 +80,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     <script src="assets/libs/Sortable.min.js"></script>
     
     <script>
+         window.APP_CONFIG = window.APP_CONFIG || {};
         // Pass server-side configuration to JavaScript
         window.APP_CONFIG = {
             RENDER_INTERNAL_PROPERTIES: <?php echo json_encode($renderInternal); ?>,

@@ -58,6 +58,9 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
 
     try {
         if (typeof optimisticDOMUpdater === 'function') optimisticDOMUpdater();
+
+         console.log("Batch operations to send:", operations);
+
         const batchResponse = await notesAPI.batchUpdateNotes(operations);
         let allSubOperationsSucceeded = true;
         

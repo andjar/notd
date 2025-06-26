@@ -1048,6 +1048,7 @@ export {
  * Opens a modal to display an image.
  * @param {string} imageUrl The URL of the image to display.
  */
+
 function openImageViewerModal(imageUrl) {
     if (!imageUrl) return;
 
@@ -1073,6 +1074,87 @@ function openImageViewerModal(imageUrl) {
         window.open(imageUrl, '_blank');
     }
 }
+
+
+// custom confirmation dialog for delete actions
+
+async function showConfirmationDialog(message) {
+    return new Promise((resolve) => {
+        // Create modal wrapper
+        const modal = document.createElement('div');
+        modal.className = 'custom-confirm-modal';
+        Object.assign(modal.style, {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: '9999',
+        });
+
+        // Create dialog box
+        const dialog = document.createElement('div');
+        Object.assign(dialog.style, {
+            backgroundColor: '#fff',
+            padding: '20px',
+            borderRadius: '8px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+            maxWidth: '400px',
+            width: '90%',
+        });
+
+        const msg = document.createElement('p');
+        msg.textContent = message;
+        msg.style.marginBottom = '20px';
+
+        const buttonGroup = document.createElement('div');
+        Object.assign(buttonGroup.style, {
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '10px',
+        });
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.padding = '8px 16px';
+        cancelBtn.style.background = '#e0e0e0';
+        cancelBtn.style.border = 'none';
+        cancelBtn.style.borderRadius = '4px';
+        cancelBtn.style.cursor = 'pointer';
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.style.padding = '8px 16px';
+        deleteBtn.style.background = '#e53935';
+        deleteBtn.style.color = '#fff';
+        deleteBtn.style.border = 'none';
+        deleteBtn.style.borderRadius = '4px';
+        deleteBtn.style.cursor = 'pointer';
+
+        cancelBtn.addEventListener('click', () => {
+            modal.remove();
+            resolve(false);
+        });
+
+        deleteBtn.addEventListener('click', () => {
+            modal.remove();
+            resolve(true);
+        });
+
+        buttonGroup.append(cancelBtn, deleteBtn);
+        dialog.append(msg, buttonGroup);
+        modal.appendChild(dialog);
+        document.body.appendChild(modal);
+    });
+}
+
+
+
+
 
 async function handleDelegatedCollapseArrowClick(targetElement) {
     const noteItem = targetElement.closest('.note-item');
@@ -1265,6 +1347,10 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
     if (typeof feather !== 'undefined') feather.replace();
 }
 
+
+
+
+
 function handleDelegatedNoteContentClick(targetElement) {
     // Check if the click was on an interactive element within the content that should not trigger edit mode
     if (targetElement.matches('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image') || 
@@ -1274,38 +1360,48 @@ function handleDelegatedNoteContentClick(targetElement) {
     switchToEditMode(targetElement);
 }
 
+
+
+
+
 async function handleDelegatedAttachmentDelete(targetElement) {
     const attachmentId = targetElement.dataset.attachmentId;
-    const noteId = targetElement.dataset.noteId; // Ensure this is on the button
+    const noteId = targetElement.dataset.noteId;
     const attachmentItem = targetElement.closest('.note-attachment-item');
     const attachmentName = attachmentItem?.querySelector('.attachment-name')?.textContent || 'this attachment';
 
     if (!attachmentId || !noteId) return;
 
-    if (confirm(`Are you sure you want to delete "${attachmentName}"?`)) {
-        try {
-            await attachmentsAPI.deleteAttachment(attachmentId);
-            attachmentItem?.remove();
-            const attachmentsContainer = targetElement.closest('.note-attachments');
-            if (attachmentsContainer && attachmentsContainer.children.length === 0) {
-                attachmentsContainer.style.display = 'none';
-            }
-             // Update has_attachments on the note in local cache
-            if (window.notesForCurrentPage) {
-                const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-                if (noteToUpdate) {
-                    const remainingAttachments = attachmentsContainer ? attachmentsContainer.children.length : 0;
-                    noteToUpdate.has_attachments = remainingAttachments > 0;
-                }
-            }
+    const confirmed = await showConfirmationDialog(`Are you sure you want to delete "${attachmentName}"?`);
+    if (!confirmed) return;
 
-        } catch (error) {
-            const deleteAttachMessage = error.message || 'Please try again.';
-            console.error(`handleDelegatedAttachmentDelete: Error deleting attachment ${attachmentId} for note ${noteId}. Error:`, error);
-            alert(`Failed to delete attachment "${attachmentName}". ${deleteAttachMessage}`);
+    try {
+        console.log("Deleting:", { attachmentId, noteId });
+
+        await attachmentsAPI.deleteAttachment(attachmentId, noteId);
+        attachmentItem?.remove();
+
+        const attachmentsContainer = targetElement.closest('.note-attachments');
+        if (attachmentsContainer && attachmentsContainer.children.length === 0) {
+            attachmentsContainer.style.display = 'none';
         }
+
+        if (window.notesForCurrentPage) {
+            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
+            if (noteToUpdate) {
+                const remaining = attachmentsContainer ? attachmentsContainer.children.length : 0;
+                noteToUpdate.has_attachments = remaining > 0;
+            }
+        }
+    } catch (error) {
+        const msg = error.message || 'Please try again.';
+        console.error(`Failed to delete attachment ${attachmentId} for note ${noteId}:`, error);
+        alert(`Failed to delete attachment "${attachmentName}". ${msg}`);
     }
 }
+
+
+
 
 function handleDelegatedAttachmentImageView(targetElement) {
     let attachmentUrl = targetElement.dataset.attachmentUrl;

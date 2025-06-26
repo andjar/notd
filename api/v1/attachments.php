@@ -121,28 +121,45 @@ class AttachmentManager {
         return $mime_type;
     }
 
-    public function handleRequest() {
-        $method = $_SERVER['REQUEST_METHOD'];
+public function handleRequest() {
+    $method = $_SERVER['REQUEST_METHOD'];
 
-        // Handle method overriding for DELETE via POST (e.g., for phpdesktop)
-        if ($method === 'POST' && isset($_POST['_method']) && strtoupper($_POST['_method']) === 'DELETE') {
+    // Handle method overriding for all request types
+    if ($method === 'POST') {
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        $isJson = strpos($contentType, 'application/json') !== false;
+        
+        // Check for JSON-based method override
+        if ($isJson) {
+            $raw = file_get_contents('php://input');
+            $input = json_decode($raw, true) ?: [];
+            
+            // Route JSON delete requests to handleDeleteRequest
+            if (isset($input['action']) && $input['action'] === 'delete') {
+                $this->handleDeleteRequest();
+                return;
+            }
+        }
+        // Check for form-based method override
+        else if (isset($_POST['_method']) && strtoupper($_POST['_method']) === 'DELETE') {
             $method = 'DELETE';
         }
-
-        switch ($method) {
-            case 'POST':
-                $this->handlePostRequest();
-                break;
-            case 'GET':
-                $this->handleGetRequest();
-                break;
-            case 'DELETE':
-                $this->handleDeleteRequest();
-                break;
-            default:
-                ApiResponse::error('Method Not Allowed', 405);
-        }
     }
+
+    switch ($method) {
+        case 'POST':
+            $this->handlePostRequest();
+            break;
+        case 'GET':
+            $this->handleGetRequest();
+            break;
+        case 'DELETE':
+            $this->handleDeleteRequest();
+            break;
+        default:
+            ApiResponse::error('Method Not Allowed', 405);
+    }
+}
 
     private function handlePostRequest() {
         error_log("=== POST METHOD PROCESSING ===");
@@ -358,65 +375,83 @@ class AttachmentManager {
         }
     }
 
-    private function handleDeleteRequest() {
-        $id_to_validate = $_GET['id'] ?? ($input['id'] ?? null);
 
-        $validationRules = ['id' => 'required|isPositiveInteger'];
-        $errors = Validator::validate(['id' => $id_to_validate], $validationRules); 
-        if (!empty($errors)) {
+    
+
+private function handleDeleteRequest() {
+    $raw = file_get_contents('php://input');
+    $input = json_decode($raw, true) ?: [];
+
+    error_log('Raw input: ' . $raw);
+    error_log('Decoded input: ' . print_r($input, true));
+
+    $attachment_id = $input['attachment_id'] ?? null;
+    $note_id = $input['note_id'] ?? null;
+
+    // Validate both IDs properly:
+    $validationRules = [
+        'attachment_id' => 'required|isPositiveInteger',
+        'note_id' => 'required|isPositiveInteger',
+    ];
+    $errors = Validator::validate([
+        'attachment_id' => $attachment_id,
+        'note_id' => $note_id,
+    ], $validationRules);
+
+    if (!empty($errors)) {
+        ob_end_clean();
+        ApiResponse::error('Invalid input.', 400, $errors);
+        return;
+    }
+
+    $attachment_id = (int)$attachment_id;
+    $note_id = (int)$note_id;
+
+    try {
+        $this->pdo->beginTransaction();
+
+        $stmt = $this->pdo->prepare("SELECT a.*, n.page_id FROM Attachments a JOIN Notes n ON a.note_id = n.id WHERE a.id = ?");
+        $stmt->execute([$attachment_id]);
+        $attachment = $stmt->fetch();
+
+        if (!$attachment) {
+            $this->pdo->rollBack();
             ob_end_clean();
-            ApiResponse::error('Invalid attachment ID.', 400, $errors);
+            ApiResponse::error('Attachment not found', 404);
             return;
         }
-        $attachment_id = (int)$id_to_validate;
 
-        try {
-            $this->pdo->beginTransaction();
-
-            $stmt = $this->pdo->prepare("SELECT a.*, n.page_id FROM Attachments a JOIN Notes n ON a.note_id = n.id WHERE a.id = ?");
-            $stmt->execute([$attachment_id]);
-            $attachment = $stmt->fetch();
-
-            if (!$attachment) {
-                $this->pdo->rollBack();
-                ob_end_clean();
-                ApiResponse::error('Attachment not found', 404);
-                return;
+        $file_path = UPLOADS_DIR . '/' . $attachment['path'];
+        if (file_exists($file_path)) {
+            if (!unlink($file_path)) {
+                throw new RuntimeException('Failed to delete file from filesystem');
             }
-
-            $file_path = UPLOADS_DIR . '/' . $attachment['path'];
-            if (file_exists($file_path)) {
-                if (!unlink($file_path)) {
-                    throw new RuntimeException('Failed to delete file from filesystem');
-                }
-            }
-
-            $delete_stmt = $this->pdo->prepare("DELETE FROM Attachments WHERE id = ?");
-            $delete_stmt->execute([$attachment_id]);
-
-            $note_update_stmt = $this->pdo->prepare("UPDATE Notes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $note_update_stmt->execute([$attachment['note_id']]);
-
-            $page_update_stmt = $this->pdo->prepare("UPDATE Pages SET updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $page_update_stmt->execute([$attachment['page_id']]);
-
-            $this->pdo->commit();
-            ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
-            ob_end_flush();
-        } catch (RuntimeException $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            ob_end_clean();
-            ApiResponse::error($e->getMessage(), 500);
-        } catch (PDOException $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            ob_end_clean();
-            ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
         }
+
+        $delete_stmt = $this->pdo->prepare("DELETE FROM Attachments WHERE id = ?");
+        $delete_stmt->execute([$attachment_id]);
+
+        $note_update_stmt = $this->pdo->prepare("UPDATE Notes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $note_update_stmt->execute([$attachment['note_id']]);
+
+        $page_update_stmt = $this->pdo->prepare("UPDATE Pages SET updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $page_update_stmt->execute([$attachment['page_id']]);
+
+        $this->pdo->commit();
+
+        ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
+        ob_end_flush();
+
+    } catch (RuntimeException | PDOException $e) {
+        if ($this->pdo->inTransaction()) {
+            $this->pdo->rollBack();
+        }
+        ob_end_clean();
+        ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
     }
+}
+
+
 }
 
 // Initialize and handle the request

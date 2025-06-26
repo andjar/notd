@@ -23,6 +23,8 @@ function get_db_connection() {
         
         $pdo = new PDO('sqlite:' . $db_path, null, null, ['ATTR_ERRMODE' => PDO::ERRMODE_EXCEPTION, 'ATTR_DEFAULT_FETCH_MODE' => PDO::FETCH_ASSOC]);
         $pdo->exec('PRAGMA foreign_keys = ON;');
+        $pdo->exec('PRAGMA busy_timeout = 5000;');        // Add this line
+$pdo->exec('PRAGMA journal_mode = WAL;');         // And this one
 
         $stmt = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='Pages'");
         if ($stmt->fetch() === false) {

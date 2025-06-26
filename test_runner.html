@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test Runner</title>
+  </head>
+  <body>
+    <h1>Test Results</h1>
+    <div id="results"></div>
+    <script>
+      async function runTests() {
+        const response = await fetch("test_runner.php");
+        const results = await response.json();
+        let html = "<ul>";
+        results.forEach((test) => {
+          html += `<li>${test.name}: ${test.status} (${test.time}ms)</li>`;
+        });
+        html += "</ul>";
+        document.getElementById("results").innerHTML = html;
+      }
+      runTests();
+    </script>
+  </body>
+</html>
