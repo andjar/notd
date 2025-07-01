@@ -172,7 +172,6 @@ function updateActivePageLink(pageName) {
 function renderPageInlineProperties(properties, targetContainer) {
     if (!targetContainer) return;
     targetContainer.innerHTML = '';
-    targetContainer.style.display = 'none';
 
     if (!properties || Object.keys(properties).length === 0) return;
 
@@ -201,6 +200,12 @@ function renderPageInlineProperties(properties, targetContainer) {
     if (hasVisibleProperties) {
         targetContainer.appendChild(fragment);
         targetContainer.style.display = 'flex';
+        // Show border when properties are visible
+        const titleContainer = targetContainer.closest('.page-title-container');
+        if (titleContainer) {
+            titleContainer.style.borderBottom = '1px solid var(--sidebar-border)';
+            titleContainer.style.paddingBottom = '0.75rem';
+        }
     }
 }
 
