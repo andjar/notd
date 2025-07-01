@@ -66,6 +66,13 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
                 if (opResult.status === 'error') {
                     allSubOperationsSucceeded = false;
                     console.error(`[${userActionName} BATCH] Server reported sub-operation error:`, opResult);
+                    // Log more details about the error
+                    if (opResult.message) {
+                        console.error(`[${userActionName} BATCH] Error message:`, opResult.message);
+                    }
+                    if (opResult.id) {
+                        console.error(`[${userActionName} BATCH] Failed operation ID:`, opResult.id);
+                    }
                 } else if (opResult.type === 'create' && opResult.client_temp_id) {
                     _finalizeNewNote(opResult.client_temp_id, opResult.note);
                 } else if (opResult.type === 'update' && opResult.note) {
@@ -78,11 +85,19 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
             console.error(`[${userActionName} BATCH] Invalid response structure from server:`, batchResponse);
         }
 
-        if (!allSubOperationsSucceeded) throw new Error(`One or more sub-operations in '${userActionName}' failed.`);
+        if (!allSubOperationsSucceeded) {
+            const errorDetails = batchResponse.results
+                .filter(r => r.status === 'error')
+                .map(r => `${r.type} operation: ${r.message || 'Unknown error'}`)
+                .join(', ');
+            throw new Error(`One or more sub-operations in '${userActionName}' failed: ${errorDetails}`);
+        }
         success = true;
         ui.updateSaveStatusIndicator('saved');
     } catch (error) {
-        alert(`${error.message || `Batch operation '${userActionName}' failed.`} Reverting local changes.`);
+        console.error(`[${userActionName}] Batch operation failed:`, error);
+        const errorMessage = error.message || `Batch operation '${userActionName}' failed.`;
+        alert(`${errorMessage} Reverting local changes.`);
         ui.updateSaveStatusIndicator('error');
         const appStore = getAppStore();
         appStore.setNotes(originalNotesState);

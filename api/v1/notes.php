@@ -10,6 +10,7 @@ require_once __DIR__ . '/batch_operations.php';
 error_log("Notes API Request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
 error_log("Input data: " . json_encode($input ?? []));
 
+// Create a fresh database connection for this request to avoid locking issues
 $pdo = get_db_connection();
 $dataManager = new DataManager($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
@@ -277,16 +278,41 @@ if (!function_exists('_handleBatchOperations')) {
         $results = [];
         $tempIdMap = [];
         
-        // Process operations in a safe order: Delete -> Create -> Update
-        $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
+        try {
+            // Process operations in a safe order: Delete -> Create -> Update
+            $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
             $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
             $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
 
-            foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
-            foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
-            foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+            foreach ($deleteOps as $op) {
+                $result = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
+                $results[] = $result;
+                if ($result['status'] === 'error') {
+                    error_log("Batch delete operation failed: " . json_encode($result));
+                }
+            }
+            
+            foreach ($createOps as $op) {
+                $result = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap, $includeParentProperties);
+                $results[] = $result;
+                if ($result['status'] === 'error') {
+                    error_log("Batch create operation failed: " . json_encode($result));
+                }
+            }
+            
+            foreach ($updateOps as $op) {
+                $result = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap, $includeParentProperties);
+                $results[] = $result;
+                if ($result['status'] === 'error') {
+                    error_log("Batch update operation failed: " . json_encode($result));
+                }
+            }
             
             return $results;
+        } catch (Exception $e) {
+            error_log("Batch operations failed with exception: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
 
@@ -320,9 +346,32 @@ if ($method === 'GET') {
 } elseif ($method === 'POST') {
     if (isset($input['action']) && $input['action'] === 'batch') {
         $includeParentProperties = (bool)($input['include_parent_properties'] ?? false);
-        $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? [], $includeParentProperties);
-        ApiResponse::success(['results' => $results]);
-        return;
+        
+        // Add retry logic for database locking issues
+        $maxRetries = 3;
+        $retryDelay = 100; // milliseconds
+        
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? [], $includeParentProperties);
+                close_db_connection($pdo);
+                ApiResponse::success(['results' => $results]);
+                return;
+            } catch (Exception $e) {
+                $errorMessage = $e->getMessage();
+                if (strpos($errorMessage, 'database is locked') !== false && $attempt < $maxRetries) {
+                    error_log("Database locked, retrying batch operation (attempt $attempt/$maxRetries)");
+                    usleep($retryDelay * 1000); // Convert to microseconds
+                    $retryDelay *= 2; // Exponential backoff
+                    continue;
+                }
+                // If it's not a locking issue or we've exhausted retries, throw the error
+                error_log("Batch operation failed after $attempt attempts: " . $errorMessage);
+                close_db_connection($pdo);
+                ApiResponse::error('Batch operation failed: ' . $errorMessage, 500);
+                return;
+            }
+        }
     }
     ApiResponse::error('This endpoint now primarily uses batch operations. Please use the batch action.', 400);
 

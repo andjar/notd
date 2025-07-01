@@ -11,8 +11,9 @@ require_once __DIR__ . '/db_helpers.php'; // Moved helpers to separate file
 require_once __DIR__ . '/pattern_processor.php'; // Added PatternProcessor include
 
 function get_db_connection() {
-    static $pdo = null;
-    if ($pdo !== null) return $pdo;
+    // Remove static connection to avoid locking issues with concurrent requests
+    // Each request gets its own connection
+    $pdo = null;
 
     try {
         $db_path = DB_PATH;
@@ -21,10 +22,17 @@ function get_db_connection() {
             throw new Exception("Failed to create database directory: $db_dir");
         }
         
-        $pdo = new PDO('sqlite:' . $db_path, null, null, ['ATTR_ERRMODE' => PDO::ERRMODE_EXCEPTION, 'ATTR_DEFAULT_FETCH_MODE' => PDO::FETCH_ASSOC]);
+        $pdo = new PDO('sqlite:' . $db_path, null, null, [
+            'ATTR_ERRMODE' => PDO::ERRMODE_EXCEPTION, 
+            'ATTR_DEFAULT_FETCH_MODE' => PDO::FETCH_ASSOC,
+            'ATTR_TIMEOUT' => 30
+        ]);
         $pdo->exec('PRAGMA foreign_keys = ON;');
-        $pdo->exec('PRAGMA busy_timeout = 5000;');        // Add this line
-$pdo->exec('PRAGMA journal_mode = WAL;');         // And this one
+        $pdo->exec('PRAGMA busy_timeout = 30000;');        // Increased timeout to 30 seconds
+        $pdo->exec('PRAGMA journal_mode = WAL;');         // WAL mode for better concurrency
+        $pdo->exec('PRAGMA synchronous = NORMAL;');       // Faster writes
+        $pdo->exec('PRAGMA cache_size = 10000;');         // Larger cache
+        $pdo->exec('PRAGMA temp_store = MEMORY;');        // Use memory for temp storage
 
         $stmt = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='Pages'");
         if ($stmt->fetch() === false) {
@@ -79,5 +87,11 @@ $pdo->exec('PRAGMA journal_mode = WAL;');         // And this one
         header('Content-Type: application/json');
         echo json_encode(['status' => 'error', 'message' => 'A critical error occurred during database setup.', 'details' => $e->getMessage()]);
         exit;
+    }
+}
+
+function close_db_connection($pdo) {
+    if ($pdo) {
+        $pdo = null;
     }
 }
