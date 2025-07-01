@@ -28,7 +28,7 @@ function get_db_connection() {
             'ATTR_TIMEOUT' => 30
         ]);
         $pdo->exec('PRAGMA foreign_keys = ON;');
-        $pdo->exec('PRAGMA busy_timeout = 30000;');        // Increased timeout to 30 seconds
+        $pdo->exec('PRAGMA busy_timeout = 5000;');        // Set timeout to 5 seconds for SQLite's internal retry
         $pdo->exec('PRAGMA journal_mode = WAL;');         // WAL mode for better concurrency
         $pdo->exec('PRAGMA synchronous = NORMAL;');       // Faster writes
         $pdo->exec('PRAGMA cache_size = 10000;');         // Larger cache

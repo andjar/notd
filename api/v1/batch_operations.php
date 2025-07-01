@@ -254,39 +254,90 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
 
     $pdo = $existingPdo;
     $ownsPdo = false;
+    $maxRetries = 5; // Max number of retries
+    $retryCount = 0;
+    $baseWaitTime = 100; // milliseconds
 
-    try {
-        if ($pdo === null) {
-            $pdo = get_db_connection();
-            $ownsPdo = true;
+    while ($retryCount <= $maxRetries) {
+        try {
+            if ($pdo === null) {
+                $pdo = get_db_connection();
+                $ownsPdo = true; // This function instance created and owns the PDO connection
+            }
+
+            $dataManager = new DataManager($pdo);
+
+            if ($ownsPdo) { // Only manage transactions if this function created the PDO connection
+                $pdo->beginTransaction();
+            }
+
+            $results = _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties);
+
+            if ($ownsPdo && $pdo->inTransaction()) { // Check inTransaction before commit
+                $pdo->commit();
+            }
+
+            return ['results' => $results];
+
+        } catch (Exception $e) {
+            if ($ownsPdo && $pdo && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            // Check if it's a SQLite busy/locked error (codes 5 or 6)
+            $errorCode = ($e instanceof PDOException) ? $e->getCode() : null;
+            // Some drivers/versions might return error code as string in $e->errorInfo[1]
+            if ($e instanceof PDOException && isset($e->errorInfo[1]) && ($e->errorInfo[1] == 5 || $e->errorInfo[1] == 6)) {
+                $errorCode = (int)$e->errorInfo[1];
+            }
+            
+            // SQLITE_BUSY is 5, SQLITE_LOCKED is 6
+            if (($errorCode === 5 || $errorCode === 6 || strpos($e->getMessage(), 'database is locked') !== false) && $retryCount < $maxRetries) {
+                $retryCount++;
+                $waitTime = $baseWaitTime * pow(2, $retryCount - 1);
+                error_log("Batch operation: DB lock detected. Attempt $retryCount/$maxRetries. Waiting {$waitTime}ms. Error: " . $e->getMessage());
+                usleep($waitTime * 1000); // usleep expects microseconds
+                
+                // If PDO was established and then failed, it might need to be reset or reconnected for the next attempt
+                // For SQLite, often just retrying the transaction is enough if the connection object itself is fine.
+                // If $ownsPdo is true, we might consider nullifying $pdo here so it's recreated in the next loop iteration.
+                // However, get_db_connection() already handles creating a new connection if $pdo is null.
+                // Let's ensure $pdo is nullified if this attempt owned it, so a fresh one is fetched.
+                if ($ownsPdo && $pdo) {
+                    $pdo = null; 
+                }
+                continue; // Retry the loop
+            }
+            
+            // For other errors, or if max retries exceeded, return/rethrow the error
+            // For testing, return error structure
+            // To avoid echoing JSON directly from here in a test context:
+            return ['error' => "An error occurred: " . $e->getMessage(), 'status_code' => 500, 'exception' => $e];
+        } finally {
+            // Close the PDO connection only if this function instance created it and it's the end of all retries.
+            // If we are in a retry loop, we might want to keep it open or nullify it to be reopened.
+            // This finally block is primarily for any cleanup needed *per attempt* if necessary,
+            // but connection closing for owned connections is handled when the function exits or before a retry.
         }
+    } // End of while loop
 
-        $dataManager = new DataManager($pdo);
-
-        if ($ownsPdo) { // Only manage transactions if this function created the PDO connection
-            $pdo->beginTransaction();
-        }
-
-        $results = _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties);
-
-        if ($ownsPdo) {
-            $pdo->commit();
-        }
-
-        return ['results' => $results];
-
-    } catch (Exception $e) {
-        if ($ownsPdo && $pdo && $pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-        // For testing, rethrow or return error structure
-        // To avoid echoing JSON directly from here in a test context:
-        return ['error' => "An error occurred: " . $e->getMessage(), 'status_code' => 500, 'exception' => $e];
-    } finally {
+    // If loop finished because retries were exhausted
+    if ($retryCount > $maxRetries) {
+        // Ensure PDO is cleaned up if it was owned and loop exhausted.
         if ($ownsPdo && $pdo) {
-            $pdo = null;
+            $pdo = null; 
         }
+        return ['error' => 'Max retries exceeded for batch operation after ' . $maxRetries . ' attempts.', 'status_code' => 503]; // Service Unavailable
     }
+
+    // Fallback for any unexpected exit from the loop without a return statement (should ideally not happen)
+    // If $pdo was owned and is still set, clean it up.
+    if ($ownsPdo && $pdo) {
+        $pdo = null;
+    }
+    // This path should ideally not be reached if the loop logic is correct.
+    // It implies the loop exited without returning results or a specific error from within.
+    return ['error' => 'An unexpected error occurred in batch processing.', 'status_code' => 500];
 }
 
 
