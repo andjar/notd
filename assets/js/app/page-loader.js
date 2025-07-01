@@ -166,26 +166,28 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
 
     const pageContentDiv = ui.domRefs.pageContent;
     const pageTitleDiv = ui.domRefs.pageTitle;
-    const pagePropertiesContainer = ui.domRefs.pagePropertiesContainer;
 
-    if (!pageContentDiv || !pageTitleDiv || !pagePropertiesContainer) {
+    if (!pageContentDiv || !pageTitleDiv) {
         console.error('[DEBUG] Missing required DOM elements:', { 
             hasPageContent: Boolean(pageContentDiv),
-            hasPageTitle: Boolean(pageTitleDiv),
-            hasPropertiesContainer: Boolean(pagePropertiesContainer)
+            hasPageTitle: Boolean(pageTitleDiv)
         });
         return;
     }
 
-    // Set page title
-    pageTitleDiv.textContent = pageData.name;
+    // Page title is now set by PHP, no need to set it here
 
     // Render properties
-    ui.renderPageInlineProperties(pageProperties, pagePropertiesContainer);
+            ui.renderPageInlineProperties(pageProperties, null);
 
     // Render main content - clean properties from content before rendering
     const contentWithoutProperties = pageData.content ? pageData.content.replace(/\{[^}]+\}/g, '').trim() : '';
-    pageContentDiv.innerHTML = contentWithoutProperties ? parseContent(contentWithoutProperties) : '';
+    if (contentWithoutProperties) {
+        pageContentDiv.innerHTML = parseContent(contentWithoutProperties);
+        pageContentDiv.style.display = 'block'; // Show the element when it has content
+    } else {
+        pageContentDiv.style.display = 'none'; // Hide the element when it's empty
+    }
 
     // Update sidebars - disabled old DOM manipulation that conflicts with Alpine.js
     // ui.displayFavorites();

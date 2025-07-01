@@ -1,6 +1,7 @@
 <?php
 // Include the main configuration file to make constants available.
 require_once 'config.php';
+require_once 'api/db_connect.php';
 
 // --- Failsafe Redirect ---
 // Get the page name from the URL.
@@ -12,6 +13,70 @@ if (empty($pageName)) {
     $redirect_url = 'page.php?page=' . urlencode($default_page_name);
     header('Location: ' . $redirect_url, true, 302);
     exit;
+}
+
+// --- Database Connection for Server-Side Rendering ---
+try {
+    $pdo = new PDO('sqlite:' . DB_PATH);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->exec('PRAGMA foreign_keys = ON;');
+} catch (PDOException $e) {
+    error_log("Database connection failed: " . $e->getMessage());
+    $pdo = null;
+}
+
+// --- Server-Side Data Fetching ---
+$pageData = null;
+$pageProperties = [];
+$recentPages = [];
+$favorites = [];
+$childPages = [];
+$backlinks = [];
+
+if ($pdo) {
+    // Get current page data
+    $stmt = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?) AND active = 1");
+    $stmt->execute([$pageName]);
+    $pageData = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($pageData) {
+        // Get page properties
+        $stmt = $pdo->prepare("SELECT name, value, weight FROM Properties WHERE page_id = ? AND active = 1 ORDER BY created_at ASC");
+        $stmt->execute([$pageData['id']]);
+        $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($properties as $prop) {
+            $key = $prop['name'];
+            if (!isset($pageProperties[$key])) {
+                $pageProperties[$key] = [];
+            }
+            $pageProperties[$key][] = [
+                'value' => $prop['value'],
+                'internal' => (int)($prop['weight'] ?? 2) > 2
+            ];
+        }
+        
+        // Get recent pages (last 7 updated pages)
+        $stmt = $pdo->prepare("SELECT id, name, updated_at FROM Pages WHERE active = 1 ORDER BY updated_at DESC LIMIT 7");
+        $stmt->execute();
+        $recentPages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get favorites
+        $stmt = $pdo->prepare("SELECT DISTINCT P.id, P.name, P.updated_at FROM Pages P JOIN Properties Prop ON P.id = Prop.page_id WHERE Prop.name = 'favorite' AND Prop.value = 'true' AND P.active = 1 ORDER BY P.updated_at DESC");
+        $stmt->execute();
+        $favorites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get child pages
+        $prefix = rtrim($pageName, '/') . '/';
+        $stmt = $pdo->prepare("SELECT id, name, updated_at FROM Pages WHERE LOWER(name) LIKE LOWER(?) || '%' AND SUBSTR(LOWER(name), LENGTH(LOWER(?)) + 1) NOT LIKE '%/%' AND active = 1 ORDER BY name ASC");
+        $stmt->execute([$prefix, $prefix]);
+        $childPages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get backlinks
+        $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, P.name as page_name FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages P ON N.page_id = P.id WHERE Prop.name = 'links_to_page' AND Prop.value = ? GROUP BY N.id ORDER BY N.updated_at DESC LIMIT 10");
+        $stmt->execute([$pageName]);
+        $backlinks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 // --- Journal Page Creation ---
@@ -50,6 +115,116 @@ if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName)) {
 // This uses the PROPERTY_WEIGHTS constant from config.php.
 $renderInternal = PROPERTY_WEIGHTS[3]['visible_in_view_mode'] ?? false;
 $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
+
+// --- Helper Functions for Rendering ---
+function renderPageProperties($properties, $renderInternal = false) {
+    if (empty($properties)) return '';
+    
+    $html = '<div id="page-properties-container" class="page-properties-inline">';
+    $hasVisibleProperties = false;
+    
+    foreach ($properties as $key => $instances) {
+        foreach ($instances as $instance) {
+            if ($instance['internal'] && !$renderInternal) continue;
+            
+            $hasVisibleProperties = true;
+            if ($key === 'favorite' && strtolower($instance['value']) === 'true') {
+                $html .= '<span class="property-inline"><span class="property-favorite">⭐</span></span>';
+            } else {
+                $html .= '<span class="property-inline"><span class="property-key">' . htmlspecialchars($key) . ':</span> <span class="property-value">' . htmlspecialchars($instance['value']) . '</span></span>';
+            }
+        }
+    }
+    
+    if ($hasVisibleProperties) {
+        $html .= '</div>';
+        return $html;
+    }
+    
+    return '';
+}
+
+function renderRecentPages($pages, $currentPageName) {
+    if (empty($pages)) {
+        return '<div class="no-pages-message">No recent pages</div>';
+    }
+    
+    $html = '<ul class="recent-pages-list">';
+    foreach ($pages as $page) {
+        $isActive = ($page['name'] === $currentPageName) ? ' active' : '';
+        $html .= '<li><a href="#" class="recent-page-link' . $isActive . '" data-page-name="' . htmlspecialchars($page['name']) . '">';
+        $html .= '<i data-feather="file-text" class="recent-page-icon"></i>';
+        $html .= '<span class="recent-page-name">' . htmlspecialchars($page['name']) . '</span>';
+        $html .= '</a></li>';
+    }
+    $html .= '</ul>';
+    return $html;
+}
+
+function renderFavorites($favorites, $currentPageName) {
+    if (empty($favorites)) {
+        return '<p>No favorite pages yet.</p>';
+    }
+    
+    $html = '<ul class="favorites-list">';
+    foreach ($favorites as $page) {
+        $isActive = ($page['name'] === $currentPageName) ? ' active' : '';
+        $html .= '<li><a href="#" class="favorite-page-link' . $isActive . '" data-page-name="' . htmlspecialchars($page['name']) . '">';
+        $html .= '<i data-feather="star" class="favorite-page-icon"></i>';
+        $html .= '<span class="favorite-page-name">' . htmlspecialchars($page['name']) . '</span>';
+        $html .= '</a></li>';
+    }
+    $html .= '</ul>';
+    return $html;
+}
+
+function renderChildPages($childPages) {
+    $html = '<h3>Child Pages</h3><ul class="child-page-list">';
+    foreach ($childPages as $page) {
+        $html .= '<li><a href="#" class="child-page-link" data-page-name="' . htmlspecialchars($page['name']) . '">' . htmlspecialchars($page['name']) . '</a></li>';
+    }
+    $html .= '</ul>';
+    return $html;
+}
+
+function renderChildPagesSidebar($childPages) {
+    if (empty($childPages)) {
+        return '';
+    }
+    
+    $html = '<h3>Child Pages</h3><ul class="child-pages-sidebar-list">';
+    foreach ($childPages as $page) {
+        $displayName = strpos($page['name'], '/') !== false ? 
+            substr($page['name'], strrpos($page['name'], '/') + 1) : 
+            $page['name'];
+        $html .= '<li><a href="#" class="child-page-sidebar-link" data-page-name="' . htmlspecialchars($page['name']) . '">';
+        $html .= '<i data-feather="file-text" class="child-page-sidebar-icon"></i>';
+        $html .= '<span class="child-page-sidebar-name">' . htmlspecialchars($displayName) . '</span>';
+        $html .= '</a></li>';
+    }
+    $html .= '</ul>';
+    return $html;
+}
+
+function renderBacklinks($backlinks) {
+    if (empty($backlinks)) {
+        return '<p>No backlinks found.</p>';
+    }
+    
+    $html = '';
+    foreach ($backlinks as $link) {
+        $snippet = substr($link['content'], 0, 100);
+        if (strlen($link['content']) > 100) $snippet .= '...';
+        
+        $html .= '<a href="#" class="backlink-item" data-page-name="' . htmlspecialchars($link['page_name']) . '">';
+        $html .= '<i data-feather="link" class="backlink-icon"></i>';
+        $html .= '<div class="backlink-content">';
+        $html .= '<span class="backlink-name">' . htmlspecialchars($link['page_name']) . '</span>';
+        $html .= '<span class="backlink-snippet">' . htmlspecialchars($snippet) . '</span>';
+        $html .= '</div></a>';
+    }
+    return $html;
+}
 
 ?>
 
@@ -161,7 +336,9 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     <div class="sidebar-section">
                         <div class="recent-pages">
                             <h3>Recent Pages</h3>
-                            <div id="page-list"></div>
+                            <div id="page-list">
+                                <?php echo renderRecentPages($recentPages, $pageName); ?>
+                            </div>
                         </div>
                     </div>
                     <div class="sidebar-footer">
@@ -177,12 +354,12 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         <div id="main-content" class="main-content">
             <div class="page-title-container">
                 <h1 id="page-title" class="page-title">
-                    <!-- Page title and breadcrumbs populated by JS -->
+                    <span class="page-title-content"><?php echo htmlspecialchars($pageName); ?></span>
                 </h1>
-                <div id="page-properties-container" class="page-properties-inline"></div>
+                <?php echo renderPageProperties($pageProperties, $renderInternal); ?>
             </div>
-            <div id="page-content" class="page-content">
-                <!-- Page content will be rendered here -->
+            <div id="page-content" class="page-content" style="display: none;">
+                <!-- Page content will be rendered here by JavaScript -->
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner" x-data="{ notes: [] }" x-init="initializeDragAndDrop()">
@@ -291,9 +468,11 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     </div>
                 </template>
             </div>
+            <?php if (!empty($childPages)): ?>
             <div id="child-pages-container">
-                <!-- Child pages will be rendered here by JavaScript -->
+                <?php echo renderChildPages($childPages); ?>
             </div>
+            <?php endif; ?>
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
             </button>
@@ -309,20 +488,22 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
                     <div class="sidebar-section">
                         <div class="favorites">
                             <h3>Favorites</h3>
-                            <div id="favorites-container"></div>
+                            <div id="favorites-container">
+                                <?php echo renderFavorites($favorites, $pageName); ?>
+                            </div>
                         </div>
                     </div>
                     <div class="sidebar-section">
                         <div id="backlinks-container" class="backlinks-sidebar">
                             <h4>Backlinks</h4>
                             <div id="backlinks-list" class="backlinks-list">
-                                <!-- Backlinks will be populated by JavaScript -->
+                                <?php echo renderBacklinks($backlinks); ?>
                             </div>
                         </div>
                     </div>
                     <div class="sidebar-section">
                         <div id="child-pages-sidebar" class="child-pages-sidebar">
-                            <!-- Child pages will be populated by JavaScript -->
+                            <?php echo renderChildPagesSidebar($childPages); ?>
                         </div>
                     </div>
                     <div class="sidebar-section extensions-section">

@@ -15,7 +15,7 @@ async function _updatePageContent(newContent) {
         pageContentForModal = updatedPage.content || '';
         // The properties are now derived from the returned content, so we pass the new properties to the UI.
         displayPageProperties(updatedPage.properties || {});
-        ui.renderPageInlineProperties(updatedPage.properties || {}, ui.domRefs.pagePropertiesContainer);
+        ui.renderPageInlineProperties(updatedPage.properties || {}, null);
         ui.updateSaveStatusIndicator('saved');
         hidePagePropertiesModal();
     } catch (error) {

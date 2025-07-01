@@ -22,61 +22,50 @@ function updatePageTitle(pageName) {
     document.title = `${pageName} - notd`;
     if (!domRefs.pageTitleContainer) return;
 
-    // Create the page title element
-    const pageTitle = document.createElement('h1');
-    pageTitle.id = 'page-title';
-    pageTitle.className = 'page-title';
+    // Check if the title content already exists (set by PHP)
+    const existingTitleContent = domRefs.pageTitleContainer.querySelector('.page-title-content');
     
-    // Clear the container and append the title element
-    domRefs.pageTitleContainer.innerHTML = '';
-    domRefs.pageTitleContainer.appendChild(pageTitle);
-
-    // Create a span for the title content
-    const titleContent = document.createElement('span');
-    titleContent.className = 'page-title-content';
-    pageTitle.appendChild(titleContent);
-
-    // Add the page name parts with links for namespaces
-    const pageNameParts = pageName.split('/');
-    let currentPath = '';
-
-    pageNameParts.forEach((part, index) => {
-        if (index > 0) {
-            titleContent.appendChild(document.createTextNode(' / '));
-        }
-        currentPath += (index > 0 ? '/' : '') + part;
-
-        if (index < pageNameParts.length - 1) {
-            const link = document.createElement('a');
-            link.href = '#';
-            link.textContent = part;
-            link.dataset.pageName = currentPath;
-            titleContent.appendChild(link);
-        } else {
-            titleContent.appendChild(document.createTextNode(part));
-        }
-    });
+    if (!existingTitleContent) {
+        // Only create the title if it doesn't exist (fallback for non-PHP scenarios)
+        const pageTitle = document.createElement('h1');
+        pageTitle.id = 'page-title';
+        pageTitle.className = 'page-title';
+        
+        const titleContent = document.createElement('span');
+        titleContent.className = 'page-title-content';
+        titleContent.textContent = pageName;
+        pageTitle.appendChild(titleContent);
+        
+        domRefs.pageTitleContainer.innerHTML = '';
+        domRefs.pageTitleContainer.appendChild(pageTitle);
+    }
     
-    // Add the gear icon to the titleContent span instead of pageTitle
-    const gearIcon = document.createElement('i');
-    gearIcon.dataset.feather = 'settings';
-    gearIcon.id = 'page-properties-gear';
-    gearIcon.className = 'page-title-gear';
-    gearIcon.title = 'Page Properties';
-    gearIcon.style.display = 'inline-block';
-    gearIcon.style.marginLeft = '8px';
-    gearIcon.style.cursor = 'pointer';
-    titleContent.appendChild(gearIcon); // Changed from pageTitle to titleContent
+    // Add the gear icon if it doesn't already exist
+    const existingGearIcon = domRefs.pageTitleContainer.querySelector('#page-properties-gear');
+    if (!existingGearIcon) {
+        const titleContent = domRefs.pageTitleContainer.querySelector('.page-title-content');
+        if (titleContent) {
+            const gearIcon = document.createElement('i');
+            gearIcon.dataset.feather = 'settings';
+            gearIcon.id = 'page-properties-gear';
+            gearIcon.className = 'page-title-gear';
+            gearIcon.title = 'Page Properties';
+            gearIcon.style.display = 'inline-block';
+            gearIcon.style.marginLeft = '8px';
+            gearIcon.style.cursor = 'pointer';
+            titleContent.appendChild(gearIcon);
 
-    // Use traditional feather replacement for this specific element
-    if (typeof feather !== 'undefined' && feather.replace) {
-        setTimeout(() => {
-            try {
-                feather.replace();
-            } catch (error) {
-                console.warn('Feather icon replacement failed for page title:', error);
+            // Use traditional feather replacement for this specific element
+            if (typeof feather !== 'undefined' && feather.replace) {
+                setTimeout(() => {
+                    try {
+                        feather.replace();
+                    } catch (error) {
+                        console.warn('Feather icon replacement failed for page title:', error);
+                    }
+                }, 0);
             }
-        }, 0);
+        }
     }
 }
 
@@ -84,9 +73,15 @@ function updatePageTitle(pageName) {
  * Updates the page list in the sidebar
  * @param {Array} pages - Array of page objects
  * @param {string} activePageName - Currently active page
+ * 
+ * NOTE: This function is now handled by PHP rendering in page.php
+ * Keeping for fallback/legacy support only
  */
 function updatePageList(pages, activePageName) {
-    if (!domRefs.pageListContainer) return;
+    // This function is now handled by PHP rendering
+    // Only execute if the page list container is empty (fallback)
+    if (!domRefs.pageListContainer || domRefs.pageListContainer.children.length > 0) return;
+    
     domRefs.pageListContainer.innerHTML = '';
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
@@ -168,12 +163,30 @@ function updateActivePageLink(pageName) {
  * Renders page properties as inline "pills" directly on the page.
  * @param {Object} properties - The page's properties object.
  * @param {HTMLElement} targetContainer - The HTML element to render properties into.
+ * 
+ * NOTE: This function is now handled by PHP rendering in page.php
+ * Keeping for fallback/legacy support only
  */
 function renderPageInlineProperties(properties, targetContainer) {
-    if (!targetContainer) return;
-    targetContainer.innerHTML = '';
-
+    // This function is now handled by PHP rendering
+    // Only execute if no properties container exists (fallback)
+    if (document.getElementById('page-properties-container')) return;
+    
     if (!properties || Object.keys(properties).length === 0) return;
+    
+    // Find or create the target container
+    let container = targetContainer;
+    if (!container) {
+        const titleContainer = document.querySelector('.page-title-container');
+        if (!titleContainer) return;
+        
+        container = document.createElement('div');
+        container.id = 'page-properties-container';
+        container.className = 'page-properties-inline';
+        titleContainer.appendChild(container);
+    }
+    
+    container.innerHTML = '';
 
     const fragment = document.createDocumentFragment();
     let hasVisibleProperties = false;
@@ -198,10 +211,10 @@ function renderPageInlineProperties(properties, targetContainer) {
     });
 
     if (hasVisibleProperties) {
-        targetContainer.appendChild(fragment);
-        targetContainer.style.display = 'flex';
+        container.appendChild(fragment);
+        container.style.display = 'flex';
         // Show border when properties are visible
-        const titleContainer = targetContainer.closest('.page-title-container');
+        const titleContainer = container.closest('.page-title-container');
         if (titleContainer) {
             titleContainer.style.borderBottom = '1px solid var(--sidebar-border)';
             titleContainer.style.paddingBottom = '0.75rem';
@@ -334,8 +347,6 @@ export function promptForEncryptionPassword() {
         });
     });
 }
-
-
 
 /**
  * Updates the visual save status indicator.
@@ -555,8 +566,10 @@ export function promptForPagePassword() {
 }
 
 function displayChildPages(pageName) {
+    // This function is now handled by PHP rendering
+    // Only execute if the child pages container is empty (fallback)
     const container = document.getElementById('child-pages-container');
-    if (!container) return;
+    if (!container || container.children.length > 0) return;
 
     // Hide container by default
     container.style.display = 'none';
@@ -602,8 +615,10 @@ function displayChildPages(pageName) {
 }
 
 function displayChildPagesInSidebar(pageName) {
+    // This function is now handled by PHP rendering
+    // Only execute if the child pages sidebar is empty (fallback)
     const container = document.getElementById('child-pages-sidebar');
-    if (!container) return;
+    if (!container || container.children.length > 0) return;
 
     // Hide container by default
     container.style.display = 'none';
@@ -663,8 +678,10 @@ function displayChildPagesInSidebar(pageName) {
 }
 
 function displayFavorites() {
+    // This function is now handled by PHP rendering
+    // Only execute if the favorites container is empty (fallback)
     const container = document.getElementById('favorites-container');
-    if (!container) return;
+    if (!container || container.children.length > 0) return;
 
     // Get or create the UL for the list items
     let listContainer = container.querySelector('ul.favorites-list');
@@ -747,9 +764,11 @@ async function toggleFavorite(pageName) {
 }
 
 function displayBacklinksInSidebar(pageName) {
+    // This function is now handled by PHP rendering
+    // Only execute if the backlinks container is empty (fallback)
     const container = document.getElementById('backlinks-container');
-    if (!container) {
-        console.log('Backlinks container not found');
+    if (!container || container.querySelector('.backlinks-list').children.length > 0) {
+        console.log('Backlinks container not found or already populated');
         return;
     }
 
