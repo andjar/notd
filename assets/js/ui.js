@@ -3,7 +3,10 @@
  * This module exports a single `ui` object that contains all UI-related functions.
  */
 
-import { setSaveStatus } from './app/state.js';
+// Get Alpine store reference
+function getAppStore() {
+    return window.Alpine.store('app');
+}
 import { domRefs } from './ui/dom-refs.js';
 import {
     displayNotes,
@@ -83,13 +86,11 @@ function updatePageTitle(pageName) {
     gearIcon.style.cursor = 'pointer';
     titleContent.appendChild(gearIcon); // Changed from pageTitle to titleContent
 
-    // Initialize Feather icons
-    if (typeof feather !== 'undefined') {
-        try {
-            feather.replace();
-        } catch (error) {
-            console.error('Error rendering feather icon:', error);
-        }
+    // Use centralized Feather icon manager
+    if (window.FeatherManager) {
+        window.FeatherManager.requestUpdate();
+    } else {
+        setTimeout(() => { feather.replace(); }, 0);
     }
 }
 
@@ -151,7 +152,7 @@ function updatePageList(pages, activePageName) {
       event.preventDefault();
       const pageName = event.currentTarget.dataset.pageName;
 
-      console.log("[DEBUG] Clicked recent page:", pageName);
+      // Load page when recent page is clicked
 
       updateActivePageLink(pageName); // Highlight the clicked link
       // Load page content
@@ -160,13 +161,11 @@ function updatePageList(pages, activePageName) {
 
     domRefs.pageListContainer.appendChild(listContainer);
 
-    // Initialize Feather icons
-    if (typeof feather !== 'undefined') {
-        try {
-            feather.replace();
-        } catch (error) {
-            console.error('Error rendering feather icons:', error);
-        }
+    // Use centralized Feather icon manager
+    if (window.FeatherManager) {
+        window.FeatherManager.requestUpdate();
+    } else {
+        setTimeout(() => { feather.replace(); }, 0);
     }
 }
 
@@ -360,7 +359,8 @@ function updateSaveStatusIndicator(newStatus) {
     const indicator = document.getElementById('save-status-indicator');
     if (!indicator) return;
 
-    setSaveStatus(newStatus);
+    const appStore = getAppStore();
+    appStore.setSaveStatus(newStatus);
     indicator.className = 'save-status-indicator';
     indicator.classList.add(`status-${newStatus}`);
 
@@ -381,7 +381,7 @@ function updateSaveStatusIndicator(newStatus) {
     }
     indicator.innerHTML = iconHtml;
     if (newStatus !== 'pending' && typeof feather !== 'undefined') {
-        feather.replace({ width: '18px', height: '18px' });
+        setTimeout(() => { feather.replace(); }, 0);
     }
 }
 
@@ -663,13 +663,7 @@ function displayChildPagesInSidebar(pageName) {
             container.appendChild(list);
 
             // Initialize Feather icons
-            if (typeof feather !== 'undefined') {
-                try {
-                    feather.replace();
-                } catch (error) {
-                    console.error('Error rendering feather icons:', error);
-                }
-            }
+            setTimeout(() => { feather.replace(); }, 0);
         })
         .catch(error => {
             console.error('Error fetching child pages:', error);
@@ -731,13 +725,7 @@ function displayFavorites() {
             });
 
             // Initialize Feather icons
-            if (typeof feather !== 'undefined') {
-                try {
-                    feather.replace();
-                } catch (error) {
-                    console.error('Error rendering feather icons:', error);
-                }
-            }
+            setTimeout(() => { feather.replace(); }, 0);
         })
         .catch(error => {
             console.error('Error fetching favorites:', error);
@@ -762,8 +750,8 @@ async function toggleFavorite(pageName) {
             await window.propertiesAPI.setProperty('page', pageData.id, 'favorite', 'true');
         }
         
-        // Refresh the display
-        displayFavorites();
+        // Refresh the display - disabled to prevent conflicts with Alpine.js
+        // displayFavorites();
     } catch (error) {
         console.error('Error toggling favorite:', error);
         alert('Error updating favorite status. Please try again.');
@@ -838,13 +826,7 @@ function displayBacklinksInSidebar(pageName) {
             });
 
             // Initialize Feather icons
-            if (typeof feather !== 'undefined') {
-                try {
-                    feather.replace();
-                } catch (error) {
-                    console.error('Error rendering feather icons:', error);
-                }
-            }
+            setTimeout(() => { feather.replace(); }, 0);
         })
         .catch(error => {
             console.error('Error fetching backlinks:', error);

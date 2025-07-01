@@ -1,20 +1,9 @@
 // assets/js/app/page-loader.js
 
-import {
-    setCurrentPageId,
-    setCurrentPageName,
-    setNotesForCurrentPage,
-    hasPageCache,
-    getPageCache,
-    setPageCache,
-    CACHE_MAX_AGE_MS,
-    MAX_PREFETCH_PAGES,
-    currentPageName,
-    notesForCurrentPage,
-    currentPageId,
-    setCurrentPagePassword,
-    getCurrentPagePassword
-} from './state.js';
+// Get Alpine store reference
+function getAppStore() {
+    return window.Alpine.store('app');
+}
 
 import { decrypt } from '../utils.js';
 import { notesAPI, pagesAPI, searchAPI, queryAPI, apiRequest } from '../api_client.js';
@@ -162,7 +151,8 @@ export async function handleSqlQueries() {
 // --- Page Loading and Rendering ---
 
 async function handleCreateAndFocusFirstNote() {
-    if (!currentPageId) return;
+    const appStore = getAppStore();
+    if (!appStore.currentPageId) return;
     await handleAddRootNote();
 }
 
@@ -197,10 +187,10 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     const contentWithoutProperties = pageData.content ? pageData.content.replace(/\{[^}]+\}/g, '').trim() : '';
     pageContentDiv.innerHTML = contentWithoutProperties ? parseContent(contentWithoutProperties) : '';
 
-    // Update sidebars
-    ui.displayFavorites();
-    ui.displayBacklinksInSidebar(pageData.name);
-    ui.displayChildPagesInSidebar(pageData.name);
+    // Update sidebars - disabled old DOM manipulation that conflicts with Alpine.js
+    // ui.displayFavorites();
+    // ui.displayBacklinksInSidebar(pageData.name);
+    // ui.displayChildPagesInSidebar(pageData.name);
 
     // Render notes
     if (pageData.notes && pageData.notes.length > 0) {
@@ -220,7 +210,8 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                 valueLength: pageEncryptProperty.value?.length
             });
 
-            let password = getCurrentPagePassword();
+            const appStore = getAppStore();
+            let password = appStore.pagePassword;
             const pageHash = pageEncryptProperty.value;
 
             if (!password) {
@@ -236,24 +227,24 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                             expectedHash: pageHash
                         });
                         alert("Wrong password!");
-                        setCurrentPagePassword(null);
+                        appStore.setPagePassword(null);
                         pageContentDiv.innerHTML = '<p>Decryption failed: Incorrect password.</p>';
-                        setNotesForCurrentPage([]);
-                        ui.displayNotes([], currentPageId);
+                        appStore.setNotes([]);
+                        ui.displayNotes([], appStore.currentPageId);
                         return; // Stop rendering
                     }
                     console.log('[DEBUG] Password verified, setting current password');
-                    setCurrentPagePassword(password);
+                    appStore.setPagePassword(password);
                 } catch (error) {
                     console.error("[DEBUG] Password prompt failed:", error);
                     pageContentDiv.innerHTML = '<p>Password entry cancelled. Cannot display page.</p>';
-                    setNotesForCurrentPage([]);
-                    ui.displayNotes([], currentPageId);
+                    appStore.setNotes([]);
+                    ui.displayNotes([], appStore.currentPageId);
                     return; // Stop rendering
                 }
             }
 
-            const currentPassword = getCurrentPagePassword();
+            const currentPassword = appStore.pagePassword;
             const currentPasswordHash = currentPassword ? sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(currentPassword)) : null;
 
             if (currentPasswordHash !== pageHash) {
@@ -261,10 +252,10 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                     storedHash: currentPasswordHash,
                     expectedHash: pageHash
                 });
-                setCurrentPagePassword(null);
+                appStore.setPagePassword(null);
                 pageContentDiv.innerHTML = '<p>Decryption failed: Stored password is incorrect for this page. Please reload.</p>';
-                setNotesForCurrentPage([]);
-                ui.displayNotes([], currentPageId);
+                appStore.setNotes([]);
+                ui.displayNotes([], appStore.currentPageId);
                 return;
             }
 
@@ -318,23 +309,25 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
         }
         
         console.log('[DEBUG] Setting notes for current page and displaying');
-        setNotesForCurrentPage(notesToRender);
-        ui.displayNotes(notesToRender, currentPageId);
+        const appStore = getAppStore();
+        appStore.setNotes(notesToRender);
+        ui.displayNotes(notesToRender, appStore.currentPageId);
         if (focusFirstNote && pageData.notes[0]) {
             handleNoteAction('focus', pageData.notes[0].id);
         }
     } else {
         console.log('[DEBUG] No notes to render');
-        setNotesForCurrentPage([]);
-        ui.displayNotes([], currentPageId); // Clear notes view
+        const appStore = getAppStore();
+        appStore.setNotes([]);
+        ui.displayNotes([], appStore.currentPageId); // Clear notes view
         if (focusFirstNote) {
             await handleNoteAction('create', null);
         }
     }
 
     console.log('[DEBUG] Rendering additional page elements');
-    displayBacklinks(pageData.name);
-    displayChildPages(pageData.name);
+    // displayBacklinks(pageData.name); // Disabled - conflicts with Alpine.js
+    // displayChildPages(pageData.name); // Disabled - conflicts with Alpine.js
     handleTransclusions();
     handleSqlQueries();
     
@@ -342,7 +335,8 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     prefetchLinkedPagesData();
     console.log('[DEBUG] _renderPageContent complete');
 
-    if (notesForCurrentPage.length === 0 && pageData.id) {
+    const appStore = getAppStore();
+    if (appStore.notes.length === 0 && pageData.id) {
         await handleCreateAndFocusFirstNote();
     } else if (focusFirstNote && ui.domRefs.notesContainer) {
         const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
@@ -351,10 +345,11 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
 }
 
 async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
-    setCurrentPageName(pageData.name);
-    setCurrentPageId(pageData.id);
-    setNotesForCurrentPage(pageData.notes || []);
-    setCurrentPagePassword(null); // Reset password for new page
+    const appStore = getAppStore();
+    appStore.setCurrentPageName(pageData.name);
+    appStore.setCurrentPageId(pageData.id);
+    appStore.setNotes(pageData.notes || []);
+    appStore.setPagePassword(null); // Reset password for new page
 
     if (updateHistory) {
         const newUrl = new URL(window.location);
@@ -397,7 +392,8 @@ async function _fetchPageFromNetwork(pageName) {
     // This check is now mostly for safety, as `notes` is explicitly assigned above.
     combinedPageData.notes = Array.isArray(combinedPageData.notes) ? combinedPageData.notes : [];
     
-    setPageCache(pageName, { ...combinedPageData, timestamp: Date.now() });
+    const appStore = getAppStore();
+    appStore.setPageCache(pageName, { ...combinedPageData, timestamp: Date.now() });
     return combinedPageData;
 }
 
@@ -418,9 +414,10 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
 
     try {
         let pageData = providedPageData;
-        const cachedPage = getPageCache(pageName);
+        const appStore = getAppStore();
+        const cachedPage = appStore.getPageCache(pageName);
 
-        if (!pageData && cachedPage && (Date.now() - cachedPage.timestamp < CACHE_MAX_AGE_MS)) {
+        if (!pageData && cachedPage && (Date.now() - cachedPage.timestamp < appStore.CACHE_MAX_AGE_MS)) {
             pageData = cachedPage;
         }
         
@@ -434,9 +431,10 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
     } catch (error) {
         console.error('[page-loader] Error object received:', error);
         console.error(`Error loading page ${pageName}:`, error);
-        setCurrentPageName(`Error: ${pageName}`);
-        setCurrentPageId(null);
-        ui.updatePageTitle(currentPageName);
+        const appStore = getAppStore();
+        appStore.setCurrentPageName(`Error: ${pageName}`);
+        appStore.setCurrentPageId(null);
+        ui.updatePageTitle(appStore.currentPageName);
         console.log('[page-loader] Attempting to display error message. notesContainer:', ui.domRefs.notesContainer);
         try {
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
@@ -450,11 +448,12 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
 }
 
 export async function prefetchLinkedPagesData() {
-    if (!notesForCurrentPage) return;
+    const appStore = getAppStore();
+    if (!appStore.notes) return;
     const linkedPageNames = new Set();
     const pageLinkRegex = /\[\[([^\]]+)\]\]/g;
 
-    notesForCurrentPage.forEach(note => {
+    appStore.notes.forEach(note => {
         if (note.content) {
             [...note.content.matchAll(pageLinkRegex)].forEach(match => {
                 const pageName = match[1].trim().split('|')[0].trim();
@@ -465,8 +464,8 @@ export async function prefetchLinkedPagesData() {
 
     let prefetchCounter = 0;
     for (const name of linkedPageNames) {
-        if (prefetchCounter >= MAX_PREFETCH_PAGES) break;
-        if (name === currentPageName || hasPageCache(name)) continue;
+        if (prefetchCounter >= appStore.MAX_PREFETCH_PAGES) break;
+        if (name === appStore.currentPageName || appStore.hasPageCache(name)) continue;
         
         try {
             await _fetchPageFromNetwork(name);
@@ -478,9 +477,10 @@ export async function prefetchLinkedPagesData() {
 
 export async function prefetchRecentPagesData() {
     try {
-        const { pages } = await pagesAPI.getPages({ sort_by: 'updated_at', sort_order: 'desc', per_page: MAX_PREFETCH_PAGES });
+        const appStore = getAppStore();
+        const { pages } = await pagesAPI.getPages({ sort_by: 'updated_at', sort_order: 'desc', per_page: appStore.MAX_PREFETCH_PAGES });
         for (const page of pages) {
-            if (page.name === currentPageName || hasPageCache(page.name)) continue;
+            if (page.name === appStore.currentPageName || appStore.hasPageCache(page.name)) continue;
             try {
                 await _fetchPageFromNetwork(page.name);
             } catch (error) {
@@ -494,8 +494,9 @@ export async function prefetchRecentPagesData() {
 
 export async function fetchAndDisplayPages(activePageName) {
     try {
+        const appStore = getAppStore();
         const { pages } = await pagesAPI.getPages({ per_page: 20, sort_by: 'updated_at', sort_order: 'desc' });
-        ui.updatePageList(pages, activePageName || currentPageName);
+        ui.updatePageList(pages, activePageName || appStore.currentPageName);
     } catch (error) {
         console.error('Error fetching pages for sidebar:', error);
         if (ui.domRefs.pageListContainer) {

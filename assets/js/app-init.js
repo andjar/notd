@@ -40,9 +40,6 @@ window.createPageWithContent = async (pageName, initialContent = '') => {
  * This function sets up UI components, event listeners, and loads the initial page.
  */
 export async function initializeApp() {
-    const splashScreen = document.getElementById('splash-screen');
-    if (splashScreen) splashScreen.classList.remove('hidden'); 
-    
     try {
         // **FIX**: Initialize the sidebar here, after the DOM is loaded
         // but before other components that might depend on it.
@@ -78,14 +75,6 @@ export async function initializeApp() {
         
     } catch (error) { 
         console.error('Failed to initialize application:', error);
-        if (splashScreen) splashScreen.classList.add('hidden');
         document.body.innerHTML = `<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>${error.message}</p><p>Check console for details.</p></div>`;
-    } finally {
-        if (splashScreen) {
-            if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
-                window.splashAnimations.stop();
-            }
-            splashScreen.classList.add('hidden');
-        }
     }
 }

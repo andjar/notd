@@ -36,15 +36,7 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         }
     }
 
-      console.log('API REQUEST BODY:', options.body);
-
     try {
-
-         console.log('Sending API request to:', API_BASE_URL + endpoint);
-    console.log('Method:', method);
-    console.log('Headers:', options.headers);
-    console.log('Body:', options.body);
-
         const response = await fetch(API_BASE_URL + endpoint, options);
         
         if (response.status === 204) {
@@ -54,7 +46,6 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            console.error('Non-JSON response:', text);
             if (!response.ok) {
                 throw new Error(`Server error: ${response.status} ${response.statusText}. Response: ${text}`);
             }
@@ -64,7 +55,6 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         const data = await response.json();
 
         if (data && data.status === 'error' && data.message && data.message.includes('PHP Error:')) {
-            console.error('PHP Error in response:', data);
             throw new Error('Server error: PHP error in response');
         }
         
@@ -73,7 +63,6 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
             if (data.details) {
                 errorMessage += ` Details: ${JSON.stringify(data.details)}`;
             }
-            console.error('API Error (data.status === "error"):', errorMessage);
             throw new Error(errorMessage);
         }
 
@@ -82,7 +71,6 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
             if (typeof errorMessage === 'object') {
                 errorMessage = JSON.stringify(errorMessage);
             }
-            console.error('API Error (HTTP status not OK):', errorMessage);
             throw new Error(errorMessage);
         }
         
@@ -91,7 +79,6 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         return data.data;
 
     } catch (error) {
-        console.error('[apiRequest] Request failed:', error);
         throw error;
     }
 }
@@ -128,11 +115,9 @@ const pagesAPI = {
                  return { pages: responsePayload, pagination: null };
             }
             
-            console.warn('[pagesAPI.getPages] Unexpected response format:', responsePayload);
             return { pages: [], pagination: null };
 
         } catch (error) {
-            console.error('[pagesAPI.getPages] Error fetching pages:', error);
             return { pages: [], pagination: null };
         }
     },
@@ -192,13 +177,14 @@ const propertiesAPI = {
  */
 const attachmentsAPI = {
     getNoteAttachments: (noteId) => apiRequest(`attachments.php?note_id=${noteId}`),
-    uploadAttachment: (formData) => apiRequest('attachments.php', 'POST', formData),deleteAttachment: (attachmentId, noteId) => {
-    return apiRequest('attachments.php', 'POST', {
-        action: 'delete',
-        attachment_id: attachmentId,
-        note_id: noteId
-    });
-}
+    uploadAttachment: (formData) => apiRequest('attachments.php', 'POST', formData),
+    deleteAttachment: (attachmentId, noteId) => {
+        return apiRequest('attachments.php', 'POST', {
+            action: 'delete',
+            attachment_id: attachmentId,
+            note_id: noteId
+        });
+    }
 };
 
 /**

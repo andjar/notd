@@ -3,12 +3,149 @@
  * @module app
  */
 
-// Core state management - not directly used here but good to see imports
-import { currentPageId } from './app/state.js';
+import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
+import noteComponent from './app/note-component.js';
+import { splashScreen } from './app/splash-screen.js';
+import sidebarComponent from './app/sidebar-component.js';
+import calendarComponent from './app/calendar-component.js';
+
+window.Alpine = Alpine;
+Alpine.store('app', {
+  // Core state variables
+  currentPageId: null,
+  currentPageName: null,
+  saveStatus: 'saved', // valid: saved, saving, error
+  pageCache: new Map(),
+  notes: [],
+  focusedNoteId: null,
+  pagePassword: null,
+  
+  // Additional state variables from state.js
+  lastResponse: null,
+  activeRequests: 0,
+  
+  // Constants
+  CACHE_MAX_AGE_MS: 5 * 60 * 1000, // 5 minutes
+  MAX_PREFETCH_PAGES: 3,
+  
+  // Helper methods for state management
+  setCurrentPageId(newId) {
+    this.currentPageId = newId;
+    window.currentPageId = newId; // Keep window object in sync for debugging
+  },
+  
+  setCurrentPageName(newName) {
+    this.currentPageName = newName;
+    window.currentPageName = newName;
+  },
+  
+  setSaveStatus(newStatus) {
+    this.saveStatus = newStatus;
+    window.saveStatus = newStatus;
+  },
+  
+  setPagePassword(newPassword) {
+    this.pagePassword = newPassword;
+    window.currentPagePassword = newPassword;
+  },
+  
+  setNotes(newNotes) {
+    this.notes = newNotes;
+    window.notesForCurrentPage = newNotes;
+  },
+  
+  addNote(note) {
+    this.notes.push(note);
+    this.notes.sort((a, b) => a.order_index - b.order_index);
+    window.notesForCurrentPage = this.notes;
+  },
+  
+  removeNoteById(noteId) {
+    const idx = this.notes.findIndex(n => String(n.id) === String(noteId));
+    if (idx > -1) this.notes.splice(idx, 1);
+    window.notesForCurrentPage = this.notes;
+  },
+  
+  updateNote(updatedNote) {
+    const idx = this.notes.findIndex(n => String(n.id) === String(updatedNote.id));
+    if (idx > -1) {
+      this.notes[idx] = { ...this.notes[idx], ...updatedNote };
+    } else {
+      this.notes.push(updatedNote);
+    }
+    window.notesForCurrentPage = this.notes;
+  },
+  
+  setFocusedNoteId(newNoteId) {
+    this.focusedNoteId = newNoteId;
+    window.currentFocusedNoteId = newNoteId;
+  },
+  
+  // Page cache management
+  setPageCache(key, value) {
+    this.pageCache.set(key, value);
+  },
+  
+  getPageCache(key) {
+    return this.pageCache.get(key);
+  },
+  
+  hasPageCache(key) {
+    return this.pageCache.has(key);
+  },
+  
+  deletePageCache(key) {
+    return this.pageCache.delete(key);
+  },
+  
+  clearPageCache() {
+    this.pageCache.clear();
+  }
+});
+Alpine.data('noteComponent', noteComponent);
+Alpine.data('splashScreen', splashScreen);
+Alpine.data('sidebarComponent', sidebarComponent);
+Alpine.data('calendarComponent', calendarComponent);
+
+// Centralized Feather Icon Manager to prevent DOM conflicts
+window.FeatherManager = {
+    timeout: null,
+    pending: false,
+    
+    requestUpdate() {
+        if (this.timeout) {
+            clearTimeout(this.timeout);
+        }
+        
+        if (this.pending) {
+            return; // Already scheduled
+        }
+        
+        this.pending = true;
+        this.timeout = setTimeout(() => {
+            try {
+                if (typeof feather !== 'undefined' && feather.replace) {
+                    feather.replace();
+                }
+            } catch (error) {
+                console.warn('Feather icon replacement failed:', error.message);
+            } finally {
+                this.pending = false;
+                this.timeout = null;
+            }
+        }, 150); // Longer delay to ensure DOM stability
+    }
+};
+
+Alpine.effect(() => {
+    window.FeatherManager.requestUpdate();
+});
+
+Alpine.start();
 
 // Page management
 import { loadPage } from './app/page-loader.js';
-window.loadPage = loadPage; 
+window.loadPage = loadPage;
 
 // UI and event handling
 import { ui } from './ui.js';
@@ -44,29 +181,6 @@ import { initializeApp } from './app/app-init.js';
 
 // --- Global Function Exposure ---
 window.displayPageProperties = displayPagePropertiesFromEditor;
-
-// Splash screen toggle
-const splashScreen = document.getElementById('splash-screen');
-const toggleSplashBtn = document.getElementById('toggle-splash-btn');
-
-if (toggleSplashBtn && splashScreen) {
-    toggleSplashBtn.addEventListener('click', () => {
-        splashScreen.classList.toggle('hidden');
-        if (splashScreen.classList.contains('hidden')) {
-            window.splashAnimations.stop();
-        } else {
-            window.splashAnimations.start();
-        }
-    });
-}
-
-// Close splash screen on click of the splash screen itself
-if (splashScreen) {
-    splashScreen.addEventListener('click', () => {
-        splashScreen.classList.add('hidden');
-        window.splashAnimations.stop();
-    });
-}
 
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
@@ -167,7 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initPropertyEditor(); // Initialize listeners for the property modal
         ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
         initializeTemplateHandling(); // Initialize template functionality
-        feather.replace(); // Initialize feather icons after DOM is ready
+        // feather.replace(); // Initialize feather icons after DOM is ready
         
         // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.
     } catch (error) {

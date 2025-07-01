@@ -4,15 +4,10 @@
  * and communication with the backend API using batch operations.
  */
 
-import {
-    currentPageId,
-    notesForCurrentPage,
-    addNoteToCurrentPage,
-    updateNoteInCurrentPage,
-    removeNoteFromCurrentPageById,
-    setNotesForCurrentPage,
-    getCurrentPagePassword,
-} from './state.js';
+// Get Alpine store reference
+function getAppStore() {
+    return window.Alpine.store('app');
+}
 
 import { calculateOrderIndex } from './order-index-service.js';
 import { notesAPI } from '../api_client.js';
@@ -24,7 +19,8 @@ const notesContainer = document.querySelector('#notes-container');
 // --- Note Data Accessors ---
 export function getNoteDataById(noteId) {
     if (!noteId) return null;
-    return notesForCurrentPage.find(n => String(n.id) === String(noteId));
+    const appStore = getAppStore();
+    return appStore.notes.find(n => String(n.id) === String(noteId));
 }
 
 export function getNoteElementById(noteId) {
@@ -38,9 +34,10 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
         return;
     }
     const permanentId = noteFromServer.id;
-    const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(clientTempId));
+    const appStore = getAppStore();
+    const noteIndex = appStore.notes.findIndex(n => String(n.id) === String(clientTempId));
     if (noteIndex > -1) {
-        notesForCurrentPage[noteIndex] = { ...notesForCurrentPage[noteIndex], ...noteFromServer, id: permanentId };
+        appStore.notes[noteIndex] = { ...appStore.notes[noteIndex], ...noteFromServer, id: permanentId };
     }
     const tempNoteEl = getNoteElementById(clientTempId);
     if (tempNoteEl) {
@@ -72,7 +69,8 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
                 } else if (opResult.type === 'create' && opResult.client_temp_id) {
                     _finalizeNewNote(opResult.client_temp_id, opResult.note);
                 } else if (opResult.type === 'update' && opResult.note) {
-                    updateNoteInCurrentPage(opResult.note);
+                    const appStore = getAppStore();
+                    appStore.updateNote(opResult.note);
                 }
             });
         } else {
@@ -86,8 +84,9 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
     } catch (error) {
         alert(`${error.message || `Batch operation '${userActionName}' failed.`} Reverting local changes.`);
         ui.updateSaveStatusIndicator('error');
-        setNotesForCurrentPage(originalNotesState);
-        ui.displayNotes(notesForCurrentPage, currentPageId);
+        const appStore = getAppStore();
+        appStore.setNotes(originalNotesState);
+        ui.displayNotes(appStore.notes, appStore.currentPageId);
         success = false;
     }
     return success;
@@ -122,7 +121,8 @@ async function _saveNoteToServer(noteId, rawContent) {
     if (String(noteId).startsWith('temp-')) return null;
     if (!getNoteDataById(noteId)) return null;
     
-    const password = getCurrentPagePassword();
+    const appStore = getAppStore();
+    const password = appStore.pagePassword;
     let contentToSave = rawContent;
     let isEncrypted = false;
     if (password) {
@@ -131,7 +131,7 @@ async function _saveNoteToServer(noteId, rawContent) {
         isEncrypted = true;
     }
     
-    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
 
     const operations = [{
         type: 'update',
@@ -166,17 +166,18 @@ export const debouncedSaveNote = debounce(async (noteEl) => {
 
 // --- Event Handlers for Structural Changes ---
 export async function handleAddRootNote() {
-    if (!currentPageId) return;
+    const appStore = getAppStore();
+    if (!appStore.currentPageId) return;
     const clientTempId = `temp-R-${Date.now()}`;
-    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
-    const rootNotes = notesForCurrentPage.filter(n => !n.parent_note_id);
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
+    const rootNotes = appStore.notes.filter(n => !n.parent_note_id);
     const lastRootNote = rootNotes.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).pop();
-    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, null, lastRootNote?.id || null, null);
+    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, null, lastRootNote?.id || null, null);
     
-    const optimisticNewNote = { id: clientTempId, page_id: currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
-    addNoteToCurrentPage(optimisticNewNote);
+    const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
+    appStore.addNote(optimisticNewNote);
     
-    const password = getCurrentPagePassword();
+    const password = appStore.pagePassword;
     let contentForServer = '';
     let isEncrypted = false;
     if (password) {
@@ -185,7 +186,7 @@ export async function handleAddRootNote() {
         isEncrypted = true;
     }
 
-    const operations = [{ type: 'create', payload: { page_id: currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     siblingUpdates.forEach(upd => {
@@ -208,18 +209,19 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     if (e.shiftKey) return;
     e.preventDefault();
 
+    const appStore = getAppStore();
     const clientTempId = `temp-E-${Date.now()}`;
-    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
-    const siblings = notesForCurrentPage.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a, b) => a.order_index - b.order_index);
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
+    const siblings = appStore.notes.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a, b) => a.order_index - b.order_index);
     const currentNoteIndexInSiblings = siblings.findIndex(n => String(n.id) === String(noteData.id));
     const nextSibling = siblings[currentNoteIndexInSiblings + 1];
 
-    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, noteData.parent_note_id, String(noteData.id), nextSibling?.id || null);
+    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, noteData.parent_note_id, String(noteData.id), nextSibling?.id || null);
     
-    const optimisticNewNote = { id: clientTempId, page_id: currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
-    addNoteToCurrentPage(optimisticNewNote);
+    const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
+    appStore.addNote(optimisticNewNote);
 
-    const password = getCurrentPagePassword();
+    const password = appStore.pagePassword;
     let contentForServer = '';
     let isEncrypted = false;
     if (password) {
@@ -228,7 +230,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
         isEncrypted = true;
     }
     
-    const operations = [{ type: 'create', payload: { page_id: currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     siblingUpdates.forEach(op => {
@@ -252,7 +254,8 @@ async function handleTabKey(e, noteItem, noteData) {
     e.preventDefault();
     await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
 
-    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+    const appStore = getAppStore();
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     let operations = [];
     let newParentId = null;
 
@@ -262,19 +265,19 @@ async function handleTabKey(e, noteItem, noteData) {
         if (!oldParentNote) return;
         newParentId = oldParentNote.parent_note_id;
 
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, newParentId, String(oldParentNote.id), null);
+        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, String(oldParentNote.id), null);
         
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
 
     } else { // Indent
-        const siblings = notesForCurrentPage.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a,b) => a.order_index - b.order_index);
+        const siblings = appStore.notes.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a,b) => a.order_index - b.order_index);
         const currentNoteIndexInSiblings = siblings.findIndex(n => String(n.id) === String(noteData.id));
         if (currentNoteIndexInSiblings < 1) return;
         
         const newParentNote = siblings[currentNoteIndexInSiblings - 1];
         newParentId = String(newParentNote.id);
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(notesForCurrentPage, newParentId, null, null);
+        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, null, null);
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
@@ -292,7 +295,8 @@ async function handleTabKey(e, noteItem, noteData) {
 
     const optimisticDOMUpdater = () => {
         // Since this is a structural change, a full re-render is the safest approach.
-        ui.displayNotes(notesForCurrentPage, currentPageId);
+        const appStore = getAppStore();
+        ui.displayNotes(appStore.notes, appStore.currentPageId);
         const newNoteItem = getNoteElementById(noteData.id);
         if (newNoteItem) {
             const newContentDiv = newNoteItem.querySelector('.note-content');
@@ -303,17 +307,18 @@ async function handleTabKey(e, noteItem, noteData) {
 }
 
 async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
+    const appStore = getAppStore();
     if ((contentDiv.dataset.rawContent || contentDiv.textContent).trim() !== '') return;
-    const children = notesForCurrentPage.filter(n => String(n.parent_note_id) === String(noteData.id));
+    const children = appStore.notes.filter(n => String(n.parent_note_id) === String(noteData.id));
     if (children.length > 0) return;
 
     e.preventDefault();
     let focusTargetEl = noteItem.previousElementSibling || getNoteElementById(noteData.parent_note_id);
     
-    const originalNotesState = JSON.parse(JSON.stringify(notesForCurrentPage));
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     const noteIdToDelete = noteData.id;
 
-    removeNoteFromCurrentPageById(noteIdToDelete);
+    appStore.removeNoteById(noteIdToDelete);
     const operations = [{ type: 'delete', payload: { id: noteIdToDelete } }];
     
     const optimisticDOMUpdater = () => {

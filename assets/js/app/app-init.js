@@ -44,9 +44,8 @@ export async function initializeApp() {
     if (splashScreen) splashScreen.classList.remove('hidden'); 
     
     try {
-        // **FIX**: Initialize the sidebar here, after the DOM is loaded
-        // but before other components that might depend on it.
-        await sidebarState.init(); 
+        // Sidebar is now handled by Alpine.js component
+        // await sidebarState.init(); // Removed - conflicts with Alpine.js 
         
         ui.initPagePropertiesModal();
         ui.updateSaveStatusIndicator('saved');

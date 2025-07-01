@@ -304,7 +304,7 @@ function renderNote(note, nestingLevel = 0) {
         }
     }
 
-    return noteItemEl;
+    return noteItemEl.outerHTML;
 }
 
 /**
@@ -805,7 +805,7 @@ function parseAndRenderContent(rawContent) {
             return `<div class="sql-query-placeholder" data-sql-query="${escapedSqlQuery}">Loading SQL Query...</div>`;
         });
 
-        html = html.replace(/!{{(.*?)}}/g, (match, blockRef) => {
+        html = html.replace(/!\{\{(.*?)\}\}|/g, (match, blockRef) => {
             const trimmedRef = blockRef.trim();
             if (/^\d+$/.test(trimmedRef)) {
                 return `<div class="transclusion-placeholder" data-block-ref="${trimmedRef}">Loading...</div>`;
@@ -844,6 +844,8 @@ function parseAndRenderContent(rawContent) {
     }
     return html;
 }
+
+window.parseAndRenderContent = parseAndRenderContent;
 
 /**
  * Renders attachments for a note

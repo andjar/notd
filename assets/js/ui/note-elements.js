@@ -7,6 +7,9 @@
 import { domRefs } from './dom-refs.js';
 import { renderNote } from './note-renderer.js';
 import { calculateOrderIndex } from '../app/order-index-service.js';
+import { setNotesForCurrentPage } from '../app/state.js';
+
+window.renderNote = renderNote;
 
 /**
  * Displays notes in the container
@@ -14,18 +17,29 @@ import { calculateOrderIndex } from '../app/order-index-service.js';
  * @param {number} pageId - Current page ID
  */
 export function displayNotes(notesData, pageId) {
-    domRefs.notesContainer.innerHTML = '';
-    if (!notesData || notesData.length === 0) return;
+    const notesContainer = document.getElementById('notes-container');
+    
+    // Ensure notesData is an array (handle null/undefined)
+    const safeNotesData = Array.isArray(notesData) ? notesData : [];
+    
+    if (safeNotesData.length === 0) {
+        // Clear the container and update Alpine.js with empty array
+        setNotesForCurrentPage([]);
+        if (notesContainer && notesContainer.__x) {
+            notesContainer.__x.getUnobservedData().notes = [];
+        }
+        return;
+    }
 
-    const sortedNotes = [...notesData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const sortedNotes = [...safeNotesData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
     const noteTree = buildNoteTree(sortedNotes);
+    setNotesForCurrentPage(sortedNotes);
     
-    noteTree.forEach(note => {
-        domRefs.notesContainer.appendChild(renderNote(note, 0));
-    });
-    
-    initializeDragAndDrop();
-    if (typeof feather !== 'undefined') feather.replace();
+    if (notesContainer && notesContainer.__x) {
+        // Update Alpine's notes array reactively
+        notesContainer.__x.getUnobservedData().notes = noteTree;
+    }
+    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
 }
 
 /**
@@ -35,68 +49,30 @@ export function displayNotes(notesData, pageId) {
  */
 export function addNoteElement(noteData) {
     if (!noteData) return null;
-
-    const parentId = noteData.parent_note_id || null;
-    const parentEl = parentId ? document.querySelector(`.note-item[data-note-id="${parentId}"]`) : domRefs.notesContainer;
-
-    if (!parentEl) {
-        console.error("Could not find parent element for new note.", { parentId });
-        return null;
+    window.notesForCurrentPage.push(noteData);
+    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const noteTree = buildNoteTree(sortedNotes);
+    const notesContainer = document.getElementById('notes-container');
+    if (notesContainer && notesContainer.__x) {
+        notesContainer.__x.getUnobservedData().notes = noteTree;
     }
-    
-    let parentContainer;
-    let nestingLevel;
-
-    if (parentId) {
-        parentContainer = parentEl.querySelector('.note-children');
-        if (!parentContainer) {
-            parentContainer = document.createElement('div');
-            parentContainer.className = 'note-children';
-            parentEl.appendChild(parentContainer);
-            parentEl.classList.add('has-children');
-            // Re-render arrow if needed
-            const controls = parentEl.querySelector('.note-controls');
-            if(controls && !controls.querySelector('.note-collapse-arrow')) {
-                const arrow = document.createElement('span');
-                arrow.className = 'note-collapse-arrow';
-                arrow.innerHTML = `<i data-feather="chevron-right"></i>`;
-                controls.insertBefore(arrow, controls.firstChild);
-                feather.replace();
-            }
-        }
-        nestingLevel = window.ui.getNestingLevel(parentEl) + 1;
-    } else {
-        parentContainer = domRefs.notesContainer;
-        nestingLevel = 0;
-    }
-
-    const newNoteEl = renderNote(noteData, nestingLevel);
-
-    const siblings = Array.from(parentContainer.children)
-        .filter(child => child.classList.contains('note-item'))
-        .map(el => ({ element: el, orderIndex: parseInt(window.notesForCurrentPage.find(n => n.id == el.dataset.noteId)?.order_index, 10) || 0 }));
-
-    const nextSibling = siblings.find(sib => sib.orderIndex > noteData.order_index);
-
-    if (nextSibling) {
-        parentContainer.insertBefore(newNoteEl, nextSibling.element);
-    } else {
-        parentContainer.appendChild(newNoteEl);
-    }
-
-    return newNoteEl;
+    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    return null;
 }
-
 
 /**
  * Removes a note element from the DOM.
  * @param {string} noteId - The ID of the note to remove.
  */
 export function removeNoteElement(noteId) {
-    const noteElement = document.querySelector(`.note-item[data-note-id="${noteId}"]`);
-    if (noteElement) {
-        noteElement.remove();
+    window.notesForCurrentPage = window.notesForCurrentPage.filter(note => String(note.id) !== String(noteId));
+    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const noteTree = buildNoteTree(sortedNotes);
+    const notesContainer = document.getElementById('notes-container');
+    if (notesContainer && notesContainer.__x) {
+        notesContainer.__x.getUnobservedData().notes = noteTree;
     }
+    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
 }
 
 /**
@@ -136,6 +112,8 @@ export function initializeDragAndDrop() {
         }
     });
 }
+
+window.initializeDragAndDrop = initializeDragAndDrop;
 
 /**
  * Handles the logic after a note is dropped via drag-and-drop.

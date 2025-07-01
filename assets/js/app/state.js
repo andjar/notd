@@ -1,119 +1,195 @@
-// This file will store the application state.
+// Legacy state.js - now a bridge to Alpine store
+// This file maintains backward compatibility while directing all state management to Alpine store
 
-// --- State Variables (Primarily for read access from outside) ---
-export let currentPageId = null;
-export let currentPageName = null;
-export let saveStatus = 'saved'; // valid: saved, saving, error
-export let pageDataCache = new Map(); // Changed back to Map
-export const CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
-export const MAX_PREFETCH_PAGES = 3;
-export let notesForCurrentPage = [];
-export let currentFocusedNoteId = null;
-export let lastResponse = null;
-export let activeRequests = 0;
-let currentPagePassword = null; // Not exported directly to encourage using setter/getter
+// Helper to access Alpine store
+function getAppStore() {
+    if (typeof window !== 'undefined' && window.Alpine && window.Alpine.store) {
+        return window.Alpine.store('app');
+    }
+    console.warn('Alpine store not available, falling back to window properties');
+    return null;
+}
 
-// --- Assign to window object (for debugging or specific global needs) ---
-// Initial assignment. Setters will keep these updated.
-window.currentPageId = currentPageId;
-window.currentPageName = currentPageName;
-window.saveStatus = saveStatus;
-window.pageDataCache = pageDataCache; // Note: window.pageDataCache will be the Map instance
-window.CACHE_MAX_AGE_MS = CACHE_MAX_AGE_MS; // Constants likely don't need setters
-window.MAX_PREFETCH_PAGES = MAX_PREFETCH_PAGES; // Constants likely don't need setters
-window.notesForCurrentPage = notesForCurrentPage;
-window.currentFocusedNoteId = currentFocusedNoteId;
-window.currentPagePassword = currentPagePassword; // For debugging
-
-// --- Setter Functions ---
+// --- Legacy exports (now proxying to Alpine store) ---
 
 export function setCurrentPageId(newId) {
-  currentPageId = newId;
-  window.currentPageId = newId;
+    const store = getAppStore();
+    if (store) {
+        store.setCurrentPageId(newId);
+    } else {
+        window.currentPageId = newId;
+    }
 }
 
 export function setCurrentPageName(newName) {
-  currentPageName = newName;
-  window.currentPageName = newName;
+    const store = getAppStore();
+    if (store) {
+        store.setCurrentPageName(newName);
+    } else {
+        window.currentPageName = newName;
+    }
 }
 
 export function setSaveStatus(newStatus) {
-  saveStatus = newStatus;
-  window.saveStatus = newStatus;
+    const store = getAppStore();
+    if (store) {
+        store.setSaveStatus(newStatus);
+    } else {
+        window.saveStatus = newStatus;
+    }
 }
 
 export function setCurrentPagePassword(newPassword) {
-    currentPagePassword = newPassword;
-    window.currentPagePassword = newPassword;
+    const store = getAppStore();
+    if (store) {
+        store.setPagePassword(newPassword);
+    } else {
+        window.currentPagePassword = newPassword;
+    }
 }
 
 export function getCurrentPagePassword() {
-    return currentPagePassword;
+    const store = getAppStore();
+    if (store) {
+        return store.pagePassword;
+    }
+    return window.currentPagePassword || null;
 }
 
-// For notesForCurrentPage, we might want more granular functions
-// e.g., addNote, removeNote, updateNote, or set all notes.
-// For this refactor, a simple setter for the whole array is implemented.
-// More complex operations should ensure window.notesForCurrentPage is also updated.
 export function setNotesForCurrentPage(newNotes) {
-  notesForCurrentPage = newNotes;
-  window.notesForCurrentPage = newNotes; // Assigns the new array reference
-}
-
-// Helper to add a single note - ensures notesForCurrentPage array is mutated directly
-// and window object is kept in sync.
-export function addNoteToCurrentPage(note) {
-  notesForCurrentPage.push(note);
-  notesForCurrentPage.sort((a, b) => a.order_index - b.order_index); // Add sort here
-}
-
-// Helper to remove a note by ID - ensures notesForCurrentPage array is mutated directly
-// and window object is kept in sync.
-export function removeNoteFromCurrentPageById(noteId) {
-    const indexToRemove = notesForCurrentPage.findIndex(n => String(n.id) === String(noteId));
-    if (indexToRemove > -1) {
-        notesForCurrentPage.splice(indexToRemove, 1);
-    }
-    // window.notesForCurrentPage will reflect this change.
-}
-
-// Helper to update a note in the array - ensures notesForCurrentPage array is mutated
-// and window object is kept in sync.
-export function updateNoteInCurrentPage(updatedNote) {
-    const noteIndex = notesForCurrentPage.findIndex(n => String(n.id) === String(updatedNote.id));
-    if (noteIndex > -1) {
-        notesForCurrentPage[noteIndex] = { ...notesForCurrentPage[noteIndex], ...updatedNote };
+    const store = getAppStore();
+    if (store) {
+        store.setNotes(newNotes);
     } else {
-        // If note not found, add it (optional behavior, depends on requirements)
-        notesForCurrentPage.push(updatedNote);
+        window.notesForCurrentPage = newNotes;
     }
-    // window.notesForCurrentPage will reflect this change.
+}
+
+export function addNoteToCurrentPage(note) {
+    const store = getAppStore();
+    if (store) {
+        store.addNote(note);
+    } else if (window.notesForCurrentPage) {
+        window.notesForCurrentPage.push(note);
+        window.notesForCurrentPage.sort((a,b)=>a.order_index-b.order_index);
+    }
+}
+
+export function removeNoteFromCurrentPageById(noteId) {
+    const store = getAppStore();
+    if (store) {
+        store.removeNoteById(noteId);
+    } else if (window.notesForCurrentPage) {
+        const idx = window.notesForCurrentPage.findIndex(n=>String(n.id)===String(noteId));
+        if(idx>-1) window.notesForCurrentPage.splice(idx,1);
+    }
+}
+
+export function updateNoteInCurrentPage(updatedNote) {
+    const store = getAppStore();
+    if (store) {
+        store.updateNote(updatedNote);
+    } else if (window.notesForCurrentPage) {
+        const idx = window.notesForCurrentPage.findIndex(n=>String(n.id)===String(updatedNote.id));
+        if(idx>-1){
+            window.notesForCurrentPage[idx]={...window.notesForCurrentPage[idx],...updatedNote};
+        }else{
+            window.notesForCurrentPage.push(updatedNote);
+        }
+    }
 }
 
 export function setCurrentFocusedNoteId(newNoteId) {
-  currentFocusedNoteId = newNoteId;
-  window.currentFocusedNoteId = newNoteId;
+    const store = getAppStore();
+    if (store) {
+        store.setFocusedNoteId(newNoteId);
+    } else {
+        window.currentFocusedNoteId = newNoteId;
+    }
 }
 
-// --- pageDataCache Management Functions ---
-
+// --- Page cache functions ---
 export function setPageCache(key, value) {
-  pageDataCache.set(key, value);
-  // window.pageDataCache automatically reflects this change as it's a Map.
+    const store = getAppStore();
+    if (store) {
+        store.setPageCache(key, value);
+    }
 }
 
 export function getPageCache(key) {
-  return pageDataCache.get(key);
+    const store = getAppStore();
+    if (store) {
+        return store.getPageCache(key);
+    }
+    return null;
 }
 
 export function hasPageCache(key) {
-  return pageDataCache.has(key);
+    const store = getAppStore();
+    if (store) {
+        return store.hasPageCache(key);
+    }
+    return false;
 }
 
 export function deletePageCache(key) {
-  return pageDataCache.delete(key);
+    const store = getAppStore();
+    if (store) {
+        return store.deletePageCache(key);
+    }
+    return false;
 }
 
 export function clearPageCache() {
-    pageDataCache.clear();
+    const store = getAppStore();
+    if (store) {
+        store.clearPageCache();
+    }
+}
+
+// --- Getters for reactive properties ---
+export function getCurrentPageId() {
+    const store = getAppStore();
+    return store ? store.currentPageId : window.currentPageId;
+}
+
+export function getCurrentPageName() {
+    const store = getAppStore();
+    return store ? store.currentPageName : window.currentPageName;
+}
+
+export function getSaveStatus() {
+    const store = getAppStore();
+    return store ? store.saveStatus : window.saveStatus;
+}
+
+export function getNotesForCurrentPage() {
+    const store = getAppStore();
+    return store ? store.notes : (window.notesForCurrentPage || []);
+}
+
+export function getCurrentFocusedNoteId() {
+    const store = getAppStore();
+    return store ? store.focusedNoteId : window.currentFocusedNoteId;
+}
+
+// --- Legacy exports for direct access (deprecated, use getters instead) ---
+export const currentPageId = null; // Use getCurrentPageId() instead
+export const currentPageName = null; // Use getCurrentPageName() instead
+export const saveStatus = 'saved'; // Use getSaveStatus() instead
+export const notesForCurrentPage = []; // Use getNotesForCurrentPage() instead
+export const currentFocusedNoteId = null; // Use getCurrentFocusedNoteId() instead
+
+// --- Constants ---
+export const CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+export const MAX_PREFETCH_PAGES = 3;
+
+// Legacy state variables (for window object compatibility)
+if (typeof window !== 'undefined') {
+    window.currentPageId = window.currentPageId || null;
+    window.currentPageName = window.currentPageName || null;
+    window.saveStatus = window.saveStatus || 'saved';
+    window.notesForCurrentPage = window.notesForCurrentPage || [];
+    window.currentFocusedNoteId = window.currentFocusedNoteId || null;
+    window.currentPagePassword = window.currentPagePassword || null;
 }
