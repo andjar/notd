@@ -3,34 +3,16 @@
  * This module exports a single `ui` object that contains all UI-related functions.
  */
 
+// Import note-related functions that were split into separate modules
+import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree, initializeDragAndDrop, handleNoteDrop } from './ui/note-elements.js';
+import { renderNote, parseAndRenderContent, switchToEditMode, getRawTextWithNewlines, normalizeNewlines, renderAttachments, renderProperties, initializeDelegatedNoteEventListeners, renderTransclusion } from './ui/note-renderer.js';
+import { domRefs } from './ui/dom-refs.js';
+import { calendarWidget } from './ui/calendar-widget.js';
+
 // Get Alpine store reference
 function getAppStore() {
     return window.Alpine.store('app');
 }
-import { domRefs } from './ui/dom-refs.js';
-import {
-    displayNotes,
-    addNoteElement,
-    removeNoteElement,
-    buildNoteTree,
-    initializeDragAndDrop,
-    handleNoteDrop
-} from './ui/note-elements.js';
-
-// **FIX**: Import the new calendar widget
-import { calendarWidget } from './ui/calendar-widget.js';
-
-import {
-    renderNote,
-    parseAndRenderContent,
-    switchToEditMode,
-    getRawTextWithNewlines,
-    normalizeNewlines,
-    renderAttachments,
-    renderProperties,
-    initializeDelegatedNoteEventListeners,
-    renderTransclusion
-} from './ui/note-renderer.js';
 
 /**
  * Updates the entire page title block, including breadcrumbs and settings gear.
@@ -86,11 +68,15 @@ function updatePageTitle(pageName) {
     gearIcon.style.cursor = 'pointer';
     titleContent.appendChild(gearIcon); // Changed from pageTitle to titleContent
 
-    // Use centralized Feather icon manager
-    if (window.FeatherManager) {
-        window.FeatherManager.requestUpdate();
-    } else {
-        setTimeout(() => { feather.replace(); }, 0);
+    // Use traditional feather replacement for this specific element
+    if (typeof feather !== 'undefined' && feather.replace) {
+        setTimeout(() => {
+            try {
+                feather.replace();
+            } catch (error) {
+                console.warn('Feather icon replacement failed for page title:', error);
+            }
+        }, 0);
     }
 }
 
@@ -160,13 +146,6 @@ function updatePageList(pages, activePageName) {
   });
 
     domRefs.pageListContainer.appendChild(listContainer);
-
-    // Use centralized Feather icon manager
-    if (window.FeatherManager) {
-        window.FeatherManager.requestUpdate();
-    } else {
-        setTimeout(() => { feather.replace(); }, 0);
-    }
 }
 
 /**
@@ -351,6 +330,8 @@ export function promptForEncryptionPassword() {
     });
 }
 
+
+
 /**
  * Updates the visual save status indicator.
  * @param {string} newStatus - The new status ('saved', 'pending', 'error').
@@ -380,8 +361,16 @@ function updateSaveStatusIndicator(newStatus) {
             break;
     }
     indicator.innerHTML = iconHtml;
-    if (newStatus !== 'pending' && typeof feather !== 'undefined') {
-        setTimeout(() => { feather.replace(); }, 0);
+    
+    // Use traditional feather replacement for icons
+    if (newStatus !== 'pending' && typeof feather !== 'undefined' && feather.replace) {
+        setTimeout(() => {
+            try {
+                feather.replace();
+            } catch (error) {
+                console.warn('Feather icon replacement failed in save status indicator:', error);
+            }
+        }, 0);
     }
 }
 
@@ -661,9 +650,6 @@ function displayChildPagesInSidebar(pageName) {
             });
 
             container.appendChild(list);
-
-            // Initialize Feather icons
-            setTimeout(() => { feather.replace(); }, 0);
         })
         .catch(error => {
             console.error('Error fetching child pages:', error);
@@ -723,9 +709,6 @@ function displayFavorites() {
                 listItem.appendChild(link); // Append A to LI
                 listContainer.appendChild(listItem); // Append LI to UL (listContainer)
             });
-
-            // Initialize Feather icons
-            setTimeout(() => { feather.replace(); }, 0);
         })
         .catch(error => {
             console.error('Error fetching favorites:', error);
@@ -824,9 +807,6 @@ function displayBacklinksInSidebar(pageName) {
                 item.appendChild(contentDiv);
                 listContainer.appendChild(item);
             });
-
-            // Initialize Feather icons
-            setTimeout(() => { feather.replace(); }, 0);
         })
         .catch(error => {
             console.error('Error fetching backlinks:', error);

@@ -3,13 +3,43 @@
  * @module app
  */
 
-import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
+// Alpine.js will be loaded from CDN and available as global Alpine
 import noteComponent from './app/note-component.js';
 import { splashScreen } from './app/splash-screen.js';
 import sidebarComponent from './app/sidebar-component.js';
 import calendarComponent from './app/calendar-component.js';
 
-window.Alpine = Alpine;
+// Wait for Alpine to be available
+document.addEventListener('alpine:init', () => {
+
+// Alpine.js directive for feather icons
+Alpine.directive('feather', (el, { expression }, { evaluate }) => {
+    const iconName = evaluate(expression);
+    
+    if (typeof feather !== 'undefined' && feather.icons && iconName && feather.icons[iconName]) {
+        try {
+            const svgString = feather.icons[iconName].toSvg();
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
+            const svgElement = svgDoc.querySelector('svg');
+            
+            if (svgElement) {
+                // Copy classes and attributes from the original element
+                Array.from(el.attributes).forEach(attr => {
+                    if (!attr.name.startsWith('x-') && !attr.name.startsWith(':') && attr.name !== 'data-feather') {
+                        svgElement.setAttribute(attr.name, attr.value);
+                    }
+                });
+                
+                // Replace the element content
+                el.innerHTML = svgElement.outerHTML;
+            }
+        } catch (error) {
+            console.warn('Error rendering feather icon:', iconName, error);
+        }
+    }
+});
+
 Alpine.store('app', {
   // Core state variables
   currentPageId: null,
@@ -102,46 +132,13 @@ Alpine.store('app', {
     this.pageCache.clear();
   }
 });
-Alpine.data('noteComponent', noteComponent);
-Alpine.data('splashScreen', splashScreen);
-Alpine.data('sidebarComponent', sidebarComponent);
-Alpine.data('calendarComponent', calendarComponent);
-
-// Centralized Feather Icon Manager to prevent DOM conflicts
-window.FeatherManager = {
-    timeout: null,
-    pending: false,
-    
-    requestUpdate() {
-        if (this.timeout) {
-            clearTimeout(this.timeout);
-        }
-        
-        if (this.pending) {
-            return; // Already scheduled
-        }
-        
-        this.pending = true;
-        this.timeout = setTimeout(() => {
-            try {
-                if (typeof feather !== 'undefined' && feather.replace) {
-                    feather.replace();
-                }
-            } catch (error) {
-                console.warn('Feather icon replacement failed:', error.message);
-            } finally {
-                this.pending = false;
-                this.timeout = null;
-            }
-        }, 150); // Longer delay to ensure DOM stability
-    }
-};
-
-Alpine.effect(() => {
-    window.FeatherManager.requestUpdate();
+    Alpine.data('noteComponent', noteComponent);
+    Alpine.data('splashScreen', splashScreen);
+    Alpine.data('sidebarComponent', sidebarComponent);
+    Alpine.data('calendarComponent', calendarComponent);
 });
 
-Alpine.start();
+// Alpine.start() is automatically called by the CDN version
 
 // Page management
 import { loadPage } from './app/page-loader.js';

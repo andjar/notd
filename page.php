@@ -79,7 +79,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
     <script type="module" src="assets/js/app.js"></script>
-    <!-- <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     
     <script>
          window.APP_CONFIG = window.APP_CONFIG || {};
@@ -129,7 +129,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         <!-- Left Sidebar -->
         <div id="left-sidebar-outer" :class="{ 'collapsed': leftCollapsed }">
             <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn left-toggle" @click="toggleLeft()">
-                <i :data-feather="leftIcon()" :key="leftIcon()"></i>
+                <i x-feather="leftIcon()"></i>
             </button>
             <div id="left-sidebar" class="sidebar left-sidebar">
                 <div class="sidebar-content">
@@ -302,7 +302,7 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         <!-- Right Sidebar -->
         <div id="right-sidebar-outer" :class="{ 'collapsed': rightCollapsed }">
             <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn right-toggle" @click="toggleRight()">
-                <i :data-feather="rightIcon()" :key="rightIcon()"></i>
+                <i x-feather="rightIcon()"></i>
             </button>
             <div id="right-sidebar" class="sidebar right-sidebar">
                 <div class="sidebar-content">

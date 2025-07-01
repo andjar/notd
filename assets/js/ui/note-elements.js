@@ -18,16 +18,25 @@ window.renderNote = renderNote;
  */
 export function displayNotes(notesData, pageId) {
     const notesContainer = document.getElementById('notes-container');
+    if (!notesContainer) {
+        console.error('Notes container not found');
+        return;
+    }
     
     // Ensure notesData is an array (handle null/undefined)
     const safeNotesData = Array.isArray(notesData) ? notesData : [];
     
+    // Clear the container first (removes "Loading page..." message)
+    notesContainer.innerHTML = '';
+    
     if (safeNotesData.length === 0) {
-        // Clear the container and update Alpine.js with empty array
+        // Update Alpine.js with empty array and update state
         setNotesForCurrentPage([]);
         if (notesContainer && notesContainer.__x) {
             notesContainer.__x.getUnobservedData().notes = [];
         }
+        // Show empty state message
+        notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
         return;
     }
 
@@ -35,11 +44,43 @@ export function displayNotes(notesData, pageId) {
     const noteTree = buildNoteTree(sortedNotes);
     setNotesForCurrentPage(sortedNotes);
     
+    // Update Alpine.js data for future use
     if (notesContainer && notesContainer.__x) {
-        // Update Alpine's notes array reactively
         notesContainer.__x.getUnobservedData().notes = noteTree;
     }
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    
+    // Render notes using traditional DOM approach since Alpine.js template is not implemented yet
+    renderNotesInContainer(noteTree, notesContainer);
+    
+    // Initialize drag and drop after rendering
+    setTimeout(() => {
+        initializeDragAndDrop();
+    }, 0);
+}
+
+/**
+ * Renders notes in the container using traditional DOM manipulation
+ * @param {Array} noteTree - Tree structure of notes
+ * @param {HTMLElement} container - Container element to render notes in
+ */
+function renderNotesInContainer(noteTree, container) {
+    noteTree.forEach(note => {
+        const noteElement = renderNote(note, 0);
+        if (noteElement) {
+            container.appendChild(noteElement);
+        }
+    });
+    
+    // Replace feather icons after rendering
+    if (typeof feather !== 'undefined') {
+        setTimeout(() => {
+            try {
+                feather.replace();
+            } catch (error) {
+                console.warn('Feather icon replacement failed:', error.message);
+            }
+        }, 0);
+    }
 }
 
 /**

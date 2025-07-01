@@ -304,7 +304,7 @@ function renderNote(note, nestingLevel = 0) {
         }
     }
 
-    return noteItemEl.outerHTML;
+    return noteItemEl;
 }
 
 /**
@@ -805,8 +805,8 @@ function parseAndRenderContent(rawContent) {
             return `<div class="sql-query-placeholder" data-sql-query="${escapedSqlQuery}">Loading SQL Query...</div>`;
         });
 
-        html = html.replace(/!\{\{(.*?)\}\}|/g, (match, blockRef) => {
-            const trimmedRef = blockRef.trim();
+        html = html.replace(/!\{\{(.*?)\}\}/g, (match, blockRef) => {
+            const trimmedRef = blockRef ? blockRef.trim() : '';
             if (/^\d+$/.test(trimmedRef)) {
                 return `<div class="transclusion-placeholder" data-block-ref="${trimmedRef}">Loading...</div>`;
             } else {

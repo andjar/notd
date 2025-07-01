@@ -18,7 +18,9 @@ This document outlines a detailed, phased approach to migrating the frontend fro
 - Backward compatibility maintained through state.js bridge layer
 
 ### Known Issues
-- Sidebar toggle icons (chevron-left/chevron-right) not rendering via Feather.js
+- ✅ **RESOLVED**: Sidebar toggle icons (chevron-left/chevron-right) now working via Alpine.js directive
+- ✅ **RESOLVED**: Notes not loading due to missing displayNotes function import
+- ✅ **RESOLVED**: Sidebar toggle functionality not working due to Alpine.js loading issues
 - Legacy code cleanup still needed
 - Performance testing and final verification pending
 
@@ -149,3 +151,25 @@ The migration will be executed in several epochs, starting with the integration 
 4.  **Final Verification:** ⏳ PENDING
     *   Conduct a full regression test to ensure all functionality is working as expected.
     *   Fix any remaining bugs or issues.
+
+### Recent Fixes
+
+**Feather Icons Integration (COMPLETED)** ✅
+- **Issue**: Sidebar toggle icons not rendering properly due to conflicts between VanillaJS feather.replace() and Alpine.js reactivity
+- **Solution**: 
+  - Created Alpine.js directive `x-feather` for handling feather icons reactively
+  - Removed problematic FeatherManager and global feather.replace() calls
+  - Updated sidebar toggle buttons to use `x-feather="leftIcon()"` and `x-feather="rightIcon()"`
+  - Static icons continue to use traditional `data-feather` with feather.replace()
+- **Result**: Dynamic sidebar icons now work correctly and change based on collapsed/expanded state
+
+**Notes Loading & Sidebar Functionality (COMPLETED)** ✅
+- **Issue**: Notes were not loading (stuck on "Loading page...") and sidebar toggles were not working
+- **Root Cause**: 
+  - Missing `displayNotes` function import in ui.js (exported but not defined)
+  - Alpine.js ES module import from CDN was failing to load properly
+- **Solution**: 
+  - Fixed missing imports from ui/note-elements.js and ui/note-renderer.js in ui.js
+  - Switched from ES module Alpine import to traditional CDN script loading
+  - Wrapped Alpine component registrations in `alpine:init` event listener
+- **Result**: Notes now load properly and sidebar toggle functionality works correctly
