@@ -13,31 +13,33 @@ import calendarComponent from './app/calendar-component.js';
 document.addEventListener('alpine:init', () => {
 
 // Alpine.js directive for feather icons
-Alpine.directive('feather', (el, { expression }, { evaluate }) => {
-    const iconName = evaluate(expression);
-    
-    if (typeof feather !== 'undefined' && feather.icons && iconName && feather.icons[iconName]) {
-        try {
-            const svgString = feather.icons[iconName].toSvg();
-            const parser = new DOMParser();
-            const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-            const svgElement = svgDoc.querySelector('svg');
-            
-            if (svgElement) {
-                // Copy classes and attributes from the original element
-                Array.from(el.attributes).forEach(attr => {
-                    if (!attr.name.startsWith('x-') && !attr.name.startsWith(':') && attr.name !== 'data-feather') {
-                        svgElement.setAttribute(attr.name, attr.value);
-                    }
-                });
+Alpine.directive('feather', (el, { expression }, { evaluate, effect }) => {
+    effect(() => {
+        const iconName = evaluate(expression);
+        
+        if (typeof feather !== 'undefined' && feather.icons && iconName && feather.icons[iconName]) {
+            try {
+                const svgString = feather.icons[iconName].toSvg();
+                const parser = new DOMParser();
+                const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
+                const svgElement = svgDoc.querySelector('svg');
                 
-                // Replace the element content
-                el.innerHTML = svgElement.outerHTML;
+                if (svgElement) {
+                    // Copy classes and attributes from the original element
+                    Array.from(el.attributes).forEach(attr => {
+                        if (!attr.name.startsWith('x-') && !attr.name.startsWith(':') && attr.name !== 'data-feather') {
+                            svgElement.setAttribute(attr.name, attr.value);
+                        }
+                    });
+                    
+                    // Replace the element content
+                    el.innerHTML = svgElement.outerHTML;
+                }
+            } catch (error) {
+                console.warn('Error rendering feather icon:', iconName, error);
             }
-        } catch (error) {
-            console.warn('Error rendering feather icon:', iconName, error);
         }
-    }
+    });
 });
 
 Alpine.store('app', {

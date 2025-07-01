@@ -127,11 +127,11 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
     
     <div class="app-container" x-data="sidebarComponent()" x-init="init()">
         <!-- Left Sidebar -->
-        <div id="left-sidebar-outer" :class="{ 'collapsed': leftCollapsed }">
+        <div id="left-sidebar-outer">
             <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn left-toggle" @click="toggleLeft()">
                 <i x-feather="leftIcon()"></i>
             </button>
-            <div id="left-sidebar" class="sidebar left-sidebar">
+            <div id="left-sidebar" class="sidebar left-sidebar" :class="{ 'collapsed': leftCollapsed }">
                 <div class="sidebar-content">
                     <div class="app-header">
                         <a href="/" id="app-title" class="app-title">notd</a>
@@ -300,11 +300,11 @@ $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
         </div>
 
         <!-- Right Sidebar -->
-        <div id="right-sidebar-outer" :class="{ 'collapsed': rightCollapsed }">
+        <div id="right-sidebar-outer">
             <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn right-toggle" @click="toggleRight()">
                 <i x-feather="rightIcon()"></i>
             </button>
-            <div id="right-sidebar" class="sidebar right-sidebar">
+            <div id="right-sidebar" class="sidebar right-sidebar" :class="{ 'collapsed': rightCollapsed }">
                 <div class="sidebar-content">
                     <div class="sidebar-section">
                         <div class="favorites">
