@@ -35,12 +35,33 @@ export function splashScreen() {
             this.startTimeUpdates();
             this.startAnimation();
             
-            // Hide splash screen after 2 seconds
-            setTimeout(() => {
-                this.show = false;
-                this.stopAnimation();
-                this.stopTimeUpdates();
-            }, 2000);
+            // Only auto-hide on initial load, not when manually toggled
+            if (this.show) {
+                setTimeout(() => {
+                    this.show = false;
+                    this.stopAnimation();
+                    this.stopTimeUpdates();
+                }, 2000);
+            }
+        },
+        
+        // Method to manually show the splash screen
+        showSplash() {
+            this.show = true;
+            this.initBubbles();
+            this.initDots();
+            this.updateTimeDate();
+            this.startTimeUpdates();
+            this.startAnimation();
+            
+            // Don't auto-hide when manually shown - let user control it
+        },
+        
+        // Method to manually hide the splash screen
+        hideSplash() {
+            this.show = false;
+            this.stopAnimation();
+            this.stopTimeUpdates();
         },
         
         getRandom(min, max) {
@@ -52,8 +73,14 @@ export function splashScreen() {
             const canvas = document.getElementById('splash-background-bubbles-canvas');
             if (!canvas) return;
             
-            const canvasCenterX = canvas.offsetWidth / 2;
-            const canvasCenterY = canvas.offsetHeight / 2;
+            // Use viewport center for bubble positioning (should align with main orb)
+            const viewportCenterX = window.innerWidth / 2;
+            const viewportCenterY = window.innerHeight / 2;
+            
+            // Get canvas position relative to viewport
+            const canvasRect = canvas.getBoundingClientRect();
+            const canvasCenterX = viewportCenterX - canvasRect.left;
+            const canvasCenterY = viewportCenterY - canvasRect.top;
             
             for (let i = 0; i < this.numBubbles; i++) {
                 const baseSize = this.getRandom(70, 120);

@@ -48,13 +48,15 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
 }
 
 let batchInProgress = false;
+let batchQueue = [];
 
 async function executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, userActionName) {
     if (!operations || operations.length === 0) return true;
+    // If a batch is in progress, queue this operation and return a promise that resolves when it's done
     if (batchInProgress) {
-        console.warn(`[${userActionName}] Batch operation ignored: another batch is in progress.`);
-        ui.updateSaveStatusIndicator('saving');
-        return false;
+        return new Promise((resolve, reject) => {
+            batchQueue.push({ originalNotesState, operations, optimisticDOMUpdater, userActionName, resolve, reject });
+        });
     }
     batchInProgress = true;
     ui.updateSaveStatusIndicator('pending');
@@ -106,6 +108,17 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         success = false;
     } finally {
         batchInProgress = false;
+        // Process the next batch in the queue, if any
+        if (batchQueue.length > 0) {
+            const nextBatch = batchQueue.shift();
+            // Call recursively, and resolve/reject the promise for the queued batch
+            executeBatchOperations(
+                nextBatch.originalNotesState,
+                nextBatch.operations,
+                nextBatch.optimisticDOMUpdater,
+                nextBatch.userActionName
+            ).then(nextBatch.resolve).catch(nextBatch.reject);
+        }
     }
     return success;
 }
@@ -227,6 +240,12 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     if (e.shiftKey) return;
     e.preventDefault();
 
+    // **FIX**: Prevent operations on notes with temporary IDs
+    if (String(noteData.id).startsWith('temp-')) {
+        console.warn('[Create Sibling Note] Cannot create sibling note when current note has temporary ID. Please wait for the note to be saved first.');
+        return;
+    }
+
     const appStore = getAppStore();
     const clientTempId = `temp-E-${Date.now()}`;
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
@@ -270,6 +289,13 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
 
 async function handleTabKey(e, noteItem, noteData) {
     e.preventDefault();
+    
+    // **FIX**: Prevent operations on notes with temporary IDs
+    if (String(noteData.id).startsWith('temp-')) {
+        console.warn('[Indent Note] Cannot indent note with temporary ID. Please wait for the note to be saved first.');
+        return;
+    }
+    
     await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
 
     const appStore = getAppStore();
@@ -281,12 +307,32 @@ async function handleTabKey(e, noteItem, noteData) {
         if (!noteData.parent_note_id) return;
         const oldParentNote = getNoteDataById(noteData.parent_note_id);
         if (!oldParentNote) return;
+        
+        // **FIX**: Check if the old parent note has a temporary ID
+        if (String(oldParentNote.id).startsWith('temp-')) {
+            console.warn('[Outdent Note] Cannot outdent from a note with temporary ID. Please wait for the parent note to be saved first.');
+            return;
+        }
+        
         newParentId = oldParentNote.parent_note_id;
+
+        // **FIX**: Check if the new parent (grandparent) has a temporary ID
+        if (newParentId && String(newParentId).startsWith('temp-')) {
+            console.warn('[Outdent Note] Cannot outdent to a note with temporary ID. Please wait for the grandparent note to be saved first.');
+            return;
+        }
 
         const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, String(oldParentNote.id), null);
         
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
-        siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
+        siblingUpdates.forEach(upd => {
+            // **FIX**: Check if sibling has a temporary ID
+            if (String(upd.id).startsWith('temp-')) {
+                console.warn('[Outdent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
+                return;
+            }
+            operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } });
+        });
 
     } else { // Indent
         const siblings = appStore.notes.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a,b) => a.order_index - b.order_index);
@@ -294,11 +340,25 @@ async function handleTabKey(e, noteItem, noteData) {
         if (currentNoteIndexInSiblings < 1) return;
         
         const newParentNote = siblings[currentNoteIndexInSiblings - 1];
+        
+        // **FIX**: Check if the new parent note has a temporary ID
+        if (String(newParentNote.id).startsWith('temp-')) {
+            console.warn('[Indent Note] Cannot indent under a note with temporary ID. Please wait for the parent note to be saved first.');
+            return;
+        }
+        
         newParentId = String(newParentNote.id);
         const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, null, null);
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
-        siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
+        siblingUpdates.forEach(upd => {
+            // **FIX**: Check if sibling has a temporary ID
+            if (String(upd.id).startsWith('temp-')) {
+                console.warn('[Indent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
+                return;
+            }
+            operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } });
+        });
     }
     
     // Perform optimistic state updates before calling the batch operation
@@ -325,6 +385,12 @@ async function handleTabKey(e, noteItem, noteData) {
 }
 
 async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
+    // **FIX**: Prevent operations on notes with temporary IDs
+    if (String(noteData.id).startsWith('temp-')) {
+        console.warn('[Delete Note] Cannot delete note with temporary ID. Please wait for the note to be saved first.');
+        return;
+    }
+    
     const appStore = getAppStore();
     if ((contentDiv.dataset.rawContent || contentDiv.textContent).trim() !== '') return;
     const children = appStore.notes.filter(n => String(n.parent_note_id) === String(noteData.id));
