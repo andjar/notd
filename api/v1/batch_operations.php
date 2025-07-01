@@ -257,7 +257,7 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
 
     try {
         if ($pdo === null) {
-            $pdo = connect_to_db();
+            $pdo = get_db_connection();
             $ownsPdo = true;
         }
 

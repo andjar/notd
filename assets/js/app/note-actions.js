@@ -47,26 +47,28 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
     }
 }
 
+let batchInProgress = false;
+
 async function executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, userActionName) {
     if (!operations || operations.length === 0) return true;
-
+    if (batchInProgress) {
+        console.warn(`[${userActionName}] Batch operation ignored: another batch is in progress.`);
+        ui.updateSaveStatusIndicator('saving');
+        return false;
+    }
+    batchInProgress = true;
     ui.updateSaveStatusIndicator('pending');
     let success = false;
-
     try {
         if (typeof optimisticDOMUpdater === 'function') optimisticDOMUpdater();
-
-         console.log("Batch operations to send:", operations);
-
+        console.log("Batch operations to send:", operations);
         const batchResponse = await notesAPI.batchUpdateNotes(operations);
         let allSubOperationsSucceeded = true;
-        
         if (batchResponse && Array.isArray(batchResponse.results)) {
             batchResponse.results.forEach(opResult => {
                 if (opResult.status === 'error') {
                     allSubOperationsSucceeded = false;
                     console.error(`[${userActionName} BATCH] Server reported sub-operation error:`, opResult);
-                    // Log more details about the error
                     if (opResult.message) {
                         console.error(`[${userActionName} BATCH] Error message:`, opResult.message);
                     }
@@ -84,7 +86,6 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
             allSubOperationsSucceeded = false;
             console.error(`[${userActionName} BATCH] Invalid response structure from server:`, batchResponse);
         }
-
         if (!allSubOperationsSucceeded) {
             const errorDetails = batchResponse.results
                 .filter(r => r.status === 'error')
@@ -103,6 +104,8 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         appStore.setNotes(originalNotesState);
         ui.displayNotes(appStore.notes, appStore.currentPageId);
         success = false;
+    } finally {
+        batchInProgress = false;
     }
     return success;
 }
