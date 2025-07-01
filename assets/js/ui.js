@@ -8,6 +8,7 @@ import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree, initial
 import { renderNote, parseAndRenderContent, switchToEditMode, getRawTextWithNewlines, normalizeNewlines, renderAttachments, renderProperties, initializeDelegatedNoteEventListeners, renderTransclusion } from './ui/note-renderer.js';
 import { domRefs } from './ui/dom-refs.js';
 import { calendarWidget } from './ui/calendar-widget.js';
+import { pagesAPI } from './api_client.js';
 
 // Get Alpine store reference
 function getAppStore() {
@@ -230,9 +231,10 @@ function initPagePropertiesModal() {
     if (!modal) return;
 
     const showModal = async () => {
-        if (!window.currentPageId || !window.pagesAPI) return;
+        const appStore = getAppStore();
+        if (!appStore || !appStore.currentPageId) return;
         try {
-            const pageData = await window.pagesAPI.getPageById(window.currentPageId);
+            const pageData = await pagesAPI.getPageById(appStore.currentPageId);
             if (window.displayPageProperties) {
                 await window.displayPageProperties(pageData.properties || {});
                 modal.classList.add('active');
