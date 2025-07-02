@@ -42,7 +42,7 @@ export async function handleTransclusions() {
         try {
             const note = await notesAPI.getNote(blockId);
             if (note && note.content) {
-                ui.renderTransclusion(placeholder, note.content, blockId);
+                await ui.renderTransclusion(placeholder, note.content, blockId, note);
             } else {
                 placeholder.textContent = 'Block not found.';
                 placeholder.classList.add('error');

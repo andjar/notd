@@ -1245,67 +1245,148 @@ body {
   color: var(--ls-add-property-btn-hover-text-color);
 }
 
-/* Transclusion and SQL Query Placeholder Styles - Minimalistic */
+/* Transclusion and SQL Query Placeholder Styles - Elegant and Minimalistic */
 .transclusion-placeholder,
 .sql-query-placeholder {
-  padding: var(--ls-space-1); /* Reduced padding */
+  padding: var(--ls-space-3);
   color: var(--ls-secondary-text-color);
   font-style: italic;
-  border: 1px dashed var(--ls-secondary-border-color); /* Softened border */
-  background-color: transparent;
-  border-radius: var(--ls-border-radius-low);
-  margin-bottom: var(--ls-space-1); /* Reduced margin */
+  border: 1px solid var(--ls-secondary-border-color);
+  background-color: var(--ls-tertiary-background-color);
+  border-radius: var(--ls-border-radius-medium);
+  margin: var(--ls-space-2) 0;
+  position: relative;
+  transition: all var(--ls-transition-fast);
+}
+
+.transclusion-placeholder::before,
+.sql-query-placeholder::before {
+  content: "↗";
+  position: absolute;
+  top: var(--ls-space-2);
+  right: var(--ls-space-2);
+  font-size: var(--ls-font-size-sm);
+  color: var(--ls-accent-9);
+  opacity: 0.6;
+  font-style: normal;
+}
+
+.transclusion-placeholder:hover,
+.sql-query-placeholder:hover {
+  border-color: var(--ls-accent-8);
+  background-color: var(--ls-secondary-background-color);
 }
 
 .transclusion-placeholder.error {
-  border-color: var(--color-error); /* Keep error distinct */
+  border-color: var(--color-error);
   background: var(--ls-transclusion-error-bg);
   color: var(--color-error);
-  font-style: normal; /* Error message should not be italic */
+  font-style: normal;
+}
+
+.transclusion-placeholder.error::before {
+  content: "⚠";
+  color: var(--color-error);
 }
 
 /* Styles for when SQL query content has loaded */
 .sql-query-placeholder.loaded {
-  border: none; /* Remove border */
-  padding: 0; /* Remove padding */
+  border: none;
+  padding: 0;
   background-color: transparent;
-  font-style: normal; /* Reset font style */
-  margin-top: var(--ls-space-2); /* Maintain spacing if needed */
-  margin-bottom: 0; /* Reset bottom margin as content will have its own */
+  font-style: normal;
+  margin: var(--ls-space-3) 0;
 }
 
+.sql-query-placeholder.loaded::before {
+  display: none;
+}
+
+/* Transcluded Content - Elegant Container */
 .transcluded-content {
-  background-color: var(
-    --ls-secondary-background-color
-  ); /* Softened background */
-  border: 1px solid var(--ls-secondary-border-color); /* Subtle border for the content box */
-  border-radius: var(--ls-border-radius-low);
-  margin-top: 0; /* Placeholder margin-bottom handles spacing */
-  box-shadow: none; /* Ensure no strong shadows */
+  position: relative;
+  background-color: var(--ls-primary-background-color);
+  border: 1px solid var(--ls-accent-4);
+  border-left: 3px solid var(--ls-accent-9);
+  border-radius: var(--ls-border-radius-medium);
+  margin: var(--ls-space-3) 0;
+  box-shadow: var(--ls-shadow-sm);
+  transition: all var(--ls-transition-fast);
+  overflow: hidden;
 }
 
+.transcluded-content:hover {
+  border-color: var(--ls-accent-8);
+  border-left-color: var(--ls-accent-10);
+  box-shadow: var(--ls-shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Transclusion Header - Elegant and Informative */
 .transclusion-header {
-  background-color: var(
-    --ls-quaternary-background-color,
-    var(--ls-tertiary-background-color)
-  ); /* Use quaternary if available, else tertiary */
-  border-bottom: 1px solid var(--ls-border-color);
-  padding: var(--ls-space-1) var(--ls-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+  background: linear-gradient(135deg, var(--ls-accent-2), var(--ls-accent-3));
+  border-bottom: 1px solid var(--ls-accent-4);
+  padding: var(--ls-space-2) var(--ls-space-3);
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-medium);
 }
 
 .transclusion-link {
-  color: var(--ls-link-text-color);
+  color: var(--ls-accent-11);
   text-decoration: none;
-  font-size: var(--ls-font-size-sm); /* Slightly smaller for header */
+  font-weight: var(--ls-font-weight-medium);
+  transition: all var(--ls-transition-fast);
+  border-radius: var(--ls-border-radius-low);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .transclusion-link:hover {
-  color: var(--ls-link-text-hover-color);
-  text-decoration: underline;
+  color: var(--ls-accent-12);
+  background-color: rgba(255, 255, 255, 0.2);
+  text-decoration: none;
+  transform: translateX(2px);
 }
 
+/* Transclusion Body - Clean Content Area */
 .transclusion-body {
-  padding: var(--ls-space-1); /* Reduced padding */
+  padding: var(--ls-space-3);
+  background-color: var(--ls-primary-background-color);
+  line-height: 1.6;
+}
+
+/* Dark theme adjustments for transclusions */
+[data-theme="dark"] .transclusion-placeholder,
+[data-theme="dark"] .sql-query-placeholder {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] .transcluded-content {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-accent-6);
+  border-left-color: var(--ls-accent-8);
+}
+
+[data-theme="dark"] .transclusion-header {
+  background: linear-gradient(135deg, var(--ls-accent-3), var(--ls-accent-4));
+  border-bottom-color: var(--ls-accent-5);
+}
+
+[data-theme="dark"] .transclusion-link {
+  color: var(--ls-accent-10);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .transclusion-link:hover {
+  color: var(--ls-accent-11);
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .transclusion-body {
+  background-color: var(--ls-secondary-background-color);
 }
 
 /* .sql-query-results is a .note-children div, so it should inherit default note-children styling. */

@@ -7,7 +7,7 @@
 import { saveNoteImmediately } from '../app/note-actions.js';
 import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
-import { attachmentsAPI, notesAPI } from '../api_client.js';
+import { attachmentsAPI, notesAPI, pagesAPI } from '../api_client.js';
 import { decrypt } from '../utils.js';
 import { getCurrentPagePassword } from '../app/state.js';
 import {
@@ -1509,8 +1509,9 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
  * @param {HTMLElement} placeholderEl - The placeholder element to be replaced.
  * @param {string} noteContent - The raw content of the note to be rendered inside the placeholder.
  * @param {string} noteId - The ID of the transcluded note, for creating a link.
+ * @param {Object} noteData - The full note data object containing page_id and other information.
  */
-export function renderTransclusion(placeholderEl, noteContent, noteId) {
+export async function renderTransclusion(placeholderEl, noteContent, noteId, noteData = null) {
     if (!placeholderEl) return;
 
     // Create a container for the transcluded content
@@ -1523,7 +1524,32 @@ export function renderTransclusion(placeholderEl, noteContent, noteId) {
     // Create a header with a link to the original note
     const headerEl = document.createElement('div');
     headerEl.className = 'transclusion-header';
-    headerEl.innerHTML = `<a href="#" class="transclusion-link" data-note-id="${noteId}" title="Go to original note"><i data-feather="corner-up-left"></i></a>`;
+    
+    // Create the link - if we have noteData with page_id, create a proper link
+    let linkHref = '#';
+    let linkText = `Note ${noteId}`;
+    
+    if (noteData && noteData.page_id) {
+        try {
+            // Fetch the page information to get the page name
+            const pageData = await pagesAPI.getPageById(noteData.page_id);
+            if (pageData && pageData.name) {
+                linkHref = `page.php?page=${encodeURIComponent(pageData.name)}#note-${noteId}`;
+                linkText = `📄 ${pageData.name}`;
+            } else {
+                // Fallback to page_id if page name not found
+                linkHref = `page.php?page_id=${noteData.page_id}#note-${noteId}`;
+                linkText = `📄 Note ${noteId}`;
+            }
+        } catch (error) {
+            console.error('Error fetching page data for transclusion link:', error);
+            // Fallback to page_id if API call fails
+            linkHref = `page.php?page_id=${noteData.page_id}#note-${noteId}`;
+            linkText = `📄 Note ${noteId}`;
+        }
+    }
+    
+    headerEl.innerHTML = `<a href="${linkHref}" class="transclusion-link" data-note-id="${noteId}" title="Go to original note">${linkText}</a>`;
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'transclusion-body';
