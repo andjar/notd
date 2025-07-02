@@ -13,6 +13,7 @@ import { calculateOrderIndex } from './order-index-service.js';
 import { notesAPI } from '../api_client.js';
 import { debounce, handleAutocloseBrackets, insertTextAtCursor, encrypt } from '../utils.js';
 import { ui } from '../ui.js';
+import { pageCache } from './page-cache.js';
 
 const notesContainer = document.querySelector('#notes-container');
 
@@ -97,6 +98,13 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         }
         success = true;
         ui.updateSaveStatusIndicator('saved');
+        
+        // **CACHE INVALIDATION**: Remove the current page from cache so fresh data is loaded on next visit
+        const appStore = getAppStore();
+        if (appStore.currentPageName) {
+            pageCache.removePage(appStore.currentPageName);
+            console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName}`);
+        }
     } catch (error) {
         console.error(`[${userActionName}] Batch operation failed:`, error);
         const errorMessage = error.message || `Batch operation '${userActionName}' failed.`;

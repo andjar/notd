@@ -24,7 +24,7 @@
   --ls-font-size-xl: 1.25rem;
   --ls-font-size-2xl: 1.5rem;
   --ls-font-size-3xl: 1.875rem;
-  --ls-page-title-size: 36px; /* From LogSeq */
+  --ls-page-title-size: 32px; /* Reduced from 36px for elegance */
 
   /* Font Weights */
   --ls-font-weight-normal: 400;
@@ -234,13 +234,16 @@ body {
 
 /* Common styles for all sidebar section headers */
 .sidebar-section h4 {
-  font-size: var(--ls-font-size-sm);
+  font-size: var(--ls-font-size-xs);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-secondary-text-color);
   margin: 0 0 var(--ls-space-2) 0;
   padding-bottom: var(--ls-space-1);
   border-bottom: 1px solid var(--ls-secondary-border-color);
   display: block;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
 }
 
 /* Sidebar Lists (Recent Pages and Favorites) */
@@ -285,9 +288,10 @@ body {
 }
 
 .sidebar-list-link.active {
-  background-color: var(--ls-tertiary-background-color);
-  color: var(--ls-primary-text-color);
-  font-weight: var(--ls-font-weight-medium);
+  background-color: hsl(var(--ls-accent-10-hsl) / 0.08); /* Very light accent background */
+  color: var(--ls-accent-11); /* Dark accent text color */
+  font-weight: var(--ls-font-weight-semibold);
+  box-shadow: inset 3px 0 0 0 var(--ls-accent-10); /* Vertical bar */
 }
 
 .sidebar-list-icon {
@@ -828,7 +832,7 @@ body {
   background-color: var(--ls-tertiary-background-color);
 }
 
-/* Arrow: More prominent, appears for parent items with better positioning */
+/* Arrow: Subtle, appears only on hover for parent items */
 .note-collapse-arrow {
   display: none; /* Hidden by default */
   position: absolute;
@@ -841,10 +845,10 @@ body {
   cursor: pointer;
   border-radius: 50%;
 
-  /* More prominent default state */
-  opacity: 0.6; /* More visible than before */
+  /* Very subtle default state */
+  opacity: 0; /* Completely hidden by default */
   pointer-events: none;
-  color: var(--ls-secondary-text-color); /* Stronger color */
+  color: var(--ls-secondary-text-color);
 
   transition: all var(--ls-transition-fast);
   z-index: 3; /* Above bullet and thread */
@@ -853,19 +857,19 @@ body {
 /* Show arrow for items with children */
 .note-item.has-children > .note-header-row .note-controls .note-collapse-arrow {
   display: inline-flex;
-  opacity: 0.2; /* More visible by default */
+  opacity: 0; /* Still hidden by default */
   pointer-events: auto;
 }
 
-/* Arrow becomes very prominent on hover */
+/* Arrow becomes visible on hover */
 .note-item.has-children:hover
   > .note-header-row
   .note-controls
   .note-collapse-arrow,
 .note-collapse-arrow:hover {
   display: inline-flex;
-  opacity: 1;
-  transform: scale(1.1);
+  opacity: 0.7; /* Subtle but visible */
+  transform: scale(1.05);
 }
 
 .note-collapse-arrow > svg.feather {
@@ -947,7 +951,7 @@ body {
   border-radius: var(--ls-border-radius-low);
   min-height: 20px; /* Or var(--ls-line-height-base) if defined */
   padding: 6px 8px; /* Standardized padding */
-  line-height: 1.6; /* From original .note-content, ensure consistency */
+  line-height: 1.7; /* Improved line height for better readability */
 }
 
 .note-content[contenteditable="true"]:empty:before {
@@ -2317,6 +2321,7 @@ textarea:focus {
 
 /* Styling for .note-item no longer needs ::after or padding-left for indentation directly */
 .notes-container > .note-item {
+  margin-bottom: var(--ls-space-4);
 }
 
 /* Drag over effect for attachment drop zones */
@@ -2524,7 +2529,7 @@ textarea:focus {
   border-radius: var(--ls-border-radius-low);
   min-height: 20px; /* Or var(--ls-line-height-base) if defined */
   padding: 6px 8px; /* Standardized padding */
-  line-height: 1.6; /* From original .note-content, ensure consistency */
+  line-height: 1.7; /* Improved line height for better readability */
 }
 
 /* Site-wide heading styles */
@@ -4586,28 +4591,30 @@ html {
 
 /* ========== BUTTON TO ADD NOTES ========== */
 #add-root-note-btn {
-  position: fixed;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--primary-color);
-  border: none;
-  color: white;
-  font-size: 1.5rem;
-  width: 3.6rem;
-  height: 3.6rem;
+  position: static; /* Remove fixed positioning */
+  margin-top: var(--ls-space-4); /* Space above the button */
+  margin-left: var(--bullet-left-indent); /* Align with bullet position */
+  background: var(--ls-tertiary-background-color); /* Grey background */
+  border: 1px solid var(--ls-secondary-border-color); /* Subtle border */
+  color: var(--ls-secondary-text-color); /* Grey text */
+  font-size: var(--ls-font-size-sm); /* Smaller font */
+  width: 2rem; /* Much smaller width */
+  height: 2rem; /* Much smaller height */
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 5px 10px rgba(59, 130, 246, 0.5);
+  box-shadow: none; /* Remove shadow */
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.3s ease;
-  z-index: 1500;
+  transition: all var(--ls-transition-fast);
+  z-index: auto; /* Remove high z-index */
 }
 
 #add-root-note-btn:hover {
-  background: #2563eb;
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  border-color: var(--ls-border-color);
+  transform: scale(1.05);
 }
 
 /* ========== RESPONSIVE ========== */

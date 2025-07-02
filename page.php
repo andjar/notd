@@ -502,11 +502,6 @@ function renderBacklinks($backlinks) {
                     </div>
                 </template>
             </div>
-            <?php if (!empty($childPages)): ?>
-            <div id="child-pages-container">
-                <?php echo renderChildPages($childPages); ?>
-            </div>
-            <?php endif; ?>
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
             </button>
