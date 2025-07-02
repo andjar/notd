@@ -15,8 +15,8 @@
   /* Typography */
   --ls-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, sans-serif;
-  --ls-header-font-family: "Ubuntu", "Inter", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, sans-serif;
+  --ls-header-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif; /* Use Inter for headers too - perfect consistency */
   --ls-font-size-xs: 0.75rem;
   --ls-font-size-sm: 0.875rem;
   --ls-font-size-base: 1rem;
@@ -76,7 +76,7 @@
   --control-vertical-offset: calc(
     (var(--ls-font-size-base) * 1.5 - var(--control-icon-size)) / 2
   ); /* Top padding for controls */
-  --ls-indentation-unit: var(--ls-space-6); /* Main indent per level */
+  --ls-indentation-unit: 32px; /* Increased from 24px for clearer hierarchy */
 
   /* Control positioning - cleaned up and more precise */
   --bullet-left-indent: 1.5em; /* Bullet position */
@@ -178,7 +178,7 @@
 body {
   font-family: var(--ls-font-family);
   font-size: var(--ls-font-size-base);
-  line-height: 1.5;
+  line-height: 1.7; /* Increased from 1.5 for better readability */
   color: var(--ls-primary-text-color);
   background-color: var(--ls-primary-background-color);
 }
@@ -221,15 +221,15 @@ body {
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--ls-space-3);
+  padding: var(--ls-space-1); /* Much tighter padding */
   display: flex;
   flex-direction: column;
-  gap: var(--ls-space-4);
+  gap: var(--ls-space-1); /* Much tighter gap between sections */
 }
 
 /* Sidebar Sections */
 .sidebar-section {
-  margin-bottom: var(--ls-space-4);
+  margin-bottom: var(--ls-space-1); /* Much tighter margin */
 }
 
 /* Common styles for all sidebar section headers */
@@ -237,26 +237,26 @@ body {
   font-size: var(--ls-font-size-xs);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-secondary-text-color);
-  margin: 0 0 var(--ls-space-2) 0;
-  padding-bottom: var(--ls-space-1);
+  margin: 0 0 var(--ls-space-1) 0; /* Much tighter */
+  padding-bottom: 2px; /* Much tighter */
   border-bottom: 1px solid var(--ls-secondary-border-color);
   display: block;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em; /* Reduced */
   text-transform: uppercase;
-  opacity: 0.7;
+  opacity: 0.6; /* More muted */
 }
 
 /* Sidebar Lists (Recent Pages and Favorites) */
 .sidebar-list-section {
-  margin-top: var(--ls-space-4);
-  padding: 0 var(--ls-space-2);
+  margin-top: var(--ls-space-1);
+  padding: 0 var(--ls-space-1);
 }
 
 .sidebar-list-section h3 {
   font-size: var(--ls-font-size-sm);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-secondary-text-color);
-  margin-bottom: var(--ls-space-2);
+  margin-bottom: var(--ls-space-1);
   padding-bottom: var(--ls-space-1);
   border-bottom: 1px solid var(--ls-secondary-border-color);
 }
@@ -268,30 +268,32 @@ body {
 }
 
 .sidebar-list li {
-  margin-bottom: var(--ls-space-1);
+  margin-bottom: 2px; /* Much tighter spacing */
 }
 
 .sidebar-list-link {
   display: flex;
   align-items: center;
-  gap: var(--ls-space-2);
-  padding: var(--ls-space-1) var(--ls-space-2);
+  gap: var(--ls-space-1);
+  padding: 4px 6px; /* Much tighter padding */
   border-radius: var(--ls-border-radius-low);
-  color: var(--ls-primary-text-color);
+  color: var(--ls-secondary-text-color); /* Muted color */
   text-decoration: none;
   transition: all var(--ls-transition-fast);
+  opacity: 0.7; /* More muted */
 }
 
 .sidebar-list-link:hover {
-  background-color: var(--ls-secondary-background-color);
+  background-color: var(--ls-tertiary-background-color);
   color: var(--ls-primary-text-color);
+  opacity: 1; /* Full opacity on hover */
 }
 
 .sidebar-list-link.active {
-  background-color: hsl(var(--ls-accent-10-hsl) / 0.08); /* Very light accent background */
-  color: var(--ls-accent-11); /* Dark accent text color */
-  font-weight: var(--ls-font-weight-semibold);
-  box-shadow: inset 3px 0 0 0 var(--ls-accent-10); /* Vertical bar */
+  background-color: var(--ls-tertiary-background-color); /* Much more subtle */
+  color: var(--ls-secondary-text-color); /* Muted text */
+  font-weight: var(--ls-font-weight-medium); /* Less bold */
+  box-shadow: inset 2px 0 0 0 var(--ls-secondary-border-color); /* Very subtle bar */
 }
 
 .sidebar-list-icon {
@@ -310,7 +312,7 @@ body {
 .no-items-message {
   color: var(--ls-tertiary-text-color);
   font-size: var(--ls-font-size-sm);
-  padding: var(--ls-space-2);
+  padding: var(--ls-space-1);
   text-align: center;
 }
 
@@ -362,8 +364,8 @@ body {
 
 /* Child Pages Container (in main content) */
 #child-pages-container {
-  margin-top: var(--ls-space-6);
-  padding: var(--ls-space-4);
+  margin-top: var(--ls-space-1);
+  padding: var(--ls-space-1);
   background-color: var(--ls-secondary-background-color);
   border-radius: var(--ls-border-radius-medium);
   border: 1px solid var(--ls-secondary-border-color);
@@ -373,8 +375,8 @@ body {
   font-size: var(--ls-font-size-base);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-primary-text-color);
-  margin: 0 0 var(--ls-space-3) 0;
-  padding-bottom: var(--ls-space-2);
+  margin: 0 0 var(--ls-space-1) 0;
+  padding-bottom: var(--ls-space-1);
   border-bottom: 1px solid var(--ls-secondary-border-color);
 }
 
@@ -384,12 +386,12 @@ body {
   margin: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--ls-space-2);
+  gap: var(--ls-space-1);
 }
 
 .child-page-link {
   display: block;
-  padding: var(--ls-space-2);
+  padding: var(--ls-space-1);
   color: var(--ls-primary-text-color);
   text-decoration: none;
   border-radius: var(--ls-border-radius-low);
@@ -407,9 +409,8 @@ body {
 
 /* Sidebar Footer */
 .sidebar-footer {
-  padding: var(--ls-space-3);
+  padding: var(--ls-space-1);
   border-top: 1px solid var(--ls-secondary-border-color);
-  background-color: var(--ls-primary-background-color);
 }
 
 .sidebar-footer .action-button {
@@ -417,7 +418,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--ls-space-2);
+  gap: var(--ls-space-1);
 }
 
 .sidebar-footer .action-button i {
@@ -471,19 +472,11 @@ body {
 }
 
 .sidebar-content {
-  padding: var(--ls-space-3); /* Reduced padding */
+  padding: var(--ls-space-1); /* Reduced padding */
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding: var(--ls-space-3); /* Reduced padding */
-  border-top: 1px solid var(--ls-secondary-border-color); /* Softened border */
-  background: var(--ls-secondary-background-color);
-  flex-shrink: 0;
 }
 
 /* Main Content */
@@ -491,7 +484,7 @@ body {
   grid-area: main-content;
   max-width: var(--ls-main-content-max-width);
   margin: 0 auto;
-  padding: var(--ls-space-4); /* Reduced padding */
+  padding: var(--ls-space-1); /* Much tighter padding */
   width: 100%;
   transition: margin 0.3s ease;
   min-height: 100vh;
@@ -506,14 +499,14 @@ body {
 
 /* App Header */
 .app-header {
-  padding-top: var(--ls-space-4); /* Reduced padding */
-  padding-bottom: var(--ls-space-3); /* Reduced padding */
-  margin-bottom: var(--ls-space-3); /* Reduced margin */
+  padding-top: var(--ls-space-1); /* Much tighter padding */
+  padding-bottom: var(--ls-space-1); /* Much tighter padding */
+  margin-bottom: var(--ls-space-1); /* Much tighter margin */
 }
 
 .app-header-main {
   text-align: center;
-  margin-bottom: var(--ls-space-2);
+  margin-bottom: var(--ls-space-1);
 }
 
 .app-title-main {
@@ -538,10 +531,11 @@ body {
 
 /* Calendar Widget */
 .calendar-widget {
-  background-color: var(--ls-tertiary-background-color);
+  background-color: transparent;
   border-radius: var(--ls-border-radius-medium);
-  padding: var(--ls-space-3); /* Reduced padding */
-  margin-bottom: var(--ls-space-4); /* Reduced margin */
+  padding: var(--ls-space-1); /* Much tighter padding */
+  margin-bottom: var(--ls-space-1); /* Much tighter margin */
+  border: none;
 }
 .calendar-header {
   display: flex;
@@ -604,30 +598,35 @@ body {
 
 /* Search Section */
 .search-section {
-  margin-bottom: var(--ls-space-4); /* Reduced margin */
+  margin-bottom: var(--ls-space-2); /* Much tighter margin */
   border-bottom: 1px solid var(--ls-border-color);
-  padding-bottom: var(--ls-space-3); /* Reduced padding */
+  padding-bottom: var(--ls-space-2); /* Much tighter padding */
 }
+
 .search-input {
   width: 100%;
   padding: var(--ls-space-2) var(--ls-space-3);
   border: 1px solid var(--ls-border-color);
   border-radius: var(--ls-border-radius-medium);
-  background: var(--ls-primary-background-color);
+  background: var(--ls-secondary-background-color); /* Light gray background */
   color: var(--ls-primary-text-color);
   font-size: var(--ls-font-size-sm);
   transition: border-color var(--ls-transition-fast),
     box-shadow var(--ls-transition-fast);
   box-shadow: none;
 }
+
 .search-input:focus {
   outline: none;
   border-color: var(--ls-accent-10);
   box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+  background: var(--ls-primary-background-color); /* Return to white on focus */
 }
+
 .search-input::placeholder {
   color: var(--ls-tertiary-text-color);
 }
+
 .search-results {
   margin-top: var(--ls-space-3);
   max-height: 300px;
@@ -637,27 +636,33 @@ body {
   border-radius: var(--ls-border-radius-medium);
   display: none;
 }
+
 .search-results.has-results {
   display: block;
 }
+
 .search-result-item {
   padding: var(--ls-space-2) var(--ls-space-3);
   border-bottom: 1px solid var(--ls-secondary-border-color);
   cursor: pointer;
   transition: background-color var(--ls-transition-fast);
 }
+
 .search-result-item:last-child {
   border-bottom: none;
 }
+
 .search-result-item:hover {
   background: var(--ls-secondary-background-color);
 }
+
 .search-result-title {
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-primary-text-color);
   margin-bottom: var(--ls-space-1);
   font-size: var(--ls-font-size-sm);
 }
+
 .search-result-parent-props {
   margin: var(--ls-space-1) 0;
   display: flex;
@@ -706,6 +711,7 @@ body {
   gap: var(--ls-space-2);
   margin-bottom: var(--ls-space-4); /* Reduced margin */
 }
+
 .new-page-form input {
   flex: 1;
   padding: var(--ls-space-2) var(--ls-space-3);
@@ -716,6 +722,7 @@ body {
   font-size: var(--ls-font-size-sm);
   box-shadow: none;
 }
+
 .new-page-form input:focus {
   outline: none;
   border-color: var(--ls-accent-10);
@@ -728,6 +735,7 @@ body {
   flex-direction: column;
   gap: var(--ls-space-1);
 }
+
 #page-list a {
   color: var(--ls-primary-text-color);
   text-decoration: none;
@@ -735,9 +743,11 @@ body {
   border-radius: var(--ls-border-radius-low);
   transition: background-color var(--ls-transition-fast);
 }
+
 #page-list a:hover {
   background-color: var(--ls-tertiary-background-color);
 }
+
 #page-list a.active {
   background-color: var(--ls-accent-10);
   color: var(--ls-active-nav-item-text-color);
@@ -910,7 +920,8 @@ body {
   /* Extend to the bottom of the children container */
   bottom: 0;
   width: var(--thread-line-width);
-  background-color: var(--ls-guideline-color);
+  background-color: var(--ls-secondary-border-color); /* Much lighter default color */
+  opacity: 0.4; /* Make them even more subtle */
   z-index: 1; /* Behind controls */
   transition: background-color var(--ls-transition-fast);
 }
@@ -1222,24 +1233,7 @@ body {
   background-color: var(--ls-tertiary-background-color);
 }
 
-/* Page Properties */
-#page-properties {
-  margin: var(--ls-space-1) 0;
-}
-.page-properties-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ls-space-1); /* Reduced gap */
-  margin-bottom: var(--ls-space-2); /* Reduced margin */
-}
-.page-property-item {
-  background-color: var(--ls-tertiary-background-color);
-  display: flex;
-  align-items: center;
-  gap: var(--ls-space-1); /* Reduced gap */
-  padding: var(--ls-space-1) var(--ls-space-2); /* Reduced padding */
-  border-radius: var(--ls-border-radius-low);
-}
+/* Old page properties styles removed - using new pill system */
 .page-property-key {
   color: var(--ls-accent-10);
   font-weight: var(--ls-font-weight-medium);
@@ -1584,7 +1578,7 @@ textarea:focus {
 #page-title {
   font-family: var(--ls-header-font-family);
   font-size: var(--ls-page-title-size);
-  font-weight: var(--ls-font-weight-semibold);
+  font-weight: var(--ls-font-weight-semibold); /* Reduced from bold for elegance */
   color: var(--ls-primary-text-color);
   line-height: 1.2;
   border-bottom: 1px solid var(--ls-secondary-border-color);
@@ -1695,31 +1689,27 @@ textarea:focus {
   height: 18px;
 }
 
-/* Styles for the list and items within the page properties modal remain */
+/* Page Properties Modal - Keep only modal-specific styles */
 #page-properties-list {
-  display: flex; /* Arrange pills in a row */
-  flex-wrap: wrap; /* Allow pills to wrap to the next line */
-  gap: var(--ls-space-2); /* Space between pills */
-  margin-bottom: var(--ls-space-4); /* Ensure space before actions */
-  padding: 0; /* Remove any default padding */
-  list-style: none; /* Ensure no list bullets if it were a ul/ol */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ls-space-2);
+  margin-bottom: var(--ls-space-4);
+  padding: 0;
+  list-style: none;
 }
 
-/* Styles for individual property pills in the modal - TO MATCH INLINE PILLS */
 #page-properties-list .page-property-item {
-  /* Match .property-item.tag and .property-inline styles exactly */
   background-color: var(--ls-tertiary-background-color);
   color: var(--ls-accent-10);
-  border-radius: var(
-    --ls-border-radius-low
-  ); /* Use low instead of full for consistency */
-  padding: 2px 6px; /* Exact match to inline properties */
-  font-size: 0.9em; /* Match .property-item.tag */
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.9em;
   display: inline-flex;
   align-items: center;
-  gap: 2px; /* Small gap, similar to inline */
-  border: 1px solid var(--ls-border-color); /* Match .property-inline border */
-  margin-right: 4px; /* Match .property-item.tag margin */
+  gap: 2px;
+  border: 1px solid var(--ls-border-color);
+  margin-right: 4px;
 }
 
 #page-properties-list .page-property-key {
@@ -2189,7 +2179,7 @@ textarea:focus {
 #notes-container {
   display: flex;
   flex-direction: column;
-  gap: var(--ls-space-1); /* This provides inter-item spacing */
+  /* Removed gap - using margin-bottom on individual notes for precise control */
 }
 
 /* Breadcrumbs Container */
@@ -2321,7 +2311,26 @@ textarea:focus {
 
 /* Styling for .note-item no longer needs ::after or padding-left for indentation directly */
 .notes-container > .note-item {
-  margin-bottom: var(--ls-space-4);
+  margin-bottom: var(--ls-space-1); /* Much tighter spacing between notes */
+}
+
+/* Ensure consistent vertical rhythm */
+.note-content {
+  margin-bottom: var(--ls-space-2); /* Consistent bottom margin */
+}
+
+.note-content h1,
+.note-content h2,
+.note-content h3,
+.note-content h4,
+.note-content h5,
+.note-content h6 {
+  margin-bottom: var(--ls-space-3); /* Consistent spacing after headers */
+  margin-top: var(--ls-space-4); /* Space before headers */
+}
+
+.task-container {
+  margin-bottom: var(--ls-space-2); /* Consistent spacing between tasks */
 }
 
 /* Drag over effect for attachment drop zones */
@@ -2545,6 +2554,8 @@ h6 {
   font-family: var(--ls-header-font-family);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-primary-text-color);
+  /* Remove any bullet styling for headers */
+  list-style: none;
 }
 
 h1 {
@@ -3433,7 +3444,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 #toggle-splash-btn {
   position: fixed;
   bottom: 20px;
-  padding: 8px;
+  padding: 12px; /* Increased from 8px for better clickability */
   border-radius: 50%;
   background: var(--ls-primary-background-color);
   box-shadow: var(--ls-shadow-md);
@@ -3443,6 +3454,9 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  width: 44px; /* Increased size */
+  height: 44px; /* Increased size */
+  border: 1px solid var(--ls-secondary-border-color); /* Add subtle border */
 }
 
 #save-status-indicator {
@@ -3450,19 +3464,20 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 #toggle-splash-btn {
-  right: 60px;
+  right: 74px; /* Adjusted position for larger button */
 }
 
 #save-status-indicator:hover,
 #toggle-splash-btn:hover {
   transform: scale(1.05);
   background: var(--ls-secondary-background-color);
+  box-shadow: var(--ls-shadow-lg); /* Enhanced shadow on hover */
 }
 
 #save-status-indicator svg,
 #toggle-splash-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 20px; /* Increased icon size */
+  height: 20px; /* Increased icon size */
   color: var(--ls-primary-text-color);
 }
 
@@ -4502,16 +4517,7 @@ html {
   font-size: 0.9rem;
 }
 
-.sidebar-list-link:hover {
-  background-color: #f0f4ff;
-  color: var(--primary-color);
-}
-
-.sidebar-list-link.active {
-  background-color: #dbeafe;
-  font-weight: 600;
-  color: var(--primary-color);
-}
+/* Legacy blue sidebar styles removed - using muted gray styles above */
 
 .sidebar-list-icon {
   width: 16px;
@@ -4522,16 +4528,17 @@ html {
 /* ========== FOOTER BUTTON ========== */
 .sidebar-footer {
   margin-top: auto;
+  padding: var(--ls-space-1); /* Much tighter padding */
 }
 
 .full-width-button {
   width: 100%;
-  padding: 0.65rem 1rem;
-  background: var(--primary-color);
-  border: none;
+  padding: 0.5rem 0.75rem; /* Reduced padding */
+  background: var(--ls-tertiary-background-color); /* Much more muted */
+  border: 1px solid var(--ls-secondary-border-color);
   border-radius: 6px;
-  font-size: 0.95rem;
-  color: white;
+  font-size: 0.9rem; /* Smaller font */
+  color: var(--ls-secondary-text-color); /* Muted text */
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -4541,7 +4548,8 @@ html {
 }
 
 .full-width-button:hover {
-  background-color: #2563eb;
+  background-color: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
 }
 
 /* ========== MAIN CONTENT ========== */
@@ -4570,24 +4578,7 @@ html {
   color: var(--text-primary);
 }
 
-.page-properties-inline {
-  margin-top: 0.5rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  display: none;
-  margin: 0;
-  padding: 0;
-  height: 0;
-  overflow: hidden;
-}
-
-.page-properties-inline:empty {
-  display: none !important;
-  margin: 0;
-  padding: 0;
-  height: 0;
-  overflow: hidden;
-}
+/* Old page properties inline styles removed - using new pill system */
 
 /* ========== BUTTON TO ADD NOTES ========== */
 #add-root-note-btn {
@@ -4723,4 +4714,132 @@ html {
 
 .backlinks-list:empty {
   display: none;
+}
+
+/* Ensure headers don't get bullet styling from note items */
+.note-content h1,
+.note-content h2,
+.note-content h3,
+.note-content h4,
+.note-content h5,
+.note-content h6 {
+  /* Override any bullet positioning */
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+/* ========== CONSISTENT PILL STYLE SYSTEM ========== */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.85em;
+  font-weight: var(--ls-font-weight-medium);
+  white-space: nowrap;
+  transition: all var(--ls-transition-fast);
+}
+
+/* Task pill variants */
+.pill.pill-task-todo {
+  background-color: var(--ls-accent-3);
+  color: var(--ls-accent-11);
+}
+
+.pill.pill-task-done {
+  background-color: var(--ls-task-done-badge-bg);
+  color: var(--ls-task-done-badge-text);
+}
+
+.pill.pill-task-cancelled {
+  background-color: var(--ls-task-cancelled-badge-bg);
+  color: var(--ls-task-cancelled-badge-text);
+}
+
+.pill.pill-task-doing {
+  background-color: #f39c12;
+  color: #fff;
+}
+
+.pill.pill-task-someday {
+  background-color: #9b59b6;
+  color: #fff;
+}
+
+.pill.pill-task-waiting {
+  background-color: #3498db;
+  color: #fff;
+}
+
+.pill.pill-task-nlr {
+  background-color: #95a5a6;
+  color: #fff;
+}
+
+/* Tag pill variant */
+.pill.pill-tag {
+  background-color: var(--ls-tertiary-background-color);
+  color: var(--ls-secondary-text-color);
+  border: 1px solid var(--ls-secondary-border-color);
+}
+
+/* Property pill variant */
+.pill.pill-property {
+  background-color: var(--ls-tertiary-background-color);
+  color: var(--ls-accent-10);
+  border: 1px solid var(--ls-secondary-border-color);
+}
+
+/* Hover states */
+.pill:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+/* ========== ELEGANT PAGE PROPERTIES PILLS ========== */
+.page-properties-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--ls-space-2);
+  margin-bottom: var(--ls-space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.page-property-pill {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--ls-tertiary-background-color);
+  color: var(--ls-secondary-text-color);
+  border: 1px solid var(--ls-secondary-border-color);
+  border-radius: 12px; /* Rounded pills */
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  font-weight: var(--ls-font-weight-medium);
+  white-space: nowrap;
+  transition: all var(--ls-transition-fast);
+}
+
+.page-property-pill:hover {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+  transform: translateY(-1px);
+}
+
+.page-property-pill .property-key {
+  color: var(--ls-accent-10);
+  font-weight: var(--ls-font-weight-medium);
+  margin-right: 4px;
+}
+
+.page-property-pill .property-separator {
+  color: var(--ls-secondary-text-color);
+  opacity: 0.6;
+  margin: 0 2px;
+}
+
+.page-property-pill .property-value {
+  color: var(--ls-primary-text-color);
+  font-weight: var(--ls-font-weight-normal);
 }

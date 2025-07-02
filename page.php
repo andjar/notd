@@ -148,7 +148,7 @@ function renderPageTitle($pageName) {
 function renderPageProperties($properties, $renderInternal = false) {
     if (empty($properties)) return '';
     
-    $html = '<div id="page-properties-container" class="page-properties-inline">';
+    $html = '<ul class="page-properties-pills">';
     $hasVisibleProperties = false;
     
     foreach ($properties as $key => $instances) {
@@ -157,15 +157,15 @@ function renderPageProperties($properties, $renderInternal = false) {
             
             $hasVisibleProperties = true;
             if ($key === 'favorite' && strtolower($instance['value']) === 'true') {
-                $html .= '<span class="property-inline"><span class="property-favorite">⭐</span></span>';
+                $html .= '<li class="page-property-pill"><span class="property-favorite">⭐</span></li>';
             } else {
-                $html .= '<span class="property-inline"><span class="property-key">' . htmlspecialchars($key) . ':</span> <span class="property-value">' . htmlspecialchars($instance['value']) . '</span></span>';
+                $html .= '<li class="page-property-pill"><span class="property-key">' . htmlspecialchars($key) . '</span><span class="property-separator">:</span><span class="property-value">' . htmlspecialchars($instance['value']) . '</span></li>';
             }
         }
     }
     
     if ($hasVisibleProperties) {
-        $html .= '</div>';
+        $html .= '</ul>';
         return $html;
     }
     

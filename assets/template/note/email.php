@@ -6,8 +6,6 @@
 **Subject:** {{subject}}
 **Date:** {{date}} {{time}}
 
----
 {{email_body}}
----
 
 *Saved on {{datetime}}* 
