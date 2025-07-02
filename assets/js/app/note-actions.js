@@ -270,21 +270,104 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
+    // **OPTIMIZATION**: Update sibling order indices immediately
     siblingUpdates.forEach(op => {
         const note = getNoteDataById(op.id);
         if (note) note.order_index = op.newOrderIndex;
     });
 
     const optimisticDOMUpdater = () => {
-        const newNoteEl = ui.renderNote(optimisticNewNote, ui.getNestingLevel(noteItem));
-        noteItem.after(newNoteEl);
-        const newContentDiv = newNoteEl?.querySelector('.note-content');
-        if (newContentDiv) {
-            newContentDiv.dataset.rawContent = '';
-            ui.switchToEditMode(newContentDiv);
+        // **OPTIMIZATION**: Create and insert new note element immediately without full re-render
+        const newNoteEl = createOptimisticNoteElement(optimisticNewNote, noteData.parent_note_id);
+        if (newNoteEl) {
+            // Insert after current note
+            noteItem.after(newNoteEl);
+            
+            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
+            setTimeout(() => {
+                const newContentDiv = newNoteEl.querySelector('.note-content');
+                if (newContentDiv) {
+                    // Switch to edit mode
+                    ui.switchToEditMode(newContentDiv);
+                    
+                    // Set cursor to beginning of the new note
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    
+                    // Clear any existing selection
+                    sel.removeAllRanges();
+                    
+                    // Position cursor at the start of the content
+                    range.setStart(newContentDiv, 0);
+                    range.collapse(true);
+                    
+                    // Apply the selection
+                    sel.addRange(range);
+                    
+                    // Ensure the new note is visible
+                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Focus the element
+                    newContentDiv.focus();
+                }
+            }, 0); // Use setTimeout to ensure DOM is ready
         }
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Sibling Note");
+}
+
+// **NEW**: Helper function to create optimistic note element without full re-render
+function createOptimisticNoteElement(noteData, parentId) {
+    const noteItemEl = document.createElement('div');
+    noteItemEl.className = 'note-item';
+    noteItemEl.dataset.noteId = noteData.id;
+    
+    // Calculate nesting level
+    const nestingLevel = calculateNestingLevel(parentId, getAppStore().notes);
+    noteItemEl.style.setProperty('--nesting-level', nestingLevel);
+
+    // Controls section
+    const controlsEl = document.createElement('div');
+    controlsEl.className = 'note-controls';
+
+    // Drag handle (hidden)
+    const dragHandleEl = document.createElement('span');
+    dragHandleEl.className = 'note-drag-handle';
+    dragHandleEl.innerHTML = '<i data-feather="menu"></i>';
+    dragHandleEl.style.display = 'none';
+    controlsEl.appendChild(dragHandleEl);
+
+    // Bullet
+    const bulletEl = document.createElement('span');
+    bulletEl.className = 'note-bullet';
+    bulletEl.dataset.noteId = noteData.id;
+    controlsEl.appendChild(bulletEl);
+
+    // Content wrapper
+    const contentWrapperEl = document.createElement('div');
+    contentWrapperEl.className = 'note-content-wrapper';
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'note-content edit-mode';
+    contentEl.dataset.placeholder = 'Type to add content...';
+    contentEl.dataset.noteId = noteData.id;
+    contentEl.dataset.rawContent = '';
+    contentEl.contentEditable = 'true';
+    contentWrapperEl.appendChild(contentEl);
+
+    // Header row
+    const noteHeaderEl = document.createElement('div');
+    noteHeaderEl.className = 'note-header-row';
+    noteHeaderEl.appendChild(controlsEl);
+    noteHeaderEl.appendChild(contentWrapperEl);
+    noteItemEl.appendChild(noteHeaderEl);
+
+    // Children container (empty)
+    const childrenContainerEl = document.createElement('div');
+    childrenContainerEl.className = 'note-children';
+    noteItemEl.appendChild(childrenContainerEl);
+
+    return noteItemEl;
 }
 
 async function handleTabKey(e, noteItem, noteData) {
@@ -302,6 +385,7 @@ async function handleTabKey(e, noteItem, noteData) {
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     let operations = [];
     let newParentId = null;
+    let targetOrderIndex = null; // **FIX**: Declare targetOrderIndex in proper scope
 
     if (e.shiftKey) { // Outdent
         if (!noteData.parent_note_id) return;
@@ -322,7 +406,8 @@ async function handleTabKey(e, noteItem, noteData) {
             return;
         }
 
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, String(oldParentNote.id), null);
+        const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, String(oldParentNote.id), null);
+        targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
         
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
@@ -348,7 +433,8 @@ async function handleTabKey(e, noteItem, noteData) {
         }
         
         newParentId = String(newParentNote.id);
-        const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, null, null);
+        const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, null, null);
+        targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
@@ -361,27 +447,114 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // Perform optimistic state updates before calling the batch operation
-    const noteToMove = getNoteDataById(noteData.id);
-    if(noteToMove) noteToMove.parent_note_id = newParentId;
-    operations.forEach(op => {
-        if (op.type === 'update') {
-            const note = getNoteDataById(op.payload.id);
-            if(note) note.order_index = op.payload.order_index;
-        }
-    });
-
+    // **OPTIMIZATION**: Immediate visual feedback without full re-render
     const optimisticDOMUpdater = () => {
-        // Since this is a structural change, a full re-render is the safest approach.
-        const appStore = getAppStore();
-        ui.displayNotes(appStore.notes, appStore.currentPageId);
-        const newNoteItem = getNoteElementById(noteData.id);
-        if (newNoteItem) {
-            const newContentDiv = newNoteItem.querySelector('.note-content');
+        // Update the note's visual indentation immediately
+        const noteElement = getNoteElementById(noteData.id);
+        if (noteElement && targetOrderIndex !== null) { // **FIX**: Check if targetOrderIndex is defined
+            // Calculate new nesting level
+            const newNestingLevel = calculateNestingLevel(newParentId, appStore.notes);
+            
+            // Update CSS custom property for immediate visual feedback
+            noteElement.style.setProperty('--nesting-level', newNestingLevel);
+            
+            // Move the note element to its new position in the DOM
+            moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex);
+            
+            // Update the note's data in the store
+            const noteToMove = getNoteDataById(noteData.id);
+            if (noteToMove) {
+                noteToMove.parent_note_id = newParentId;
+                noteToMove.order_index = targetOrderIndex;
+            }
+            
+            // Update sibling order indices
+            operations.forEach(op => {
+                if (op.type === 'update') {
+                    const note = getNoteDataById(op.payload.id);
+                    if (note) note.order_index = op.payload.order_index;
+                }
+            });
+            
+            // Refocus the note content
+            const newContentDiv = noteElement.querySelector('.note-content');
             if (newContentDiv) ui.switchToEditMode(newContentDiv);
         }
     };
+    
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
+}
+
+// **NEW**: Helper function to calculate nesting level
+function calculateNestingLevel(parentId, notes) {
+    if (!parentId) return 0;
+    
+    let level = 0;
+    let currentParentId = parentId;
+    
+    while (currentParentId) {
+        const parentNote = notes.find(n => String(n.id) === String(currentParentId));
+        if (!parentNote) break;
+        
+        level++;
+        currentParentId = parentNote.parent_note_id;
+    }
+    
+    return level;
+}
+
+// **NEW**: Helper function to move note element in DOM without full re-render
+function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
+    const notesContainer = document.getElementById('notes-container');
+    if (!notesContainer) return;
+    
+    // Remove from current position
+    noteElement.remove();
+    
+    if (!newParentId) {
+        // Moving to root level
+        const rootNotes = Array.from(notesContainer.children).filter(el => 
+            el.classList.contains('note-item') && 
+            !el.closest('.note-children')
+        );
+        
+        if (targetOrderIndex >= rootNotes.length) {
+            notesContainer.appendChild(noteElement);
+        } else {
+            const targetElement = rootNotes[targetOrderIndex];
+            notesContainer.insertBefore(noteElement, targetElement);
+        }
+    } else {
+        // Moving to a specific parent
+        const parentElement = getNoteElementById(newParentId);
+        if (!parentElement) {
+            // Fallback: append to root
+            notesContainer.appendChild(noteElement);
+            return;
+        }
+        
+        let childrenContainer = parentElement.querySelector('.note-children');
+        if (!childrenContainer) {
+            // Create children container if it doesn't exist
+            childrenContainer = document.createElement('div');
+            childrenContainer.className = 'note-children';
+            parentElement.appendChild(childrenContainer);
+            
+            // Add has-children class to parent
+            parentElement.classList.add('has-children');
+        }
+        
+        const existingChildren = Array.from(childrenContainer.children).filter(el => 
+            el.classList.contains('note-item')
+        );
+        
+        if (targetOrderIndex >= existingChildren.length) {
+            childrenContainer.appendChild(noteElement);
+        } else {
+            const targetElement = existingChildren[targetOrderIndex];
+            childrenContainer.insertBefore(noteElement, targetElement);
+        }
+    }
 }
 
 async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
@@ -417,12 +590,54 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
 
 function handleArrowKey(e, contentDiv) {
     e.preventDefault();
+    
+    // **OPTIMIZATION**: More efficient arrow key navigation inspired by treehouse
     const allVisibleNotesContent = Array.from(notesContainer.querySelectorAll('.note-item:not(.note-hidden) .note-content'));
     const currentIndex = allVisibleNotesContent.indexOf(contentDiv);
     let nextIndex = -1;
 
-    if (e.key === 'ArrowUp' && currentIndex > 0) nextIndex = currentIndex - 1;
-    else if (e.key === 'ArrowDown' && currentIndex < allVisibleNotesContent.length - 1) nextIndex = currentIndex + 1;
+    if (e.key === 'ArrowUp' && currentIndex > 0) {
+        nextIndex = currentIndex - 1;
+    } else if (e.key === 'ArrowDown' && currentIndex < allVisibleNotesContent.length - 1) {
+        nextIndex = currentIndex + 1;
+    } else if (e.key === 'ArrowLeft') {
+        // **NEW**: Treehouse-style - move to parent note
+        const noteItem = contentDiv.closest('.note-item');
+        const parentNote = noteItem?.parentElement?.closest('.note-item');
+        if (parentNote) {
+            const parentContent = parentNote.querySelector('.note-content');
+            if (parentContent) {
+                ui.switchToEditMode(parentContent);
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(parentContent);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                return;
+            }
+        }
+    } else if (e.key === 'ArrowRight') {
+        // **NEW**: Treehouse-style - move to first child note
+        const noteItem = contentDiv.closest('.note-item');
+        const childrenContainer = noteItem?.querySelector('.note-children');
+        if (childrenContainer && !childrenContainer.classList.contains('collapsed')) {
+            const firstChild = childrenContainer.querySelector('.note-item');
+            if (firstChild) {
+                const childContent = firstChild.querySelector('.note-content');
+                if (childContent) {
+                    ui.switchToEditMode(childContent);
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(childContent);
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    return;
+                }
+            }
+        }
+    }
 
     if (nextIndex !== -1) {
         const nextContent = allVisibleNotesContent[nextIndex];
@@ -486,13 +701,145 @@ export async function handleNoteKeyDown(e) {
     if (await handleShortcutExpansion(e, contentDiv)) return;
     if (handleAutocloseBrackets(e)) return;
     
+    // **NEW**: Treehouse-inspired shortcuts
+    if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+            case 'Enter':
+                e.preventDefault();
+                // **NEW**: Ctrl+Enter creates a child note (treehouse style)
+                await handleCreateChildNote(e, noteItem, noteData, contentDiv);
+                return;
+            case 'ArrowUp':
+                e.preventDefault();
+                // **NEW**: Ctrl+Up moves note up in hierarchy
+                await handleMoveNoteUp(e, noteItem, noteData);
+                return;
+            case 'ArrowDown':
+                e.preventDefault();
+                // **NEW**: Ctrl+Down moves note down in hierarchy
+                await handleMoveNoteDown(e, noteItem, noteData);
+                return;
+        }
+    }
+    
     switch (e.key) {
         case 'Enter': return await handleEnterKey(e, noteItem, noteData, contentDiv);
         case 'Tab': return await handleTabKey(e, noteItem, noteData);
         case 'Backspace': return await handleBackspaceKey(e, noteItem, noteData, contentDiv);
         case 'ArrowUp':
-        case 'ArrowDown': return handleArrowKey(e, contentDiv);
+        case 'ArrowDown':
+        case 'ArrowLeft':
+        case 'ArrowRight': return handleArrowKey(e, contentDiv);
     }
+}
+
+// **NEW**: Treehouse-inspired function to create child note
+async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
+    if (String(noteData.id).startsWith('temp-')) {
+        console.warn('[Create Child Note] Cannot create child note when parent has temporary ID.');
+        return;
+    }
+
+    const appStore = getAppStore();
+    const clientTempId = `temp-C-${Date.now()}`;
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
+    
+    // Calculate order index for the new child
+    const existingChildren = appStore.notes.filter(n => String(n.parent_note_id) === String(noteData.id)).sort((a, b) => a.order_index - b.order_index);
+    const targetOrderIndex = existingChildren.length > 0 ? existingChildren[existingChildren.length - 1].order_index + 1 : 0;
+    
+    const optimisticNewNote = { 
+        id: clientTempId, 
+        page_id: appStore.currentPageId, 
+        content: '', 
+        parent_note_id: noteData.id, 
+        order_index: targetOrderIndex, 
+        properties: {} 
+    };
+    appStore.addNote(optimisticNewNote);
+
+    const password = appStore.pagePassword;
+    let contentForServer = '';
+    let isEncrypted = false;
+    if (password) {
+        contentForServer = encrypt(password, '');
+        isEncrypted = true;
+    }
+    
+    const operations = [{ 
+        type: 'create', 
+        payload: { 
+            page_id: appStore.currentPageId, 
+            content: contentForServer, 
+            is_encrypted: isEncrypted, 
+            parent_note_id: noteData.id, 
+            order_index: targetOrderIndex, 
+            client_temp_id: clientTempId 
+        } 
+    }];
+
+    const optimisticDOMUpdater = () => {
+        // Create and insert child note element
+        const newNoteEl = createOptimisticNoteElement(optimisticNewNote, noteData.id);
+        if (newNoteEl) {
+            // Find or create children container
+            let childrenContainer = noteItem.querySelector('.note-children');
+            if (!childrenContainer) {
+                childrenContainer = document.createElement('div');
+                childrenContainer.className = 'note-children';
+                noteItem.appendChild(childrenContainer);
+                noteItem.classList.add('has-children');
+            }
+            
+            // Insert the new child
+            childrenContainer.appendChild(newNoteEl);
+            
+            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
+            setTimeout(() => {
+                const newContentDiv = newNoteEl.querySelector('.note-content');
+                if (newContentDiv) {
+                    // Switch to edit mode
+                    ui.switchToEditMode(newContentDiv);
+                    
+                    // Set cursor to beginning of the new note
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    
+                    // Clear any existing selection
+                    sel.removeAllRanges();
+                    
+                    // Position cursor at the start of the content
+                    range.setStart(newContentDiv, 0);
+                    range.collapse(true);
+                    
+                    // Apply the selection
+                    sel.addRange(range);
+                    
+                    // Ensure the new note is visible
+                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Focus the element
+                    newContentDiv.focus();
+                }
+            }, 0); // Use setTimeout to ensure DOM is ready
+        }
+    };
+    
+    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Child Note");
+}
+
+// **NEW**: Treehouse-inspired function to move note up in hierarchy
+async function handleMoveNoteUp(e, noteItem, noteData) {
+    // This would implement moving a note up in the hierarchy
+    // Similar to outdenting but with more sophisticated logic
+    console.log('Move note up - to be implemented');
+}
+
+// **NEW**: Treehouse-inspired function to move note down in hierarchy
+async function handleMoveNoteDown(e, noteItem, noteData) {
+    // This would implement moving a note down in the hierarchy
+    // Similar to indenting but with more sophisticated logic
+    console.log('Move note down - to be implemented');
 }
 
 export async function handleTaskCheckboxClick(e) {
