@@ -3299,6 +3299,155 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
   display: none;
 }
 
+/* Backlinks Header with Expand Text */
+.backlinks-header {
+  margin-bottom: var(--ls-space-3);
+}
+
+.backlinks-header h3 {
+  margin: 0;
+  font-size: var(--ls-font-size-lg);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+}
+
+.backlinks-expand-text {
+  color: var(--ls-secondary-text-color);
+  cursor: pointer;
+  font-weight: var(--ls-font-weight-normal);
+  font-size: var(--ls-font-size-base);
+  transition: all var(--ls-transition-fast);
+  opacity: 0.7;
+  user-select: none;
+}
+
+.backlinks-expand-text:hover {
+  color: var(--ls-primary-text-color);
+  opacity: 1;
+}
+
+/* Backlinks Modal Styles */
+.backlinks-modal-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--ls-space-2);
+}
+
+.backlinks-modal-content .backlink-item {
+  background-color: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-secondary-border-color);
+  border-radius: var(--ls-border-radius-medium);
+  padding: var(--ls-space-4);
+  margin-bottom: var(--ls-space-3);
+  transition: all var(--ls-transition-fast);
+}
+
+.backlinks-modal-content .backlink-item:hover {
+  background-color: var(--ls-quaternary-background-color);
+  border-color: var(--ls-accent-9);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+.backlinks-modal-content .backlink-item .page-link {
+  display: block;
+  font-weight: var(--ls-font-weight-semibold);
+  color: var(--ls-link-text-color);
+  text-decoration: none;
+  font-size: var(--ls-font-size-base);
+  margin-bottom: var(--ls-space-2);
+  padding: var(--ls-space-2);
+  border-radius: var(--ls-border-radius-low);
+  background-color: var(--ls-secondary-background-color);
+  transition: all var(--ls-transition-fast);
+}
+
+.backlinks-modal-content .backlink-item .page-link:hover {
+  color: var(--ls-link-text-hover-color);
+  background-color: var(--ls-accent-3);
+  text-decoration: none;
+}
+
+.backlinks-modal-content .backlink-snippet {
+  display: block;
+  font-size: var(--ls-font-size-sm);
+  color: var(--ls-secondary-text-color);
+  line-height: 1.5;
+  padding: var(--ls-space-3);
+  background-color: var(--ls-primary-background-color);
+  border-radius: var(--ls-border-radius-low);
+  border-left: 3px solid var(--ls-guideline-color);
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: var(--ls-space-2);
+}
+
+.backlinks-modal-content .backlink-snippet code,
+.backlinks-modal-content .backlink-snippet .wiki-link {
+  background-color: var(--ls-accent-3);
+  color: var(--ls-accent-11);
+  padding: 1px 4px;
+  border-radius: var(--ls-border-radius-low);
+  font-weight: var(--ls-font-weight-medium);
+  font-size: 0.9em;
+}
+
+/* Dark theme adjustments for backlinks modal */
+[data-theme="dark"] .backlinks-modal-content .backlink-item {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] .backlinks-modal-content .backlink-item:hover {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+[data-theme="dark"] .backlinks-modal-content .backlink-snippet {
+  background-color: var(--ls-tertiary-background-color);
+  border-left-color: var(--ls-secondary-border-color);
+}
+
+/* Loading and Error States for Backlinks Modal */
+.loading-state,
+.error-state,
+.no-backlinks-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ls-space-8);
+  text-align: center;
+  color: var(--ls-secondary-text-color);
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ls-border-color);
+  border-top: 2px solid var(--ls-accent-10);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--ls-space-3);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-state {
+  color: var(--color-error, #dc2626);
+}
+
+.no-backlinks-state {
+  color: var(--ls-tertiary-text-color);
+  font-style: italic;
+}
+
 .backlink-icon {
   width: 16px;
   height: 16px;

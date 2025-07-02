@@ -18,8 +18,12 @@ export const domRefs = {
     // **FIX**: Corrected the ID to match the HTML
     extensionIconsContainer: document.getElementById('extension-icons-container'),
     backlinksContainer: document.getElementById('backlinks-container'),
+    openBacklinksModalBtn: document.getElementById('open-backlinks-modal-btn'),
     
     // Modals
+    backlinksModal: document.getElementById('backlinks-modal'),
+    backlinksModalClose: document.getElementById('backlinks-modal-close'),
+    backlinksModalContent: document.getElementById('backlinks-modal-content'),
     pagePropertiesModal: document.getElementById('page-properties-modal'),
     pagePropertiesModalClose: document.getElementById('page-properties-modal-close'),
     pagePropertiesList: document.getElementById('page-properties-list'),

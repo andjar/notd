@@ -14,6 +14,7 @@ import { initGlobalSearch, initPageSearchModal } from './search.js';
 import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js';
 import { pagesAPI } from '../api_client.js'; // Import pagesAPI
 import { calendarCache } from './calendar-cache.js';
+import { initBacklinksModal } from './backlinks-modal.js';
 
 // Import UI module
 import { ui } from '../ui.js';
@@ -57,6 +58,7 @@ export async function initializeApp() {
         
         initGlobalSearch();
         initPageSearchModal();
+        initBacklinksModal();
         
         // Calendar is now handled by Alpine.js component
         

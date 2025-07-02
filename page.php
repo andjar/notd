@@ -523,7 +523,9 @@ function renderBacklinks($backlinks) {
                     </div>
                     <div class="sidebar-section">
                         <div id="backlinks-container" class="backlinks-sidebar">
-                            <h3>Backlinks</h3>
+                            <div class="backlinks-header">
+                                <h3>Backlinks<?php echo !empty($backlinks) ? ' <span id="open-backlinks-modal-btn" class="backlinks-expand-text" title="View all backlinks">+</span>' : ''; ?></h3>
+                            </div>
                             <div id="backlinks-list" class="backlinks-list">
                                 <?php echo renderBacklinks($backlinks); ?>
                             </div>
@@ -626,6 +628,21 @@ function renderBacklinks($backlinks) {
                 <i data-feather="x"></i>
             </button>
             <img id="image-viewer-modal-img" src="" alt="Full size view">
+        </div>
+    </div>
+
+    <!-- Backlinks Modal -->
+    <div id="backlinks-modal" class="generic-modal">
+        <div class="generic-modal-content">
+            <div class="generic-modal-header">
+                <h2 class="generic-modal-title">Backlinks to "<?php echo htmlspecialchars($pageName); ?>"</h2>
+                <button id="backlinks-modal-close" class="modal-close-x" aria-label="Close">
+                    <i data-feather="x"></i>
+                </button>
+            </div>
+            <div id="backlinks-modal-content" class="backlinks-modal-content">
+                <!-- Backlinks will be populated here by JavaScript -->
+            </div>
         </div>
     </div>
 </body>
