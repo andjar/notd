@@ -8,6 +8,7 @@ import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree, initial
 import { renderNote, parseAndRenderContent, switchToEditMode, getRawTextWithNewlines, normalizeNewlines, renderAttachments, renderProperties, initializeDelegatedNoteEventListeners, renderTransclusion } from './ui/note-renderer.js';
 import { domRefs } from './ui/dom-refs.js';
 import { pagesAPI } from './api_client.js';
+import { getInitialPage } from './app/page-loader.js';
 
 // Get Alpine store reference
 function getAppStore() {
@@ -831,6 +832,27 @@ function displayBacklinksInSidebar(pageName) {
         });
 }
 
+/**
+ * Creates a URL with a note anchor for deep linking
+ * @param {string} pageName - The page name
+ * @param {string} noteId - The note ID to anchor to
+ * @returns {string} The complete URL with anchor
+ */
+function createNoteAnchorLink(pageName, noteId) {
+    return `page.php?page=${encodeURIComponent(pageName)}#note-${noteId}`;
+}
+
+/**
+ * Creates a note anchor link for the current page
+ * @param {string} noteId - The note ID to anchor to
+ * @returns {string} The complete URL with anchor
+ */
+function createCurrentPageNoteAnchorLink(noteId) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentPage = urlParams.get('page') || getInitialPage();
+    return createNoteAnchorLink(currentPage, noteId);
+}
+
 // Export the main UI object
 export const ui = {
     displayNotes,
@@ -866,7 +888,9 @@ export const ui = {
     displayChildPagesInSidebar,
     displayFavorites,
     toggleFavorite,
-    displayBacklinksInSidebar
+    displayBacklinksInSidebar,
+    createNoteAnchorLink,
+    createCurrentPageNoteAnchorLink
 };
 
 // Make ui available globally

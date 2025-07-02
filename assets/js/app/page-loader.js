@@ -334,6 +334,9 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     handleTransclusions();
     handleSqlQueries();
     
+    // Handle URL anchor highlighting after notes are rendered
+    handleUrlAnchor();
+    
     console.log('[DEBUG] Starting prefetch of linked pages');
     prefetchLinkedPagesData();
     console.log('[DEBUG] _renderPageContent complete');
@@ -505,4 +508,69 @@ export async function fetchAndDisplayPages(activePageName) {
 
 export function getInitialPage() {
     return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Handles URL anchor highlighting for specific notes
+ * Parses the URL hash for #note-{id} and highlights the corresponding note
+ */
+export function handleUrlAnchor() {
+    const hash = window.location.hash;
+    if (!hash) return;
+    
+    // Parse hash for note anchor (e.g., #note-532)
+    const noteMatch = hash.match(/^#note-(\d+)$/);
+    if (!noteMatch) return;
+    
+    const noteId = noteMatch[1];
+    console.log(`[URL Anchor] Looking for note with ID: ${noteId}`);
+    
+    // Find the note element in the DOM
+    const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
+    if (!noteElement) {
+        console.warn(`[URL Anchor] Note element with ID ${noteId} not found in DOM`);
+        // Try again after a short delay in case the note is still loading
+        setTimeout(() => {
+            const retryElement = document.querySelector(`[data-note-id="${noteId}"]`);
+            if (retryElement) {
+                console.log(`[URL Anchor] Found note ${noteId} on retry`);
+                highlightNoteElement(retryElement);
+            }
+        }, 500);
+        return;
+    }
+    
+    highlightNoteElement(noteElement);
+}
+
+/**
+ * Highlights a note element with animation and scrolling
+ * @param {HTMLElement} noteElement - The note element to highlight
+ */
+function highlightNoteElement(noteElement) {
+    const noteId = noteElement.dataset.noteId;
+    
+    // Add highlighting class
+    noteElement.classList.add('anchor-highlight');
+    
+    // Scroll to the note with smooth animation and offset
+    const headerHeight = 80; // Approximate header height
+    const elementTop = noteElement.offsetTop;
+    const elementHeight = noteElement.offsetHeight;
+    const windowHeight = window.innerHeight;
+    
+    // Calculate scroll position to center the element with some offset from top
+    const scrollTop = elementTop - headerHeight - (windowHeight / 2) + (elementHeight / 2);
+    
+    window.scrollTo({
+        top: Math.max(0, scrollTop),
+        behavior: 'smooth'
+    });
+    
+    // Remove the highlight class after animation completes
+    setTimeout(() => {
+        noteElement.classList.remove('anchor-highlight');
+    }, 3000); // Keep highlight for 3 seconds
+    
+    console.log(`[URL Anchor] Successfully highlighted note ${noteId}`);
 }

@@ -1,6 +1,6 @@
 // assets/js/app/event-handlers.js (No changes needed, just verification)
 
-import { getNextDayPageName, getPreviousDayPageName } from './page-loader.js';
+import { getNextDayPageName, getPreviousDayPageName, handleUrlAnchor } from './page-loader.js';
 import { currentPageName } from './state.js';
 import { ui } from '../ui.js';
 
@@ -128,5 +128,11 @@ export function initGlobalEventListeners() {
                 console.log('Splash screen shown');
             }
         }
+    });
+
+    // Handle URL hash changes for note anchoring
+    window.addEventListener('hashchange', () => {
+        console.log('[Hash Change] URL hash changed, handling anchor');
+        handleUrlAnchor();
     });
 }

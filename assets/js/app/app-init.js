@@ -73,10 +73,11 @@ export async function initializeApp() {
         await fetchAndDisplayPages(initialPageName);
         await prefetchRecentPagesData(); 
         
-        const initialSaveIndicator = document.getElementById('save-status-indicator');
-        if (initialSaveIndicator) {
-            initialSaveIndicator.classList.add('status-hidden'); 
-        }
+        // Save status indicator is now always visible
+        // const initialSaveIndicator = document.getElementById('save-status-indicator');
+        // if (initialSaveIndicator) {
+        //     initialSaveIndicator.classList.add('status-hidden'); 
+        // }
         
         console.log('App initialized successfully');
         

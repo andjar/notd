@@ -1243,6 +1243,9 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
         <div class="menu-item" data-action="copy-transclusion" data-note-id="${noteId}">
             <i data-feather="link"></i> Copy transclusion link
         </div>
+        <div class="menu-item" data-action="copy-anchor-link" data-note-id="${noteId}">
+            <i data-feather="anchor"></i> Copy anchor link
+        </div>
         <div class="menu-item" data-action="delete" data-note-id="${noteId}">
             <i data-feather="trash-2"></i> Delete
         </div>
@@ -1276,6 +1279,18 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                 feedbackCopy.textContent = 'Transclusion link copied!';
                 document.body.appendChild(feedbackCopy);
                 setTimeout(() => feedbackCopy.remove(), 2000);
+                break;
+            case 'copy-anchor-link':
+                // Get current page name from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentPage = urlParams.get('page') || 'default';
+                const anchorLink = `${window.location.origin}${window.location.pathname}?page=${encodeURIComponent(currentPage)}#note-${actionNoteId}`;
+                await navigator.clipboard.writeText(anchorLink);
+                const feedbackAnchor = document.createElement('div');
+                feedbackAnchor.className = 'copy-feedback';
+                feedbackAnchor.textContent = 'Anchor link copied!';
+                document.body.appendChild(feedbackAnchor);
+                setTimeout(() => feedbackAnchor.remove(), 2000);
                 break;
             case 'delete':
                 if (confirm(`Are you sure you want to delete note ${actionNoteId}?`)) {

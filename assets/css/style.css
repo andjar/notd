@@ -1357,6 +1357,49 @@ body {
   line-height: 1.6;
 }
 
+/* URL Anchor Highlighting */
+.note-item.anchor-highlight {
+  background-color: var(--ls-accent-3);
+  animation: anchorPulse 1s ease-out;
+}
+
+@keyframes anchorPulse {
+  0% {
+    background-color: var(--ls-accent-2);
+  }
+  50% {
+    background-color: var(--ls-accent-3);
+  }
+  100% {
+    background-color: var(--ls-accent-3);
+  }
+}
+
+/* Dark theme adjustments for anchor highlighting */
+[data-theme="dark"] .note-item.anchor-highlight {
+  background-color: var(--ls-accent-4);
+  box-shadow: 0 0 0 2px var(--ls-accent-8);
+}
+
+[data-theme="dark"] .note-item.anchor-highlight {
+  animation: anchorPulseDark 2s ease-out;
+}
+
+@keyframes anchorPulseDark {
+  0% {
+    background-color: var(--ls-accent-3);
+    box-shadow: 0 0 0 4px var(--ls-accent-7);
+  }
+  50% {
+    background-color: var(--ls-accent-4);
+    box-shadow: 0 0 0 2px var(--ls-accent-8);
+  }
+  100% {
+    background-color: var(--ls-accent-4);
+    box-shadow: 0 0 0 2px var(--ls-accent-8);
+  }
+}
+
 /* Dark theme adjustments for transclusions */
 [data-theme="dark"] .transclusion-placeholder,
 [data-theme="dark"] .sql-query-placeholder {
