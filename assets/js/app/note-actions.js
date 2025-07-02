@@ -353,6 +353,27 @@ function createOptimisticNoteElement(noteData, parentId) {
     contentEl.dataset.noteId = noteData.id;
     contentEl.dataset.rawContent = '';
     contentEl.contentEditable = 'true';
+    
+    // **ENHANCEMENT**: Add event listeners for markdown rendering
+    contentEl.addEventListener('blur', () => {
+        // Switch to rendered mode when losing focus (if there's content)
+        if (contentEl.textContent.trim()) {
+            switchToRenderedMode(contentEl);
+        }
+    });
+    
+    // **ENHANCEMENT**: Add input handler for real-time markdown preview
+    contentEl.addEventListener('input', (e) => {
+        const rawContent = ui.normalizeNewlines(ui.getRawTextWithNewlines(contentEl));
+        contentEl.dataset.rawContent = rawContent;
+        
+        // Update the note data in the store
+        const noteData = getNoteDataById(noteData.id);
+        if (noteData) {
+            noteData.content = rawContent;
+        }
+    });
+    
     contentWrapperEl.appendChild(contentEl);
 
     // Header row
@@ -368,6 +389,70 @@ function createOptimisticNoteElement(noteData, parentId) {
     noteItemEl.appendChild(childrenContainerEl);
 
     return noteItemEl;
+}
+
+// **NEW**: Helper function to switch to rendered mode (copied from note-renderer.js)
+function switchToRenderedMode(contentEl) {
+    if (contentEl.classList.contains('rendered-mode')) return;
+
+    const rawTextValue = ui.getRawTextWithNewlines(contentEl);
+    const newContent = ui.normalizeNewlines(rawTextValue);
+    
+    contentEl.dataset.rawContent = newContent;
+    
+    contentEl.classList.remove('edit-mode');
+    contentEl.classList.add('rendered-mode');
+    contentEl.contentEditable = false;
+    contentEl.style.whiteSpace = '';
+
+    if (newContent.trim()) {
+        const tempDiv = document.createElement('div');
+        tempDiv.textContent = newContent;
+        const decodedContent = tempDiv.textContent;
+        
+        // **ENHANCEMENT**: Use the proper markdown rendering function
+        if (typeof window.parseAndRenderContent === 'function') {
+            contentEl.innerHTML = window.parseAndRenderContent(decodedContent);
+        } else {
+            // Fallback to basic HTML if parseAndRenderContent is not available
+            contentEl.innerHTML = parseBasicMarkdown(decodedContent);
+        }
+    } else {
+        contentEl.innerHTML = '';
+    }
+}
+
+// **NEW**: Fallback markdown parser for optimistic notes
+function parseBasicMarkdown(text) {
+    if (!text) return '';
+    
+    let html = text;
+    
+    // Handle page links [[page name]]
+    html = html.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
+        const trimmedName = pageName.trim();
+        return `<span class="page-link-bracket">[[</span><a href="#" class="page-link" data-page-name="${trimmedName}">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
+    });
+    
+    // Handle basic markdown if marked.js is available
+    if (typeof marked !== 'undefined' && marked.parse) {
+        try {
+            html = marked.parse(html, {
+                breaks: true,
+                gfm: true,
+                smartypants: true,
+                sanitize: false,
+                smartLists: true
+            });
+        } catch (e) {
+            console.warn('Marked.js parsing error:', e);
+        }
+    } else {
+        // Basic fallback
+        html = html.replace(/\n/g, '<br>');
+    }
+    
+    return html;
 }
 
 async function handleTabKey(e, noteItem, noteData) {

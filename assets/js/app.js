@@ -150,6 +150,9 @@ window.loadPage = loadPage;
 import { ui } from './ui.js';
 import { safeAddEventListener } from './utils.js';
 
+// **ENHANCEMENT**: Import parseAndRenderContent for global access
+import { parseAndRenderContent } from './ui/note-renderer.js';
+
 // Note actions
 import {
     handleAddRootNote,
@@ -180,6 +183,7 @@ import { initializeApp } from './app/app-init.js';
 
 // --- Global Function Exposure ---
 window.displayPageProperties = displayPagePropertiesFromEditor;
+window.parseAndRenderContent = parseAndRenderContent; // **ENHANCEMENT**: Expose markdown rendering function globally
 
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
