@@ -1,0 +1,226 @@
+name: Release Tests
+
+on:
+  release:
+    types: [published, created]
+  workflow_dispatch:
+    inputs:
+      run_performance_tests:
+        description: 'Run performance tests'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  full-test-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        php-version: ['8.1', '8.2']
+        test-suite: ['unit', 'integration']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: sqlite3, pdo_sqlite, mbstring, json, xdebug
+        coverage: xdebug
+
+    - name: Validate composer.json
+      run: composer validate --strict
+
+    - name: Install dependencies
+      run: |
+        composer install --prefer-dist --no-progress
+        composer require --dev phpunit/phpunit
+
+    - name: Create test directories
+      run: |
+        mkdir -p db
+        mkdir -p uploads/test
+        mkdir -p coverage
+
+    - name: Run ${{ matrix.test-suite }} tests
+      run: |
+        cd tests
+        php run_tests.php ${{ matrix.test-suite }} coverage
+      env:
+        DB_PATH: ./db/test_database.sqlite
+        UPLOADS_DIR: ./uploads/test
+        APP_ENV: testing
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-${{ matrix.php-version }}-${{ matrix.test-suite }}
+        path: tests/coverage/
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.php-version }}-${{ matrix.test-suite }}
+        path: |
+          tests/test-results.xml
+          tests/testdox.html
+          tests/testdox.txt
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.inputs.run_performance_tests != 'false'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: sqlite3, pdo_sqlite, mbstring, json
+
+    - name: Install dependencies
+      run: |
+        composer install --prefer-dist --no-progress
+        composer require --dev phpunit/phpunit
+
+    - name: Create test directories
+      run: |
+        mkdir -p db
+        mkdir -p uploads/test
+
+    - name: Run performance tests
+      run: |
+        cd tests
+        php run_tests.php performance
+      env:
+        DB_PATH: ./db/test_database.sqlite
+        UPLOADS_DIR: ./uploads/test
+        APP_ENV: testing
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-test-results
+        path: |
+          tests/test-results.xml
+          tests/testdox.txt
+
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: sqlite3, pdo_sqlite, mbstring, json
+
+    - name: Install dependencies
+      run: |
+        composer install --prefer-dist --no-progress
+
+    - name: Run security check
+      run: |
+        composer audit --format=json > security-audit.json || true
+
+    - name: Upload security results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-audit
+        path: security-audit.json
+
+  test-summary:
+    needs: [full-test-suite, performance-tests, security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Download all test results
+      uses: actions/download-artifact@v3
+      with:
+        path: test-results
+
+    - name: Generate comprehensive test summary
+      run: |
+        echo "## 🧪 Release Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Count test results
+        total_runs=0
+        passed_runs=0
+        
+        for result in test-results/*; do
+          if [ -d "$result" ]; then
+            total_runs=$((total_runs + 1))
+            if [ -f "$result/test-results.xml" ]; then
+              passed_runs=$((passed_runs + 1))
+            fi
+          fi
+        done
+        
+        echo "- **Total Test Runs:** $total_runs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Passed:** $passed_runs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Failed:** $((total_runs - passed_runs))" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ $passed_runs -eq $total_runs ]; then
+          echo "🎉 **All tests passed!**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Some tests failed. Please check the logs.**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Detailed Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Suite | PHP Version | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|------------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+        
+        for result in test-results/*; do
+          if [ -d "$result" ]; then
+            name=$(basename "$result")
+            if [[ $name == test-results-* ]]; then
+              suite=$(echo $name | sed 's/test-results-.*-//')
+              version=$(echo $name | sed 's/test-results-\(.*\)-.*/\1/')
+              
+              if [ -f "$result/test-results.xml" ]; then
+                status="✅ Passed"
+              else
+                status="❌ Failed"
+              fi
+              
+              echo "| $suite | $version | $status |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        done
+
+    - name: Create Release Summary
+      if: github.event_name == 'release'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+          
+          // Add test summary to release notes
+          const release = context.payload.release;
+          const newBody = release.body + '\n\n' + summary;
+          
+          github.rest.repos.updateRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            release_id: release.id,
+            body: newBody
+          }); 

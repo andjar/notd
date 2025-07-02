@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.5/phpunit.xsd"
+         bootstrap="bootstrap.php"
+         colors="true"
+         verbose="true"
+         stopOnFailure="false"
+         stopOnError="false"
+         stopOnIncomplete="false"
+         stopOnSkipped="false"
+         stopOnRisky="false"
+         failOnWarning="false"
+         failOnEmptyTestSuite="false"
+         failOnRisky="false"
+         failOnSkipped="false"
+         cacheDirectory=".phpunit.cache"
+         backupGlobals="false"
+         backupStaticAttributes="false"
+         beStrictAboutChangesToGlobalState="false"
+         beStrictAboutCoversAnnotation="false"
+         beStrictAboutOutputDuringTests="false"
+         beStrictAboutResourceUsageDuringSmallTests="false"
+         beStrictAboutTestsThatDoNotTestAnything="false"
+         beStrictAboutTodoAnnotatedTests="false"
+         checkForUnintentionallyCoveredCode="false"
+         convertDeprecationsToExceptions="false"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="false"
+         forceCoversAnnotation="false"
+         ignoreDeprecatedCodeUnits="false"
+         processIsolation="false"
+         requireCoverageMetadata="false"
+         reverseDefectList="false"
+         registerMockObjectsFromTestArgumentsRecursively="false"
+         timeoutForSmallTests="1"
+         timeoutForMediumTests="10"
+         timeoutForLargeTests="60"
+         verbose="true">
+    
+    <testsuites>
+        <testsuite name="Unit Tests">
+            <directory>.</directory>
+            <exclude>ApiIntegrationTest.php</exclude>
+            <exclude>PerformanceTest.php</exclude>
+        </testsuite>
+        
+        <testsuite name="Integration Tests">
+            <file>ApiIntegrationTest.php</file>
+        </testsuite>
+        
+        <testsuite name="Performance Tests">
+            <file>PerformanceTest.php</file>
+        </testsuite>
+        
+        <testsuite name="All Tests">
+            <directory>.</directory>
+        </testsuite>
+    </testsuites>
+    
+    <coverage>
+        <include>
+            <directory suffix=".php">../api</directory>
+        </include>
+        <exclude>
+            <directory>../api/v1</directory>
+            <file>../config.php</file>
+        </exclude>
+        <report>
+            <html outputDirectory="coverage"/>
+            <text outputFile="coverage.txt"/>
+        </report>
+    </coverage>
+    
+    <logging>
+        <junit outputFile="test-results.xml"/>
+        <testdoxHtml outputFile="testdox.html"/>
+        <testdoxText outputFile="testdox.txt"/>
+    </logging>
+    
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="DB_PATH" value="db/test_database.sqlite"/>
+        <env name="UPLOADS_DIR" value="uploads/test"/>
+    </php>
+</phpunit> 
