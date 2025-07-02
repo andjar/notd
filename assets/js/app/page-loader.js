@@ -70,7 +70,7 @@ async function displayBacklinks(pageName) {
         }
         const html = backlinksData.map(link => `
             <div class="backlink-item">
-                <a href="#" class="page-link" data-page-name="${link.page_name}">${link.page_name}</a>
+                <a href="page.php?page=${encodeURIComponent(link.page_name)}" class="page-link">${link.page_name}</a>
                 <div class="backlink-snippet">${link.content_snippet || ''}</div>
             </div>
         `).join('');
@@ -99,13 +99,12 @@ async function displayChildPages(namespace) {
             childPages.forEach(page => {
                 const item = document.createElement('li');
                 const link = document.createElement('a');
-                link.href = '#';
+                link.href = `page.php?page=${encodeURIComponent(page.name)}`;
                 const displayName = page.name.includes('/') ? 
                     page.name.substring(page.name.lastIndexOf('/') + 1) : 
                     page.name;
                 link.textContent = displayName;
                 link.className = 'child-page-link';
-                link.dataset.pageName = page.name;
                 item.appendChild(link);
                 list.appendChild(item);
             });

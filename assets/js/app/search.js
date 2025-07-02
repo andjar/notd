@@ -64,10 +64,12 @@ function displaySearchResults(results) {
             : '';
         
         return `
-            <div class="search-result-item" data-page-name="${result.page_name}">
-                <div class="search-result-title">${encryptedIcon}${result.page_name}</div>
-                ${parentPropsHtml}
-                <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.globalSearchInput.value)}</div>
+            <div class="search-result-item">
+                <a href="page.php?page=${encodeURIComponent(result.page_name)}" class="search-result-link">
+                    <div class="search-result-title">${encryptedIcon}${result.page_name}</div>
+                    ${parentPropsHtml}
+                    <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.globalSearchInput.value)}</div>
+                </a>
             </div>
         `;
     }).join('');
@@ -80,18 +82,7 @@ function displaySearchResults(results) {
         feather.replace();
     }
 
-    searchResultsEl.addEventListener('click', (e) => {
-        const resultItem = e.target.closest('.search-result-item');
-        if (resultItem) {
-            const pageName = resultItem.dataset.pageName;
-            
-            if (ui.domRefs.globalSearchInput) ui.domRefs.globalSearchInput.value = '';
-            searchResultsEl.classList.remove('has-results');
-            searchResultsEl.innerHTML = '';
-            
-            loadPage(pageName);
-        }
-    });
+    // No need for click handler - links will navigate directly
 }
 
 const debouncedSearch = debounce(async (query, includeParentProps = false) => {
@@ -186,9 +177,11 @@ function renderPageSearchResults(query) {
 
     filteredPages.slice(0, 10).forEach(page => {
         const li = document.createElement('li');
-        li.textContent = page.name;
-        li.dataset.pageName = page.name;
-        li.addEventListener('click', () => selectAndActionPageSearchResult(page.name, false));
+        const link = document.createElement('a');
+        link.href = `page.php?page=${encodeURIComponent(page.name)}`;
+        link.textContent = page.name;
+        link.className = 'page-search-result-link';
+        li.appendChild(link);
         ui.domRefs.pageSearchModalResults.appendChild(li);
     });
 
@@ -196,10 +189,11 @@ function renderPageSearchResults(query) {
     if (query.trim() !== '' && !exactMatch) {
         const li = document.createElement('li');
         li.classList.add('create-new-option');
-        li.innerHTML = `Create page: <span>"${query}"</span>`;
-        li.dataset.pageName = query;
-        li.dataset.isCreate = 'true';
-        li.addEventListener('click', () => selectAndActionPageSearchResult(query, true));
+        const link = document.createElement('a');
+        link.href = `page.php?page=${encodeURIComponent(query)}`;
+        link.innerHTML = `Create page: <span>"${query}"</span>`;
+        link.className = 'page-search-result-link create-new-link';
+        li.appendChild(link);
         ui.domRefs.pageSearchModalResults.appendChild(li);
     }
     

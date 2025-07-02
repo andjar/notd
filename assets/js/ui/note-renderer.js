@@ -794,7 +794,7 @@ function parseAndRenderContent(rawContent) {
         // Handle page links
         html = html.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
             const trimmedName = pageName.trim();
-            return `<span class="page-link-bracket">[[</span><a href="#" class="page-link" data-page-name="${trimmedName}">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
+            return `<span class="page-link-bracket">[[</span><a href="page.php?page=${encodeURIComponent(trimmedName)}" class="page-link">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
         });
 
         // Handle SQL Queries SQL{...} - This should happen before Markdown parsing of the query content itself.

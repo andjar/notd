@@ -1,5 +1,5 @@
-import { saveNoteImmediately } from '../app/note-actions.js';
-import { getRawTextWithNewlines, normalizeNewlines } from '../ui/note-renderer.js';
+import { saveNoteImmediately, handleNoteKeyDown } from '../app/note-actions.js';
+import { getRawTextWithNewlines, normalizeNewlines, switchToEditMode, switchToRenderedMode } from '../ui/note-renderer.js';
 
 /**
  * Alpine.js component for rendering and managing a single note.
@@ -55,19 +55,8 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
 
         switchToEditMode() {
             if (!this.contentEl) return;
-
-            let textToEdit = this.note.content || '';
-
-            this.contentEl.classList.remove('rendered-mode');
-            this.contentEl.classList.add('edit-mode');
-            this.contentEl.contentEditable = true;
-            this.contentEl.style.whiteSpace = 'pre-wrap';
-            this.contentEl.innerHTML = ''; // Clear HTML to set textContent
-            this.contentEl.textContent = textToEdit;
-            this.contentEl.focus();
-
-            // Re-attach event listeners for input, paste, etc. if needed
-            // For now, relying on delegated events or Alpine's x-on
+            // Use the UI module's switchToEditMode function
+            switchToEditMode(this.contentEl);
         },
 
         switchToRenderedMode() {
@@ -78,16 +67,14 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
             
             this.note.content = newContent; // Update the note data
             
-            this.contentEl.classList.remove('edit-mode');
-            this.contentEl.classList.add('rendered-mode');
-            this.contentEl.contentEditable = false;
-            this.contentEl.style.whiteSpace = '';
+            // Use the UI module's switchToRenderedMode function
+            switchToRenderedMode(this.contentEl);
 
-            // Re-render content via Alpine's x-html
-            // This will happen automatically when this.note.content changes
-
-            // Save the note
-            saveNoteImmediately(this.note);
+            // Save the note - find the note element and save it
+            const noteElement = this.contentEl.closest('.note-item');
+            if (noteElement) {
+                saveNoteImmediately(noteElement);
+            }
 
             this.isEditing = false;
         },
@@ -104,6 +91,11 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
             event.preventDefault();
             const text = (event.clipboardData || window.clipboardData).getData('text');
             document.execCommand('insertText', false, text);
+        },
+
+        handleNoteKeyDown(event) {
+            // Call the imported handleNoteKeyDown function
+            return handleNoteKeyDown(event);
         }
     }
 }

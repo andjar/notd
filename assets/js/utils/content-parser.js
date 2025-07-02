@@ -56,8 +56,15 @@ export function parseContent(text) {
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
     // Code: `code`
     html = html.replace(/`(.*?)`/g, '<code>$1</code>');
-    // Links: [title](url)
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    // Links: [title](url) - handle both external links and page links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, title, url) => {
+        // If it's a page link (no protocol), make it a page.php link
+        if (!url.match(/^https?:\/\//) && !url.match(/^mailto:/) && !url.match(/^#/)) {
+            return `<a href="page.php?page=${encodeURIComponent(url)}" class="page-link">${title}</a>`;
+        }
+        // Otherwise, treat as external link
+        return `<a href="${url}" target="_blank">${title}</a>`;
+    });
     // Newlines to <br>
     html = html.replace(/\n/g, '<br>');
 

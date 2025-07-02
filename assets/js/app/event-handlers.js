@@ -37,8 +37,6 @@ export function initGlobalEventListeners() {
 
     // Handle splash screen toggle button
     document.addEventListener('click', (e) => {
-
-        // Handle splash screen toggle button
         const toggleSplashBtn = e.target.closest('#toggle-splash-btn');
         if (toggleSplashBtn) {
             e.preventDefault();

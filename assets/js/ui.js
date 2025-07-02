@@ -106,8 +106,7 @@ function updatePageList(pages, activePageName) {
    recentPages.forEach((page) => {
     const listItem = document.createElement("li");
     const link = document.createElement("a");
-    link.href = "#";
-    link.dataset.pageName = page.name;
+    link.href = `page.php?page=${encodeURIComponent(page.name)}`;
     link.className = "recent-page-link";
 
     // Add active class if this is the current page
@@ -128,16 +127,7 @@ function updatePageList(pages, activePageName) {
     link.appendChild(nameSpan);
     listItem.appendChild(link);
     listContainer.appendChild(listItem);
-    // ✅ Add click handler here!
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      const pageName = event.currentTarget.dataset.pageName;
-
-      // Load page when recent page is clicked
-
-      updateActivePageLink(pageName); // Highlight the clicked link
-      // Load page content
-    });
+    // No need for click handler - direct href navigation
   });
 
     domRefs.pageListContainer.appendChild(listContainer);

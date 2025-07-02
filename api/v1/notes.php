@@ -293,7 +293,7 @@ if (!function_exists('_handleBatchOperations')) {
             }
             
             foreach ($createOps as $op) {
-                $result = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap, $includeParentProperties);
+                $result = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
                 $results[] = $result;
                 if ($result['status'] === 'error') {
                     error_log("Batch create operation failed: " . json_encode($result));
@@ -301,7 +301,7 @@ if (!function_exists('_handleBatchOperations')) {
             }
             
             foreach ($updateOps as $op) {
-                $result = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap, $includeParentProperties);
+                $result = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
                 $results[] = $result;
                 if ($result['status'] === 'error') {
                     error_log("Batch update operation failed: " . json_encode($result));

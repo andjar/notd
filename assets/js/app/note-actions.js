@@ -166,7 +166,7 @@ async function _saveNoteToServer(noteId, rawContent) {
 
     const operations = [{
         type: 'update',
-        payload: { id: noteId, content: contentToSave, is_encrypted: isEncrypted }
+        payload: { id: noteId, content: contentToSave }
     }];
 
     const success = await executeBatchOperations(originalNotesState, operations, null, "Save Note Content");
@@ -217,7 +217,7 @@ export async function handleAddRootNote() {
         isEncrypted = true;
     }
 
-    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     siblingUpdates.forEach(upd => {
@@ -267,7 +267,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
         isEncrypted = true;
     }
     
-    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, is_encrypted: isEncrypted, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
     siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     // **OPTIMIZATION**: Update sibling order indices immediately
@@ -368,9 +368,9 @@ function createOptimisticNoteElement(noteData, parentId) {
         contentEl.dataset.rawContent = rawContent;
         
         // Update the note data in the store
-        const noteData = getNoteDataById(noteData.id);
-        if (noteData) {
-            noteData.content = rawContent;
+        const note = getNoteDataById(noteData.id);
+        if (note) {
+            note.content = rawContent;
         }
     });
     
@@ -902,7 +902,6 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
         payload: { 
             page_id: appStore.currentPageId, 
             content: contentForServer, 
-            is_encrypted: isEncrypted, 
             parent_note_id: noteData.id, 
             order_index: targetOrderIndex, 
             client_temp_id: clientTempId 

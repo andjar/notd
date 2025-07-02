@@ -684,6 +684,18 @@ body {
   line-height: 1.4;
 }
 
+.search-result-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: all var(--ls-transition-fast);
+}
+
+.search-result-link:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
 /* New Page Form */
 .new-page-form {
   display: flex;
@@ -1985,10 +1997,32 @@ textarea:focus {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 .page-search-results-list li {
-  padding: var(--ls-space-3) var(--ls-space-4);
+  padding: 0;
   border-bottom: 1px solid var(--ls-secondary-border-color);
-  cursor: pointer;
   transition: all var(--ls-transition-fast);
+}
+
+.page-search-results-list li:last-child {
+  border-bottom: none;
+}
+
+.page-search-result-link {
+  display: block;
+  padding: var(--ls-space-3) var(--ls-space-4);
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  transition: all var(--ls-transition-fast);
+}
+
+.page-search-result-link:hover {
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+}
+
+.create-new-link {
+  color: var(--ls-accent-9);
+  font-style: italic;
 }
 .page-search-results-list li:last-child {
   border-bottom: none;
@@ -4134,6 +4168,22 @@ ul.child-page-list li:last-child {
 .page-title-gear:hover {
   color: var(--ls-primary-text-color);
   background: var(--ls-secondary-background-color);
+}
+
+/* Namespace links in page title */
+.namespace-link {
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  transition: color var(--ls-transition-fast);
+}
+
+.namespace-link:hover {
+  color: var(--ls-primary-color);
+  text-decoration: underline;
+}
+
+.namespace-link:visited {
+  color: var(--ls-primary-text-color);
 }
 
 /* Favorites and Backlinks in Right Sidebar */

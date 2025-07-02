@@ -66,10 +66,10 @@ if ($pdo) {
         $stmt->execute();
         $favorites = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Get child pages
+        // Get child pages (direct children only)
         $prefix = rtrim($pageName, '/') . '/';
-        $stmt = $pdo->prepare("SELECT id, name, updated_at FROM Pages WHERE LOWER(name) LIKE LOWER(?) || '%' AND SUBSTR(LOWER(name), LENGTH(LOWER(?)) + 1) NOT LIKE '%/%' AND active = 1 ORDER BY name ASC");
-        $stmt->execute([$prefix, $prefix]);
+        $stmt = $pdo->prepare("SELECT id, name, updated_at FROM Pages WHERE LOWER(name) LIKE LOWER(?) || '%' AND LOWER(name) != LOWER(?) AND SUBSTR(LOWER(name), LENGTH(LOWER(?)) + 1) NOT LIKE '%/%' AND active = 1 ORDER BY name ASC");
+        $stmt->execute([$prefix, $pageName, $prefix]);
         $childPages = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get backlinks
@@ -117,6 +117,34 @@ $renderInternal = PROPERTY_WEIGHTS[3]['visible_in_view_mode'] ?? false;
 $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
 
 // --- Helper Functions for Rendering ---
+function renderPageTitle($pageName) {
+    if (strpos($pageName, '/') === false) {
+        // No namespace, just return the page name
+        return htmlspecialchars($pageName);
+    }
+    
+    // Split by namespace separator
+    $parts = explode('/', $pageName);
+    $html = '';
+    
+    for ($i = 0; $i < count($parts); $i++) {
+        if ($i > 0) {
+            $html .= ' / ';
+        }
+        
+        if ($i === count($parts) - 1) {
+            // Last part (current page) - no link
+            $html .= htmlspecialchars($parts[$i]);
+        } else {
+            // Build the namespace path up to this point
+            $namespacePath = implode('/', array_slice($parts, 0, $i + 1));
+            $html .= '<a href="page.php?page=' . urlencode($namespacePath) . '" class="namespace-link">' . htmlspecialchars($parts[$i]) . '</a>';
+        }
+    }
+    
+    return $html;
+}
+
 function renderPageProperties($properties, $renderInternal = false) {
     if (empty($properties)) return '';
     
@@ -181,7 +209,10 @@ function renderFavorites($favorites, $currentPageName) {
 function renderChildPages($childPages) {
     $html = '<h3>Child Pages</h3><ul class="child-page-list">';
     foreach ($childPages as $page) {
-        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="child-page-link">' . htmlspecialchars($page['name']) . '</a></li>';
+        $displayName = strpos($page['name'], '/') !== false ? 
+            substr($page['name'], strrpos($page['name'], '/') + 1) : 
+            $page['name'];
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="child-page-link">' . htmlspecialchars($displayName) . '</a></li>';
     }
     $html .= '</ul>';
     return $html;
@@ -354,7 +385,7 @@ function renderBacklinks($backlinks) {
         <div id="main-content" class="main-content">
             <div class="page-title-container">
                 <h1 id="page-title" class="page-title">
-                    <span class="page-title-content"><?php echo htmlspecialchars($pageName); ?></span>
+                    <span class="page-title-content"><?php echo renderPageTitle($pageName); ?></span>
                 </h1>
                 <?php echo renderPageProperties($pageProperties, $renderInternal); ?>
             </div>
@@ -387,7 +418,8 @@ function renderBacklinks($backlinks) {
                                     @click="editNote()"
                                     @blur="isEditing = false"
                                     @input="handleInput($event)"
-                                    @paste="handlePaste($event)">
+                                    @paste="handlePaste($event)"
+                                    @keydown="handleNoteKeyDown($event)">
                                 </div>
                                 <div class="note-attachments"></div>
                             </div>
@@ -418,7 +450,8 @@ function renderBacklinks($backlinks) {
                                                 @click="editNote()"
                                                 @blur="isEditing = false"
                                                 @input="handleInput($event)"
-                                                @paste="handlePaste($event)">
+                                                @paste="handlePaste($event)"
+                                                @keydown="handleNoteKeyDown($event)">
                                             </div>
                                             <div class="note-attachments"></div>
                                         </div>
@@ -450,7 +483,8 @@ function renderBacklinks($backlinks) {
                                                             @click="editNote()"
                                                             @blur="isEditing = false"
                                                             @input="handleInput($event)"
-                                                            @paste="handlePaste($event)">
+                                                            @paste="handlePaste($event)"
+                                                            @keydown="handleNoteKeyDown($event)">
                                                         </div>
                                                         <div class="note-attachments"></div>
                                                     </div>
