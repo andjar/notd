@@ -6,50 +6,194 @@
     <title>Attachments Dashboard</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 </head>
 <body>
-    <div class="container">
+    <div class="container" x-data="attachmentsDashboard()">
         <h1>Attachments Dashboard</h1>
 
         <div class="controls">
-            <input type="text" id="search-bar" placeholder="Search by name...">
-            <select id="type-filter">
+            <input type="text" id="search-bar" placeholder="Search by name..." x-model.debounce.300ms="searchTerm" @input="fetchAttachments(true)">
+            <select id="type-filter" x-model="filterType" @change="fetchAttachments(true)">
                 <option value="">All Types</option>
-                <!-- Common types as placeholders -->
-                <option value="image/jpeg">JPEG Image</option>
-                <option value="image/png">PNG Image</option>
-                <option value="application/pdf">PDF</option>
-                <option value="text/plain">Text File</option>
-                <option value="application/msword">MS Word Document</option>
-                <option value="application/vnd.openxmlformats-officedocument.wordprocessingml.document">MS Word Document (DOCX)</option>
-                <!-- Options will be populated dynamically by JS -->
+                <template x-for="type in uniqueTypes" :key="type">
+                    <option :value="type" x-text="type"></option>
+                </template>
             </select>
         </div>
 
-        <table id="attachments-table">
+        <div x-show="isLoading" class="loading-indicator">Loading attachments...</div>
+        <div x-show="errorMessage" class="error-message" x-text="errorMessage"></div>
+
+        <table id="attachments-table" x-show="!isLoading && !errorMessage && attachments.length > 0">
             <thead>
                 <tr>
-                    <th data-sort="name">Name</th>
-                    <th data-sort="size">Size</th>
-                    <th data-sort="type">Type</th>
-                    <th data-sort="created_at">Date Uploaded</th>
+                    <th @click="updateSort('name')" :class="{ 'sort-asc': sortBy === 'name' && sortOrder === 'asc', 'sort-desc': sortBy === 'name' && sortOrder === 'desc' }">Name</th>
+                    <th @click="updateSort('size')" :class="{ 'sort-asc': sortBy === 'size' && sortOrder === 'asc', 'sort-desc': sortBy === 'size' && sortOrder === 'desc' }">Size</th>
+                    <th @click="updateSort('type')" :class="{ 'sort-asc': sortBy === 'type' && sortOrder === 'asc', 'sort-desc': sortBy === 'type' && sortOrder === 'desc' }">Type</th>
+                    <th @click="updateSort('created_at')" :class="{ 'sort-asc': sortBy === 'created_at' && sortOrder === 'asc', 'sort-desc': sortBy === 'created_at' && sortOrder === 'desc' }">Date Uploaded</th>
                     <th>Preview/Link</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td colspan="5">Loading attachments...</td>
-                </tr>
+                <template x-for="att in attachments" :key="att.id || att.name">
+                    <tr>
+                        <td data-label="Name" x-text="att.name"></td>
+                        <td data-label="Size" x-text="formatFileSize(att.size)"></td>
+                        <td data-label="Type" x-text="att.type"></td>
+                        <td data-label="Date Uploaded" x-text="formatDate(att.created_at)"></td>
+                        <td data-label="Preview/Link">
+                            <a :href="att.url" target="_blank">View/Download</a>
+                            <template x-if="att.type && att.type.startsWith('image/')">
+                                <img :src="att.url" :alt="att.name + ' preview'" class="attachment-preview-image">
+                            </template>
+                        </td>
+                    </tr>
+                </template>
             </tbody>
         </table>
 
-        <div class="pagination">
-            <button id="prev-page" disabled>Previous</button>
-            <span id="page-info">Page 1 of 1</span>
-            <button id="next-page" disabled>Next</button>
+        <div x-show="!isLoading && !errorMessage && attachments.length === 0 && !initialLoad" class="no-results">
+            No attachments found matching your criteria.
+        </div>
+
+        <div class="pagination" x-show="!isLoading && !errorMessage && attachments.length > 0">
+            <button id="prev-page" @click="changePage(currentPage - 1)" :disabled="currentPage <= 1">Previous</button>
+            <span id="page-info" x-text="`Page ${currentPage} of ${totalPages || 1}`"></span>
+            <button id="next-page" @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages">Next</button>
         </div>
     </div>
 
-    <script src="main.js" type="module"></script>
+    <script type="module">
+        import { attachmentsAPI } from './api_client.js';
+
+        function attachmentsDashboard() {
+            return {
+                attachments: [],
+                currentPage: 1,
+                sortBy: 'created_at',
+                sortOrder: 'desc',
+                searchTerm: '',
+                filterType: '',
+                perPage: 10,
+                totalPages: 1,
+                isLoading: true,
+                initialLoad: true, // To prevent "no results" on first load before data comes
+                errorMessage: '',
+                uniqueTypes: [],
+
+                init() {
+                    this.fetchAttachments();
+                    // Populate some default common types, API will add more if found
+                    this.uniqueTypes = ['image/jpeg', 'image/png', 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+                },
+
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    if (!bytes || isNaN(bytes)) return 'N/A';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return 'N/A';
+                    try {
+                        const date = new Date(dateString);
+                        if (isNaN(date.getTime())) return 'Invalid Date';
+                        return date.toISOString().split('T')[0] + ' ' + date.toTimeString().split(' ')[0];
+                    } catch (e) {
+                        return 'Invalid Date';
+                    }
+                },
+
+                async fetchAttachments(resetPage = false) {
+                    if (resetPage) {
+                        this.currentPage = 1;
+                    }
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    const params = {
+                        page: this.currentPage,
+                        sort_by: this.sortBy,
+                        sort_order: this.sortOrder,
+                        per_page: this.perPage,
+                    };
+                    if (this.searchTerm) {
+                        params.filter_by_name = this.searchTerm;
+                    }
+                    if (this.filterType) {
+                        params.filter_by_type = this.filterType;
+                    }
+
+                    console.log("Fetching with params:", params);
+
+                    try {
+                        const response = await attachmentsAPI.getAllAttachments(params);
+                        console.log("API Response:", response);
+
+                        if (!response) {
+                            throw new Error('No response received from API client.');
+                        }
+                        if (response.status === 'error') {
+                            throw new Error(response.message || 'An unknown API error occurred.');
+                        }
+                        if (!response.data || !response.data.data || !response.data.pagination) {
+                            throw new Error('Invalid data format received from server.');
+                        }
+
+                        this.attachments = response.data.data;
+                        const pagination = response.data.pagination;
+                        this.currentPage = pagination.current_page;
+                        this.totalPages = pagination.total_pages || 1;
+
+                        // Update unique types for filter dropdown
+                        if (this.attachments.length > 0) {
+                            const currentTypes = new Set(this.uniqueTypes);
+                            this.attachments.forEach(att => {
+                                if (att.type && !currentTypes.has(att.type)) {
+                                    this.uniqueTypes.push(att.type);
+                                    currentTypes.add(att.type); // Keep track of added types to avoid duplicates if API returns same types often
+                                }
+                            });
+                            // Optional: Sort uniqueTypes alphabetically
+                            // this.uniqueTypes.sort();
+                        }
+                        this.initialLoad = false;
+
+                    } catch (error) {
+                        console.error('Error fetching attachments:', error.message, error.response || error);
+                        this.errorMessage = error.message || 'A client-side error occurred. Check console.';
+                        this.attachments = [];
+                        this.totalPages = 1;
+                        this.currentPage = 1;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                updateSort(newSortBy) {
+                    if (this.sortBy === newSortBy) {
+                        this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        this.sortBy = newSortBy;
+                        this.sortOrder = 'desc';
+                    }
+                    this.fetchAttachments(true); // Reset to page 1 on sort
+                },
+
+                changePage(newPage) {
+                    if (newPage >= 1 && newPage <= this.totalPages) {
+                        this.currentPage = newPage;
+                        this.fetchAttachments();
+                    }
+                }
+            }
+        }
+        // Make the function globally available for Alpine to use
+        window.attachmentsDashboard = attachmentsDashboard;
+    </script>
 </body>
 </html>
