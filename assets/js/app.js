@@ -180,6 +180,7 @@ import {
 
 // App initialization
 import { initializeApp } from './app/app-init.js';
+import { initGlobalSearch, initPageSearchModal, initNoteSearchModal } from './app/search.js';
 
 // --- Global Function Exposure ---
 window.displayPageProperties = displayPagePropertiesFromEditor;
@@ -284,6 +285,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         initPropertyEditor(); // Initialize listeners for the property modal
         ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
         initializeTemplateHandling(); // Initialize template functionality
+
+        // Initialize search modals
+        initGlobalSearch(); // Already existed, ensure it's called if not already
+        initPageSearchModal(); // Already existed, ensure it's called if not already
+        initNoteSearchModal(); // Initialize our new note search modal
+
         // feather.replace(); // Initialize feather icons after DOM is ready
         
         // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.

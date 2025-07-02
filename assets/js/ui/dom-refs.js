@@ -42,6 +42,12 @@ export const domRefs = {
     passwordSubmit: document.getElementById('password-submit'),
     passwordCancel: document.getElementById('password-cancel'),
 
+    // Note Search Modal
+    noteSearchModal: document.getElementById('note-search-modal'),
+    noteSearchModalInput: document.getElementById('note-search-modal-input'),
+    noteSearchModalResults: document.getElementById('note-search-modal-results'),
+    noteSearchModalCancel: document.getElementById('note-search-modal-cancel'),
+
     // Encryption Modal Elements
     encryptionPasswordModal: document.getElementById('encryption-password-modal'),
     encryptionModalClose: document.getElementById('encryption-modal-close'),
