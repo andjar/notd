@@ -687,6 +687,12 @@ body {
   text-decoration: none;
 }
 
+.search-result-page-name {
+  color: var(--ls-secondary-text-color);
+  font-size: 0.9em; /* Slightly smaller */
+  opacity: 0.8;
+}
+
 /* New Page Form */
 .new-page-form {
   display: flex;

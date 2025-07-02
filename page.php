@@ -622,6 +622,17 @@ function renderBacklinks($backlinks) {
             </div>
         </div>
     </div>
+
+    <!-- Note Search Modal -->
+    <div id="note-search-modal" class="generic-modal">
+        <div class="generic-modal-content page-search-modal-styling"> <!-- Reusing styling for now -->
+            <input type="text" id="note-search-modal-input" class="generic-modal-input-field" placeholder="Search notes...">
+            <ul id="note-search-modal-results" class="page-search-results-list"></ul> <!-- Reusing styling for now -->
+            <div class="generic-modal-actions">
+                <button id="note-search-modal-cancel" class="button secondary-button">Cancel</button>
+            </div>
+        </div>
+    </div>
     
     <div id="image-viewer-modal" class="generic-modal image-viewer">
         <div class="generic-modal-content">

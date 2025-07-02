@@ -294,3 +294,178 @@ export function initPageSearchModal() {
         }
     });
 }
+
+// --- Note Search Modal ---
+
+let noteSearchSelectedResultIndex = -1;
+
+function openNoteSearchModal() {
+    if (!ui.domRefs.noteSearchModal) return;
+    ui.domRefs.noteSearchModalInput.value = '';
+    if (ui.domRefs.noteSearchModalResults) ui.domRefs.noteSearchModalResults.innerHTML = '';
+    noteSearchSelectedResultIndex = -1;
+    ui.domRefs.noteSearchModal.classList.add('active');
+    ui.domRefs.noteSearchModalInput.focus();
+}
+
+function closeNoteSearchModal() {
+    if (ui.domRefs.noteSearchModal) ui.domRefs.noteSearchModal.classList.remove('active');
+    noteSearchSelectedResultIndex = -1;
+}
+
+function renderNoteSearchResults(results) {
+    const searchResultsEl = ui.domRefs.noteSearchModalResults;
+    if (!searchResultsEl) return;
+
+    searchResultsEl.innerHTML = ''; // Clear previous results
+    noteSearchSelectedResultIndex = -1;
+
+    if (!results || results.length === 0) {
+        searchResultsEl.innerHTML = '<li class="no-results-item">No notes found</li>';
+        return;
+    }
+
+    const html = results.map(result => {
+        let snippet = result.content_snippet || result.content; // Fallback to full content if snippet is missing
+        let isEncrypted = false;
+
+        const isEncryptedInProps = (props) => props && Array.isArray(props.encrypted) &&
+            props.encrypted.some(p => String(p.value).toLowerCase() === 'true');
+
+        isEncrypted = isEncryptedInProps(result.properties) ||
+                     isEncryptedInProps(result.parent_properties);
+
+        if (isEncrypted) {
+            const password = getCurrentPagePassword(); // Assuming this function is available and works
+            if (password) {
+                try {
+                    snippet = decrypt(snippet, password); // Assuming decrypt is available
+                    if (snippet === null) {
+                        snippet = '[DECRYPTION FAILED]';
+                    }
+                } catch (e) {
+                    console.error('Failed to decrypt search result snippet:', e);
+                    snippet = '[DECRYPTION FAILED]';
+                }
+            } else {
+                snippet = '[ENCRYPTED CONTENT - Enter password to view]';
+            }
+        }
+
+        const encryptedIcon = isEncrypted ? '<i data-feather="lock" class="encrypted-icon"></i> ' : '';
+        const pageNamePrefix = result.page_name ? `<span class="search-result-page-name">${result.page_name}</span> > ` : '';
+
+        // Use result.note_id for data-note-id if available, otherwise it's a page result from global search
+        const noteIdAttr = result.note_id ? `data-note-id="${result.note_id}"` : '';
+
+        return `
+            <li class="page-search-result-item" data-page-name="${encodeURIComponent(result.page_name)}" ${noteIdAttr}>
+                <a href="page.php?page=${encodeURIComponent(result.page_name)}" class="page-search-result-link">
+                    <div class="search-result-title">${pageNamePrefix}${encryptedIcon}${highlightSearchTerms(result.content.split('\\n')[0], ui.domRefs.noteSearchModalInput.value)}</div>
+                    <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.noteSearchModalInput.value)}</div>
+                </a>
+            </li>
+        `;
+    }).join('');
+
+    searchResultsEl.innerHTML = html;
+
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
+
+    if (searchResultsEl.children.length > 0) {
+        noteSearchSelectedResultIndex = 0;
+        searchResultsEl.children[0].classList.add('selected');
+    }
+}
+
+const debouncedNoteSearch = debounce(async (query) => {
+    const searchResultsEl = ui.domRefs.noteSearchModalResults;
+    if (!searchResultsEl) return;
+
+    if (!query.trim()) {
+        searchResultsEl.innerHTML = '';
+        noteSearchSelectedResultIndex = -1;
+        return;
+    }
+
+    try {
+        // For note search, we don't need includeParentProps typically, but the API might handle it.
+        // The main goal is to search note content.
+        const response = await searchAPI.search(query, { includeParentProps: false }); // or true, depending on desired behavior
+        if (response && Array.isArray(response.results)) {
+            renderNoteSearchResults(response.results);
+        } else {
+            console.warn('Note Search API returned unexpected format:', response);
+            renderNoteSearchResults([]);
+        }
+    } catch (error) {
+        console.error('Note search error:', error);
+        searchResultsEl.innerHTML = '<li class="search-result-item error-item">Error performing search</li>';
+    }
+}, 300);
+
+export function initNoteSearchModal() {
+    if (ui.domRefs.noteSearchModal && ui.domRefs.noteSearchModalInput && ui.domRefs.noteSearchModalCancel && ui.domRefs.noteSearchModalResults) {
+        safeAddEventListener(ui.domRefs.noteSearchModalInput, 'input', (e) => {
+            debouncedNoteSearch(e.target.value);
+        }, 'noteSearchModalInput');
+
+        safeAddEventListener(ui.domRefs.noteSearchModalInput, 'keydown', (e) => {
+            const items = ui.domRefs.noteSearchModalResults.children;
+            if (items.length === 0 && e.key !== 'Escape') return;
+
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (noteSearchSelectedResultIndex < items.length - 1) {
+                        items[noteSearchSelectedResultIndex]?.classList.remove('selected');
+                        noteSearchSelectedResultIndex++;
+                        items[noteSearchSelectedResultIndex]?.classList.add('selected');
+                        items[noteSearchSelectedResultIndex]?.scrollIntoView({ block: 'nearest' });
+                    }
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (noteSearchSelectedResultIndex > 0) {
+                        items[noteSearchSelectedResultIndex]?.classList.remove('selected');
+                        noteSearchSelectedResultIndex--;
+                        items[noteSearchSelectedResultIndex]?.classList.add('selected');
+                        items[noteSearchSelectedResultIndex]?.scrollIntoView({ block: 'nearest' });
+                    }
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (noteSearchSelectedResultIndex > -1 && items[noteSearchSelectedResultIndex]) {
+                        const selectedLink = items[noteSearchSelectedResultIndex].querySelector('a');
+                        if (selectedLink && selectedLink.href) {
+                            window.location.href = selectedLink.href; // Navigate to the page
+                            closeNoteSearchModal();
+                        }
+                    }
+                    break;
+                case 'Escape':
+                    closeNoteSearchModal();
+                    break;
+            }
+        });
+
+        safeAddEventListener(ui.domRefs.noteSearchModalCancel, 'click', closeNoteSearchModal, 'noteSearchModalCancel');
+
+        // Global listener for Shift+Space
+        document.addEventListener('keydown', (e) => {
+            if (e.shiftKey && e.code === 'Space') {
+                // Prevent default browser behavior for Shift+Space (e.g., page scroll)
+                // And prevent triggering if an input/textarea is focused
+                if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
+                    return;
+                }
+                e.preventDefault();
+                openNoteSearchModal();
+            }
+        });
+    } else {
+        console.warn("Note Search Modal elements not fully found in domRefs. Initialization skipped.");
+    }
+}
