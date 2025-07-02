@@ -1612,13 +1612,7 @@ function initializeDelegatedNoteEventListeners(notesContainerEl) {
             return;
         }
 
-        // Page link click
-        const pageLink = target.closest('a.page-link');
-        if (pageLink && pageLink.dataset.pageName) {
-            event.preventDefault();
-            window.loadPage(pageLink.dataset.pageName);
-            return;
-        }
+
     });
 
     notesContainerEl.addEventListener('contextmenu', (event) => {

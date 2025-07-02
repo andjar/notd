@@ -12,7 +12,9 @@ import { ui } from '../ui.js';
 import { parseProperties, parseContent, cleanProperties } from '../utils/content-parser.js';
 import { handleNoteAction } from './note-actions.js';
 import { promptForPagePassword } from '../ui.js';
-import { updatePageMetadata } from './page-metadata-updater.js';
+import { pageCache } from './page-cache.js';
+import { recentHistory } from './recent-history.js';
+import { calendarCache } from './calendar-cache.js';
 
 // --- Restored Utility Functions ---
 export function getPreviousDayPageName(currentDateStr) {
@@ -347,26 +349,20 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     }
 }
 
-async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
+async function _processAndRenderPage(pageData, focusFirstNote) {
     const appStore = getAppStore();
     appStore.setCurrentPageName(pageData.name);
     appStore.setCurrentPageId(pageData.id);
     appStore.setNotes(pageData.notes || []);
     appStore.setPagePassword(null); // Reset password for new page
 
-    if (updateHistory) {
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.set('page', pageData.name);
-        history.pushState({ pageName: pageData.name }, '', newUrl.toString());
-    }
+    // Add to recent history
+    recentHistory.addPage(pageData.name);
 
     ui.updatePageTitle(pageData.name);
-    if (ui.calendarWidget && ui.calendarWidget.setCurrentPage) ui.calendarWidget.setCurrentPage(pageData.name);
+    // Calendar current page is handled by Alpine.js component
     
     const pageProperties = pageData.properties || {};
-    
-    // Update page metadata elements (title, properties, sidebars, etc.)
-    await updatePageMetadata(pageData.name);
     
     await _renderPageContent(pageData, pageProperties, focusFirstNote);
 }
@@ -379,6 +375,11 @@ async function _fetchPageFromNetwork(pageName) {
         if (String(error.message).includes('404')) {
              console.warn(`Page "${pageName}" not found, creating it.`);
              pageDetails = await pagesAPI.createPage(pageName);
+             
+             // Add new page to calendar cache if it's a date-based page
+             if (pageDetails && pageDetails.id) {
+                 calendarCache.addPage(pageDetails);
+             }
         } else {
             console.error(`Fatal: Failed to GET page "${pageName}":`, error);
             throw error;
@@ -398,42 +399,35 @@ async function _fetchPageFromNetwork(pageName) {
     // This check is now mostly for safety, as `notes` is explicitly assigned above.
     combinedPageData.notes = Array.isArray(combinedPageData.notes) ? combinedPageData.notes : [];
     
-    const appStore = getAppStore();
-    appStore.setPageCache(pageName, { ...combinedPageData, timestamp: Date.now() });
+    // Cache the page data for future loads
+    pageCache.setPage(pageName, combinedPageData);
+    
     return combinedPageData;
 }
 
-export async function loadPage(pageName, focusFirstNote = false, updateHistory = true, providedPageData = null) {
+export async function loadPage(pageName, focusFirstNote = false, providedPageData = null) {
     if (window.blockPageLoad) return;
     window.blockPageLoad = true;
     
     pageName = pageName || getInitialPage();
 
-    // Remove manual splash screen class manipulation - let Alpine.js handle it
-    // const splashScreen = document.getElementById('splash-screen');
-    // if (splashScreen) {
-    //     splashScreen.classList.add('hidden');
-    //     if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
-    //         window.splashAnimations.stop();
-    //     }
-    // }
-
     try {
         let pageData = providedPageData;
-        const appStore = getAppStore();
-        const cachedPage = appStore.getPageCache(pageName);
-
-        if (!pageData && cachedPage && (Date.now() - cachedPage.timestamp < appStore.CACHE_MAX_AGE_MS)) {
-            pageData = cachedPage;
+        
+        // Check localStorage cache first
+        if (!pageData) {
+            pageData = pageCache.getPage(pageName);
         }
         
         if (!pageData) {
             console.log('[page-loader] Attempting to show loading message. notesContainer:', ui.domRefs.notesContainer);
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
             pageData = await _fetchPageFromNetwork(pageName);
+        } else {
+            console.log('[page-loader] Using cached page data for:', pageName);
         }
         
-        await _processAndRenderPage(pageData, updateHistory, focusFirstNote);
+        await _processAndRenderPage(pageData, focusFirstNote);
     } catch (error) {
         console.error('[page-loader] Error object received:', error);
         console.error(`Error loading page ${pageName}:`, error);

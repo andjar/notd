@@ -152,7 +152,7 @@ function renderRecentPages($pages, $currentPageName) {
     $html = '<ul class="recent-pages-list">';
     foreach ($pages as $page) {
         $isActive = ($page['name'] === $currentPageName) ? ' active' : '';
-        $html .= '<li><a href="#" class="recent-page-link' . $isActive . '" data-page-name="' . htmlspecialchars($page['name']) . '">';
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="recent-page-link' . $isActive . '">';
         $html .= '<i data-feather="file-text" class="recent-page-icon"></i>';
         $html .= '<span class="recent-page-name">' . htmlspecialchars($page['name']) . '</span>';
         $html .= '</a></li>';
@@ -169,7 +169,7 @@ function renderFavorites($favorites, $currentPageName) {
     $html = '<ul class="favorites-list">';
     foreach ($favorites as $page) {
         $isActive = ($page['name'] === $currentPageName) ? ' active' : '';
-        $html .= '<li><a href="#" class="favorite-page-link' . $isActive . '" data-page-name="' . htmlspecialchars($page['name']) . '">';
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="favorite-page-link' . $isActive . '">';
         $html .= '<i data-feather="star" class="favorite-page-icon"></i>';
         $html .= '<span class="favorite-page-name">' . htmlspecialchars($page['name']) . '</span>';
         $html .= '</a></li>';
@@ -181,7 +181,7 @@ function renderFavorites($favorites, $currentPageName) {
 function renderChildPages($childPages) {
     $html = '<h3>Child Pages</h3><ul class="child-page-list">';
     foreach ($childPages as $page) {
-        $html .= '<li><a href="#" class="child-page-link" data-page-name="' . htmlspecialchars($page['name']) . '">' . htmlspecialchars($page['name']) . '</a></li>';
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="child-page-link">' . htmlspecialchars($page['name']) . '</a></li>';
     }
     $html .= '</ul>';
     return $html;
@@ -197,7 +197,7 @@ function renderChildPagesSidebar($childPages) {
         $displayName = strpos($page['name'], '/') !== false ? 
             substr($page['name'], strrpos($page['name'], '/') + 1) : 
             $page['name'];
-        $html .= '<li><a href="#" class="child-page-sidebar-link" data-page-name="' . htmlspecialchars($page['name']) . '">';
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="child-page-sidebar-link">';
         $html .= '<i data-feather="file-text" class="child-page-sidebar-icon"></i>';
         $html .= '<span class="child-page-sidebar-name">' . htmlspecialchars($displayName) . '</span>';
         $html .= '</a></li>';
@@ -216,7 +216,7 @@ function renderBacklinks($backlinks) {
         $snippet = substr($link['content'], 0, 100);
         if (strlen($link['content']) > 100) $snippet .= '...';
         
-        $html .= '<a href="#" class="backlink-item" data-page-name="' . htmlspecialchars($link['page_name']) . '">';
+        $html .= '<a href="page.php?page=' . urlencode($link['page_name']) . '" class="backlink-item">';
         $html .= '<i data-feather="link" class="backlink-icon"></i>';
         $html .= '<div class="backlink-content">';
         $html .= '<span class="backlink-name">' . htmlspecialchars($link['page_name']) . '</span>';
@@ -324,7 +324,7 @@ function renderBacklinks($backlinks) {
                             </div>
                             <div id="calendar-days-grid" class="calendar-grid calendar-days">
                                 <template x-for="(day,index) in days" :key="index">
-                                    <div class="calendar-day" :class="{ 'empty': day.empty, 'today': day.today, 'has-content': day.hasPage }" x-text="day.empty ? '' : day.day" @click="dayClick(day)"></div>
+                                    <div class="calendar-day" :class="{ 'empty': day.empty, 'today': day.today, 'has-content': day.hasPage, 'current-page': day.isCurrentPage }" x-text="day.empty ? '' : day.day" @click="dayClick(day)"></div>
                                 </template>
                             </div>
                         </div>

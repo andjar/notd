@@ -1,18 +1,10 @@
 // assets/js/app/event-handlers.js (No changes needed, just verification)
 
-import { loadPage, getNextDayPageName, getPreviousDayPageName } from './page-loader.js';
+import { getNextDayPageName, getPreviousDayPageName } from './page-loader.js';
 import { currentPageName } from './state.js';
 import { ui } from '../ui.js';
 
 export function initGlobalEventListeners() {
-    // Handle browser back/forward navigation
-    window.addEventListener('popstate', (event) => {
-        if (event.state && event.state.pageName) {
-            // Load the page without adding a new history entry
-            loadPage(event.state.pageName, false, false);
-        }
-    });
-
     // Global Keyboard Shortcuts
     document.addEventListener('keydown', (e) => {
         // Journal navigation shortcuts
@@ -22,11 +14,11 @@ export function initGlobalEventListeners() {
                 if (e.key === 'ArrowRight') {
                     e.preventDefault();
                     const nextPage = getNextDayPageName(currentPageName);
-                    loadPage(nextPage);
+                    window.location.href = `page.php?page=${encodeURIComponent(nextPage)}`;
                 } else if (e.key === 'ArrowLeft') {
                     e.preventDefault();
                     const prevPage = getPreviousDayPageName(currentPageName);
-                    loadPage(prevPage);
+                    window.location.href = `page.php?page=${encodeURIComponent(prevPage)}`;
                 }
             }
         }
@@ -43,14 +35,8 @@ export function initGlobalEventListeners() {
         }
     });
 
-    // Handle clicks on internal page links (e.g., in backlinks, child pages, page title breadcrumbs, sidebar)
+    // Handle splash screen toggle button
     document.addEventListener('click', (e) => {
-        const link = e.target.closest('a[data-page-name]');
-        if (link) {
-            e.preventDefault();
-            const pageName = link.dataset.pageName;
-            loadPage(pageName);
-        }
 
         // Handle splash screen toggle button
         const toggleSplashBtn = e.target.closest('#toggle-splash-btn');

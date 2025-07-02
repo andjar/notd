@@ -13,6 +13,7 @@ import { initGlobalEventListeners } from './event-handlers.js';
 import { initGlobalSearch, initPageSearchModal } from './search.js';
 import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js';
 import { pagesAPI } from '../api_client.js'; // Import pagesAPI
+import { calendarCache } from './calendar-cache.js';
 
 // Import UI module
 import { ui } from '../ui.js';
@@ -22,6 +23,9 @@ window.createPageWithContent = async (pageName, initialContent = '') => {
     try {
         const newPage = await pagesAPI.createPage(pageName, initialContent);
         if (newPage && newPage.id) {
+            // Add new page to calendar cache if it's a date-based page
+            calendarCache.addPage(newPage);
+            
             await loadPage(newPage.name, true);
             return true;
         } else {
@@ -54,9 +58,7 @@ export async function initializeApp() {
         initGlobalSearch();
         initPageSearchModal();
         
-        if (ui.calendarWidget && typeof ui.calendarWidget.init === 'function') {
-            ui.calendarWidget.init();
-        }
+        // Calendar is now handled by Alpine.js component
         
         initGlobalEventListeners();
         initSuggestionUI();

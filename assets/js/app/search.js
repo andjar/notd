@@ -1,5 +1,6 @@
 import { pagesAPI, searchAPI } from '../api_client.js';
 import { loadPage, fetchAndDisplayPages } from './page-loader.js';
+import { calendarCache } from './calendar-cache.js';
 import { debounce, safeAddEventListener, decrypt } from '../utils.js';
 import { ui } from '../ui.js';
 import { getCurrentPagePassword } from './state.js';
@@ -214,6 +215,9 @@ async function selectAndActionPageSearchResult(pageName, isCreate) {
         try {
             const newPage = await pagesAPI.createPage(pageName);
             if (newPage && newPage.id) {
+                // Add new page to calendar cache if it's a date-based page
+                calendarCache.addPage(newPage);
+                
                 await fetchAndDisplayPages(newPage.name); 
                 await loadPage(newPage.name, true); 
             } else {

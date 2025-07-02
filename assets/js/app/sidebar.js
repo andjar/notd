@@ -98,11 +98,8 @@ export const sidebarState = {
                     listItem.appendChild(link);
                     listContainer.appendChild(listItem);
 
-                    // Add click handler
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        window.loadPage(page.name);
-                    });
+                    // Set proper href for navigation
+                    link.href = `page.php?page=${encodeURIComponent(page.name)}`;
                 });
 
                 favoritesContainer.appendChild(listContainer);
@@ -140,10 +137,7 @@ export const sidebarState = {
                             listItem.appendChild(link);
                             fullList.appendChild(listItem);
 
-                            link.addEventListener('click', (e) => {
-                                e.preventDefault();
-                                window.loadPage(page.name);
-                            });
+                            link.href = `page.php?page=${encodeURIComponent(page.name)}`;
                         });
 
                         favoritesContainer.appendChild(fullList);

@@ -7,7 +7,6 @@
 import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree, initializeDragAndDrop, handleNoteDrop } from './ui/note-elements.js';
 import { renderNote, parseAndRenderContent, switchToEditMode, getRawTextWithNewlines, normalizeNewlines, renderAttachments, renderProperties, initializeDelegatedNoteEventListeners, renderTransclusion } from './ui/note-renderer.js';
 import { domRefs } from './ui/dom-refs.js';
-import { calendarWidget } from './ui/calendar-widget.js';
 import { pagesAPI } from './api_client.js';
 
 // Get Alpine store reference
@@ -872,7 +871,6 @@ export const ui = {
     getNestingLevel,
     getNoteAncestors,
     promptForPassword,
-    calendarWidget,
     displayChildPages,
     displayChildPagesInSidebar,
     displayFavorites,

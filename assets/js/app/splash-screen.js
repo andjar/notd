@@ -29,20 +29,30 @@ export function splashScreen() {
         dotRadius: 105,
         
         init() {
+            // Check if this is a subsequent page load (not the initial app load)
+            const isSubsequentLoad = sessionStorage.getItem('notd_initial_load_complete');
+            
+            if (isSubsequentLoad) {
+                // Skip splash screen on subsequent loads
+                this.show = false;
+                return;
+            }
+            
+            // Mark initial load as complete
+            sessionStorage.setItem('notd_initial_load_complete', 'true');
+            
             this.initBubbles();
             this.initDots();
             this.updateTimeDate();
             this.startTimeUpdates();
             this.startAnimation();
             
-            // Only auto-hide on initial load, not when manually toggled
-            if (this.show) {
-                setTimeout(() => {
-                    this.show = false;
-                    this.stopAnimation();
-                    this.stopTimeUpdates();
-                }, 2000);
-            }
+            // Auto-hide after 2 seconds on initial load
+            setTimeout(() => {
+                this.show = false;
+                this.stopAnimation();
+                this.stopTimeUpdates();
+            }, 2000);
         },
         
         // Method to manually show the splash screen
