@@ -518,7 +518,28 @@ async function handleTabKey(e, noteItem, noteData) {
         }
         
         newParentId = String(newParentNote.id);
-        const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, null, null);
+        
+        // **FIX**: Calculate the correct position for the indented note
+        // Find the existing children of the new parent
+        const newParentChildren = appStore.notes.filter(n => String(n.parent_note_id) === String(newParentId)).sort((a,b) => a.order_index - b.order_index);
+        
+        // Find the position where the note should be inserted
+        // It should be positioned after the new parent's last child, or at the beginning if no children exist
+        let previousSiblingId = null;
+        let nextSiblingId = null;
+        
+        if (newParentChildren.length > 0) {
+            // Insert at the end of the new parent's children
+            const lastChild = newParentChildren[newParentChildren.length - 1];
+            previousSiblingId = String(lastChild.id);
+            nextSiblingId = null;
+        } else {
+            // No existing children, insert at the beginning
+            previousSiblingId = null;
+            nextSiblingId = null;
+        }
+        
+        const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, previousSiblingId, nextSiblingId);
         targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
