@@ -243,6 +243,19 @@ const favoritesAPI = {
     removeFavorite: (pageName) => apiRequest('favorites.php', 'POST', { _method: 'DELETE', page_name: pageName })
 };
 
+/**
+ * API functions for page metadata
+ * @namespace pageMetadataAPI
+ */
+const pageMetadataAPI = {
+    /**
+     * Get page metadata including properties, recent pages, favorites, child pages, and backlinks
+     * @param {string} pageName - The name of the page
+     * @returns {Promise<Object>} Page metadata object
+     */
+    getPageMetadata: (pageName) => apiRequest(`page_metadata.php?page=${encodeURIComponent(pageName)}`)
+};
+
 export {
     pagesAPI,
     notesAPI,
@@ -252,5 +265,6 @@ export {
     templatesAPI,
     queryAPI,
     favoritesAPI,
+    pageMetadataAPI,
     apiRequest
 };

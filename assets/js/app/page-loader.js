@@ -12,6 +12,7 @@ import { ui } from '../ui.js';
 import { parseProperties, parseContent, cleanProperties } from '../utils/content-parser.js';
 import { handleNoteAction } from './note-actions.js';
 import { promptForPagePassword } from '../ui.js';
+import { updatePageMetadata } from './page-metadata-updater.js';
 
 // --- Restored Utility Functions ---
 export function getPreviousDayPageName(currentDateStr) {
@@ -363,6 +364,9 @@ async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
     if (ui.calendarWidget && ui.calendarWidget.setCurrentPage) ui.calendarWidget.setCurrentPage(pageData.name);
     
     const pageProperties = pageData.properties || {};
+    
+    // Update page metadata elements (title, properties, sidebars, etc.)
+    await updatePageMetadata(pageData.name);
     
     await _renderPageContent(pageData, pageProperties, focusFirstNote);
 }
