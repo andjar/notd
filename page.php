@@ -191,15 +191,15 @@ function renderRecentPages($pages, $currentPageName) {
 
 function renderFavorites($favorites, $currentPageName) {
     if (empty($favorites)) {
-        return '<p>No favorite pages yet.</p>';
+        return '<div class="no-items-message">No favorite pages yet.</div>';
     }
     
-    $html = '<ul class="favorites-list">';
+    $html = '<ul class="recent-pages-list">';
     foreach ($favorites as $page) {
         $isActive = ($page['name'] === $currentPageName) ? ' active' : '';
-        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="favorite-page-link' . $isActive . '">';
-        $html .= '<i data-feather="star" class="favorite-page-icon"></i>';
-        $html .= '<span class="favorite-page-name">' . htmlspecialchars($page['name']) . '</span>';
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="recent-page-link' . $isActive . '">';
+        $html .= '<i data-feather="star" class="recent-page-icon"></i>';
+        $html .= '<span class="recent-page-name">' . htmlspecialchars($page['name']) . '</span>';
         $html .= '</a></li>';
     }
     $html .= '</ul>';
@@ -223,14 +223,14 @@ function renderChildPagesSidebar($childPages) {
         return '';
     }
     
-    $html = '<h3>Child Pages</h3><ul class="child-pages-sidebar-list">';
+    $html = '<h3>Child Pages</h3><ul class="recent-pages-list">';
     foreach ($childPages as $page) {
         $displayName = strpos($page['name'], '/') !== false ? 
             substr($page['name'], strrpos($page['name'], '/') + 1) : 
             $page['name'];
-        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="child-page-sidebar-link">';
-        $html .= '<i data-feather="file-text" class="child-page-sidebar-icon"></i>';
-        $html .= '<span class="child-page-sidebar-name">' . htmlspecialchars($displayName) . '</span>';
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="recent-page-link">';
+        $html .= '<i data-feather="file-text" class="recent-page-icon"></i>';
+        $html .= '<span class="recent-page-name">' . htmlspecialchars($displayName) . '</span>';
         $html .= '</a></li>';
     }
     $html .= '</ul>';
@@ -239,21 +239,20 @@ function renderChildPagesSidebar($childPages) {
 
 function renderBacklinks($backlinks) {
     if (empty($backlinks)) {
-        return '<p>No backlinks found.</p>';
+        return '<div class="no-items-message">No backlinks found.</div>';
     }
     
-    $html = '';
+    $html = '<ul class="recent-pages-list">';
     foreach ($backlinks as $link) {
         $snippet = substr($link['content'], 0, 100);
         if (strlen($link['content']) > 100) $snippet .= '...';
         
-        $html .= '<a href="page.php?page=' . urlencode($link['page_name']) . '" class="backlink-item">';
-        $html .= '<i data-feather="link" class="backlink-icon"></i>';
-        $html .= '<div class="backlink-content">';
-        $html .= '<span class="backlink-name">' . htmlspecialchars($link['page_name']) . '</span>';
-        $html .= '<span class="backlink-snippet">' . htmlspecialchars($snippet) . '</span>';
-        $html .= '</div></a>';
+        $html .= '<li><a href="page.php?page=' . urlencode($link['page_name']) . '" class="recent-page-link">';
+        $html .= '<i data-feather="link" class="recent-page-icon"></i>';
+        $html .= '<span class="recent-page-name">' . htmlspecialchars($link['page_name']) . '</span>';
+        $html .= '</a></li>';
     }
+    $html .= '</ul>';
     return $html;
 }
 
@@ -524,7 +523,7 @@ function renderBacklinks($backlinks) {
                     </div>
                     <div class="sidebar-section">
                         <div id="backlinks-container" class="backlinks-sidebar">
-                            <h4>Backlinks</h4>
+                            <h3>Backlinks</h3>
                             <div id="backlinks-list" class="backlinks-list">
                                 <?php echo renderBacklinks($backlinks); ?>
                             </div>
