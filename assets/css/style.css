@@ -17,14 +17,14 @@
     Roboto, sans-serif;
   --ls-header-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, sans-serif; /* Use Inter for headers too - perfect consistency */
-  --ls-font-size-xs: 0.75rem;
-  --ls-font-size-sm: 0.875rem;
-  --ls-font-size-base: 1rem;
-  --ls-font-size-lg: 1.125rem;
-  --ls-font-size-xl: 1.25rem;
-  --ls-font-size-2xl: 1.5rem;
-  --ls-font-size-3xl: 1.875rem;
-  --ls-page-title-size: 32px; /* Reduced from 36px for elegance */
+  --ls-font-size-xs: 0.8rem; /* Increased from 0.7rem */
+  --ls-font-size-sm: 0.9rem; /* Increased from 0.8rem */
+  --ls-font-size-base: 1rem; /* Increased from 0.9rem */
+  --ls-font-size-lg: 1.1rem; /* Increased from 1rem */
+  --ls-font-size-xl: 1.2rem; /* Increased from 1.1rem */
+  --ls-font-size-2xl: 1.4rem; /* Increased from 1.3rem */
+  --ls-font-size-3xl: 1.7rem; /* Increased from 1.6rem */
+  --ls-page-title-size: 30px; /* Increased from 28px */
 
   /* Font Weights */
   --ls-font-weight-normal: 400;
@@ -33,7 +33,8 @@
   --ls-font-weight-bold: 700;
 
   /* Layout */
-  --ls-left-sidebar-width: 280px;
+  --ls-left-sidebar-width: 300px; /* Increased for better symmetry */
+  --ls-right-sidebar-width: 300px; /* Match left sidebar width for symmetry */
   --ls-header-height: 3rem;
   --ls-main-content-max-width: 810px;
   --ls-border-radius-low: 4px;
@@ -103,8 +104,8 @@
   --ls-tag-text-hover-opacity: 1;
 
   /* Calendar specific variables */
-  --ls-calendar-today-bg: var(--ls-accent-10);
-  --ls-calendar-today-text: var(--ls-primary-background-color, #ffffff);
+  --ls-calendar-today-bg: var(--ls-accent-3);
+  --ls-calendar-today-text: var(--ls-primary-background-color, black);
   --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3);
 
   /* Button specific variables */
@@ -178,7 +179,7 @@
 body {
   font-family: var(--ls-font-family);
   font-size: var(--ls-font-size-base);
-  line-height: 1.7; /* Increased from 1.5 for better readability */
+  line-height: 1.5; /* Increased from 1.4 for better readability */
   color: var(--ls-primary-text-color);
   background-color: var(--ls-primary-background-color);
 }
@@ -187,7 +188,7 @@ body {
 .app-container {
   display: grid;
   grid-template-columns: var(--ls-left-sidebar-width) 1fr var(
-      --ls-left-sidebar-width
+      --ls-right-sidebar-width
     );
   grid-template-areas: "left-sidebar main-content right-sidebar";
   min-height: 100vh;
@@ -206,6 +207,12 @@ body {
   transition: transform var(--ls-transition-fast);
   background: var(--ls-secondary-background-color);
   border-right: 1px solid var(--ls-secondary-border-color);
+}
+
+.right-sidebar {
+  width: var(--ls-right-sidebar-width);
+  border-right: none;
+  border-left: 1px solid var(--ls-secondary-border-color);
 }
 
 .left-sidebar {
@@ -494,7 +501,7 @@ body {
   margin-left: var(--ls-left-sidebar-width);
 }
 .right-sidebar:not(.collapsed) ~ .main-content {
-  margin-right: var(--ls-left-sidebar-width);
+  margin-right: var(--ls-right-sidebar-width);
 }
 
 /* App Header */
@@ -529,72 +536,6 @@ body {
   text-align: center;
 }
 
-/* Calendar Widget */
-.calendar-widget {
-  background-color: transparent;
-  border-radius: var(--ls-border-radius-medium);
-  padding: var(--ls-space-1); /* Much tighter padding */
-  margin-bottom: var(--ls-space-1); /* Much tighter margin */
-  border: none;
-}
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--ls-space-4);
-}
-.calendar-grid {
-  display: grid;
-  gap: var(--ls-space-2);
-}
-.calendar-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: var(--ls-font-size-sm);
-  color: var(--ls-secondary-text-color);
-}
-.calendar-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: var(--ls-space-1);
-}
-.calendar-day {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--ls-border-radius-low);
-  cursor: pointer;
-  transition: background-color var(--ls-transition-fast),
-    color var(--ls-transition-fast);
-  font-size: var(--ls-font-size-sm);
-  color: var(--ls-secondary-text-color);
-}
-.calendar-day:hover {
-  background-color: var(--ls-gray-4);
-  color: var(--ls-primary-text-color);
-}
-.calendar-day.today {
-  background-color: var(--ls-calendar-today-bg);
-  color: var(--ls-calendar-today-text);
-  font-weight: var(--ls-font-weight-medium);
-}
-.calendar-day.current-page {
-  background-color: var(--ls-tertiary-background-color);
-  color: var(--ls-primary-text-color);
-  font-weight: var(--ls-font-weight-medium);
-  border: 1px solid var(--ls-accent-10);
-  box-shadow: var(--ls-calendar-current-page-glow);
-}
-.calendar-day.today.current-page {
-  background-color: var(--ls-calendar-today-bg);
-  color: var(--ls-calendar-today-text);
-  border: 1px solid var(--ls-accent-9);
-  box-shadow: var(
-    --ls-calendar-current-page-glow
-  ); /* Consider a brighter variant if needed */
-}
 
 /* Search Section */
 .search-section {
@@ -749,8 +690,7 @@ body {
 }
 
 #page-list a.active {
-  background-color: var(--ls-accent-10);
-  color: var(--ls-active-nav-item-text-color);
+  background-color: var(--ls-accent-3);
 }
 
 /* Outliner / Notes Container */
@@ -762,9 +702,8 @@ body {
 .note-item {
   position: relative;
   --controls-top-offset: calc(
-    (var(--ls-space-1) * 1.5) + (var(--ls-font-size-base) * 0.8) -
-      (var(--control-icon-size) / 2)
-  ); /* Adjusted for slightly less top padding */
+    (var(--ls-font-size-base) * 1.5) / 2 - (var(--control-icon-size) / 2)
+  ); /* Center bullets with text baseline */
   margin: 0; /* Rely on parent gap for inter-item spacing */
   padding: 0; /* No internal padding for note-item itself */
 }
@@ -787,8 +726,8 @@ body {
   flex: 1;
   min-width: 0;
   padding-left: var(--content-left-padding);
-  padding-top: 2px; /* Reduced padding-top significantly */
-  padding-bottom: 2px; /* Reduced padding-bottom significantly */
+  padding-top: 0px; /* Removed padding-top completely */
+  padding-bottom: 0px; /* Removed padding-bottom completely */
   display: flex;
   flex-direction: column;
 }
@@ -960,9 +899,9 @@ body {
 .note-content {
   transition: all 0.2s ease;
   border-radius: var(--ls-border-radius-low);
-  min-height: 20px; /* Or var(--ls-line-height-base) if defined */
-  padding: 6px 8px; /* Standardized padding */
-  line-height: 1.7; /* Improved line height for better readability */
+  min-height: 18px; /* Increased from 16px for better touch targets */
+  padding: 3px 8px; /* Increased padding slightly for better readability */
+  line-height: 1.4; /* Increased from 1.3 for better readability */
 }
 
 .note-content[contenteditable="true"]:empty:before {
@@ -2311,12 +2250,7 @@ textarea:focus {
 
 /* Styling for .note-item no longer needs ::after or padding-left for indentation directly */
 .notes-container > .note-item {
-  margin-bottom: var(--ls-space-1); /* Much tighter spacing between notes */
-}
-
-/* Ensure consistent vertical rhythm */
-.note-content {
-  margin-bottom: var(--ls-space-2); /* Consistent bottom margin */
+  margin-bottom: 1px; /* Extremely tight spacing between notes */
 }
 
 .note-content h1,
@@ -2536,9 +2470,9 @@ textarea:focus {
 .note-content {
   transition: all 0.2s ease;
   border-radius: var(--ls-border-radius-low);
-  min-height: 20px; /* Or var(--ls-line-height-base) if defined */
-  padding: 6px 8px; /* Standardized padding */
-  line-height: 1.7; /* Improved line height for better readability */
+  min-height: 18px; /* Increased from 16px for better touch targets */
+  padding: 3px 8px; /* Increased padding slightly for better readability */
+  line-height: 1.4; /* Increased from 1.3 for better readability */
 }
 
 /* Site-wide heading styles */
@@ -2803,8 +2737,8 @@ h6 {
 /* Task-specific vertical alignment for bullet/arrow */
 .note-item:has(.task-container) {
   --controls-top-offset: calc(
-    (2 * var(--ls-space-1)) + 23px - (var(--control-icon-size) / 2)
-  ); /* Align bullet/arrow with checkbox center */
+    (var(--ls-font-size-base) * 1.5) / 2 - (var(--control-icon-size) / 2)
+  ); /* Use same alignment as regular notes for consistency */
 }
 
 /* Sidebar Toggle Buttons */
@@ -4790,13 +4724,35 @@ html {
   border: 1px solid var(--ls-secondary-border-color);
 }
 
+/* Property elements within pills */
+.pill.pill-property .property-key {
+  color: var(--ls-accent-10);
+  font-weight: var(--ls-font-weight-medium);
+  margin-right: 4px;
+}
+
+.pill.pill-property .property-separator {
+  color: var(--ls-secondary-text-color);
+  opacity: 0.6;
+  margin: 0 2px;
+}
+
+.pill.pill-property .property-value {
+  color: var(--ls-primary-text-color);
+  font-weight: var(--ls-font-weight-normal);
+}
+
+.pill.pill-property .property-favorite {
+  color: #f39c12;
+}
+
 /* Hover states */
 .pill:hover {
   transform: translateY(-1px);
   box-shadow: var(--ls-shadow-sm);
 }
 
-/* ========== ELEGANT PAGE PROPERTIES PILLS ========== */
+/* ========== PAGE PROPERTIES PILLS ========== */
 .page-properties-pills {
   display: flex;
   flex-wrap: wrap;
@@ -4805,41 +4761,4 @@ html {
   margin-bottom: var(--ls-space-4);
   padding: 0;
   list-style: none;
-}
-
-.page-property-pill {
-  display: inline-flex;
-  align-items: center;
-  background-color: var(--ls-tertiary-background-color);
-  color: var(--ls-secondary-text-color);
-  border: 1px solid var(--ls-secondary-border-color);
-  border-radius: 12px; /* Rounded pills */
-  padding: 4px 8px;
-  font-size: 0.8rem;
-  font-weight: var(--ls-font-weight-medium);
-  white-space: nowrap;
-  transition: all var(--ls-transition-fast);
-}
-
-.page-property-pill:hover {
-  background-color: var(--ls-secondary-background-color);
-  border-color: var(--ls-border-color);
-  transform: translateY(-1px);
-}
-
-.page-property-pill .property-key {
-  color: var(--ls-accent-10);
-  font-weight: var(--ls-font-weight-medium);
-  margin-right: 4px;
-}
-
-.page-property-pill .property-separator {
-  color: var(--ls-secondary-text-color);
-  opacity: 0.6;
-  margin: 0 2px;
-}
-
-.page-property-pill .property-value {
-  color: var(--ls-primary-text-color);
-  font-weight: var(--ls-font-weight-normal);
 }

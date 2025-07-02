@@ -157,9 +157,9 @@ function renderPageProperties($properties, $renderInternal = false) {
             
             $hasVisibleProperties = true;
             if ($key === 'favorite' && strtolower($instance['value']) === 'true') {
-                $html .= '<li class="page-property-pill"><span class="property-favorite">⭐</span></li>';
+                $html .= '<li class="pill pill-property"><span class="property-favorite">⭐</span></li>';
             } else {
-                $html .= '<li class="page-property-pill"><span class="property-key">' . htmlspecialchars($key) . '</span><span class="property-separator">:</span><span class="property-value">' . htmlspecialchars($instance['value']) . '</span></li>';
+                $html .= '<li class="pill pill-property"><span class="property-key">' . htmlspecialchars($key) . '</span><span class="property-separator">:</span><span class="property-value">' . htmlspecialchars($instance['value']) . '</span></li>';
             }
         }
     }

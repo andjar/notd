@@ -119,7 +119,6 @@
 
 .calendar-day.today {
     background-color: var(--ls-calendar-today-bg, var(--ls-accent-10));
-    color: var(--ls-calendar-today-text, #ffffff);
     font-weight: bold;
 }
 
@@ -149,7 +148,6 @@
 
 .calendar-day.today.current-page {
     background-color: var(--ls-calendar-today-bg, var(--ls-accent-10));
-    color: var(--ls-calendar-today-text, #ffffff);
     box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7)); /* Enhanced glow for today's current page */
     animation: pulse-glow 2s infinite alternate; /* Pulsing animation */
 }

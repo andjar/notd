@@ -10,7 +10,7 @@ if (!function_exists('_create_note_and_index_properties')) {
         $noteId = $pdo->lastInsertId();
         if (!$noteId) throw new Exception("Failed to create note record for welcome note.");
         if (!empty(trim($content))) {
-            $patternProcessor = getPatternProcessor();
+            $patternProcessor = new PatternProcessor($pdo);
             $processedData = $patternProcessor->processContent($content, 'note', $noteId, ['pdo' => $pdo]);
             $parsedProperties = $processedData['properties'];
             if (!empty($parsedProperties)) {
@@ -28,7 +28,7 @@ if (!function_exists('_create_page_and_index_properties')) {
         $pageId = $pdo->lastInsertId();
         if (!$pageId) throw new Exception("Failed to create page record for '$name'.");
         if ($content && !empty(trim($content))) {
-            $patternProcessor = getPatternProcessor();
+            $patternProcessor = new PatternProcessor($pdo);
             $processedData = $patternProcessor->processContent($content, 'page', $pageId, ['pdo' => $pdo]);
             $parsedProperties = $processedData['properties'];
             if (!empty($parsedProperties)) {

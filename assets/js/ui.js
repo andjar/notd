@@ -154,13 +154,14 @@ function updateActivePageLink(pageName) {
  * @param {Object} properties - The page's properties object.
  * @param {HTMLElement} targetContainer - The HTML element to render properties into.
  * 
- * NOTE: This function is now handled by PHP rendering in page.php
- * Keeping for fallback/legacy support only
+ * DEPRECATED: This function is no longer used as properties are now rendered server-side in page.php
+ * Keeping for potential future use or fallback scenarios
  */
 function renderPageInlineProperties(properties, targetContainer) {
-    // This function is now handled by PHP rendering
-    // Only execute if no properties container exists (fallback)
-    if (document.getElementById('page-properties-container')) return;
+    // DEPRECATED: Properties are now rendered server-side in page.php
+    // This function is kept for potential future use but should not be called
+    console.warn('renderPageInlineProperties is deprecated - properties are now rendered server-side');
+    return;
     
     if (!properties || Object.keys(properties).length === 0) return;
     

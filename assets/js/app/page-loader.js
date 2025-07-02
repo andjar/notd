@@ -179,8 +179,7 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
 
     // Page title is now set by PHP, no need to set it here
 
-    // Render properties
-            ui.renderPageInlineProperties(pageProperties, null);
+    // Properties are now rendered server-side in page.php, no need for client-side rendering
 
     // Render main content - clean properties from content before rendering
     const contentWithoutProperties = pageData.content ? pageData.content.replace(/\{[^}]+\}/g, '').trim() : '';

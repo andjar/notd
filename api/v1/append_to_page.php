@@ -4,6 +4,7 @@ require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../validator_utils.php';
+require_once __DIR__ . '/../pattern_processor.php';
 
 // New "Smart Property Indexer"
 // This function is the single source of truth for processing properties from content.
@@ -18,8 +19,8 @@ if (!function_exists('_indexPropertiesFromContent')) {
             }
         }
 
-        // Instantiate the pattern processor. It gets PDO from get_db_connection()
-        $patternProcessor = getPatternProcessor();
+        // Instantiate the pattern processor with the existing PDO connection to avoid database locks
+        $patternProcessor = new PatternProcessor($pdo);
 
         // Process the content to extract properties and potentially modified content
         // Pass $pdo in context for handlers that might need it directly.

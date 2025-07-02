@@ -16,7 +16,7 @@ async function _updatePageContent(newContent) {
         pageContentForModal = updatedPage.content || '';
         // The properties are now derived from the returned content, so we pass the new properties to the UI.
         displayPageProperties(updatedPage.properties || {});
-        ui.renderPageInlineProperties(updatedPage.properties || {}, null);
+        // Properties are rendered server-side, no need for client-side rendering
         ui.updateSaveStatusIndicator('saved');
         
         // **CACHE INVALIDATION**: Invalidate cache after page content update
