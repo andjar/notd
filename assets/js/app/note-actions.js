@@ -592,10 +592,19 @@ function calculateNestingLevel(parentId, notes) {
 function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
     const notesContainer = document.getElementById('notes-container');
     if (!notesContainer) return;
-    
-    // Remove from current position
-    noteElement.remove();
-    
+
+    // Remove from current position (move the whole subtree)
+    // Instead of just noteElement.remove(), move the note and its children as a block
+    const subtreeFragment = document.createDocumentFragment();
+    subtreeFragment.appendChild(noteElement);
+
+    // Move all children (if any)
+    const childrenContainer = noteElement.querySelector('.note-children');
+    if (childrenContainer && childrenContainer.children.length > 0) {
+        // Move all child notes as part of the fragment
+        // (they are already inside noteElement, so this is just for clarity)
+    }
+
     if (!newParentId) {
         // Moving to root level
         const rootNotes = Array.from(notesContainer.children).filter(el => 
@@ -604,17 +613,17 @@ function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
         );
         
         if (targetOrderIndex >= rootNotes.length) {
-            notesContainer.appendChild(noteElement);
+            notesContainer.appendChild(subtreeFragment);
         } else {
             const targetElement = rootNotes[targetOrderIndex];
-            notesContainer.insertBefore(noteElement, targetElement);
+            notesContainer.insertBefore(subtreeFragment, targetElement);
         }
     } else {
         // Moving to a specific parent
         const parentElement = getNoteElementById(newParentId);
         if (!parentElement) {
             // Fallback: append to root
-            notesContainer.appendChild(noteElement);
+            notesContainer.appendChild(subtreeFragment);
             return;
         }
         
@@ -634,10 +643,26 @@ function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
         );
         
         if (targetOrderIndex >= existingChildren.length) {
-            childrenContainer.appendChild(noteElement);
+            childrenContainer.appendChild(subtreeFragment);
         } else {
             const targetElement = existingChildren[targetOrderIndex];
-            childrenContainer.insertBefore(noteElement, targetElement);
+            childrenContainer.insertBefore(subtreeFragment, targetElement);
+        }
+    }
+
+    // After moving, update nesting level for the note and all descendants
+    const newNestingLevel = calculateNestingLevel(newParentId, getAppStore().notes);
+    updateSubtreeNestingLevels(noteElement, newNestingLevel);
+}
+
+// **NEW**: Recursively update --nesting-level for a note and all its descendants
+function updateSubtreeNestingLevels(noteElement, nestingLevel) {
+    noteElement.style.setProperty('--nesting-level', nestingLevel);
+    const childrenContainer = noteElement.querySelector('.note-children');
+    if (childrenContainer) {
+        const childNotes = Array.from(childrenContainer.children).filter(el => el.classList.contains('note-item'));
+        for (const child of childNotes) {
+            updateSubtreeNestingLevels(child, nestingLevel + 1);
         }
     }
 }
