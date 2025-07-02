@@ -57,6 +57,10 @@ class NotdApiClient {
         return this.request(`/pages?${params.toString()}`);
     }
 
+    async getRecentPages() {
+        return this.request('/recent_pages');
+    }
+
     async getPageByName(name) {
         return this.request(`/pages?name=${encodeURIComponent(name)}`);
     }

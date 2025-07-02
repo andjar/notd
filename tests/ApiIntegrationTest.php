@@ -68,6 +68,40 @@ class ApiIntegrationTest extends TestCase
         $this->assertArrayHasKey('timestamp', $response['data']['data']);
     }
 
+    public function testGetRecentPages()
+    {
+        // Create some test pages with different timestamps
+        $this->makeRequest('POST', '/pages', [
+            'name' => 'Recent Page 1',
+            'content' => 'Test content 1'
+        ]);
+        
+        $this->makeRequest('POST', '/pages', [
+            'name' => 'Recent Page 2',
+            'content' => 'Test content 2'
+        ]);
+
+        $response = $this->makeRequest('GET', '/recent_pages');
+        
+        $this->assertEquals(200, $response['status_code']);
+        $this->assertEquals('success', $response['data']['status']);
+        $this->assertArrayHasKey('recent_pages', $response['data']['data']);
+        $this->assertIsArray($response['data']['data']['recent_pages']);
+        
+        // Should return at least the pages we created
+        $this->assertGreaterThanOrEqual(2, count($response['data']['data']['recent_pages']));
+        
+        // Check structure of returned pages
+        foreach ($response['data']['data']['recent_pages'] as $page) {
+            $this->assertArrayHasKey('id', $page);
+            $this->assertArrayHasKey('name', $page);
+            $this->assertArrayHasKey('updated_at', $page);
+            $this->assertIsInt($page['id']);
+            $this->assertIsString($page['name']);
+            $this->assertIsString($page['updated_at']);
+        }
+    }
+
     public function testCreatePage()
     {
         $response = $this->makeRequest('POST', '/pages', [
@@ -280,6 +314,10 @@ class ApiIntegrationTest extends TestCase
 
         // Test invalid method
         $response = $this->makeRequest('PATCH', '/pages');
+        $this->assertEquals(405, $response['status_code']);
+
+        // Test recent_pages with invalid method
+        $response = $this->makeRequest('POST', '/recent_pages');
         $this->assertEquals(405, $response['status_code']);
     }
 

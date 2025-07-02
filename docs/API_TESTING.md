@@ -45,7 +45,28 @@ curl http://localhost/api/v1/ping
 
 ## Page Management Tests
 
-### 1. Create a Page
+### 1. Get Recent Pages
+```bash
+curl "http://localhost/api/v1/recent_pages"
+```
+
+**Expected Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "recent_pages": [
+      {
+        "id": 1,
+        "name": "Most Recent Page",
+        "updated_at": "2024-01-15 10:30:00"
+      }
+    ]
+  }
+}
+```
+
+### 2. Create a Page
 ```bash
 curl -X POST http://localhost/api/v1/pages \
   -H "Content-Type: application/json" \

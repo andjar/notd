@@ -74,6 +74,48 @@ paths:
                     format: date-time
                     example: "2024-01-15T10:30:00Z"
 
+  /recent_pages:
+    get:
+      summary: Get recent pages
+      description: |
+        Returns the 7 most recently updated pages, ordered by updated_at timestamp in descending order.
+        This endpoint is useful for displaying recent activity in the sidebar or navigation.
+      responses:
+        '200':
+          description: Recent pages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      recent_pages:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: Page ID
+                            name:
+                              type: string
+                              description: Page name
+                            updated_at:
+                              type: string
+                              format: date-time
+                              description: Last update timestamp
+                          required:
+                            - id
+                            - name
+                            - updated_at
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /pages:
     get:
       summary: List or retrieve pages

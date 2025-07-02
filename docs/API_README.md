@@ -88,14 +88,21 @@ curl -X POST http://localhost/api/v1/append_to_page \
 curl "http://localhost/api/v1/search?tasks=TODO&page=1&per_page=10"
 ```
 
-### 3. Full-text Search
+### 3. Get Recent Pages
+
+```bash
+# Get the 7 most recently updated pages
+curl "http://localhost/api/v1/recent_pages"
+```
+
+### 4. Full-text Search
 
 ```bash
 # Search for notes containing "project"
 curl "http://localhost/api/v1/search?q=project&page=1&per_page=10"
 ```
 
-### 4. Batch Operations
+### 5. Batch Operations
 
 ```bash
 # Create multiple notes in one request
@@ -132,6 +139,34 @@ curl -X POST http://localhost/api/v1/notes \
 ```bash
 GET /api/v1/pages?page=1&per_page=20&exclude_journal=true
 ```
+
+#### Get Recent Pages
+```bash
+GET /api/v1/recent_pages
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "recent_pages": [
+      {
+        "id": 1,
+        "name": "Most Recent Page",
+        "updated_at": "2024-01-15 10:30:00"
+      },
+      {
+        "id": 2,
+        "name": "Second Most Recent",
+        "updated_at": "2024-01-15 09:15:00"
+      }
+    ]
+  }
+}
+```
+
+**Description:** Returns the 7 most recently updated pages, ordered by `updated_at` timestamp in descending order. This endpoint is useful for displaying recent activity in the sidebar or navigation.
 
 #### Get Specific Page
 ```bash
