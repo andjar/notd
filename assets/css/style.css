@@ -702,7 +702,7 @@ body {
 .note-item {
   position: relative;
   --controls-top-offset: calc(
-    (var(--ls-font-size-base) * 1.5) / 2 - (var(--control-icon-size) / 2)
+    var(--ls-font-size-base) - (var(--control-icon-size) / 2)
   ); /* Center bullets with text baseline */
   margin: 0; /* Rely on parent gap for inter-item spacing */
   padding: 0; /* No internal padding for note-item itself */
@@ -2734,13 +2734,6 @@ h6 {
   transform: rotate(90deg); /* Down when expanded */
 }
 
-/* Task-specific vertical alignment for bullet/arrow */
-.note-item:has(.task-container) {
-  --controls-top-offset: calc(
-    (var(--ls-font-size-base) * 1.5) / 2 - (var(--control-icon-size) / 2)
-  ); /* Use same alignment as regular notes for consistency */
-}
-
 /* Sidebar Toggle Buttons */
 .sidebar-toggle-btn {
   position: fixed;
@@ -4762,3 +4755,23 @@ html {
   padding: 0;
   list-style: none;
 }
+
+/* === Improved bullet alignment for tasks and headers === */
+/* Center bullet for tasks (checkbox + pill) */
+.note-item:has(.task-container) {
+  --controls-top-offset: calc((var(--ls-font-size-base) * 2.8) / 2 - (var(--control-icon-size) / 2));
+}
+/* Center bullet for notes starting with headers */
+.note-item:has(.note-content > h1) {
+  --controls-top-offset: calc((var(--ls-font-size-2xl) * 3.2) / 2 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h2) {
+  --controls-top-offset: calc((var(--ls-font-size-xl) * 3.6) / 2 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h3) {
+  --controls-top-offset: calc((var(--ls-font-size-lg) * 3.6) / 2 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h4) {
+  --controls-top-offset: calc((var(--ls-font-size-lg) * 3.6) / 2 - (var(--control-icon-size) / 2));
+}
+/* You can add more for h4-h6 if needed, but these are the most visually impactful */
