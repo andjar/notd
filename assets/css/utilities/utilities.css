@@ -167,10 +167,9 @@
 }
 
 /* Page Header Separator */
-.page-title-container {
+.page-title-container > h1 {
   border-bottom: 1px solid var(--ls-secondary-border-color);
   padding-bottom: var(--ls-space-3);
-  margin-bottom: var(--ls-space-4);
 }
 
 /* Page Title Gear Icon - Smaller and more subtle */
