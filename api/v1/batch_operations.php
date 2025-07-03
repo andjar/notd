@@ -5,6 +5,55 @@ require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../pattern_processor.php';
 
+// Define the _indexPropertiesFromContent function if it doesn't exist
+if (!function_exists('_indexPropertiesFromContent')) {
+    function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
+        // For notes, check if encrypted. If so, do not process properties from content.
+        if ($entityType === 'note') {
+            $encryptedStmt = $pdo->prepare("SELECT 1 FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND value = 'true' LIMIT 1");
+            $encryptedStmt->execute([':note_id' => $entityId]);
+            if ($encryptedStmt->fetch()) {
+                return; // Note is encrypted, do not parse/modify properties from its content.
+            }
+        }
+
+        // Instantiate the pattern processor with the existing PDO connection to avoid database locks
+        $patternProcessor = new \App\PatternProcessor($pdo);
+
+        // Process the content to extract properties and potentially modified content
+        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
+        
+        $parsedProperties = $processedData['properties'];
+
+        // Save all extracted/generated properties using the processor's save method
+        if (!empty($parsedProperties)) {
+            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
+        }
+        
+        // Update the note's 'internal' flag based on the final set of properties applied.
+        $hasInternalTrue = false;
+        if (!empty($parsedProperties)) {
+            foreach ($parsedProperties as $prop) {
+                if (isset($prop['name']) && strtolower($prop['name']) === 'internal' && 
+                    isset($prop['value']) && strtolower((string)$prop['value']) === 'true') {
+                    $hasInternalTrue = true;
+                    break;
+                }
+            }
+        }
+
+        if ($entityType === 'note') {
+             try {
+                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
+                $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
+            } catch (PDOException $e) {
+                // Log error but don't let it break the entire process if just this update fails
+                error_log("Could not update Notes.internal flag for note {$entityId}. Error: " . $e->getMessage());
+            }
+        }
+    }
+}
+
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
     function _createNoteInBatch($pdo, $dataManager, $payload, &$tempIdMap, $includeParentProperties) {

@@ -119,12 +119,14 @@ require_once '../../config.php';
                 },
 
                 generateColumns() {
+                    console.log('Generating columns with states:', this.configuredKanbanStates);
                     this.columns = this.configuredKanbanStates.map(state => ({
                         id: state.toLowerCase(),
                         title: state.charAt(0).toUpperCase() + state.slice(1).toLowerCase(),
                         statusMatcher: state.toUpperCase(),
                         tasks: []
                     }));
+                    console.log('Generated columns:', this.columns.map(col => ({ id: col.id, statusMatcher: col.statusMatcher })));
                 },
 
                 getBoardConfig(boardId) {
@@ -166,6 +168,7 @@ require_once '../../config.php';
                             this.allTasksRaw = response.results.map(result => ({
                                 id: result.note_id,
                                 content: result.content,
+                                status: result.status, // Preserve direct status field from API
                                 properties: result.properties || {},
                                 parent_properties: result.parent_properties || {},
                                 page_id: result.page_id,
@@ -209,11 +212,13 @@ require_once '../../config.php';
                 },
 
                 getNoteStatus(note) {
-                    // Simplified from ui.js for now - primarily uses property if available
-                    // then content prefix. Assumes `configuredKanbanStates` is available.
-                    let status = this.configuredKanbanStates[0]?.toUpperCase() || 'TODO'; // Default
-                    const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
+                    // Check for direct status field first (from API response)
+                    if (note.status) {
+                        console.log(`Note ${note.id} has direct status field: ${note.status}`);
+                        return note.status.toUpperCase();
+                    }
 
+                    // Then check properties
                     if (note.properties && note.properties.status) {
                         let rawStatus = '';
                         if (Array.isArray(note.properties.status) && note.properties.status.length > 0) {
@@ -223,22 +228,27 @@ require_once '../../config.php';
                         } else if (note.properties.status.value && typeof note.properties.status.value === 'string') {
                             rawStatus = note.properties.status.value;
                         }
-                        if (rawStatus && statusKeywords.includes(rawStatus.toUpperCase())) {
+                        console.log(`Note ${note.id} status from properties: "${rawStatus}"`);
+                        if (rawStatus && this.configuredKanbanStates.includes(rawStatus.toUpperCase())) {
                             return rawStatus.toUpperCase();
                         }
                     }
 
+                    // Finally check content prefix
                     if (note.content) {
+                        const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
                         const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
                         const match = note.content.match(statusRegex);
                         if (match) {
+                            console.log(`Note ${note.id} status from content: ${match[1].toUpperCase()}`);
                             return match[1].toUpperCase();
                         }
                     }
-                    // If note has a status property but it's not in configuredKanbanStates, it might fall here.
-                    // Or if it has no status at all.
-                    // For now, we return the default. A more robust solution might be needed.
-                    return status;
+                    
+                    // Default to first configured state
+                    const defaultStatus = this.configuredKanbanStates[0]?.toUpperCase() || 'TODO';
+                    console.log(`Note ${note.id} using default status: ${defaultStatus}`);
+                    return defaultStatus;
                 },
 
                 getCardDisplayContent(noteContent, columnStatusMatcher) {
@@ -256,12 +266,30 @@ require_once '../../config.php';
                     return noteContent;
                 },
 
+                syncContentWithStatus(content, newStatus) {
+                    // Ensure content starts with the correct status prefix
+                    const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
+                    const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
+                    const match = content.match(statusRegex);
+                    
+                    if (match) {
+                        // Replace existing status prefix with new status
+                        return newStatus + " " + content.substring(match[0].length);
+                    } else {
+                        // Add new status prefix to content
+                        return newStatus + " " + content;
+                    }
+                },
+
                 distributeTasksToColumns(tasks) {
+                    console.log(`Distributing ${tasks.length} tasks to columns`);
                     this.columns.forEach(col => col.tasks = []); // Clear existing
                     tasks.forEach(task => {
                         const taskStatus = this.getNoteStatus(task).toUpperCase();
+                        console.log(`Task ${task.id} has status: ${taskStatus}`);
                         const targetColumn = this.columns.find(col => col.statusMatcher === taskStatus);
                         if (targetColumn) {
+                            console.log(`Placing task ${task.id} in column: ${targetColumn.statusMatcher}`);
                             targetColumn.tasks.push(task);
                         } else {
                             // Fallback: if status is not recognized, put in the first configured column
@@ -273,6 +301,11 @@ require_once '../../config.php';
                                 console.error(`[Kanban Alpine] No column for status: '${taskStatus}' and no fallback column configured for note ID ${task.id}.`);
                             }
                         }
+                    });
+                    
+                    // Log final distribution
+                    this.columns.forEach(col => {
+                        console.log(`Column ${col.statusMatcher}: ${col.tasks.length} tasks`);
                     });
                 },
 
@@ -395,18 +428,23 @@ require_once '../../config.php';
                             const originalTaskIndex = sourceColumn.tasks.findIndex(t => t.id === noteId);
                             const originalTask = { ...taskToMove };
 
+                            // Optimistic UI update: Move task in Alpine data model immediately
+                            // This ensures the visual position matches the data model
+                            console.log(`Optimistically moving task ${noteId} from ${sourceColumn.statusMatcher} to ${targetColumn.statusMatcher}`);
+                            
+                            // Remove from source column
+                            sourceColumn.tasks.splice(originalTaskIndex, 1);
+                            
+                            // Add to target column (but don't duplicate the reference)
+                            const taskCopy = { ...taskToMove };
+                            targetColumn.tasks.push(taskCopy);
+                            
+                            // Update the task reference to point to the copy in the target column
+                            taskToMove = taskCopy;
 
-                            // Update task on backend
-                            let newContent = taskToMove.content;
-                            const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
-                            const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
-                            const match = taskToMove.content.match(statusRegex);
 
-                            if (match) {
-                                newContent = newStatus + " " + taskToMove.content.substring(match[0].length);
-                            } else {
-                                newContent = newStatus + " " + taskToMove.content;
-                            }
+                            // Update task on backend - ensure content and properties are in sync
+                            let newContent = this.syncContentWithStatus(taskToMove.content, newStatus);
 
                             console.log('Original content:', taskToMove.content);
                             console.log('New content:', newContent);
@@ -434,9 +472,10 @@ require_once '../../config.php';
                                     Object.assign(taskToMove, updateResult.note);
                                     itemEl.dataset.currentStatus = newStatus; // Reflect new status on the DOM element for future drags
                                     console.log(`Note ${noteId} updated to status ${newStatus}.`);
+                                    console.log(`Task content after update:`, taskToMove.content);
                                     
-                                    // Move the task to the correct column based on its updated content
-                                    this.moveTaskToCorrectColumn(taskToMove, newStatus);
+                                    // Task is already in the correct column from optimistic update
+                                    // Just ensure the content is properly updated
                                 } else {
                                     throw new Error('Update failed or no matching result in API response.');
                                 }
@@ -448,8 +487,20 @@ require_once '../../config.php';
                                 Object.assign(taskToMove, originalTask);
                                 itemEl.dataset.currentStatus = oldStatus;
                                 
-                                // Move the task back to its original column
-                                this.moveTaskToCorrectColumn(taskToMove, oldStatus);
+                                // Revert the optimistic update in Alpine data model
+                                console.log(`Reverting optimistic move for task ${noteId} back to ${sourceColumn.statusMatcher}`);
+                                
+                                // Find and remove the task from wherever it currently is
+                                for (let col of this.columns) {
+                                    const taskIndex = col.tasks.findIndex(t => t.id === noteId);
+                                    if (taskIndex !== -1) {
+                                        col.tasks.splice(taskIndex, 1);
+                                        break;
+                                    }
+                                }
+                                
+                                // Restore the original task to the source column
+                                sourceColumn.tasks.splice(originalTaskIndex, 0, originalTask);
                                 
                                 // Revert the DOM change that Sortable.js made
                                 evt.from.appendChild(itemEl);

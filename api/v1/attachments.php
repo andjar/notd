@@ -286,7 +286,7 @@ public function handleRequest() {
             $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             foreach ($attachments as &$attachment) {
-                $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path']; 
+                $attachment['url'] = '/uploads/' . $attachment['path']; 
             }
             \App\ApiResponse::success($attachments);
             ob_end_flush();
@@ -361,7 +361,7 @@ public function handleRequest() {
             $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($attachments as &$attachment) {
-                $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path'];
+                $attachment['url'] = '/uploads/' . $attachment['path'];
             }
             
             \App\ApiResponse::success([

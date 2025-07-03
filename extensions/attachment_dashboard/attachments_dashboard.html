@@ -6,11 +6,12 @@
     <title>Attachments Dashboard</title>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
 <body>
-    <div class="container" x-data="attachmentsDashboard()">
+    <div class="container" x-data="attachmentsDashboard()" x-init="console.log('Alpine x-init called')">
         <h1>Attachments Dashboard</h1>
+        <div x-data="{ test: 'Alpine is working!' }" x-text="test"></div>
 
         <div class="controls">
             <input type="text" id="search-bar" placeholder="Search by name..." x-model.debounce.300ms="searchTerm" @input="fetchAttachments(true)">
@@ -66,7 +67,9 @@
 
     <script>
         // Define the attachmentsDashboard function in global scope
+        console.log("=== Script loading, defining attachmentsDashboard function ===");
         function attachmentsDashboard() {
+            console.log("=== attachmentsDashboard function called ===");
             return {
                 attachments: [],
                 currentPage: 1,
@@ -82,7 +85,9 @@
                 uniqueTypes: [],
 
                 init() {
+                    console.log("=== Alpine init() called ===");
                     this.fetchAttachments();
+                    console.log("=== fetchAttachments() called from init ===");
                     // Populate some default common types, API will add more if found
                     this.uniqueTypes = ['image/jpeg', 'image/png', 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
                 },
@@ -108,11 +113,13 @@
                 },
 
                 async fetchAttachments(resetPage = false) {
+                    console.log("=== fetchAttachments START ===");
                     if (resetPage) {
                         this.currentPage = 1;
                     }
                     this.isLoading = true;
                     this.errorMessage = '';
+                    console.log("Set isLoading = true");
 
                     const params = {
                         page: this.currentPage,
@@ -232,7 +239,9 @@
                         this.totalPages = 1;
                         this.currentPage = 1;
                     } finally {
+                        console.log("=== fetchAttachments FINALLY ===");
                         this.isLoading = false;
+                        console.log("Set isLoading = false");
                     }
                 },
 

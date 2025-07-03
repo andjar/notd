@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../pattern_processor.php';
@@ -271,7 +274,7 @@ if (!function_exists('_deleteNoteInBatch')) {
 if (!function_exists('_handleBatchOperations')) {
     function _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties = false) {
         if (!is_array($operations)) {
-            ApiResponse::error('Batch request validation failed: "operations" must be an array.', 400);
+            \App\ApiResponse::error('Batch request validation failed: "operations" must be an array.', 400);
             return;
         }
 
@@ -328,20 +331,20 @@ if ($method === 'GET') {
             $noteId = (int)$_GET['id'];
             $note = $dataManager->getNoteById($noteId, $includeInternal, $includeParentProperties);
             if ($note) {
-                ApiResponse::success($note);
+                \App\ApiResponse::success($note);
             } else {
-                ApiResponse::error('Note not found', 404);
+                \App\ApiResponse::error('Note not found', 404);
             }
         } elseif (isset($_GET['page_id'])) {
             $pageId = (int)$_GET['page_id'];
             $notes = $dataManager->getNotesByPageId($pageId, $includeInternal);
-            ApiResponse::success($notes);
+            \App\ApiResponse::success($notes);
         } else {
-             ApiResponse::error('Missing required parameter: id or page_id', 400);
+             \App\ApiResponse::error('Missing required parameter: id or page_id', 400);
         }
     } catch (Exception $e) {
         error_log("API Error in notes.php (GET): " . $e->getMessage());
-        ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
+        \App\ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
     }
 } elseif ($method === 'POST') {
     if (isset($input['action']) && $input['action'] === 'batch') {
@@ -355,7 +358,7 @@ if ($method === 'GET') {
             try {
                 $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? [], $includeParentProperties);
                 close_db_connection($pdo);
-                ApiResponse::success(['results' => $results]);
+                \App\ApiResponse::success(['results' => $results]);
                 return;
             } catch (Exception $e) {
                 $errorMessage = $e->getMessage();
@@ -368,17 +371,17 @@ if ($method === 'GET') {
                 // If it's not a locking issue or we've exhausted retries, throw the error
                 error_log("Batch operation failed after $attempt attempts: " . $errorMessage);
                 close_db_connection($pdo);
-                ApiResponse::error('Batch operation failed: ' . $errorMessage, 500);
+                \App\ApiResponse::error('Batch operation failed: ' . $errorMessage, 500);
                 return;
             }
         }
     }
-    ApiResponse::error('This endpoint now primarily uses batch operations. Please use the batch action.', 400);
+    \App\ApiResponse::error('This endpoint now primarily uses batch operations. Please use the batch action.', 400);
 
 } elseif ($method === 'PUT') {
-    ApiResponse::error('PUT is deprecated. Please use POST with batch operations for updates.', 405);
+    \App\ApiResponse::error('PUT is deprecated. Please use POST with batch operations for updates.', 405);
 } elseif ($method === 'DELETE') {
-    ApiResponse::error('DELETE is deprecated. Please use POST with batch operations for deletions.', 405);
+    \App\ApiResponse::error('DELETE is deprecated. Please use POST with batch operations for deletions.', 405);
 } else {
-    ApiResponse::error('Method not allowed', 405);
+    \App\ApiResponse::error('Method not allowed', 405);
 }

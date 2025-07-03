@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 /**
  * Query Notes API - Enhanced to support property-based queries
  * This API allows executing safe, predefined SQL queries to find notes.
@@ -12,7 +15,7 @@ $pdo = get_db_connection();
 $input = json_decode(file_get_contents('php://input'), true);
 
 if (!isset($input['sql_query'])) {
-    ApiResponse::error('Missing sql_query parameter.', 400);
+    \App\ApiResponse::error('Missing sql_query parameter.', 400);
 }
 
 // --- SQL Validation ---
@@ -32,17 +35,17 @@ foreach ($allowedPatterns as $pattern) {
 }
 
 if (!$patternMatched) {
-    ApiResponse::error('Query must be one of the allowed patterns.', 400);
+    \App\ApiResponse::error('Query must be one of the allowed patterns.', 400);
 }
 
 if (strpos($sqlQuery, ';') !== false) {
-    ApiResponse::error('Query must not contain semicolons.', 400);
+    \App\ApiResponse::error('Query must not contain semicolons.', 400);
 }
 
 $forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'EXEC', 'CREATE', 'ATTACH', 'DETACH'];
 foreach ($forbiddenKeywords as $keyword) {
     if (preg_match('/\b' . $keyword . '\b/i', $sqlQuery)) {
-        ApiResponse::error('Query contains forbidden SQL keywords.', 400);
+        \App\ApiResponse::error('Query contains forbidden SQL keywords.', 400);
     }
 }
 
@@ -51,7 +54,7 @@ foreach ($forbiddenKeywords as $keyword) {
 $allowedColumnsRegex = '/\b(N|P|Notes|Properties)\.(id|content|page_id|parent_note_id|created_at|updated_at|order_index|collapsed|active|note_id|name|value|weight)\b/i';
 $strippedQuery = preg_replace($allowedColumnsRegex, '', $sqlQuery);
 if (preg_match('/(N|P|Notes|Properties)\.\w+/', $strippedQuery)) {
-     ApiResponse::error('Query references unauthorized columns.', 400);
+     \App\ApiResponse::error('Query references unauthorized columns.', 400);
 }
 
 
@@ -74,7 +77,7 @@ try {
     $noteIds = $stmtGetIds->fetchAll(PDO::FETCH_COLUMN, 0);
 
     if (empty($noteIds)) {
-        ApiResponse::success(
+        \App\ApiResponse::success(
             [], 200, ['pagination' => ['current_page' => $page, 'per_page' => $perPage, 'total_items' => $totalCount, 'total_pages' => $totalPages]]
         );
         exit;
@@ -98,7 +101,7 @@ try {
         }
     }
 
-    ApiResponse::success(
+    \App\ApiResponse::success(
         $notes,
         200,
         [
@@ -113,5 +116,5 @@ try {
 
 } catch (PDOException $e) {
     error_log("Database error in query_notes.php: " . $e->getMessage() . " SQL: " . $sqlQuery);
-    ApiResponse::error('A database error occurred during query execution.', 500);
+    \App\ApiResponse::error('A database error occurred during query execution.', 500);
 }
