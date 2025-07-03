@@ -8,7 +8,6 @@ if (!function_exists('log_db_error')) {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/setup_db.php';
 require_once __DIR__ . '/db_helpers.php'; // Moved helpers to separate file
-require_once __DIR__ . '/pattern_processor.php'; // Added PatternProcessor include
 
 function get_db_connection() {
     // Remove static connection to avoid locking issues with concurrent requests
