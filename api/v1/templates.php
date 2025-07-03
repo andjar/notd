@@ -54,7 +54,7 @@ try {
         }
 
         try {
-            $processor = new TemplateProcessor($type);
+            $processor = new \App\TemplateProcessor($type);
             $templates = $processor->getAvailableTemplates();
             logError("Found templates", ['count' => count($templates), 'templates' => $templates]);
             
@@ -108,7 +108,7 @@ try {
                     ApiResponse::error('Current template name and content are required for update', 400);
                     exit;
                 }
-                $processor = new TemplateProcessor($input['type']);
+                $processor = new \App\TemplateProcessor($input['type']);
                 $success = false;
                 if (isset($input['new_name']) && $input['new_name'] !== $input['current_name']) {
                     $deleteSuccess = $processor->deleteTemplate($input['current_name']);
@@ -138,7 +138,7 @@ try {
                     ApiResponse::error('Template name is required for deletion', 400);
                     exit;
                 }
-                $processor = new TemplateProcessor($input['type']);
+                $processor = new \App\TemplateProcessor($input['type']);
                 $success = $processor->deleteTemplate($input['name']);
                 if ($success) {
                     ApiResponse::success(['message' => 'Template deleted successfully']);
@@ -157,7 +157,7 @@ try {
                     ApiResponse::error('Template name and content are required', 400);
                     exit;
                 }
-                $processor = new TemplateProcessor($input['type']);
+                $processor = new \App\TemplateProcessor($input['type']);
                 $success = $processor->addTemplate($input['name'], $input['content']);
                 if ($success) {
                     ApiResponse::success(['message' => 'Template created successfully'], 201);

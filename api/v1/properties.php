@@ -50,7 +50,7 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
                 exit;
             }
 
-            $dataManager = new DataManager($pdo);
+            $dataManager = new \App\DataManager($pdo);
             $properties = null;
 
             if ($entityType === 'note') {

@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 error_log("=== ATTACHMENTS.PHP START ===");
 error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
 error_log("POST data: " . print_r($_POST, true));
@@ -456,5 +459,5 @@ private function handleDeleteRequest() {
 
 // Initialize and handle the request
 $pdo = get_db_connection();
-$attachmentManager = new AttachmentManager($pdo);
+$attachmentManager = new \App\AttachmentManager($pdo);
 $attachmentManager->handleRequest();

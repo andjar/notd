@@ -5,7 +5,7 @@ require_once __DIR__ . '/../data_manager.php';
 require_once __DIR__ . '/../../config.php';
 
 $pdo = get_db_connection();
-$dataManager = new DataManager($pdo);
+$dataManager = new \App\DataManager($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
 
 function get_content_snippet($content, $term, $context_length = 100) {

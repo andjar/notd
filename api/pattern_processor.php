@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 // Unified Pattern Processing System
 require_once 'db_connect.php';
 require_once 'property_trigger_service.php'; // New trigger service
@@ -14,7 +17,7 @@ class PatternProcessor {
     
     public function __construct($pdo) {
         $this->pdo = $pdo;
-        $this->propertyTriggerService = new PropertyTriggerService($pdo); // Instantiate service
+        $this->propertyTriggerService = new \App\PropertyTriggerService($pdo); // Instantiate service
         $this->registerDefaultHandlers();
     }
     
@@ -480,7 +483,7 @@ class PatternProcessor {
 function getPatternProcessor() {
     static $processor = null;
     if ($processor === null) {
-        $processor = new PatternProcessor(get_db_connection());
+        $processor = new \App\PatternProcessor(get_db_connection());
     }
     return $processor;
 } 

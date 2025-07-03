@@ -89,7 +89,7 @@ try {
 
     // If properties are requested, fetch and format them using the DataManager
     if ($includeProperties && !empty($notes)) {
-        $dataManager = new DataManager($pdo);
+        $dataManager = new \App\DataManager($pdo);
         // Pass 'true' to include properties that are normally hidden in view mode
         $propertiesByNoteId = $dataManager->getPropertiesForNoteIds($noteIds, true);
 

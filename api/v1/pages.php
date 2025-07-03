@@ -16,7 +16,7 @@ if (!function_exists('_indexPropertiesFromContent')) {
         // For pages, we don't have the 'encrypted' property check or 'internal' flag update as for notes.
 
         // Instantiate the pattern processor with the existing PDO connection to avoid database locks
-        $patternProcessor = new PatternProcessor($pdo);
+        $patternProcessor = new \App\PatternProcessor($pdo);
 
         // Process the content to extract properties and potentially modified content
         // Pass $pdo in context for handlers that might need it directly.
@@ -48,7 +48,7 @@ if ($method === 'POST' && isset($input['_method'])) {
 }
 
 $pdo = get_db_connection();
-$dataManager = new DataManager($pdo);
+$dataManager = new \App\DataManager($pdo);
 // $propertyParser = new PropertyParser($pdo); // Removed global instantiation
 
 try {

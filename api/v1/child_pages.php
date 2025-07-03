@@ -23,7 +23,7 @@ if (!$namespace || !Validator::isNotEmpty($namespace)) {
 
 try {
     $pdo = get_db_connection();
-    $dataManager = new DataManager($pdo);
+    $dataManager = new \App\DataManager($pdo);
     
     $childPages = $dataManager->getChildPages($namespace);
     

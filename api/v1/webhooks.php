@@ -1,4 +1,9 @@
 <?php
+
+namespace App;
+
+use PDO;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
@@ -341,7 +346,7 @@ class WebhooksManager {
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     try {
         $pdo = get_db_connection();
-        $manager = new WebhooksManager($pdo);
+        $manager = new \App\WebhooksManager($pdo);
         $manager->handleRequest();
     } catch (Exception $e) {
         ApiResponse::error('Database connection failed or other critical error.', 500, ['details' => $e->getMessage()]);

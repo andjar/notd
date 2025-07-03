@@ -265,7 +265,7 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
                 $ownsPdo = true; // This function instance created and owns the PDO connection
             }
 
-            $dataManager = new DataManager($pdo);
+            $dataManager = new \App\DataManager($pdo);
 
             if ($ownsPdo) { // Only manage transactions if this function created the PDO connection
                 $pdo->beginTransaction();
