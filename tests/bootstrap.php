@@ -1,4 +1,7 @@
 <?php
+// Load composer autoloader
+require_once __DIR__ . '/../vendor/autoload.php';
+
 // Override database path for testing
 $GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = getenv('DB_PATH') ?: __DIR__ . '/../db/test_database.sqlite';
 
