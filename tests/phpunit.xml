@@ -3,7 +3,6 @@
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.5/phpunit.xsd"
          bootstrap="bootstrap.php"
          colors="true"
-         verbose="true"
          stopOnFailure="false"
          stopOnError="false"
          stopOnIncomplete="false"
@@ -35,8 +34,7 @@
          registerMockObjectsFromTestArgumentsRecursively="false"
          timeoutForSmallTests="1"
          timeoutForMediumTests="10"
-         timeoutForLargeTests="60"
-         verbose="true">
+         timeoutForLargeTests="60">
     
     <testsuites>
         <testsuite name="Unit Tests">
