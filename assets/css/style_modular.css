@@ -1,0 +1,45 @@
+/* ========== MODULAR CSS STRUCTURE ========== */
+/* This file imports all the modular CSS components */
+
+/* Base styles */
+@import url('base/variables.css');
+@import url('base/reset.css');
+
+/* Layout */
+@import url('layout/grid.css');
+@import url('layout/sidebar.css');
+
+/* Utilities */
+@import url('utilities/utilities.css');
+
+/* Components */
+@import url('components/notes.css');
+@import url('components/tasks.css');
+@import url('components/splash.css');
+@import url('components/buttons.css');
+@import url('components/forms.css');
+@import url('components/pills.css');
+@import url('components/modals.css');
+@import url('components/encryption.css');
+@import url('components/transclusion.css');
+@import url('components/properties.css');
+@import url('components/links.css');
+@import url('components/note-styling.css');
+
+/* Additional component files can be added here as they are created */
+/* @import url('components/search.css'); */
+/* @import url('components/properties.css'); */
+/* @import url('components/pills.css'); */
+/* @import url('components/transclusions.css'); */
+/* @import url('components/encryption.css'); */
+
+/* Utilities */
+/* @import url('utilities/animations.css'); */
+/* @import url('utilities/helpers.css'); */
+
+/* Theme overrides */
+/* @import url('themes/dark.css'); */
+/* @import url('themes/light.css'); */
+
+/* Responsive */
+/* @import url('utilities/responsive.css'); */ 

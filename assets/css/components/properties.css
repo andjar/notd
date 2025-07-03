@@ -1,0 +1,343 @@
+/* ========== INLINE PROPERTIES ========== */
+.inline-properties {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.property-inline {
+  display: inline-flex;
+  align-items: center;
+  background: var(--ls-tertiary-background-color);
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.85em;
+  border: 1px solid var(--ls-border-color);
+}
+
+.property-key {
+  color: var(--ls-accent-10);
+  font-weight: var(--ls-font-weight-medium);
+  margin-right: 2px;
+}
+
+.property-value {
+  color: var(--ls-primary-text-color);
+}
+
+.property-tag {
+  background: var(--ls-property-tag-bg, var(--ls-accent-3));
+  color: var(--ls-property-tag-text, var(--ls-accent-11));
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.85em;
+  font-weight: var(--ls-font-weight-medium);
+}
+
+.property-tag .property-key {
+  color: var(--ls-property-tag-text, var(--ls-accent-11));
+}
+
+.property-tag .property-value {
+  color: var(--ls-property-tag-text, var(--ls-accent-11));
+}
+
+.property-inline.alias-property {
+  background: var(--ls-accent-01, var(--ls-accent-3));
+  border: 1px solid var(--ls-accent-05, var(--ls-accent-5));
+}
+
+.property-inline.alias-property .property-key {
+  color: var(--ls-accent-10);
+}
+
+/* Dark theme adjustments for properties */
+[data-theme="dark"] .property-inline {
+  background: var(--ls-secondary-background-color);
+  border-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] .property-inline.alias-property {
+  background: var(--ls-accent-02, var(--ls-accent-4));
+  border-color: var(--ls-accent-07, var(--ls-accent-7));
+}
+
+/* ========== PAGE PROPERTIES PILLS ========== */
+.page-properties-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--ls-space-2);
+  margin-bottom: var(--ls-space-4);
+  padding: 0;
+  list-style: none;
+}
+
+/* ========== UPDATED PAGE PROPERTIES MODAL ========== */
+
+/* Page Properties Modal - Wider and with proper background */
+#page-properties-modal .generic-modal-content {
+  min-width: 500px; /* Increased from 300px */
+  max-width: 800px; /* Increased max width */
+  background-color: var(--ls-primary-background-color); /* Ensure background is set */
+  border: 1px solid var(--ls-secondary-border-color); /* Add subtle border */
+  box-shadow: var(--ls-shadow-lg); /* Enhanced shadow */
+}
+
+#page-properties-modal .generic-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ls-space-4); /* Increased margin */
+  padding-bottom: var(--ls-space-4); /* Increased padding */
+  border-bottom: 1px solid var(--ls-secondary-border-color);
+  background-color: var(--ls-secondary-background-color); /* Header background */
+  padding: var(--ls-space-3) var(--ls-space-4); /* Add padding to header */
+  margin: calc(-1 * var(--ls-space-3)) calc(-1 * var(--ls-space-3)) var(--ls-space-4) calc(-1 * var(--ls-space-3)); /* Negative margins to extend to edges */
+  border-radius: var(--ls-border-radius-medium) var(--ls-border-radius-medium) 0 0; /* Round top corners */
+}
+
+#page-properties-modal .generic-modal-title {
+  font-family: var(--ls-header-font-family);
+  font-size: var(--ls-font-size-xl);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  margin: 0;
+}
+
+#page-properties-modal .modal-header-icons {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+}
+
+#page-properties-modal .page-encryption-icon,
+#page-properties-modal .page-properties-modal-close {
+  /* These styles are now handled by .modal-icon-button */
+}
+
+#page-properties-modal .page-encryption-icon:hover,
+#page-properties-modal .page-properties-modal-close:hover {
+  /* These styles are now handled by .modal-icon-button */
+}
+
+#page-properties-modal .page-encryption-icon svg.feather,
+#page-properties-modal .page-properties-modal-close svg.feather {
+  width: 18px;
+  height: 18px;
+}
+
+/* Updated page properties list with better spacing */
+#page-properties-list {
+  margin-bottom: var(--ls-space-4);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--ls-space-2); /* Add padding to the list container */
+  background-color: var(--ls-tertiary-background-color); /* Light background for the list area */
+  border-radius: var(--ls-border-radius-medium);
+}
+
+#page-properties-list .page-property-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+  padding: var(--ls-space-3); /* Increased padding */
+  border-radius: var(--ls-border-radius-low);
+  background-color: var(--ls-primary-background-color); /* White background for each item */
+  margin-bottom: var(--ls-space-2);
+  border: 1px solid var(--ls-secondary-border-color); /* Subtle border */
+  transition: all var(--ls-transition-fast);
+}
+
+#page-properties-list .page-property-item:hover {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-accent-9);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+#page-properties-list .page-property-key {
+  color: var(--ls-accent-10);
+  font-weight: var(--ls-font-weight-medium);
+  padding: var(--ls-space-2) var(--ls-space-3); /* Increased padding */
+  border-radius: var(--ls-border-radius-low);
+  min-width: 120px; /* Increased min-width */
+  outline: none;
+  background-color: var(--ls-tertiary-background-color); /* Light background for keys */
+  border: 1px solid var(--ls-border-color);
+  transition: all var(--ls-transition-fast);
+}
+
+#page-properties-list .page-property-key:hover {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+#page-properties-list .page-property-key:focus {
+  outline: 2px solid var(--ls-accent-10);
+  outline-offset: 1px;
+  background-color: var(--ls-primary-background-color);
+  border-color: var(--ls-accent-10);
+}
+
+#page-properties-list .page-property-value {
+  flex: 1;
+  padding: var(--ls-space-2) var(--ls-space-3); /* Increased padding */
+  border: 1px solid var(--ls-border-color);
+  border-radius: var(--ls-border-radius-low);
+  background-color: var(--ls-primary-background-color);
+  color: var(--ls-primary-text-color);
+  outline: none;
+  transition: all var(--ls-transition-fast);
+}
+
+#page-properties-list .page-property-value:focus {
+  border-color: var(--ls-accent-10);
+  box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+  background-color: var(--ls-primary-background-color);
+}
+
+#page-properties-list .page-property-value:hover {
+  border-color: var(--ls-accent-9);
+}
+
+#page-properties-list .page-property-delete {
+  color: var(--ls-secondary-text-color);
+  background: none;
+  border: none;
+  padding: var(--ls-space-2); /* Increased padding */
+  cursor: pointer;
+  border-radius: var(--ls-border-radius-low);
+  transition: all var(--ls-transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; /* Fixed width */
+  height: 32px; /* Fixed height */
+}
+
+#page-properties-list .page-property-delete:hover {
+  color: var(--ls-error-color, #dc2626);
+  background-color: var(--ls-modal-close-danger-hover-bg);
+  transform: scale(1.05);
+}
+
+/* Updated add property button */
+.add-property-btn {
+  background-color: var(--ls-accent-10);
+  color: white;
+  border: none;
+  padding: var(--ls-space-3) var(--ls-space-4); /* Increased padding */
+  border-radius: var(--ls-border-radius-low);
+  cursor: pointer;
+  transition: all var(--ls-transition-fast);
+  font-weight: var(--ls-font-weight-medium);
+  margin-top: var(--ls-space-3);
+}
+
+.add-property-btn:hover {
+  background-color: var(--ls-accent-9);
+  transform: translateY(-1px);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+/* Dark theme adjustments for page properties modal */
+[data-theme="dark"] #page-properties-modal .generic-modal-content {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #page-properties-modal .generic-modal-header {
+  background-color: var(--ls-tertiary-background-color);
+  border-bottom-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #page-properties-list {
+  background-color: var(--ls-primary-background-color);
+}
+
+[data-theme="dark"] #page-properties-list .page-property-item {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #page-properties-list .page-property-item:hover {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+[data-theme="dark"] #page-properties-list .page-property-key {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #page-properties-list .page-property-key:hover {
+  background-color: var(--ls-primary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+[data-theme="dark"] #page-properties-list .page-property-value {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-border-color);
+  color: var(--ls-primary-text-color);
+}
+
+[data-theme="dark"] #page-properties-list .page-property-value:focus {
+  background-color: var(--ls-primary-background-color);
+  border-color: var(--ls-accent-10);
+}
+
+/* ========== PAGE PROPERTIES MODAL: WIDER TEXTAREA & BETTER BACKGROUND ========== */
+#page-properties-modal .modal-content {
+  background: var(--ls-primary-background-color);
+  border-radius: var(--ls-border-radius-medium);
+  box-shadow: var(--ls-shadow-lg);
+  padding: var(--ls-space-4) var(--ls-space-6);
+  min-width: 500px;
+  max-width: 700px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#page-properties-modal .full-width-textarea,
+#page-properties-modal textarea.full-width-textarea {
+  width: 100%;
+  min-width: 400px;
+  max-width: 100%;
+  min-height: 350px;
+  font-size: var(--ls-font-size-base);
+  font-family: var(--ls-font-family);
+  border: 1px solid var(--ls-border-color);
+  border-radius: var(--ls-border-radius-medium);
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  padding: var(--ls-space-3) var(--ls-space-4);
+  box-sizing: border-box;
+  resize: vertical;
+  margin-bottom: var(--ls-space-4);
+  transition: border-color 0.2s;
+}
+
+#page-properties-modal .full-width-textarea:focus {
+  border-color: var(--ls-accent-10);
+  outline: none;
+  background: var(--ls-primary-background-color);
+}
+
+#page-properties-modal .generic-modal-actions {
+  margin-top: var(--ls-space-3);
+}
+
+[data-theme="dark"] #page-properties-modal .modal-content {
+  background: var(--ls-secondary-background-color);
+}
+
+[data-theme="dark"] #page-properties-modal .full-width-textarea {
+  background: var(--ls-primary-background-color);
+  color: var(--ls-primary-text-color);
+  border-color: var(--ls-border-color);
+} 

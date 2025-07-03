@@ -1,0 +1,183 @@
+/* ========== COMPREHENSIVE PILL SYSTEM ========== */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.85em;
+  font-weight: var(--ls-font-weight-medium);
+  white-space: nowrap;
+  transition: all var(--ls-transition-fast);
+}
+
+.pill.pill-task-todo {
+  background-color: var(--ls-accent-3);
+  color: var(--ls-accent-11);
+}
+
+.pill.pill-task-done {
+  background-color: var(--ls-task-done-badge-bg);
+  color: var(--ls-task-done-badge-text);
+}
+
+.pill.pill-task-cancelled {
+  background-color: var(--ls-task-cancelled-badge-bg);
+  color: var(--ls-task-cancelled-badge-text);
+}
+
+.pill.pill-task-doing {
+  background-color: #f39c12;
+  color: #fff;
+}
+
+.pill.pill-task-someday {
+  background-color: #9b59b6;
+  color: #fff;
+}
+
+.pill.pill-task-waiting {
+  background-color: #3498db;
+  color: #fff;
+}
+
+.pill.pill-task-nlr {
+  background-color: #95a5a6;
+  color: #fff;
+}
+
+.pill.pill-tag {
+  background-color: var(--ls-tertiary-background-color);
+  color: var(--ls-secondary-text-color);
+  border: 1px solid var(--ls-secondary-border-color);
+}
+
+.pill.pill-property {
+  background-color: var(--ls-tertiary-background-color);
+  color: var(--ls-accent-10);
+  border: 1px solid var(--ls-secondary-border-color);
+}
+
+.pill:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+/* ========== INLINE PROPERTIES ========== */
+.inline-properties {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.property-inline {
+  display: inline-flex;
+  align-items: center;
+  background: var(--ls-tertiary-background-color);
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.85em;
+  border: 1px solid var(--ls-border-color);
+}
+
+.property-key {
+  color: var(--ls-accent-10);
+  font-weight: var(--ls-font-weight-medium);
+  margin-right: 2px;
+}
+
+.property-value {
+  color: var(--ls-primary-text-color);
+}
+
+.property-tag {
+  background: var(--ls-property-tag-bg, var(--ls-accent-3));
+  color: var(--ls-property-tag-text, var(--ls-accent-11));
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.85em;
+  font-weight: var(--ls-font-weight-medium);
+}
+
+.property-tag .property-key {
+  color: var(--ls-property-tag-text, var(--ls-accent-11));
+}
+
+.property-tag .property-value {
+  color: var(--ls-property-tag-text, var(--ls-accent-11));
+}
+
+.property-inline.alias-property {
+  background: var(--ls-accent-01, var(--ls-accent-3));
+  border: 1px solid var(--ls-accent-05, var(--ls-accent-5));
+}
+
+.property-inline.alias-property .property-key {
+  color: var(--ls-accent-10);
+}
+
+/* Dark theme adjustments for properties */
+[data-theme="dark"] .property-inline {
+  background: var(--ls-secondary-background-color);
+  border-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] .property-inline.alias-property {
+  background: var(--ls-accent-02, var(--ls-accent-4));
+  border-color: var(--ls-accent-07, var(--ls-accent-7));
+}
+
+/* ========== PAGE PROPERTIES PILLS ========== */
+.page-properties-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--ls-space-2);
+  margin-bottom: var(--ls-space-4);
+  padding: 0;
+  list-style: none;
+}
+
+/* ========== ENHANCED NOTE STYLING ========== */
+.note-content h1,
+.note-content h2,
+.note-content h3,
+.note-content h4,
+.note-content h5,
+.note-content h6 {
+  border-bottom: 1px solid var(--ls-secondary-border-color);
+  padding-bottom: var(--ls-space-1);
+  margin-bottom: var(--ls-space-2);
+  font-family: var(--ls-header-font-family);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  list-style: none;
+}
+
+.note-content h1 {
+  font-size: var(--ls-font-size-2xl);
+}
+
+.note-content h2 {
+  font-size: var(--ls-font-size-xl);
+}
+
+.note-content h3 {
+  font-size: var(--ls-font-size-lg);
+}
+
+.note-content h4 {
+  font-size: var(--ls-font-size-base);
+  font-weight: var(--ls-font-weight-semibold);
+}
+
+.note-content h5 {
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-semibold);
+}
+
+.note-content h6 {
+  font-size: var(--ls-font-size-xs);
+  font-weight: var(--ls-font-weight-semibold);
+} 

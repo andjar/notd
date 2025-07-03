@@ -1,7 +1,7 @@
 <?php
 // Email Template
 ?>
-# Email: {{subject}}
+## Email: {{subject}}
 
 **To:** {{to_address}}
 **From:** {{from_address}}
@@ -10,8 +10,7 @@
 **Priority:** {{priority}}
 **Tags:** {{tags}}
 
----
 {{email_body}}
 
----
 *Saved: {{created_datetime}}*
+{tag::mail}

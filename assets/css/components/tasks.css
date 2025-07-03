@@ -1,0 +1,218 @@
+/* === Task/Todo System === */
+.task-container {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-1);
+  padding: var(--ls-space-1) 0;
+  margin: var(--ls-space-1) 0;
+  border-radius: var(--ls-border-radius-medium);
+  border: none;
+  background-color: transparent;
+  transition: all var(--ls-transition-fast);
+}
+
+.task-container:hover {
+}
+
+.task-container.todo .task-status-badge {
+}
+
+/* Task Checkbox */
+.task-checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-1);
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.task-checkbox {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--ls-tertiary-text-color);
+  background-color: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--ls-transition-fast);
+  accent-color: var(--ls-accent-10);
+}
+
+.task-checkbox:hover {
+  transform: scale(1.1);
+  border-color: var(--ls-accent-9);
+}
+
+.task-checkbox:checked {
+  background-color: var(--ls-task-done-badge-bg);
+  border-color: var(--ls-accent-10);
+}
+
+.task-checkbox:checked::after {
+  content: "";
+  display: block;
+  width: 3px;
+  height: 6px;
+  border: solid var(--ls-task-checkbox-checkmark-color);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-50%, -50%);
+  position: absolute;
+  top: 45%;
+  left: 30%;
+}
+
+.task-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  border-color: var(--ls-gray-5);
+}
+
+/* Task Keywords */
+.task-content .task-keyword {
+  font-weight: var(--ls-font-weight-semibold);
+  padding: 1px 5px;
+  border-radius: var(--ls-border-radius-low);
+  margin-right: var(--ls-space-1);
+  display: inline-block;
+  line-height: 1.2;
+  font-size: var(--ls-font-size-sm);
+}
+
+.task-content .task-keyword.todo,
+.task-content .task-keyword.later,
+.task-content .task-keyword.now,
+.task-content .task-keyword.doing {
+  background-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 90%);
+  color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 30%);
+}
+
+.task-content .task-keyword.later {
+  background-color: var(--ls-task-keyword-later-bg);
+  color: var(--ls-task-keyword-later-text);
+}
+
+.task-content.done-text .task-keyword.done,
+.task-content.cancelled-text .task-keyword.cancelled {
+  background-color: var(--ls-gray-3);
+  color: var(--ls-tertiary-text-color);
+  text-decoration: none;
+}
+
+/* Task Status Badges */
+.task-status-badge {
+  font-size: 9px;
+  font-weight: var(--ls-font-weight-bold);
+  padding: 3px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  box-shadow: none;
+  font-family: var(--ls-font-family);
+}
+
+.task-status-badge.todo {
+  background: var(--ls-accent-10);
+  color: var(--ls-task-badge-todo-text-color);
+}
+
+.task-status-badge.doing {
+  background: #f39c12;
+  color: #fff;
+}
+
+.task-status-badge.someday {
+  background: #9b59b6;
+  color: #fff;
+}
+
+.task-status-badge.done {
+  background: var(--ls-task-done-badge-bg);
+  color: var(--ls-task-done-badge-text);
+}
+
+.task-status-badge.cancelled {
+  background: var(--ls-task-cancelled-badge-bg);
+  color: var(--ls-task-cancelled-badge-text);
+}
+
+.task-status-badge.waiting {
+  background: #3498db;
+  color: #fff;
+}
+
+.task-status-badge.nlr {
+  background: #95a5a6;
+  color: #fff;
+}
+
+/* Task Content */
+.task-content {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+  font-size: var(--ls-font-size-base);
+  padding: 0;
+}
+
+/* Task Content States */
+.task-content.done-text {
+  text-decoration: line-through;
+  opacity: 0.75;
+  color: var(--ls-secondary-text-color);
+}
+
+.task-content.cancelled-text {
+  text-decoration: line-through;
+  opacity: 0.6;
+  color: var(--ls-tertiary-text-color);
+}
+
+.task-content.waiting-text {
+  color: var(--ls-secondary-text-color);
+  font-style: italic;
+}
+
+.task-content.nlr-text {
+  text-decoration: line-through;
+  opacity: 0.5;
+  color: var(--ls-tertiary-text-color);
+  font-style: italic;
+}
+
+/* Task Container Improvements */
+.task-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: transparent;
+}
+
+.task-content.cancelled-text {
+  text-decoration: line-through;
+  opacity: 0.6;
+  color: var(--ls-tertiary-text-color);
+}
+
+/* Dark Theme Adjustments */
+[data-theme="dark"] .task-container {
+  background: var(--ls-primary-background-color);
+}
+
+[data-theme="dark"] .task-container:hover {
+  background: var(--ls-secondary-background-color);
+}
+
+[data-theme="dark"] .task-checkbox {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] .task-checkbox:hover {
+  border-color: var(--ls-accent-11);
+}
+
+[data-theme="dark"] .task-checkbox:disabled {
+  background-color: var(--ls-tertiary-background-color);
+} 

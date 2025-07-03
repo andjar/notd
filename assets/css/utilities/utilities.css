@@ -1,0 +1,311 @@
+/* ========== UTILITY CLASSES ========== */
+
+/* Save Status Indicator */
+#save-status-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  padding: 8px;
+  border-radius: 50%;
+  box-shadow: var(--ls-shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  transition: opacity 0.3s var(--ls-transition-normal),
+    transform 0.3s var(--ls-transition-normal);
+  transform: scale(1);
+  opacity: 1;
+  overflow: hidden;
+  background-color: var(--ls-save-status-bg);
+  padding: 12px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ls-secondary-border-color);
+}
+
+#save-status-indicator svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+  display: block;
+}
+
+#save-status-indicator.status-hidden {
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+}
+
+#save-status-indicator.status-saved svg {
+  stroke: var(--ls-save-status-saved-icon-color);
+}
+
+#save-status-indicator.status-error svg {
+  stroke: var(--ls-save-status-error-icon-color);
+}
+
+/* Dot Spinner */
+.dot-spinner {
+  --uib-size: 20px;
+  --uib-speed: 1s;
+  --uib-color: var(--ls-save-status-spinner-color);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--uib-size);
+  width: var(--uib-size);
+}
+
+.dot-spinner__dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100%;
+  width: 100%;
+}
+
+.dot-spinner__dot::before {
+  content: "";
+  height: 25%;
+  width: 25%;
+  border-radius: 50%;
+  background-color: var(--uib-color);
+  animation: PulseDot var(--uib-speed) ease-in-out infinite;
+}
+
+.dot-spinner__dot:nth-child(1) {
+}
+
+.dot-spinner__dot:nth-child(1)::before {
+  animation-delay: calc(var(--uib-speed) * -0.45);
+}
+
+.dot-spinner__dot:nth-child(2) {
+  transform: rotate(120deg);
+}
+
+.dot-spinner__dot:nth-child(2)::before {
+  animation-delay: calc(var(--uib-speed) * -0.3);
+}
+
+.dot-spinner__dot:nth-child(3) {
+  transform: rotate(240deg);
+}
+
+.dot-spinner__dot:nth-child(3)::before {
+  animation-delay: calc(var(--uib-speed) * -0.15);
+}
+
+@keyframes PulseDot {
+  0%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Toggle Splash Button */
+#toggle-splash-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 60px;
+  z-index: 1000;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  border-radius: 50%;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 12px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ls-secondary-border-color);
+  right: 74px;
+}
+
+#toggle-splash-btn:hover {
+  background: var(--surface-hover-color);
+  transform: scale(1.05);
+  transform: scale(1.05);
+  background: var(--ls-secondary-background-color);
+  box-shadow: var(--ls-shadow-lg);
+}
+
+#toggle-splash-btn .icon {
+  font-size: 16px;
+}
+
+#save-status-indicator:hover,
+#toggle-splash-btn:hover {
+  transform: scale(1.05);
+  background: var(--ls-secondary-background-color);
+  box-shadow: var(--ls-shadow-lg);
+}
+
+#save-status-indicator svg,
+#toggle-splash-btn svg {
+  width: 20px;
+  height: 20px;
+  color: var(--ls-primary-text-color);
+}
+
+/* Page Title and Gear Icon */
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+  margin: 0;
+  padding: 0;
+}
+
+.page-title-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-1);
+}
+
+/* Page Title Gear Icon - Smaller and more subtle */
+.page-title-gear {
+  color: var(--ls-secondary-text-color);
+  cursor: pointer;
+  padding: var(--ls-space-1);
+  border-radius: var(--ls-border-radius-low);
+  transition: all var(--ls-transition-fast);
+  opacity: 0; /* Invisible by default */
+  width: 22px; /* Smaller size */
+  height: 22px; /* Smaller size */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-title:hover .page-title-gear {
+  opacity: 1; /* Only visible on hover */
+}
+
+.page-title-gear:hover {
+  color: var(--ls-primary-text-color);
+  background: var(--ls-secondary-background-color);
+}
+
+/* Namespace links in page title */
+.namespace-link {
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  transition: color var(--ls-transition-fast);
+}
+
+.namespace-link:hover {
+  color: var(--ls-primary-color);
+  text-decoration: underline;
+}
+
+.namespace-link:visited {
+  color: var(--ls-primary-text-color);
+}
+
+/* Calendar Widget */
+.calendar-widget {
+  background: white;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.02);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.arrow-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  color: var(--text-muted);
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.arrow-btn:hover {
+  background-color: var(--sidebar-bg);
+  color: var(--primary-color);
+}
+
+.month-year-display {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.calendar-weekdays span {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Time and Date Container */
+.time-date-container {
+  text-align: center;
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+.clock {
+  font-size: 64px;
+  font-weight: 300;
+  color: var(--ls-gray-8);
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.date {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--ls-gray-7);
+  margin-top: 5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Dark theme adjustments for utilities */
+[data-theme="dark"] .clock {
+  color: var(--ls-gray-3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .date {
+  color: var(--ls-gray-4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+} 

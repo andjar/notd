@@ -1,0 +1,252 @@
+/* ========== ENCRYPTION/DECRYPTION MODAL STYLES ========== */
+
+/* Encryption Modal Background */
+#encryption-password-modal {
+  background-color: var(--ls-generic-modal-backdrop-bg, rgba(0, 0, 0, 0.6));
+  z-index: calc(var(--ls-z-index-modal, 1050) + 1); /* Ensure it's above other modals */
+}
+
+#encryption-password-modal .generic-modal-content,
+#encryption-password-modal .modal-content {
+  background-color: var(--ls-primary-background-color);
+  border-radius: var(--ls-border-radius-medium);
+  padding: var(--ls-space-4);
+  width: 90%;
+  max-width: 400px;
+  box-shadow: var(--ls-shadow-lg);
+}
+
+/* Encryption Modal Header */
+#encryption-password-modal .generic-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ls-space-4);
+  padding-bottom: var(--ls-space-3);
+  border-bottom: 1px solid var(--ls-secondary-border-color);
+}
+
+#encryption-password-modal .generic-modal-title {
+  font-family: var(--ls-header-font-family);
+  font-size: var(--ls-font-size-lg);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  margin: 0;
+}
+
+/* Encryption Modal Form */
+#encryption-password-modal .encryption-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ls-space-3);
+}
+
+#encryption-password-modal .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ls-space-1);
+}
+
+#encryption-password-modal label {
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  font-size: var(--ls-font-size-sm);
+}
+
+#encryption-password-modal input[type="password"] {
+  padding: var(--ls-space-2) var(--ls-space-3);
+  border: 1px solid var(--ls-border-color);
+  border-radius: var(--ls-border-radius-medium);
+  background-color: var(--ls-primary-background-color);
+  color: var(--ls-primary-text-color);
+  font-size: var(--ls-font-size-base);
+  transition: border-color var(--ls-transition-fast), box-shadow var(--ls-transition-fast);
+}
+
+#encryption-password-modal input[type="password"]:focus {
+  outline: none;
+  border-color: var(--ls-accent-10);
+  box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+
+/* Encryption Modal Actions */
+#encryption-password-modal .generic-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ls-space-2);
+  margin-top: var(--ls-space-4);
+  padding-top: var(--ls-space-3);
+  border-top: 1px solid var(--ls-secondary-border-color);
+}
+
+#encryption-password-modal .action-button {
+  padding: var(--ls-space-2) var(--ls-space-4);
+  border-radius: var(--ls-border-radius-medium);
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--ls-transition-fast);
+  border: 1px solid var(--ls-border-color);
+}
+
+#encryption-password-modal .action-button.primary {
+  background-color: var(--ls-accent-10);
+  border-color: var(--ls-accent-10);
+  color: var(--ls-active-nav-item-text-color, #ffffff);
+}
+
+#encryption-password-modal .action-button.primary:hover {
+  background-color: var(--ls-accent-11);
+  border-color: var(--ls-accent-11);
+}
+
+#encryption-password-modal .action-button.secondary {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+  color: var(--ls-primary-text-color);
+}
+
+#encryption-password-modal .action-button.secondary:hover {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+/* Dark theme adjustments for encryption modal */
+[data-theme="dark"] #encryption-password-modal .generic-modal-content,
+[data-theme="dark"] #encryption-password-modal .modal-content {
+  background-color: var(--ls-secondary-background-color);
+}
+
+[data-theme="dark"] #encryption-password-modal input[type="password"] {
+  background-color: var(--ls-primary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #encryption-password-modal .action-button.secondary {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #encryption-password-modal .action-button.secondary:hover {
+  background-color: var(--ls-quaternary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+/* ========== PASSWORD MODAL STYLES ========== */
+
+/* Password Modal for Encrypted Pages */
+#password-modal {
+  background-color: var(--ls-generic-modal-backdrop-bg, rgba(0, 0, 0, 0.6));
+  z-index: calc(var(--ls-z-index-modal, 1050) + 1);
+}
+
+#password-modal .modal-content {
+  background-color: var(--ls-primary-background-color);
+  border-radius: var(--ls-border-radius-medium);
+  padding: var(--ls-space-4);
+  width: 90%;
+  max-width: 400px;
+  box-shadow: var(--ls-shadow-lg);
+}
+
+#password-modal .generic-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ls-space-4);
+  padding-bottom: var(--ls-space-3);
+  border-bottom: 1px solid var(--ls-secondary-border-color);
+}
+
+#password-modal .generic-modal-title {
+  font-family: var(--ls-header-font-family);
+  font-size: var(--ls-font-size-lg);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  margin: 0;
+}
+
+#password-modal p {
+  color: var(--ls-primary-text-color);
+  margin-bottom: var(--ls-space-3);
+  line-height: 1.5;
+}
+
+#password-modal .full-width-input {
+  width: 100%;
+  padding: var(--ls-space-2) var(--ls-space-3);
+  border: 1px solid var(--ls-border-color);
+  border-radius: var(--ls-border-radius-medium);
+  background-color: var(--ls-primary-background-color);
+  color: var(--ls-primary-text-color);
+  font-size: var(--ls-font-size-base);
+  margin-bottom: var(--ls-space-3);
+  transition: border-color var(--ls-transition-fast), box-shadow var(--ls-transition-fast);
+}
+
+#password-modal .full-width-input:focus {
+  outline: none;
+  border-color: var(--ls-accent-10);
+  box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+}
+
+#password-modal .generic-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ls-space-2);
+  margin-top: var(--ls-space-4);
+  padding-top: var(--ls-space-3);
+  border-top: 1px solid var(--ls-secondary-border-color);
+}
+
+#password-modal .button {
+  padding: var(--ls-space-2) var(--ls-space-4);
+  border-radius: var(--ls-border-radius-medium);
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--ls-transition-fast);
+  border: 1px solid var(--ls-border-color);
+}
+
+#password-modal .button:not(.button-secondary) {
+  background-color: var(--ls-accent-10);
+  border-color: var(--ls-accent-10);
+  color: var(--ls-active-nav-item-text-color, #ffffff);
+}
+
+#password-modal .button:not(.button-secondary):hover {
+  background-color: var(--ls-accent-11);
+  border-color: var(--ls-accent-11);
+}
+
+#password-modal .button-secondary {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+  color: var(--ls-primary-text-color);
+}
+
+#password-modal .button-secondary:hover {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+/* Dark theme adjustments for password modal */
+[data-theme="dark"] #password-modal .modal-content {
+  background-color: var(--ls-secondary-background-color);
+}
+
+[data-theme="dark"] #password-modal .full-width-input {
+  background-color: var(--ls-primary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #password-modal .button-secondary {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] #password-modal .button-secondary:hover {
+  background-color: var(--ls-quaternary-background-color);
+  border-color: var(--ls-accent-9);
+} 
