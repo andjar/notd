@@ -13,7 +13,7 @@ class PropertyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = new PDO('sqlite:' . DB_PATH);
+        $this->pdo = new \PDO('sqlite:' . DB_PATH);
         $this->dm = new DataManager($this->pdo);
     }
 
@@ -97,7 +97,7 @@ class PropertyTest extends TestCase
         // Verify properties were saved to database
         $stmt = $this->pdo->prepare("SELECT name, value, weight FROM Properties WHERE page_id = ? ORDER BY name, value");
         $stmt->execute([$pageId]);
-        $savedProperties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $savedProperties = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
         $this->assertCount(4, $savedProperties, 'Should have 4 properties in database');
         
@@ -141,7 +141,7 @@ class PropertyTest extends TestCase
         // Verify old properties are gone and new ones are present
         $stmt = $this->pdo->prepare("SELECT name, value FROM Properties WHERE page_id = ? ORDER BY name, value");
         $stmt->execute([$pageId]);
-        $finalProperties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $finalProperties = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
         $propertyMap = [];
         foreach ($finalProperties as $prop) {

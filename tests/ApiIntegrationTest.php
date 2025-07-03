@@ -22,6 +22,11 @@ class ApiIntegrationTest extends TestCase
         
         // Run bootstrap to set up test database
         require_once __DIR__ . '/bootstrap.php';
+        
+        // Skip all tests if server is not available
+        if (!$this->isServerAvailable()) {
+            $this->markTestSkipped('Web server not available for integration tests');
+        }
     }
 
     protected function tearDown(): void
@@ -30,6 +35,19 @@ class ApiIntegrationTest extends TestCase
         if (file_exists($this->testDbPath)) {
             unlink($this->testDbPath);
         }
+    }
+
+    private function isServerAvailable()
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 5
+            ]
+        ]);
+        
+        $result = @file_get_contents($this->baseUrl . '/ping', false, $context);
+        return $result !== false;
     }
 
     private function makeRequest($method, $endpoint, $data = null, $headers = [])
