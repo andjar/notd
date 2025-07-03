@@ -2,6 +2,9 @@
 // Override database path for testing (must be set before config.php is included)
 $GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = getenv('DB_PATH') ?: __DIR__ . '/../db/test_database.sqlite';
 
+// Always include config.php first (needed for DB_PATH constant)
+require_once __DIR__ . '/../config.php';
+
 // Load composer autoloader if it exists, otherwise manually include required files
 $autoloadPath = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($autoloadPath)) {
@@ -11,7 +14,6 @@ if (file_exists($autoloadPath)) {
     error_log("Loading classes manually for testing...");
     
     // Include dependencies first (in correct order to avoid circular dependencies)
-    require_once __DIR__ . '/../config.php';
     require_once __DIR__ . '/../api/db_connect.php';
     require_once __DIR__ . '/../api/response_utils.php';
     require_once __DIR__ . '/../api/validator_utils.php';
