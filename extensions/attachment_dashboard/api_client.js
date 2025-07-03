@@ -24,8 +24,8 @@ const attachmentsAPI = {
      *                           On error, it throws an error or returns a structured error object.
      */
     getAllAttachments: async (params) => {
-        // Resolve APP_BASE_URL. Fallback to empty string if not defined globally.
-        const endpoint = '../../api/v1/attachments.php';
+        // Use absolute path from the root of the application
+        const endpoint = '/api/v1/attachments.php';
 
         const queryParams = new URLSearchParams();
         if (params) {
@@ -40,14 +40,21 @@ const attachmentsAPI = {
         console.log(`Constructed API URL: ${url}`); // For debugging
 
         try {
+            // Create an AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
                     // Add any other necessary headers, like 'Authorization' if your API requires it.
                     // 'Authorization': 'Bearer YOUR_TOKEN_HERE',
-                }
+                },
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId); // Clear timeout if request completes
 
             if (!response.ok) {
                 let errorData = { message: `HTTP error! Status: ${response.status}` };
@@ -69,8 +76,16 @@ const attachmentsAPI = {
             return await response.json(); // Parse and return the JSON response
         } catch (error) {
             console.error('Error in attachmentsAPI.getAllAttachments:', error.message, error.response || '');
-            // Re-throw the error so it can be caught by the caller in main.js
-            // Ensure the error object has a message property for main.js to display
+            
+            // Handle specific error types
+            if (error.name === 'AbortError') {
+                error.message = "Request timed out after 10 seconds. Please check your connection and try again.";
+            } else if (error.message.includes('Failed to fetch')) {
+                error.message = "Could not connect to the server. Please check if the server is running.";
+            }
+            
+            // Re-throw the error so it can be caught by the caller
+            // Ensure the error object has a message property for display
             if (!error.message) {
                 error.message = "An unknown error occurred during the API request.";
             }

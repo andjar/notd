@@ -382,6 +382,10 @@ require_once '../../config.php';
                                 newContent = newStatus + " " + taskToMove.content;
                             }
 
+                            console.log('Original content:', taskToMove.content);
+                            console.log('New content:', newContent);
+                            console.log('New status:', newStatus);
+
                             try {
                                 if (!apiLoaded || !notesAPI) {
                                     throw new Error('Notes API not loaded yet');
@@ -391,9 +395,13 @@ require_once '../../config.php';
                                     type: 'update',
                                     payload: { id: noteId, content: newContent }
                                 };
+                                console.log('Batch operation to send:', batchOperation);
                                 const response = await notesAPI.batchUpdateNotes([batchOperation]);
-                                const results = response.data?.results || response.results;
+                                console.log('Batch update response:', response);
+                                const results = response.results || response.data?.results;
+                                console.log('Results from response:', results);
                                 const updateResult = results?.find(r => r.type === 'update' && r.note && r.note.id === noteId);
+                                console.log('Update result:', updateResult);
 
                                 if (updateResult && updateResult.status === 'success') {
                                     // Update taskToMove with data from server response

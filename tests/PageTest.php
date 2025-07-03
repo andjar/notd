@@ -14,7 +14,7 @@ class PageTest extends TestCase
     protected function setUp(): void
     {
         $this->pdo = new \PDO('sqlite:' . DB_PATH);
-        $this->dm = new \App\DataManager($this->pdo);
+        $this->dm = new DataManager($this->pdo);
     }
 
     public function testGetPages()

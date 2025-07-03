@@ -64,9 +64,8 @@
         </div>
     </div>
 
-    <script type="module">
-        import { attachmentsAPI } from './api_client.js';
-
+    <script>
+        // Define the attachmentsDashboard function in global scope
         function attachmentsDashboard() {
             return {
                 attachments: [],
@@ -131,6 +130,12 @@
                     console.log("Fetching with params:", params);
 
                     try {
+                        console.log("Importing API client...");
+                        // Import the API client dynamically
+                        const { attachmentsAPI } = await import('./api_client.js');
+                        console.log("API client imported successfully");
+                        
+                        console.log("Making API call...");
                         const response = await attachmentsAPI.getAllAttachments(params);
                         console.log("API Response:", response);
 
@@ -192,8 +197,6 @@
                 }
             }
         }
-        // Make the function globally available for Alpine to use
-        window.attachmentsDashboard = attachmentsDashboard;
     </script>
 </body>
 </html>

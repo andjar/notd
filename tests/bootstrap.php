@@ -5,12 +5,22 @@ if (file_exists($autoloadPath)) {
     require_once $autoloadPath;
 } else {
     // Manual includes for testing when autoloader is not available
+    error_log("Loading classes manually for testing...");
+    
+    // Include dependencies first
+    require_once __DIR__ . '/../api/db_connect.php';
+    require_once __DIR__ . '/../api/response_utils.php';
+    require_once __DIR__ . '/../api/validator_utils.php';
+    
+    // Include main classes
     require_once __DIR__ . '/../api/data_manager.php';
     require_once __DIR__ . '/../api/pattern_processor.php';
     require_once __DIR__ . '/../api/property_trigger_service.php';
     require_once __DIR__ . '/../api/template_processor.php';
     require_once __DIR__ . '/../api/v1/webhooks.php';
     require_once __DIR__ . '/../api/v1/attachments.php';
+    
+    error_log("Manual class loading completed");
 }
 
 // Override database path for testing

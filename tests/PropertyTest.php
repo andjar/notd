@@ -5,6 +5,7 @@ namespace Tests;
 
 use PHPUnit\Framework\TestCase;
 use App\DataManager;
+use App\PatternProcessor;
 
 class PropertyTest extends TestCase
 {
@@ -14,7 +15,7 @@ class PropertyTest extends TestCase
     protected function setUp(): void
     {
         $this->pdo = new \PDO('sqlite:' . DB_PATH);
-        $this->dm = new \App\DataManager($this->pdo);
+        $this->dm = new DataManager($this->pdo);
     }
 
     public function testSystemPropertyAppendBehavior()
@@ -85,7 +86,7 @@ class PropertyTest extends TestCase
         $testContent = "{favorite::true} {type::person} {favorite::false} {type::journal}";
         
         // Process content through pattern processor
-        $patternProcessor = new \App\PatternProcessor($this->pdo);
+        $patternProcessor = new PatternProcessor($this->pdo);
         $result = $patternProcessor->processContent($testContent, 'page', $pageId, ['pdo' => $this->pdo]);
         
         // Verify all properties were extracted
@@ -132,7 +133,7 @@ class PropertyTest extends TestCase
         $newContent = "{status::new} {priority::high} {status::active}";
         
         require_once __DIR__ . '/../api/pattern_processor.php';
-        $patternProcessor = new \App\PatternProcessor($this->pdo);
+        $patternProcessor = new PatternProcessor($this->pdo);
         $result = $patternProcessor->processContent($newContent, 'page', $pageId, ['pdo' => $this->pdo]);
         
         // Save new properties (this should replace old ones)
