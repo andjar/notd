@@ -37,8 +37,8 @@
   --ls-right-sidebar-width: 300px; /* Match left sidebar width for symmetry */
   --ls-header-height: 3rem;
   --ls-main-content-max-width: 810px;
-  --ls-border-radius-low: 4px;
-  --ls-border-radius-medium: 8px;
+  --ls-border-radius-low: 2px;
+  --ls-border-radius-medium: 4px;
 
   /* Transitions */
   --ls-transition-fast: 150ms ease;
@@ -206,24 +206,18 @@ body {
   z-index: var(--ls-z-index-sidebar);
   transition: transform var(--ls-transition-fast);
   background: var(--ls-secondary-background-color);
-  /* border-right: 1px solid var(--ls-secondary-border-color); Removed for a cleaner look */
 }
 
 .right-sidebar {
   width: var(--ls-right-sidebar-width);
-  /* border-right: none; Already none */
-  /* border-left: 1px solid var(--ls-secondary-border-color); Removed for a cleaner look */
 }
 
 .left-sidebar {
   left: 0;
-  /* border-right: 1px solid var(--ls-border-color); Removed for cleaner, borderless look */
 }
 
 .right-sidebar {
   right: 0;
-  /* border-right: none; */ /* This was a duplicate rule, removing */
-  /* border-left: 1px solid var(--ls-border-color); Removed for cleaner, borderless look */
 }
 
 .sidebar-content {
@@ -2119,10 +2113,6 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 .page-search-results-list li.selected {
   background: var(--ls-secondary-background-color);
   transform: translateX(2px);
-}
-.page-search-results-list li.selected {
-  background: var(--ls-accent-10);
-  color: var(--ls-search-selected-item-text-color);
 }
 .page-search-results-list li.create-new-option {
   font-style: italic;
@@ -4596,8 +4586,6 @@ html {
   height: 100vh;
 
   background: var(--sidebar-bg);
-  border: 1px solid var(--sidebar-border);
-  box-shadow: 1px 0 8px var(--sidebar-shadow);
   display: flex;
   flex-direction: column;
   padding: 1.25rem 1rem;
@@ -4616,17 +4604,6 @@ html {
 .sidebar::-webkit-scrollbar-thumb {
   background-color: var(--sidebar-border);
   border-radius: 4px;
-}
-
-.left-sidebar {
-  left: 0;
-  border-right: 1px solid var(--sidebar-border);
-}
-
-.right-sidebar {
-  right: 0;
-  border-left: 1px solid var(--sidebar-border);
-  box-shadow: -1px 0 8px var(--sidebar-shadow);
 }
 
 /* ========== SIDEBAR CONTENT ========== */
