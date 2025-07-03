@@ -1,6 +1,17 @@
 <?php
-// Load composer autoloader
-require_once __DIR__ . '/../vendor/autoload.php';
+// Load composer autoloader if it exists, otherwise manually include required files
+$autoloadPath = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+} else {
+    // Manual includes for testing when autoloader is not available
+    require_once __DIR__ . '/../api/data_manager.php';
+    require_once __DIR__ . '/../api/pattern_processor.php';
+    require_once __DIR__ . '/../api/property_trigger_service.php';
+    require_once __DIR__ . '/../api/template_processor.php';
+    require_once __DIR__ . '/../api/v1/webhooks.php';
+    require_once __DIR__ . '/../api/v1/attachments.php';
+}
 
 // Override database path for testing
 $GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = getenv('DB_PATH') ?: __DIR__ . '/../db/test_database.sqlite';

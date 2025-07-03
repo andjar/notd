@@ -15,7 +15,7 @@ require_once '../../config.php';
     <?php require_once '../../assets/css/theme_loader.php'; // If theme consistency is desired ?>
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="../../assets/css/icons.css">
+    <link rel="stylesheet" href="../../assets/css/components/icons.css">
     <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 </head>
 <body>
@@ -31,15 +31,14 @@ require_once '../../config.php';
                 <a href="/" class="action-button">Back to Main App</a>
             </div>
         </header>
-        <main id="kanban-root" class="kanban-root">
+        <main id="kanban-root" class="kanban-root" x-show="!isLoading && !errorMessage">
             <div x-show="isLoading" class="loading-message">Loading Kanban board...</div>
             <div x-show="errorMessage" class="error-message" x-text="errorMessage"></div>
 
-            <div class="kanban-board-active" x-show="!isLoading && !errorMessage">
-                <template x-for="column in columns" :key="column.id">
+            <template x-for="column in columns" :key="column.id">
                     <div class="kanban-column" :data-status-id="column.id" :data-status-matcher="column.statusMatcher">
                         <h3 class="kanban-column-title" x-text="column.title"></h3>
-                        <div class="kanban-column-cards" :id="'column-' + column.id" x-init="initSortable($el, column.statusMatcher)">
+                        <div class="kanban-column-cards" :id="'column-' + column.id">
                             <template x-for="task in column.tasks" :key="task.id">
                                 <div class="kanban-card" :data-note-id="task.id" :data-current-status="getNoteStatus(task)" draggable="true">
                                     <span x-text="getCardDisplayContent(task.content, column.statusMatcher)"></span>
@@ -52,39 +51,41 @@ require_once '../../config.php';
                         </div>
                     </div>
                 </template>
-            </div>
         </main>
     </div>
-
-    <script>
-      // Load board configurations from config.json
-      <?php
-      $configPath = __DIR__ . '/config.json';
-      $phpConfig = json_decode(file_get_contents($configPath), true);
-      ?>
-      window.kanbanConfig = <?php echo json_encode($phpConfig); ?>;
-      window.configuredKanbanStates = <?php echo defined('TASK_STATES') ? json_encode(TASK_STATES) : json_encode(['TODO', 'DOING', 'DONE']); ?>;
-    </script>
 
     <!-- SCRIPTS -->
     <!-- Libraries -->
     <script src="../../assets/libs/feather.min.js"></script>
     <script src="../../assets/libs/Sortable.min.js"></script>
-    <!-- sjcl.js not directly used by Kanban from what's visible, can be removed if not needed for other global functions -->
-    <!-- <script src="../../assets/libs/sjcl.js"></script> -->
-
-
-    <!-- Application-specific JavaScript -->
-    <!-- utils.js might be needed by other scripts, keeping for now -->
-    <script type="module" src="../../assets/js/utils.js"></script>
     
-    <!-- API client is crucial -->
-    <script type="module" src="../../assets/js/api_client.js"></script>
+    <!-- Application-specific JavaScript -->
+    <script type="module" src="../../assets/js/utils.js"></script>
     
     <!-- Kanban-specific JS (ui.js, main.js, app.js) are replaced by the Alpine component below -->
 
-    <script type="module">
-        import { notesAPI, searchAPI } from '../../assets/js/api_client.js';
+    <script>
+        // Load board configurations from config.json
+        <?php
+        $configPath = __DIR__ . '/config.json';
+        $phpConfig = json_decode(file_get_contents($configPath), true);
+        ?>
+        window.kanbanConfig = <?php echo json_encode($phpConfig); ?>;
+        window.configuredKanbanStates = <?php echo defined('TASK_STATES') ? json_encode(TASK_STATES) : json_encode(['TODO', 'DOING', 'DONE']); ?>;
+        
+        // Import API functions
+        let notesAPI, searchAPI;
+        let apiLoaded = false;
+        
+        // Load API functions asynchronously
+        import('../../assets/js/api_client.js').then(module => {
+            notesAPI = module.notesAPI;
+            searchAPI = module.searchAPI;
+            apiLoaded = true;
+            console.log('API client loaded successfully');
+        }).catch(error => {
+            console.error('Failed to load API client:', error);
+        });
 
         function kanbanApp() {
             return {
@@ -146,6 +147,20 @@ require_once '../../config.php';
                                                                     // Could be refined with boardConfig.statuses if defined
 
                     try {
+                        // Wait for API to be loaded
+                        if (!apiLoaded || !searchAPI) {
+                            this.errorMessage = 'Loading API...';
+                            // Retry after a short delay
+                            setTimeout(() => {
+                                if (apiLoaded) {
+                                    this.fetchTasksForCurrentBoard();
+                                } else {
+                                    this.errorMessage = 'Failed to load API client';
+                                }
+                            }, 1000);
+                            return;
+                        }
+                        
                         const response = await searchAPI.getTasks('ALL', { includeParentProps: true });
                         if (response && response.results) {
                             this.allTasksRaw = response.results.map(result => ({
@@ -187,6 +202,8 @@ require_once '../../config.php';
                         this.isLoading = false;
                         this.$nextTick(() => {
                            if (window.feather) window.feather.replace();
+                           // Initialize Sortable after tasks are rendered
+                           this.initializeSortable();
                         });
                     }
                 },
@@ -266,8 +283,33 @@ require_once '../../config.php';
                     console.log("Board changed to:", this.currentBoardId);
                 },
 
+                initializeSortable() {
+                    console.log('Initializing Sortable for columns:', this.columns.length);
+                    
+                    // Destroy existing Sortable instances to prevent duplicates
+                    this.columns.forEach(column => {
+                        const columnEl = document.getElementById('column-' + column.id);
+                        if (columnEl && columnEl.sortable) {
+                            columnEl.sortable.destroy();
+                            console.log('Destroyed existing Sortable for column:', column.id);
+                        }
+                    });
+
+                    // Initialize Sortable for each column
+                    this.columns.forEach(column => {
+                        const columnEl = document.getElementById('column-' + column.id);
+                        if (columnEl) {
+                            console.log('Initializing Sortable for column:', column.id, 'with', column.tasks.length, 'tasks');
+                            this.initSortable(columnEl, column.statusMatcher);
+                        } else {
+                            console.error('Column element not found:', 'column-' + column.id);
+                        }
+                    });
+                },
+
                 initSortable(el, columnStatusMatcher) {
-                    new Sortable(el, {
+                    console.log('Creating Sortable instance for element:', el.id, 'with status:', columnStatusMatcher);
+                    const sortableInstance = new Sortable(el, {
                         group: 'kanban-cards',
                         animation: 150,
                         ghostClass: 'kanban-ghost',
@@ -341,6 +383,10 @@ require_once '../../config.php';
                             }
 
                             try {
+                                if (!apiLoaded || !notesAPI) {
+                                    throw new Error('Notes API not loaded yet');
+                                }
+                                
                                 const batchOperation = {
                                     type: 'update',
                                     payload: { id: noteId, content: newContent }
@@ -382,10 +428,17 @@ require_once '../../config.php';
                             }
                         }
                     });
+                    
+                    // Store the sortable instance on the element for cleanup
+                    el.sortable = sortableInstance;
+                    console.log('Sortable instance created and stored for:', el.id);
                 }
             };
         }
-        window.kanbanApp = kanbanApp; // Make it global for Alpine x-data
+        
+        // Make it global for Alpine x-data
+        window.kanbanApp = kanbanApp;
+        console.log('kanbanApp function defined and exposed globally');
     </script>
 </body>
 </html>

@@ -56,8 +56,8 @@ body.kanban-page-body {
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-/* Styling for #kanban-root which gets .kanban-board-active */
-.kanban-root.kanban-board-active {
+/* Styling for #kanban-root */
+.kanban-root {
     display: flex;
     flex-direction: row; /* Columns side-by-side */
     overflow-x: auto;  /* Allow horizontal scrolling for columns */
@@ -149,6 +149,14 @@ body.kanban-page-body {
 
 .error-message {
     color: var(--color-error, #dc3545);
+}
+
+.empty-column-message {
+    text-align: center;
+    padding: 20px;
+    color: var(--color-text-secondary, #6c757d);
+    font-style: italic;
+    font-size: 0.9em;
 }
 
 /* Ensure app-container on kanban.php takes full height if not already default */

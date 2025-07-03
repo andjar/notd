@@ -25,9 +25,23 @@
       font-size: 14px;
       cursor: pointer;
     }
+    .controls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .controls span {
       font-size: 12px;
       color: #333;
+    }
+    .error-message {
+      color: #d32f2f;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+    .success-message {
+      color: #2e7d32;
+      font-size: 12px;
+      margin-left: 10px;
     }
     #excalidraw-container {
       flex-grow: 1; /* Excalidraw container takes remaining space */
@@ -38,12 +52,17 @@
     }
   </style>
   <!-- Ensure api_client.js is loaded BEFORE the main logic script -->
-  <script src="../../assets/js/api_client.js" type="module"></script> 
+  <script src="../../assets/js/api_client.js" type="module"></script>
+  <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 </head>
-<body>
+<body x-data="excalidrawEditor()" x-init="init()">
   <div class="controls">
-    <button id="save-to-note-btn">Save as Attachment</button>
-    <span id="note-id-display">Note ID: (loading...)</span>
+    <button id="save-to-note-btn" @click="saveDrawing()" :disabled="isSaving || !currentNoteId || !excalidrawAPI">
+      <span x-text="isSaving ? 'Saving...' : 'Save as Attachment'"></span>
+    </button>
+    <span id="note-id-display" x-text="noteIdDisplay"></span>
+    <span x-show="errorMessage" class="error-message" x-text="errorMessage"></span>
+    <span x-show="successMessage" class="success-message" x-text="successMessage"></span>
   </div>
   <div id="excalidraw-container"></div>
 
@@ -52,6 +71,123 @@
   <script src="./excalidraw.production.min.js"></script>
   
   <!-- Main logic for the extension, including save functionality -->
-  <script src="main.js" type="module"></script> 
+  <script src="main.js" type="module"></script>
+  
+  <!-- Alpine.js Component -->
+  <script type="module">
+    import { attachmentsAPI } from '../../assets/js/api_client.js';
+
+    function excalidrawEditor() {
+      return {
+        currentNoteId: null,
+        excalidrawAPI: null,
+        isSaving: false,
+        errorMessage: '',
+        successMessage: '',
+        noteIdDisplay: 'Note ID: (loading...)',
+
+        init() {
+          this.retrieveNoteId();
+          this.setupExcalidrawAPI();
+        },
+
+        retrieveNoteId() {
+          try {
+            const urlParams = new URLSearchParams(window.location.search);
+            this.currentNoteId = urlParams.get('note_id');
+            if (this.currentNoteId) {
+              this.noteIdDisplay = `Note ID: ${this.currentNoteId}`;
+              console.log('Current Note ID:', this.currentNoteId);
+            } else {
+              this.noteIdDisplay = 'Note ID: Not Provided!';
+              this.errorMessage = 'Note ID not found in URL parameters.';
+              console.error('Note ID not found in URL parameters.');
+            }
+          } catch (e) {
+            console.error("Error parsing URL parameters:", e);
+            this.noteIdDisplay = 'Note ID: Error';
+            this.errorMessage = 'Error reading Note ID from URL.';
+          }
+        },
+
+        setupExcalidrawAPI() {
+          // Wait for the main.js to set up Excalidraw and expose the API
+          const checkAPI = setInterval(() => {
+            if (window.excalidrawAPI) {
+              this.excalidrawAPI = window.excalidrawAPI;
+              clearInterval(checkAPI);
+              console.log('Excalidraw API connected to Alpine.js');
+            }
+          }, 100);
+        },
+
+        async saveDrawing() {
+          if (!this.currentNoteId) {
+            this.errorMessage = 'Error: Note ID is missing. Cannot save attachment.';
+            return;
+          }
+          if (!this.excalidrawAPI) {
+            this.errorMessage = 'Error: Excalidraw API is not available. Cannot save.';
+            return;
+          }
+
+          this.isSaving = true;
+          this.errorMessage = '';
+          this.successMessage = '';
+
+          try {
+            // Get all elements from Excalidraw scene
+            const elements = this.excalidrawAPI.getSceneElements();
+            if (!elements || elements.length === 0) {
+              this.errorMessage = "The canvas is empty. Nothing to save.";
+              return;
+            }
+            
+            const appState = this.excalidrawAPI.getAppState();
+
+            // Use Excalidraw's exportToBlob utility
+            const blob = await window.ExcalidrawLib.exportToBlob({
+              elements: elements,
+              mimeType: 'image/png',
+              appState: {
+                ...appState,
+                exportWithDarkMode: appState.theme === 'dark',
+              },
+            });
+
+            if (!blob) {
+              throw new Error('Failed to export drawing to Blob.');
+            }
+
+            // Prepare FormData
+            const formData = new FormData();
+            formData.append('note_id', this.currentNoteId);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `excalidraw_${timestamp}.png`;
+            formData.append('attachmentFile', blob, filename);
+
+            console.log('FormData prepared for upload:', { note_id: this.currentNoteId, filename });
+
+            // Call attachmentsAPI.uploadAttachment
+            if (!attachmentsAPI || !attachmentsAPI.uploadAttachment) {
+              throw new Error('attachmentsAPI or uploadAttachment function is not available.');
+            }
+            
+            const result = await attachmentsAPI.uploadAttachment(formData);
+            console.log('Attachment upload result:', result);
+            this.successMessage = 'Drawing saved successfully as an attachment!';
+
+          } catch (error) {
+            console.error('Error saving Excalidraw drawing:', error);
+            this.errorMessage = `Error saving drawing: ${error.message}`;
+          } finally {
+            this.isSaving = false;
+          }
+        }
+      };
+    }
+    
+    window.excalidrawEditor = excalidrawEditor;
+  </script>
 </body>
 </html>
