@@ -162,7 +162,7 @@ public function handleRequest() {
             $this->handleDeleteRequest();
             break;
         default:
-            ApiResponse::error('Method Not Allowed', 405);
+            \App\ApiResponse::error('Method Not Allowed', 405);
     }
 }
 
@@ -173,14 +173,14 @@ public function handleRequest() {
         $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
         if (!empty($errorsPOST)) {
             ob_end_clean();
-            ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
+            \App\ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
             return;
         }
         $note_id = (int)$_POST['note_id'];
 
         if (!isset($_FILES['attachmentFile'])) {
             ob_end_clean();
-            ApiResponse::error('attachmentFile is required.', 400);
+            \App\ApiResponse::error('attachmentFile is required.', 400);
             return;
         }
         $file = $_FILES['attachmentFile'];
@@ -202,7 +202,7 @@ public function handleRequest() {
                 error_log("Note not found for ID: $note_id");
                 $this->pdo->rollBack();
                 ob_end_clean();
-                ApiResponse::error('Note not found', 404);
+                \App\ApiResponse::error('Note not found', 404);
                 return;
             }
 
@@ -247,7 +247,7 @@ public function handleRequest() {
             $attachment = $attachment_stmt->fetch();
 
             $this->pdo->commit();
-            ApiResponse::success($attachment, 201);
+            \App\ApiResponse::success($attachment, 201);
             ob_end_flush();
         } catch (RuntimeException $e) {
             if (isset($full_path) && file_exists($full_path)) {
@@ -257,7 +257,7 @@ public function handleRequest() {
                 $this->pdo->rollBack();
             }
             ob_end_clean();
-            ApiResponse::error($e->getMessage(), 400);
+            \App\ApiResponse::error($e->getMessage(), 400);
         } catch (PDOException $e) {
             if (isset($full_path) && file_exists($full_path)) {
                 unlink($full_path);
@@ -266,7 +266,7 @@ public function handleRequest() {
                 $this->pdo->rollBack();
             }
             ob_end_clean();
-            ApiResponse::error('Failed to save attachment: ' . $e->getMessage(), 500);
+            \App\ApiResponse::error('Failed to save attachment: ' . $e->getMessage(), 500);
         }
     }
 
@@ -288,11 +288,11 @@ public function handleRequest() {
             foreach ($attachments as &$attachment) {
                 $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path']; 
             }
-            ApiResponse::success($attachments);
+            \App\ApiResponse::success($attachments);
             ob_end_flush();
         } catch (PDOException $e) {
             ob_end_clean();
-            ApiResponse::error('Failed to fetch attachments for note_id: ' . $e->getMessage(), 500);
+            \App\ApiResponse::error('Failed to fetch attachments for note_id: ' . $e->getMessage(), 500);
         }
     }
 
@@ -364,7 +364,7 @@ public function handleRequest() {
                 $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path'];
             }
             
-            ApiResponse::success([
+            \App\ApiResponse::success([
                 'data' => $attachments,
                 'pagination' => [
                     'total_items' => $totalItems,
@@ -376,7 +376,7 @@ public function handleRequest() {
             ob_end_flush();
         } catch (PDOException $e) {
             ob_end_clean();
-            ApiResponse::error('Failed to fetch all attachments: ' . $e->getMessage(), 500);
+            \App\ApiResponse::error('Failed to fetch all attachments: ' . $e->getMessage(), 500);
         }
     }
 
@@ -405,7 +405,7 @@ private function handleDeleteRequest() {
 
     if (!empty($errors)) {
         ob_end_clean();
-        ApiResponse::error('Invalid input.', 400, $errors);
+        \App\ApiResponse::error('Invalid input.', 400, $errors);
         return;
     }
 
@@ -422,7 +422,7 @@ private function handleDeleteRequest() {
         if (!$attachment) {
             $this->pdo->rollBack();
             ob_end_clean();
-            ApiResponse::error('Attachment not found', 404);
+            \App\ApiResponse::error('Attachment not found', 404);
             return;
         }
 
@@ -444,7 +444,7 @@ private function handleDeleteRequest() {
 
         $this->pdo->commit();
 
-        ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
+        \App\ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
         ob_end_flush();
 
     } catch (RuntimeException | PDOException $e) {
@@ -452,7 +452,7 @@ private function handleDeleteRequest() {
             $this->pdo->rollBack();
         }
         ob_end_clean();
-        ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
+        \App\ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
     }
 }
 

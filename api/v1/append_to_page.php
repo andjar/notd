@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
@@ -67,13 +70,13 @@ $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
 if ($method !== 'POST') {
-    ApiResponse::error('Method not allowed. Only POST is supported.', 405);
+    \App\ApiResponse::error('Method not allowed. Only POST is supported.', 405);
     exit;
 }
 
 // 1. Validate input
 if (!isset($input['page_name']) || !is_string($input['page_name']) || empty(trim($input['page_name']))) {
-    ApiResponse::error('page_name is required and must be a non-empty string.', 400);
+    \App\ApiResponse::error('page_name is required and must be a non-empty string.', 400);
     exit;
 }
 $page_name = Validator::sanitizeString($input['page_name']);
@@ -141,7 +144,7 @@ try {
             // Re-fetch page_data to include any new properties
             $final_page_data = $dataManager->getPageDetailsById($page_id, true);
 
-            ApiResponse::success([
+            \App\ApiResponse::success([
                 'message' => ($page_data ? 'Page retrieved' : 'Page created') . ' and notes appended successfully.',
                 'page' => $final_page_data,
                 'appended_notes' => $appended_notes_results
@@ -164,5 +167,5 @@ try {
         $pdo->rollBack();
     }
     error_log("Error in append_to_page.php: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
-    ApiResponse::error('An error occurred: ' . $e->getMessage(), 500);
+    \App\ApiResponse::error('An error occurred: ' . $e->getMessage(), 500);
 }

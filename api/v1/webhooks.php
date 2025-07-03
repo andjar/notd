@@ -50,22 +50,22 @@ class WebhooksManager {
                         $input = json_decode(file_get_contents('php://input'), true);
                         $this->updateWebhook($id, $input);
                     } else {
-                        ApiResponse::error('Webhook ID is required for updating.', 400);
+                        \App\ApiResponse::error('Webhook ID is required for updating.', 400);
                     }
                     break;
                 case 'DELETE':
                     if ($id) {
                         $this->deleteWebhook($id);
                     } else {
-                        ApiResponse::error('Webhook ID is required for deleting.', 400);
+                        \App\ApiResponse::error('Webhook ID is required for deleting.', 400);
                     }
                     break;
                 default:
-                    ApiResponse::error('Method Not Allowed', 405);
+                    \App\ApiResponse::error('Method Not Allowed', 405);
                     break;
             }
         } catch (Exception $e) {
-            ApiResponse::error('An unexpected error occurred: ' . $e->getMessage(), 500);
+            \App\ApiResponse::error('An unexpected error occurred: ' . $e->getMessage(), 500);
         }
     }
 
@@ -79,7 +79,7 @@ class WebhooksManager {
             $webhook['event_types'] = json_decode($webhook['event_types'], true);
         }
         
-        ApiResponse::success($webhooks);
+        \App\ApiResponse::success($webhooks);
     }
 
     private function getWebhook($id) {
@@ -90,9 +90,9 @@ class WebhooksManager {
             // Decode JSON fields for better readability
             $webhook['property_names'] = json_decode($webhook['property_names'], true);
             $webhook['event_types'] = json_decode($webhook['event_types'], true);
-            ApiResponse::success($webhook);
+            \App\ApiResponse::success($webhook);
         } else {
-            ApiResponse::error('Webhook not found.', 404);
+            \App\ApiResponse::error('Webhook not found.', 404);
         }
     }
 
@@ -105,12 +105,12 @@ class WebhooksManager {
         ];
         $errors = Validator::validate($data, $validationRules);
         if (!empty($errors)) {
-            ApiResponse::error('Invalid input.', 400, $errors);
+            \App\ApiResponse::error('Invalid input.', 400, $errors);
             return;
         }
 
         if (filter_var($data['url'], FILTER_VALIDATE_URL) === false) {
-             ApiResponse::error('Invalid URL format.', 400, ['url' => 'Must be a valid URL.']);
+             \App\ApiResponse::error('Invalid URL format.', 400, ['url' => 'Must be a valid URL.']);
              return;
         }
 
@@ -138,7 +138,7 @@ class WebhooksManager {
         $stmt = $this->pdo->prepare("SELECT id FROM Webhooks WHERE id = ?");
         $stmt->execute([$id]);
         if (!$stmt->fetch()) {
-            ApiResponse::error('Webhook not found.', 404);
+            \App\ApiResponse::error('Webhook not found.', 404);
             return;
         }
         
@@ -147,7 +147,7 @@ class WebhooksManager {
 
         if (isset($data['url'])) {
             if (filter_var($data['url'], FILTER_VALIDATE_URL) === false) {
-                 ApiResponse::error('Invalid URL format.', 400, ['url' => 'Must be a valid URL.']);
+                 \App\ApiResponse::error('Invalid URL format.', 400, ['url' => 'Must be a valid URL.']);
                  return;
             }
             $fields[] = 'url = ?';
@@ -173,7 +173,7 @@ class WebhooksManager {
         }
         
         if (empty($fields)) {
-            ApiResponse::error('No valid fields provided for update.', 400);
+            \App\ApiResponse::error('No valid fields provided for update.', 400);
             return;
         }
 
@@ -194,9 +194,9 @@ class WebhooksManager {
             // Also delete associated events
             $stmt_events = $this->pdo->prepare("DELETE FROM WebhookEvents WHERE webhook_id = ?");
             $stmt_events->execute([$id]);
-            ApiResponse::success(['message' => "Webhook {$id} and its events deleted successfully."]);
+            \App\ApiResponse::success(['message' => "Webhook {$id} and its events deleted successfully."]);
         } else {
-            ApiResponse::error('Webhook not found.', 404);
+            \App\ApiResponse::error('Webhook not found.', 404);
         }
     }
     
@@ -214,7 +214,7 @@ class WebhooksManager {
         ];
         
         $this->dispatchEvent($webhook, 'test', $payload);
-        ApiResponse::success(['message' => 'Test event sent. Check history for result.']);
+        \App\ApiResponse::success(['message' => 'Test event sent. Check history for result.']);
     }
 
     private function verifyWebhookEndpoint($id) {
@@ -235,9 +235,9 @@ class WebhooksManager {
         $this->pdo->commit();
 
         if ($success) {
-            ApiResponse::success(['message' => "Webhook verified successfully with status {$httpCode}."]);
+            \App\ApiResponse::success(['message' => "Webhook verified successfully with status {$httpCode}."]);
         } else {
-            ApiResponse::error("Webhook verification failed with status {$httpCode}.", 502, ['response' => $responseBody]);
+            \App\ApiResponse::error("Webhook verification failed with status {$httpCode}.", 502, ['response' => $responseBody]);
         }
     }
 
@@ -249,7 +249,7 @@ class WebhooksManager {
         $stmt->execute([$id]);
         $webhook = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$webhook) {
-            ApiResponse::error('Webhook not found.', 404);
+            \App\ApiResponse::error('Webhook not found.', 404);
             return null;
         }
         return $webhook;
@@ -331,7 +331,7 @@ class WebhooksManager {
         $totalStmt->execute([$id]);
         $total = $totalStmt->fetchColumn();
 
-        ApiResponse::success([
+        \App\ApiResponse::success([
             'pagination' => [
                 'total' => $total,
                 'page' => $page,
@@ -349,6 +349,6 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
         $manager = new \App\WebhooksManager($pdo);
         $manager->handleRequest();
     } catch (Exception $e) {
-        ApiResponse::error('Database connection failed or other critical error.', 500, ['details' => $e->getMessage()]);
+        \App\ApiResponse::error('Database connection failed or other critical error.', 500, ['details' => $e->getMessage()]);
     }
 }
