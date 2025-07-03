@@ -77,8 +77,8 @@
   border: 1px solid var(--ls-secondary-border-color);
   color: var(--ls-secondary-text-color);
   font-size: var(--ls-font-size-sm);
-  width: 2rem;
-  height: 2rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 50%;
   cursor: pointer;
   box-shadow: none;

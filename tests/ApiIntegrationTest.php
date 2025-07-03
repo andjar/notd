@@ -385,4 +385,94 @@ class ApiIntegrationTest extends TestCase
         $this->assertArrayHasKey('parent_properties', $response['data']['data']);
         $this->assertArrayHasKey('category', $response['data']['data']['parent_properties']);
     }
+
+    public function testMultiplePropertiesWithSameName()
+    {
+        // Test that the API correctly handles multiple properties with the same name
+        // This tests the bug fix where only the last property was retained
+        
+        // Create a page with multiple properties of the same name
+        $response = $this->makeRequest('POST', '/pages', [
+            'name' => 'Multiple Properties Test Page',
+            'content' => '{favorite::true} {type::person} {favorite::false} {type::journal}'
+        ]);
+
+        $this->assertEquals(201, $response['status_code']);
+        $this->assertEquals('success', $response['data']['status']);
+        
+        $pageId = $response['data']['data']['id'];
+        
+        // Get the page and verify all properties are present
+        $pageResponse = $this->makeRequest('GET', "/pages?id=$pageId");
+        
+        $this->assertEquals(200, $pageResponse['status_code']);
+        $this->assertEquals('success', $pageResponse['data']['status']);
+        
+        $page = $pageResponse['data']['data'];
+        $this->assertArrayHasKey('properties', $page, 'Page should have properties');
+        
+        $properties = $page['properties'];
+        
+        // Verify both property names exist
+        $this->assertArrayHasKey('favorite', $properties, 'favorite property should exist');
+        $this->assertArrayHasKey('type', $properties, 'type property should exist');
+        
+        // Verify multiple values for favorite property
+        $this->assertCount(2, $properties['favorite'], 'favorite property should have 2 values');
+        $favoriteValues = array_column($properties['favorite'], 'value');
+        $this->assertContains('true', $favoriteValues, 'favorite should contain true');
+        $this->assertContains('false', $favoriteValues, 'favorite should contain false');
+        
+        // Verify multiple values for type property
+        $this->assertCount(2, $properties['type'], 'type property should have 2 values');
+        $typeValues = array_column($properties['type'], 'value');
+        $this->assertContains('person', $typeValues, 'type should contain person');
+        $this->assertContains('journal', $typeValues, 'type should contain journal');
+    }
+
+    public function testPropertyUpdateWithMultipleValues()
+    {
+        // Test updating a page with multiple properties of the same name
+        // First create a page with initial properties
+        $createResponse = $this->makeRequest('POST', '/pages', [
+            'name' => 'Property Update Test Page',
+            'content' => '{status::old} {priority::low}'
+        ]);
+
+        $this->assertEquals(201, $createResponse['status_code']);
+        $pageId = $createResponse['data']['data']['id'];
+        
+        // Update the page with new content containing multiple properties of the same name
+        $updateResponse = $this->makeRequest('PUT', '/pages', [
+            'id' => $pageId,
+            'name' => 'Property Update Test Page',
+            'content' => '{status::new} {priority::high} {status::active}'
+        ]);
+
+        $this->assertEquals(200, $updateResponse['status_code']);
+        $this->assertEquals('success', $updateResponse['data']['status']);
+        
+        // Get the updated page and verify properties
+        $pageResponse = $this->makeRequest('GET', "/pages?id=$pageId");
+        
+        $this->assertEquals(200, $pageResponse['status_code']);
+        $page = $pageResponse['data']['data'];
+        $properties = $page['properties'];
+        
+        // Verify old values are gone and new values are present
+        $this->assertArrayHasKey('status', $properties, 'status property should exist');
+        $this->assertArrayHasKey('priority', $properties, 'priority property should exist');
+        
+        $statusValues = array_column($properties['status'], 'value');
+        $priorityValues = array_column($properties['priority'], 'value');
+        
+        // Old values should be gone
+        $this->assertNotContains('old', $statusValues, 'Old status should be replaced');
+        $this->assertNotContains('low', $priorityValues, 'Old priority should be replaced');
+        
+        // New values should be present
+        $this->assertContains('new', $statusValues, 'New status should be present');
+        $this->assertContains('active', $statusValues, 'Active status should be present');
+        $this->assertContains('high', $priorityValues, 'High priority should be present');
+    }
 } 

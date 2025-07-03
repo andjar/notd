@@ -184,8 +184,8 @@ class PatternProcessor {
     public function handleProperties($matches, $content, $entityType, $entityId, $context, $pdo) {
         error_log("[PATTERN_PROCESSOR_DEBUG] Processing property matches with new regex: " . json_encode($matches));
         
-        // Use an associative array to only keep the last value (and its weight) for each property name
-        $propertiesByName = [];
+        // Use an array to preserve all properties, including duplicates
+        $properties = [];
         
         foreach ($matches as $match) {
             // $match[0] is the full matched string e.g. "{key::value}" or "{key:::value}"
@@ -202,22 +202,22 @@ class PatternProcessor {
             
             // It's possible $propertyName or $propertyValue could be empty if regex allows, though current one requires them.
             if (!empty($propertyName)) { // Value can be empty
-                // Store in associative array - later values will overwrite earlier ones
-                $propertiesByName[$propertyName] = [
+                // Store all properties in array - preserve duplicates
+                $properties[] = [
                     'name' => $propertyName,
                     'value' => $propertyValue,
                     'weight' => $weight, // Store the calculated weight
                     'type' => 'property', // Retain type if useful, or simplify
                     'raw_match' => $match[0]
                 ];
-                error_log("[PATTERN_PROCESSOR_DEBUG] Stored property: " . json_encode($propertiesByName[$propertyName]));
+                error_log("[PATTERN_PROCESSOR_DEBUG] Stored property: " . json_encode(end($properties)));
             } else {
                 error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty property name.");
             }
         }
         
-        // Convert back to indexed array for the return structure
-        $result = ['properties' => array_values($propertiesByName)];
+        // Return all properties as indexed array
+        $result = ['properties' => $properties];
         error_log("[PATTERN_PROCESSOR_DEBUG] Returning properties: " . json_encode($result));
         return $result;
     }
@@ -436,57 +436,29 @@ class PatternProcessor {
                         }
                     }
                 } else { // replace
-                    // First, group all properties by weight for replace behavior
-                    $replaceWeights = [];
+                    // First, delete all existing properties for this entity and name
+                    $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND name = ?";
+                    $deleteStmt = $this->pdo->prepare($deleteSql);
+                    $deleteStmt->execute([$entityId, $name]);
+                    error_log("[PATTERN_PROCESSOR_DEBUG] Deleted existing properties for {$idColumn}={$entityId}, name='{$name}'");
+                    
+                    // For each property in the group, insert it with its individual weight
                     foreach ($propertyGroup as $property) {
-                        $weight = isset($property['weight']) ? $property['weight'] : 3;
-                        if (defined('PROPERTY_WEIGHTS') && isset(PROPERTY_WEIGHTS[$weight]['update_behavior']) && PROPERTY_WEIGHTS[$weight]['update_behavior'] === 'replace') {
-                            if (!isset($replaceWeights[$weight])) $replaceWeights[$weight] = [];
-                            $replaceWeights[$weight][] = $property['name'];
-                        }
-                    }
-                    // For each replace weight, delete all properties for this note/page and weight where name is NOT in the new set
-                    foreach ($replaceWeights as $weight => $names) {
-                        $idValue = $entityId;
-                        if (count($names) > 0) {
-                            $placeholders = implode(',', array_fill(0, count($names), '?'));
-                            $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND weight = ? AND name NOT IN ($placeholders)";
-                            $deleteParams = array_merge([$idValue, $weight], $names);
+                        $propertyWeight = isset($property['weight']) ? $property['weight'] : 3;
+                        
+                        // Insert new property
+                        $insertSql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight, created_at, updated_at) 
+                                    VALUES (?, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+                        $insertStmt = $this->pdo->prepare($insertSql);
+                        $insertStmt->execute([$entityId, $property['name'], $property['value'], $propertyWeight]);
+                        
+                        if ($insertStmt->rowCount() > 0) {
+                            error_log("[PATTERN_PROCESSOR_DEBUG] Inserted property '{$property['name']}' with value '{$property['value']}' and weight {$propertyWeight}");
                         } else {
-                            $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND weight = ?";
-                            $deleteParams = [$idValue, $weight];
+                            error_log("[PATTERN_PROCESSOR_DEBUG] Failed to insert property '{$property['name']}'");
                         }
-                        error_log("[PATTERN_PROCESSOR_DEBUG] Deleting properties for {$idColumn}={$idValue}, weight={$weight}, names not in: " . json_encode($names));
-                        $deleteStmt = $this->pdo->prepare($deleteSql);
-                        $deleteStmt->execute($deleteParams);
-                    }
-                    // For each property, check if it exists
-                    foreach ($propertyGroup as $property) {
-                        // Check if property exists
-                        $checkSql = "SELECT id, value, created_at FROM Properties WHERE {$idColumn} = ? AND name = ? AND weight = ?";
-                        $checkStmt = $this->pdo->prepare($checkSql);
-                        $checkStmt->execute([$entityId, $property['name'], $weight]);
-                        $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
-                        if ($existing) {
-                            // Only update if value is different
-                            if ($existing['value'] !== $property['value']) {
-                                $updateSql = "UPDATE Properties SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-                                $updateStmt = $this->pdo->prepare($updateSql);
-                                $updateStmt->execute([$property['value'], $existing['id']]);
-                                error_log("[PATTERN_PROCESSOR_DEBUG] Updated property '{$name}' (id={$existing['id']}) value to '{$property['value']}'");
-                            }
-                        } else {
-                            // Insert new property - use INSERT OR IGNORE to handle race conditions
-                            $insertSql = "INSERT OR IGNORE INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight, created_at, updated_at) 
-                                        VALUES (?, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
-                            $insertStmt = $this->pdo->prepare($insertSql);
-                            $insertStmt->execute([$entityId, $property['name'], $property['value'], $weight]);
-                            if ($insertStmt->rowCount() > 0) {
-                                error_log("[PATTERN_PROCESSOR_DEBUG] Inserted new property '{$name}'");
-                            } else {
-                                error_log("[PATTERN_PROCESSOR_DEBUG] Property '{$name}' already exists (race condition handled)");
-                            }
-                        }
+                        
+                        // Dispatch trigger for the first property in the group
                         if ($property === reset($propertyGroup)) {
                             error_log("[PATTERN_PROCESSOR_DEBUG] Dispatching trigger for {$name}");
                             $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
