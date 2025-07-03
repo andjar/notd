@@ -7,24 +7,31 @@
 **Date:** {{date}}
 **Time:** {{time}}
 **Location:** {{location}}
+**Tags:** {{tags}}
 
 ## Attendees
-{{attendees}}
+- {{attendee_1}}
+- {{attendee_2}}
 
 ## Agenda
 1. {{agenda_item_1}}
 2. {{agenda_item_2}}
 3. {{agenda_item_3}}
 
-## Notes
+## Discussion / Notes
 - 
 
 ## Action Items
+- [ ] {{action_item_1_description}} (Assignee: {{assignee_1}}, Due: {{due_date_1}})
 - [ ] 
+
+## Decisions
+-
 
 ## Next Meeting
 **Date:** {{next_meeting_date}}
 **Time:** {{next_meeting_time}}
+**Agenda (Draft):** {{next_meeting_agenda_draft}}
 
 ---
-*Generated on {{datetime}}* 
+*Generated: {{created_datetime}}*

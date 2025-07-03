@@ -2,11 +2,19 @@
 // R Snippet Template
 ?>
 # R Snippet: {{snippet_name}}
+
 **Description:** {{description}}
-**Date Created:** {{date}}
+**Language:** R
+**Version:** {{r_version}}
+**Tags:** {{tags}}
+**Date:** {{date}}
 
 ```r
 {{r_code}}
 ```
 
-*Created on {{datetime}}* 
+## Notes
+{{notes}}
+
+---
+*Created: {{created_datetime}}*
