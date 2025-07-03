@@ -283,6 +283,42 @@ require_once '../../config.php';
                     console.log("Board changed to:", this.currentBoardId);
                 },
 
+                moveTaskToCorrectColumn(task, targetStatus) {
+                    // Find which column the task is currently in
+                    let currentColumn = null;
+                    let taskIndex = -1;
+                    
+                    for (let col of this.columns) {
+                        taskIndex = col.tasks.findIndex(t => t.id === task.id);
+                        if (taskIndex !== -1) {
+                            currentColumn = col;
+                            break;
+                        }
+                    }
+                    
+                    if (!currentColumn) {
+                        console.error('Task not found in any column:', task.id);
+                        return;
+                    }
+                    
+                    const targetColumn = this.columns.find(col => col.statusMatcher === targetStatus);
+                    if (!targetColumn) {
+                        console.error(`Target column for status ${targetStatus} not found`);
+                        return;
+                    }
+                    
+                    // If the task is already in the correct column, do nothing
+                    if (currentColumn.statusMatcher === targetStatus) {
+                        console.log(`Task ${task.id} is already in the correct column (${targetStatus})`);
+                        return;
+                    }
+                    
+                    // Move the task to the target column
+                    console.log(`Moving task ${task.id} from column ${currentColumn.statusMatcher} to ${targetStatus}`);
+                    currentColumn.tasks.splice(taskIndex, 1);
+                    targetColumn.tasks.push(task);
+                },
+
                 initializeSortable() {
                     console.log('Initializing Sortable for columns:', this.columns.length);
                     
@@ -355,19 +391,9 @@ require_once '../../config.php';
                             }
 
 
-                            // Optimistic UI update: Move task in Alpine data model
-                            // This will cause Alpine to re-render, which might conflict with Sortable's DOM change.
-                            // We need to ensure Sortable's change is either undone or Alpine's re-render is compatible.
-
-                            // Remove from old column's tasks array
-                            const taskIndex = sourceColumn.tasks.findIndex(t => t.id === noteId);
-                            if (taskIndex > -1) {
-                                sourceColumn.tasks.splice(taskIndex, 1);
-                            }
-                            // Add to new column's tasks array
-                            // Sortable's evt.newDraggableIndex refers to the DOM. We'll just push for now.
-                            // For precise positioning based on drop, this would need more logic.
-                            targetColumn.tasks.push(taskToMove);
+                            // Store the original position for potential rollback
+                            const originalTaskIndex = sourceColumn.tasks.findIndex(t => t.id === noteId);
+                            const originalTask = { ...taskToMove };
 
 
                             // Update task on backend
@@ -408,7 +434,9 @@ require_once '../../config.php';
                                     Object.assign(taskToMove, updateResult.note);
                                     itemEl.dataset.currentStatus = newStatus; // Reflect new status on the DOM element for future drags
                                     console.log(`Note ${noteId} updated to status ${newStatus}.`);
-                                    // Alpine's reactivity should handle re-rendering based on taskToMove changes.
+                                    
+                                    // Move the task to the correct column based on its updated content
+                                    this.moveTaskToCorrectColumn(taskToMove, newStatus);
                                 } else {
                                     throw new Error('Update failed or no matching result in API response.');
                                 }
@@ -416,18 +444,15 @@ require_once '../../config.php';
                                 console.error(`Failed to update note ${noteId} to status ${newStatus}:`, error);
                                 this.errorMessage = `Failed to update task: ${error.message}. Reverting move.`;
 
-                                // Revert optimistic UI update in Alpine data
-                                targetColumn.tasks.pop(); // Remove from new column
-                                sourceColumn.tasks.splice(taskIndex, 0, taskToMove); // Add back to old column at original position
-
-                                // SortableJS might have already moved the item in the DOM.
-                                // We need to tell Sortable to cancel or manually move it back.
-                                // This can be tricky. A full re-fetch or more complex state management might be safer.
-                                // For now, this revert is in the data. The DOM might be briefly inconsistent.
-                                // A simple way to force DOM consistency is to tell sortable to cancel:
-                                // evt.from.appendChild(itemEl); // This is a common way to revert.
-                                // However, this might trigger another onEnd if not careful.
-                                // The safest is often to let Alpine re-render from the corrected data.
+                                // Revert the task to its original state
+                                Object.assign(taskToMove, originalTask);
+                                itemEl.dataset.currentStatus = oldStatus;
+                                
+                                // Move the task back to its original column
+                                this.moveTaskToCorrectColumn(taskToMove, oldStatus);
+                                
+                                // Revert the DOM change that Sortable.js made
+                                evt.from.appendChild(itemEl);
                             } finally {
                                 // Ensure feather icons are updated if content changes affect them
                                 this.$nextTick(() => {
