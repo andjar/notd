@@ -206,32 +206,33 @@ body {
   z-index: var(--ls-z-index-sidebar);
   transition: transform var(--ls-transition-fast);
   background: var(--ls-secondary-background-color);
-  border-right: 1px solid var(--ls-secondary-border-color);
+  /* border-right: 1px solid var(--ls-secondary-border-color); Removed for a cleaner look */
 }
 
 .right-sidebar {
   width: var(--ls-right-sidebar-width);
-  border-right: none;
-  border-left: 1px solid var(--ls-secondary-border-color);
+  /* border-right: none; Already none */
+  /* border-left: 1px solid var(--ls-secondary-border-color); Removed for a cleaner look */
 }
 
 .left-sidebar {
   left: 0;
+  /* border-right: 1px solid var(--ls-border-color); Removed for cleaner, borderless look */
 }
 
 .right-sidebar {
   right: 0;
-  border-right: none;
-  border-left: 1px solid var(--ls-secondary-border-color);
+  /* border-right: none; */ /* This was a duplicate rule, removing */
+  /* border-left: 1px solid var(--ls-border-color); Removed for cleaner, borderless look */
 }
 
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--ls-space-1); /* Much tighter padding */
+  padding: var(--ls-space-3); /* Increased padding */
   display: flex;
   flex-direction: column;
-  gap: var(--ls-space-1); /* Much tighter gap between sections */
+  gap: var(--ls-space-3); /* Increased gap */
 }
 
 /* Sidebar Sections */
@@ -244,11 +245,11 @@ body {
   font-size: var(--ls-font-size-xs);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-secondary-text-color);
-  margin: 0 0 var(--ls-space-1) 0; /* Much tighter */
-  padding-bottom: 2px; /* Much tighter */
-  border-bottom: 1px solid var(--ls-secondary-border-color);
+  margin: 0 0 var(--ls-space-1) 0; 
+  padding-bottom: var(--ls-space-1); /* Added some padding for spacing */
+  /* border-bottom: 1px solid var(--ls-secondary-border-color); Removed for cleaner look */
   display: block;
-  letter-spacing: 0.05em; /* Reduced */
+  letter-spacing: 0.05em; 
   text-transform: uppercase;
   opacity: 0.6; /* More muted */
 }
@@ -264,8 +265,8 @@ body {
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-secondary-text-color);
   margin-bottom: var(--ls-space-1);
-  padding-bottom: var(--ls-space-1);
-  border-bottom: 1px solid var(--ls-secondary-border-color);
+  padding-bottom: var(--ls-space-1); /* Keep padding for spacing */
+  /* border-bottom: 1px solid var(--ls-secondary-border-color); Removed for cleaner look */
 }
 
 .sidebar-list {
@@ -474,43 +475,8 @@ body {
   height: 16px;
 }
 
-/* Sidebar Toggle Buttons */
-.sidebar-toggle {
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 40px;
-  background-color: var(--ls-primary-background-color);
-  border: 1px solid var(--ls-secondary-border-color);
-  border-radius: var(--ls-border-radius-medium);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--ls-z-index-sidebar-toggle);
-  transition: all var(--ls-transition-fast);
-}
-
-.sidebar-toggle:hover {
-  background-color: var(--ls-secondary-background-color);
-}
-
-.sidebar-toggle.left {
-  left: var(--ls-left-sidebar-width);
-}
-
-.sidebar-toggle.right {
-  right: var(--ls-left-sidebar-width);
-}
-
-.left-sidebar.collapsed ~ .sidebar-toggle.left {
-  left: 0;
-}
-
-.right-sidebar.collapsed ~ .sidebar-toggle.right {
-  right: 0;
-}
+/* Older .sidebar-toggle styles removed. Modern .sidebar-toggle-btn styles are used. */
+/* The actual sidebar collapse transforms are below. */
 
 .left-sidebar.collapsed {
   transform: translateX(-100%);
@@ -532,17 +498,30 @@ body {
   grid-area: main-content;
   max-width: var(--ls-main-content-max-width);
   margin: 0 auto;
-  padding: var(--ls-space-1); /* Much tighter padding */
+  padding: var(--ls-space-6) var(--ls-space-4); /* Increased padding: Top/Bottom 24px, Left/Right 16px */
   width: 100%;
   transition: margin 0.3s ease;
   min-height: 100vh;
 }
 
+/* When only left sidebar is open */
 .left-sidebar:not(.collapsed) ~ .main-content {
   margin-left: var(--ls-left-sidebar-width);
+  margin-right: auto;
 }
+
+/* When only right sidebar is open */
 .right-sidebar:not(.collapsed) ~ .main-content {
+  margin-left: auto;
   margin-right: var(--ls-right-sidebar-width);
+}
+
+/* When both sidebars are open - center the content in the remaining space */
+.left-sidebar:not(.collapsed) ~ .right-sidebar:not(.collapsed) ~ .main-content,
+.right-sidebar:not(.collapsed) ~ .left-sidebar:not(.collapsed) ~ .main-content {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: calc(100vw - var(--ls-left-sidebar-width) - var(--ls-right-sidebar-width) - var(--ls-space-8));
 }
 
 /* App Header */
@@ -685,12 +664,6 @@ body {
 .search-result-link:hover {
   color: inherit;
   text-decoration: none;
-}
-
-.search-result-page-name {
-  color: var(--ls-secondary-text-color);
-  font-size: 0.9em; /* Slightly smaller */
-  opacity: 0.8;
 }
 
 /* New Page Form */
@@ -948,7 +921,7 @@ body {
   border-radius: var(--ls-border-radius-low);
   min-height: 18px; /* Increased from 16px for better touch targets */
   padding: 3px 8px; /* Increased padding slightly for better readability */
-  line-height: 1.4; /* Increased from 1.3 for better readability */
+  line-height: 1.6; /* Increased for better readability */
 }
 
 .note-content[contenteditable="true"]:empty:before {
@@ -1492,17 +1465,19 @@ textarea:focus {
 .button:hover,
 .action-button:hover {
   background-color: var(--ls-tertiary-background-color);
-  border-color: var(--ls-gray-7);
+  border-color: var(--ls-accent-9); /* Using accent for hover border on default */
 }
-.button.primary-button,
+/* Note: .button.primary-button selector seems unused, .action-button.primary is used. */
 .action-button.primary {
   background-color: var(--ls-accent-10);
   border-color: var(--ls-accent-10);
+  color: var(--ls-active-nav-item-text-color, #fff); /* Ensure contrast text color */
 }
-.button.primary-button:hover,
+
 .action-button.primary:hover {
   background-color: var(--ls-accent-11);
   border-color: var(--ls-accent-11);
+  color: var(--ls-active-nav-item-text-color, #fff); /* Ensure contrast text color on hover */
 }
 
 /* Styles from original file that might need to be adapted or were intentionally kept */
@@ -1535,47 +1510,51 @@ textarea:focus {
 }
 
 /* Sidebar Toggle Buttons */
-.sidebar-toggle {
+/* This is the modern .sidebar-toggle-btn section that should be kept */
+.sidebar-toggle-btn {
   position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 40px;
-  background: var(--ls-primary-background-color);
-  border: 1px solid var(--ls-border-color);
-  border-radius: var(--ls-border-radius-medium);
+  width: 36px; 
+  height: 36px; 
+  background: transparent; 
+  border: none; 
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--ls-z-index-modal);
-  box-shadow: var(--ls-shadow-sm);
+  z-index: calc(var(--ls-z-index-sticky) + 1); 
   transition: all var(--ls-transition-normal);
+  font-size: 24px; 
+  color: var(--ls-secondary-text-color);
+  padding: 0; 
+  box-shadow: none; 
 }
 
-.sidebar-toggle:hover {
-  background: var(--ls-secondary-background-color);
+.sidebar-toggle-btn:hover {
+  background: transparent; 
+  color: var(--ls-primary-text-color); 
+  transform: scale(1.1);
 }
 
-.sidebar-toggle.left {
-  left: 0;
+#toggle-left-sidebar-btn {
+  top: 15px;
+  left: 15px; 
 }
 
-.sidebar-toggle.right {
-  right: 0;
-  border-radius: var(--ls-border-radius-low) 0 0 var(--ls-border-radius-low);
-  border-left: none;
-  border-right: 1px solid var(--ls-border-color);
+#toggle-right-sidebar-btn {
+  top: 15px;
+  right: 15px; 
 }
 
-/* When sidebars are collapsed, adjust toggle button positions */
-.left-sidebar.collapsed ~ .sidebar-toggle.left {
-  left: 0;
+body.left-sidebar-collapsed #toggle-left-sidebar-btn {
+  top: 15px;
+  left: 15px; 
 }
 
-.right-sidebar.collapsed ~ .sidebar-toggle.right {
-  right: 0;
+body.right-sidebar-collapsed #toggle-right-sidebar-btn {
+  top: 15px;
+  right: 15px; 
 }
+
 
 /* Responsive Design - Using LS variables now */
 @media (max-width: 1200px) {
@@ -1613,16 +1592,21 @@ textarea:focus {
     margin-right: 220px;
   }
 
-  .sidebar-toggle {
-    width: 20px;
-    height: 40px;
+  /* .sidebar-toggle specific styles were here, but already removed as part of older toggle cleanup */
+  /* .sidebar-toggle-btn specific responsive styles are below */
+
+  .sidebar-toggle-btn { /* This selector for .sidebar-toggle-btn was .sidebar-toggle in original responsive block */
+    width: 24px; /* Adjusted from original .sidebar-toggle: width: 20px; */
+    height: 40px; /* Kept from original .sidebar-toggle: height: 40px; */
+    /* font-size: 14px; This was for the old .sidebar-toggle-btn, the new one is icon based */
+  }
+  
+  /* If the icons themselves need resizing for mobile in .sidebar-toggle-btn: */
+  .sidebar-toggle-btn svg.feather {
+    width: 20px; /* Example size for mobile */
+    height: 20px; /* Example size for mobile */
   }
 
-  .sidebar-toggle-btn {
-    width: 24px;
-    height: 40px;
-    font-size: 14px;
-  }
 
   .app-title-main {
     font-size: var(--ls-font-size-3xl);
@@ -2492,55 +2476,8 @@ textarea:focus {
 }
 
 /* Essential UI Styles - moved from ui.js injections */
-
-/* Bullet Context Menu */
-.bullet-context-menu {
-  background: var(--ls-primary-background-color);
-  border: 1px solid var(--ls-border-color);
-  border-radius: var(--ls-border-radius-medium);
-  box-shadow: var(--ls-shadow-lg);
-  padding: var(--ls-space-1);
-  z-index: var(--ls-z-index-popover);
-  min-width: 180px;
-  position: fixed;
-}
-.bullet-context-menu .menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--ls-space-2);
-  padding: var(--ls-space-2);
-  border-radius: var(--ls-border-radius-low);
-  cursor: pointer;
-  transition: background-color var(--ls-transition-fast);
-  font-size: var(--ls-font-size-sm);
-  color: var(--ls-primary-text-color);
-}
-.bullet-context-menu .menu-item:hover {
-  background-color: var(--ls-secondary-background-color);
-  color: var(--ls-primary-text-color);
-}
-.bullet-context-menu .menu-item svg.feather {
-  width: 16px;
-  height: 16px;
-  color: var(--ls-secondary-text-color);
-}
-.bullet-context-menu .menu-item:hover svg.feather {
-  color: var(--ls-primary-text-color);
-}
-
-/* Copy Feedback Toast */
-.copy-feedback {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: var(--ls-accent-10);
-  color: var(--ls-toast-feedback-text-color);
-  padding: var(--ls-space-2) var(--ls-space-4);
-  border-radius: var(--ls-border-radius-medium);
-  animation: fadeInOutToast 3s ease-in-out;
-  z-index: var(--ls-z-index-tooltip);
-  font-size: var(--ls-font-size-sm);
-}
+/* Redundant Bullet Context Menu and Copy Feedback Toast removed from here. */
+/* Their primary definitions are kept earlier in the file. */
 
 /* Task Container Improvements */
 .task-container {
@@ -4864,8 +4801,6 @@ html {
 
 /* ========== MAIN CONTENT ========== */
 .main-content {
-  margin-left: var(--sidebar-width-left);
-  margin-right: var(--sidebar-width-right);
   padding: 1.5rem 2rem;
   min-height: 100vh;
   background: white;
@@ -5158,3 +5093,76 @@ html {
   --controls-top-offset: calc((var(--ls-font-size-lg) * 3.6) / 2 - (var(--control-icon-size) / 2));
 }
 /* You can add more for h4-h6 if needed, but these are the most visually impactful */
+
+
+/* FROM app.css: Template Autocomplete Styles */
+.template-autocomplete-dropdown {
+    position: absolute;
+    background-color: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-low); /* Assuming 4px maps to low */
+    box-shadow: var(--ls-shadow-sm); /* Using a standard small shadow */
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: var(--ls-z-index-dropdown, 1000); /* Use variable with fallback */
+    min-width: 200px;
+}
+
+.template-autocomplete-dropdown ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.template-autocomplete-dropdown li {
+    padding: var(--ls-space-2) var(--ls-space-3); /* Using space variables ~8px 12px */
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: var(--ls-primary-text-color); /* Ensure text color is themed */
+}
+
+.template-autocomplete-dropdown li:hover,
+.template-autocomplete-dropdown li.selected {
+    background-color: var(--ls-tertiary-background-color); /* For general hover */
+}
+
+.template-autocomplete-dropdown li.selected {
+    background-color: var(--ls-accent-3); /* More prominent for selected */
+    color: var(--ls-accent-11); /* Ensure selected text is readable */
+}
+
+.template-autocomplete-dropdown li:not(:last-child) {
+    border-bottom: 1px solid var(--ls-secondary-border-color);
+}
+
+
+/* FROM notes.css: Encrypted note styles */
+.note-item.encrypted-note {
+    position: relative;
+}
+
+.note-item.encrypted-note::before {
+    content: '🔒';
+    position: absolute;
+    left: -20px; /* This positioning might need review relative to new outliner styles */
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: var(--ls-font-size-sm); /* Using a theme font size variable */
+    opacity: 0.7;
+    color: var(--ls-secondary-text-color); /* Give the icon a theme color */
+}
+
+.note-item.needs-password .note-content {
+    color: var(--ls-tertiary-text-color); /* Use a muted text color */
+    font-style: italic;
+}
+
+.note-item.decryption-failed .note-content {
+    color: var(--color-error, #d32f2f); /* Use the theme's error color, with fallback */
+    font-style: italic;
+    font-weight: var(--ls-font-weight-medium); /* Make it slightly more prominent */
+}
+
+.note-item.decrypted-note .note-content {
+    color: inherit; /* This is fine, it will inherit the normal note content color */
+}

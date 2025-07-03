@@ -20,7 +20,7 @@
 }
 
 .month-year-display {
-    font-weight: bold;
+    font-weight: var(--ls-font-weight-semibold); /* Using theme variable */
     font-size: var(--ls-font-size-m);
     color: var(--ls-primary-text-color);
 }
@@ -60,7 +60,7 @@
 .today-btn {
     padding: var(--ls-space-1) var(--ls-space-1);
     font-size: var(--ls-font-size-s);
-    font-weight: 600;
+    font-weight: var(--ls-font-weight-semibold); /* Using theme variable */
 }
 
 .calendar-grid {
@@ -75,7 +75,7 @@
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     text-align: center;
-    font-weight: bold;
+    font-weight: var(--ls-font-weight-medium); /* Using theme variable, medium for less emphasis than header */
     color: var(--ls-secondary-text-color);
     padding-bottom: var(--ls-space-1);
     gap: var(--ls-space-2);
@@ -114,35 +114,25 @@
 
 .calendar-day:active {
     transform: scale(0.95);
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2) inset; /* Subtle press effect */
+    /* Consider if a standard shadow variable like --ls-shadow-sm inset could work, or define a new one if this specific shadow is needed. */
+    /* For now, keeping specific shadow if it's unique to this interaction. */
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.15) inset; /* Slightly softened alpha */
 }
 
 .calendar-day.today {
     background-color: var(--ls-calendar-today-bg, var(--ls-accent-10));
-    font-weight: bold;
+    font-weight: var(--ls-font-weight-bold); /* Today can be bold */
 }
 
 .calendar-day.has-content {
     position: relative;
-    border: 1px solid var(--ls-accent-5);
-}
-
-.calendar-day.has-content::after {
-    content: '';
-    display: block;
-    width: 6px;
-    height: 6px;
-    background-color: var(--ls-accent-8); /* Indicator dot */
-    border-radius: 50%;
-    position: absolute;
-    bottom: 2px;
-    left: 50%;
-    transform: translateX(-50%);
+    /* Use a more subtle border from the theme if possible, or a theme accent */
+    border: 1px solid var(--ls-accent-9); /* Was --ls-accent-5, using a slightly stronger accent for visibility */
 }
 
 .calendar-day.current-page {
     box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7)); /* Enhanced glow */
-    border-color: var(--ls-accent-8);
+    border-color: var(--ls-accent-10); /* Was --ls-accent-8 */
     animation: pulse-glow 2s infinite alternate; /* Pulsing animation */
 }
 
@@ -150,6 +140,7 @@
     background-color: var(--ls-calendar-today-bg, var(--ls-accent-10));
     box-shadow: var(--ls-calendar-current-page-glow, 0 0 15px 5px hsl(var(--ls-accent-10-hsl) / 0.7)); /* Enhanced glow for today's current page */
     animation: pulse-glow 2s infinite alternate; /* Pulsing animation */
+    color: var(--ls-calendar-today-text, var(--ls-primary-text-color)); /* Ensure text color contrasts */
 }
 
 @keyframes pulse-glow {
