@@ -25,6 +25,8 @@
 @import url('components/properties.css');
 @import url('components/links.css');
 @import url('components/note-styling.css');
+@import url('components/calendar.css');
+@import url('components/icons.css');
 
 /* Additional component files can be added here as they are created */
 /* @import url('components/search.css'); */

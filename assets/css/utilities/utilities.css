@@ -5,25 +5,21 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 1000;
-  padding: 8px;
+  z-index: calc(var(--ls-z-index-modal) + 10); /* Higher than sidebar */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
+  background-color: var(--ls-primary-background-color);
+  border: 1px solid var(--ls-secondary-border-color);
   box-shadow: var(--ls-shadow-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  transition: opacity 0.3s var(--ls-transition-normal),
-    transform 0.3s var(--ls-transition-normal);
+  transition: all var(--ls-transition-fast);
   transform: scale(1);
   opacity: 1;
   overflow: hidden;
-  background-color: var(--ls-save-status-bg);
-  padding: 12px;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--ls-secondary-border-color);
+  cursor: pointer;
 }
 
 #save-status-indicator svg {
@@ -119,43 +115,31 @@
 #toggle-splash-btn {
   position: fixed;
   bottom: 20px;
-  right: 60px;
-  z-index: 1000;
-  width: 32px;
-  height: 32px;
-  padding: 4px;
+  right: 74px;
+  z-index: calc(var(--ls-z-index-modal) + 10); /* Higher than sidebar */
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  cursor: pointer;
+  background-color: var(--ls-primary-background-color);
+  border: 1px solid var(--ls-secondary-border-color);
+  box-shadow: var(--ls-shadow-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
-  padding: 12px;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--ls-secondary-border-color);
-  right: 74px;
+  transition: all var(--ls-transition-fast);
+  cursor: pointer;
 }
 
 #toggle-splash-btn:hover {
-  background: var(--surface-hover-color);
+  background-color: var(--ls-secondary-background-color);
   transform: scale(1.05);
-  transform: scale(1.05);
-  background: var(--ls-secondary-background-color);
   box-shadow: var(--ls-shadow-lg);
-}
-
-#toggle-splash-btn .icon {
-  font-size: 16px;
 }
 
 #save-status-indicator:hover,
 #toggle-splash-btn:hover {
+  background-color: var(--ls-secondary-background-color);
   transform: scale(1.05);
-  background: var(--ls-secondary-background-color);
   box-shadow: var(--ls-shadow-lg);
 }
 
@@ -180,6 +164,13 @@
   display: flex;
   align-items: center;
   gap: var(--ls-space-1);
+}
+
+/* Page Header Separator */
+.page-title-container {
+  border-bottom: 1px solid var(--ls-secondary-border-color);
+  padding-bottom: var(--ls-space-3);
+  margin-bottom: var(--ls-space-4);
 }
 
 /* Page Title Gear Icon - Smaller and more subtle */
@@ -222,56 +213,7 @@
   color: var(--ls-primary-text-color);
 }
 
-/* Calendar Widget */
-.calendar-widget {
-  background: white;
-  border: 1px solid var(--sidebar-border);
-  border-radius: 8px;
-  padding: 0.75rem;
-  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.02);
-}
-
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: var(--text-primary);
-}
-
-.arrow-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.2rem 0.4rem;
-  color: var(--text-muted);
-  border-radius: 4px;
-  transition: background-color 0.2s ease;
-}
-
-.arrow-btn:hover {
-  background-color: var(--sidebar-bg);
-  color: var(--primary-color);
-}
-
-.month-year-display {
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  font-size: 0.75rem;
-  text-align: center;
-}
-
-.calendar-weekdays span {
-  font-weight: 600;
-  color: var(--text-muted);
-}
+/* Calendar styles moved to components/calendar.css */
 
 /* Time and Date Container */
 .time-date-container {

@@ -1,4 +1,6 @@
-/* Custom icon system using SVG backgrounds */
+/* ========== CUSTOM ICON SYSTEM ========== */
+
+/* Base icon class */
 .icon {
     display: inline-block;
     width: 1em;
@@ -35,15 +37,101 @@
 }
 
 /* Size variants */
-.icon-sm { width: 0.875em; height: 0.875em; }
-.icon-lg { width: 1.25em; height: 1.25em; }
-.icon-xl { width: 1.5em; height: 1.5em; }
-.icon-2xl { width: 2em; height: 2em; }
-.icon-3xl { width: 3em; height: 3em; }
-.icon-4xl { width: 4em; height: 4em; }
+.icon-sm { 
+    width: 0.875em; 
+    height: 0.875em; 
+}
+
+.icon-lg { 
+    width: 1.25em; 
+    height: 1.25em; 
+}
+
+.icon-xl { 
+    width: 1.5em; 
+    height: 1.5em; 
+}
+
+.icon-2xl { 
+    width: 2em; 
+    height: 2em; 
+}
+
+.icon-3xl { 
+    width: 3em; 
+    height: 3em; 
+}
+
+.icon-4xl { 
+    width: 4em; 
+    height: 4em; 
+}
 
 /* Color utilities */
-.icon-primary { color: var(--primary-color, #007bff); }
-.icon-secondary { color: var(--secondary-color, #6c757d); }
-.icon-light { color: var(--light-color, #f8f9fa); }
-.icon-dark { color: var(--dark-color, #343a40); } 
+.icon-primary { 
+    color: var(--ls-accent-10, #007bff); 
+}
+
+.icon-secondary { 
+    color: var(--ls-secondary-text-color, #6c757d); 
+}
+
+.icon-light { 
+    color: var(--ls-tertiary-text-color, #f8f9fa); 
+}
+
+.icon-dark { 
+    color: var(--ls-primary-text-color, #343a40); 
+}
+
+/* Additional icon variants */
+.icon-success { 
+    color: var(--ls-task-done-badge-bg, #10b981); 
+}
+
+.icon-warning { 
+    color: var(--ls-accent-9, #f39c12); 
+}
+
+.icon-danger { 
+    color: var(--ls-button-danger-bg, #dc2626); 
+}
+
+.icon-info { 
+    color: var(--ls-accent-8, #3498db); 
+}
+
+/* Icon with background */
+.icon-with-bg {
+    background-color: var(--ls-tertiary-background-color);
+    border-radius: var(--ls-border-radius-low);
+    padding: var(--ls-space-1);
+}
+
+.icon-with-bg:hover {
+    background-color: var(--ls-secondary-background-color);
+}
+
+/* Icon in buttons */
+.button .icon,
+.action-button .icon {
+    margin-right: var(--ls-space-1);
+}
+
+.button .icon:last-child,
+.action-button .icon:last-child {
+    margin-right: 0;
+    margin-left: var(--ls-space-1);
+}
+
+/* Icon only buttons */
+.button.icon-only,
+.action-button.icon-only {
+    padding: var(--ls-space-2);
+    min-width: auto;
+}
+
+.button.icon-only .icon,
+.action-button.icon-only .icon {
+    margin: 0;
+} 

@@ -1,4 +1,4 @@
-/* assets/css/calendar.css */
+/* ========== CALENDAR WIDGET COMPONENT ========== */
 
 .calendar-widget {
     background-color: var(--ls-primary-background-color);
@@ -36,14 +36,17 @@
     align-items: center;
     justify-content: center;
 }
+
 .arrow-btn:hover {
     background-color: var(--ls-tertiary-background-color);
     color: var(--ls-primary-text-color);
 }
+
 .arrow-btn svg {
     width: 18px;
     height: 18px;
 }
+
 .today-btn {
     font-size: var(--ls-font-size-xs);
     font-weight: var(--ls-font-weight-semibold);
@@ -96,6 +99,7 @@
     font-weight: var(--ls-font-weight-semibold);
     position: relative;
 }
+
 .calendar-day.has-content::after {
     content: '';
     position: absolute;
@@ -113,6 +117,7 @@
     color: var(--ls-accent-text-color);
     font-weight: var(--ls-font-weight-bold);
 }
+
 .calendar-day.current-page.has-content::after {
     background-color: var(--ls-accent-text-color);
 }
@@ -125,3 +130,22 @@
         box-shadow: 0 0 0px 4px var(--ls-accent-transparent);
     }
 }
+
+/* Dark theme adjustments for calendar */
+[data-theme="dark"] .calendar-widget {
+    background-color: var(--ls-secondary-background-color);
+    border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] .calendar-day:not(.empty):hover {
+    background-color: var(--ls-tertiary-background-color);
+}
+
+[data-theme="dark"] .calendar-day.today {
+    color: var(--ls-accent-10);
+    border-color: var(--ls-accent-10);
+}
+
+[data-theme="dark"] .calendar-day.has-content::after {
+    background-color: var(--ls-accent-10);
+} 
