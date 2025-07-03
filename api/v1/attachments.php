@@ -2,6 +2,8 @@
 
 namespace App;
 
+use PDO;
+
 error_log("=== ATTACHMENTS.PHP START ===");
 error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
 error_log("POST data: " . print_r($_POST, true));

@@ -14,11 +14,31 @@ if (file_exists($autoloadPath)) {
     
     // Include main classes
     require_once __DIR__ . '/../api/data_manager.php';
+    error_log("DataManager file included");
+    
     require_once __DIR__ . '/../api/pattern_processor.php';
+    error_log("PatternProcessor file included");
+    
     require_once __DIR__ . '/../api/property_trigger_service.php';
+    error_log("PropertyTriggerService file included");
+    
     require_once __DIR__ . '/../api/template_processor.php';
+    error_log("TemplateProcessor file included");
+    
     require_once __DIR__ . '/../api/v1/webhooks.php';
+    error_log("WebhooksManager file included");
+    
     require_once __DIR__ . '/../api/v1/attachments.php';
+    error_log("AttachmentManager file included");
+    
+    // Verify classes exist
+    error_log("Checking if classes exist:");
+    error_log("DataManager exists: " . (class_exists('App\DataManager') ? 'YES' : 'NO'));
+    error_log("PatternProcessor exists: " . (class_exists('App\PatternProcessor') ? 'YES' : 'NO'));
+    error_log("PropertyTriggerService exists: " . (class_exists('App\PropertyTriggerService') ? 'YES' : 'NO'));
+    error_log("TemplateProcessor exists: " . (class_exists('App\TemplateProcessor') ? 'YES' : 'NO'));
+    error_log("WebhooksManager exists: " . (class_exists('App\WebhooksManager') ? 'YES' : 'NO'));
+    error_log("AttachmentManager exists: " . (class_exists('App\AttachmentManager') ? 'YES' : 'NO'));
     
     error_log("Manual class loading completed");
 }
@@ -28,6 +48,10 @@ $GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = getenv('DB_PATH') ?: __DIR__ . '/../d
 
 // Include config.php which will use the override
 require_once __DIR__ . '/../config.php';
+
+// Set error reporting to catch any issues
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 // Initialize test database
 // Ensure the directory exists
