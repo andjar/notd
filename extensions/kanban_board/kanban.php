@@ -16,7 +16,8 @@ require_once '../../config.php';
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="../../assets/css/components/icons.css">
-    <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
+    <!-- Remove old Alpine v2 script and add Alpine v3 -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
 <body>
     <div class="app-container kanban-app-container" x-data="kanbanApp()" x-init="init()">
@@ -137,22 +138,16 @@ require_once '../../config.php';
                     this.isLoading = true;
                     this.errorMessage = '';
                     this.columns.forEach(col => col.tasks = []); // Clear tasks from columns
-
                     const boardConfig = this.getBoardConfig(this.currentBoardId);
                     if (!boardConfig) {
                         this.errorMessage = `Configuration for board '${this.currentBoardId}' not found.`;
                         this.isLoading = false;
                         return;
                     }
-
-                    const statusesForBoard = this.configuredKanbanStates; // Assuming all configured states are relevant for any board for now
-                                                                    // Could be refined with boardConfig.statuses if defined
-
+                    const statusesForBoard = this.configuredKanbanStates;
                     try {
-                        // Wait for API to be loaded
                         if (!apiLoaded || !searchAPI) {
                             this.errorMessage = 'Loading API...';
-                            // Retry after a short delay
                             setTimeout(() => {
                                 if (apiLoaded) {
                                     this.fetchTasksForCurrentBoard();
@@ -162,13 +157,13 @@ require_once '../../config.php';
                             }, 1000);
                             return;
                         }
-                        
                         const response = await searchAPI.getTasks('ALL', { includeParentProps: true });
+                        console.log('[FETCH] Raw API response:', response);
                         if (response && response.results) {
                             this.allTasksRaw = response.results.map(result => ({
                                 id: result.note_id,
                                 content: result.content,
-                                status: result.status, // Preserve direct status field from API
+                                status: result.status,
                                 properties: result.properties || {},
                                 parent_properties: result.parent_properties || {},
                                 page_id: result.page_id,
@@ -176,12 +171,11 @@ require_once '../../config.php';
                                 is_encrypted: (result.properties?.encrypted?.some(p => String(p.value).toLowerCase() === 'true') ||
                                                result.parent_properties?.encrypted?.some(p => String(p.value).toLowerCase() === 'true')) || false
                             }));
-
+                            console.log('[FETCH] Processed tasks:', this.allTasksRaw);
                             let filteredTasks = this.allTasksRaw.filter(task => {
                                 const taskStatus = this.getNoteStatus(task).toUpperCase();
                                 const statusMatch = statusesForBoard.includes(taskStatus);
                                 if (!statusMatch) return false;
-
                                 if (boardConfig.filters && boardConfig.filters.length > 0) {
                                     return boardConfig.filters.every(filter => {
                                         const noteProp = task.properties?.[filter.name]?.[0]?.value;
@@ -191,9 +185,7 @@ require_once '../../config.php';
                                 }
                                 return true;
                             });
-
                             this.distributeTasksToColumns(filteredTasks);
-
                         } else {
                             this.errorMessage = 'Failed to load tasks or tasks not found.';
                             console.warn('Search API returned unexpected format or no results:', response);
@@ -205,7 +197,6 @@ require_once '../../config.php';
                         this.isLoading = false;
                         this.$nextTick(() => {
                            if (window.feather) window.feather.replace();
-                           // Initialize Sortable after tasks are rendered
                            this.initializeSortable();
                         });
                     }
@@ -214,10 +205,9 @@ require_once '../../config.php';
                 getNoteStatus(note) {
                     // Check for direct status field first (from API response)
                     if (note.status) {
-                        console.log(`Note ${note.id} has direct status field: ${note.status}`);
+                        console.log(`[STATUS] Note ${note.id} has direct status field: ${note.status}`);
                         return note.status.toUpperCase();
                     }
-
                     // Then check properties
                     if (note.properties && note.properties.status) {
                         let rawStatus = '';
@@ -228,26 +218,24 @@ require_once '../../config.php';
                         } else if (note.properties.status.value && typeof note.properties.status.value === 'string') {
                             rawStatus = note.properties.status.value;
                         }
-                        console.log(`Note ${note.id} status from properties: "${rawStatus}"`);
+                        console.log(`[STATUS] Note ${note.id} status from properties: "${rawStatus}"`);
                         if (rawStatus && this.configuredKanbanStates.includes(rawStatus.toUpperCase())) {
                             return rawStatus.toUpperCase();
                         }
                     }
-
                     // Finally check content prefix
                     if (note.content) {
                         const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
-                        const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
+                        const statusRegex = new RegExp(`^(${statusKeywords.join('|')})\\s+`, 'i');
                         const match = note.content.match(statusRegex);
+                        console.log(`[STATUS] Note ${note.id} content='${note.content}', regex=${statusRegex}, match=${match ? match[0] : 'none'}`);
                         if (match) {
-                            console.log(`Note ${note.id} status from content: ${match[1].toUpperCase()}`);
+                            console.log(`[STATUS] Note ${note.id} status from content: ${match[1].toUpperCase()}`);
                             return match[1].toUpperCase();
                         }
                     }
-                    
-                    // Default to first configured state
                     const defaultStatus = this.configuredKanbanStates[0]?.toUpperCase() || 'TODO';
-                    console.log(`Note ${note.id} using default status: ${defaultStatus}`);
+                    console.log(`[STATUS] Note ${note.id} using default status: ${defaultStatus}`);
                     return defaultStatus;
                 },
 
@@ -267,29 +255,42 @@ require_once '../../config.php';
                 },
 
                 syncContentWithStatus(content, newStatus) {
-                    // Ensure content starts with the correct status prefix
                     const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
-                    const statusRegex = new RegExp(`^(${statusKeywords.join('|')}):?\\s+`, 'i');
+                    const statusRegex = new RegExp(`^(${statusKeywords.join('|')})\\s+`, 'i');
                     const match = content.match(statusRegex);
-                    
+                    console.log(`[SYNC] syncContentWithStatus: content='${content}', newStatus='${newStatus}', regex=${statusRegex}, match=${match ? match[0] : 'none'}`);
+                    let result;
                     if (match) {
-                        // Replace existing status prefix with new status
-                        return newStatus + " " + content.substring(match[0].length);
+                        result = newStatus + ' ' + content.substring(match[0].length);
                     } else {
-                        // Add new status prefix to content
-                        return newStatus + " " + content;
+                        result = newStatus + ' ' + content;
                     }
+                    console.log(`[SYNC] Resulting content: '${result}'`);
+                    return result;
                 },
 
                 distributeTasksToColumns(tasks) {
                     console.log(`Distributing ${tasks.length} tasks to columns`);
                     this.columns.forEach(col => col.tasks = []); // Clear existing
+                    const seenTaskIds = new Set();
                     tasks.forEach(task => {
                         const taskStatus = this.getNoteStatus(task).toUpperCase();
-                        console.log(`Task ${task.id} has status: ${taskStatus}`);
+                        console.log(`[DISTRIBUTE] Task ${task.id} has status: ${taskStatus}`);
+                        // Check for duplication in all columns
+                        let alreadyPresent = false;
+                        this.columns.forEach(col => {
+                            if (col.tasks.some(t => t.id === task.id)) {
+                                alreadyPresent = true;
+                                console.warn(`[DUPLICATE] Task ${task.id} already present in column ${col.statusMatcher}`);
+                            }
+                        });
+                        if (seenTaskIds.has(task.id)) {
+                            console.warn(`[DUPLICATE] Task ${task.id} already processed in this distribution pass.`);
+                        }
+                        seenTaskIds.add(task.id);
                         const targetColumn = this.columns.find(col => col.statusMatcher === taskStatus);
                         if (targetColumn) {
-                            console.log(`Placing task ${task.id} in column: ${targetColumn.statusMatcher}`);
+                            console.log(`[DISTRIBUTE] Placing task ${task.id} in column: ${targetColumn.statusMatcher}`);
                             targetColumn.tasks.push(task);
                         } else {
                             // Fallback: if status is not recognized, put in the first configured column
@@ -302,10 +303,10 @@ require_once '../../config.php';
                             }
                         }
                     });
-                    
                     // Log final distribution
                     this.columns.forEach(col => {
-                        console.log(`Column ${col.statusMatcher}: ${col.tasks.length} tasks`);
+                        const ids = col.tasks.map(t => t.id);
+                        console.log(`[DISTRIBUTE] Column ${col.statusMatcher}: ${col.tasks.length} tasks, IDs: ${ids.join(', ')}`);
                     });
                 },
 
@@ -429,19 +430,40 @@ require_once '../../config.php';
                             const originalTask = { ...taskToMove };
 
                             // Optimistic UI update: Move task in Alpine data model immediately
-                            // This ensures the visual position matches the data model
                             console.log(`Optimistically moving task ${noteId} from ${sourceColumn.statusMatcher} to ${targetColumn.statusMatcher}`);
                             
-                            // Remove from source column
-                            sourceColumn.tasks.splice(originalTaskIndex, 1);
-                            
-                            // Add to target column (but don't duplicate the reference)
+                            // Remove the task from all columns to prevent duplication
+                            this.columns.forEach(col => {
+                                col.tasks = col.tasks.filter(t => t.id !== noteId);
+                            });
+
+                            // Add to target column (as a new object to ensure Alpine reactivity)
                             const taskCopy = { ...taskToMove };
                             targetColumn.tasks.push(taskCopy);
-                            
-                            // Update the task reference to point to the copy in the target column
                             taskToMove = taskCopy;
 
+                            // Final de-duplication pass: ensure no column contains the same task ID more than once
+                            this.columns.forEach(col => {
+                                const seen = new Set();
+                                col.tasks = col.tasks.filter(t => {
+                                    if (seen.has(t.id)) {
+                                        console.warn(`[DEDUP] Duplicate task ${t.id} found in column ${col.statusMatcher}, removing.`);
+                                        return false;
+                                    }
+                                    seen.add(t.id);
+                                    return true;
+                                });
+                            });
+
+                            // After deduplication, always reassign the array to force Alpine reactivity
+                            this.columns.forEach(col => {
+                                col.tasks = [...col.tasks];
+                            });
+                            // Log all column contents for debugging
+                            this.columns.forEach(col => {
+                                const ids = col.tasks.map(t => t.id);
+                                console.log(`[GLOBAL DEDUP] After move/update, column ${col.statusMatcher} has tasks: [${ids.join(', ')}]`);
+                            });
 
                             // Update task on backend - ensure content and properties are in sync
                             let newContent = this.syncContentWithStatus(taskToMove.content, newStatus);
@@ -459,23 +481,43 @@ require_once '../../config.php';
                                     type: 'update',
                                     payload: { id: noteId, content: newContent }
                                 };
-                                console.log('Batch operation to send:', batchOperation);
+                                console.log('[BATCH] Sending batchOperation:', batchOperation);
                                 const response = await notesAPI.batchUpdateNotes([batchOperation]);
-                                console.log('Batch update response:', response);
+                                console.log('[BATCH] Batch update response:', response);
                                 const results = response.results || response.data?.results;
-                                console.log('Results from response:', results);
+                                console.log('[BATCH] Results from response:', results);
                                 const updateResult = results?.find(r => r.type === 'update' && r.note && r.note.id === noteId);
-                                console.log('Update result:', updateResult);
+                                console.log('[BATCH] Update result:', updateResult);
 
                                 if (updateResult && updateResult.status === 'success') {
-                                    // Update taskToMove with data from server response
-                                    Object.assign(taskToMove, updateResult.note);
-                                    itemEl.dataset.currentStatus = newStatus; // Reflect new status on the DOM element for future drags
-                                    console.log(`Note ${noteId} updated to status ${newStatus}.`);
-                                    console.log(`Task content after update:`, taskToMove.content);
-                                    
-                                    // Task is already in the correct column from optimistic update
-                                    // Just ensure the content is properly updated
+                                    // Remove all instances of this note from all columns (after backend response)
+                                    this.columns.forEach(col => {
+                                        col.tasks = col.tasks.filter(t => t.id !== noteId);
+                                    });
+                                    // Add the backend-confirmed note object to the target column
+                                    targetColumn.tasks.push({ ...updateResult.note });
+                                    // GLOBAL DEDUPLICATION: ensure only one instance of each task id exists in all columns
+                                    const globalSeen = new Set();
+                                    this.columns.forEach(col => {
+                                        col.tasks = col.tasks.filter(t => {
+                                            if (globalSeen.has(t.id)) return false;
+                                            globalSeen.add(t.id);
+                                            return true;
+                                        });
+                                    });
+                                    // After deduplication, always reassign the array to force Alpine reactivity
+                                    this.columns.forEach(col => {
+                                        col.tasks = [...col.tasks];
+                                    });
+                                    // Log all column contents for debugging
+                                    this.columns.forEach(col => {
+                                        const ids = col.tasks.map(t => t.id);
+                                        console.log(`[GLOBAL DEDUP] After move/update, column ${col.statusMatcher} has tasks: [${ids.join(', ')}]`);
+                                    });
+                                    itemEl.dataset.currentStatus = newStatus;
+                                    console.log(`[BATCH] Note ${noteId} updated to status ${newStatus}.`);
+                                    console.log(`[BATCH] Task content after update:`, updateResult.note.content);
+                                    return;
                                 } else {
                                     throw new Error('Update failed or no matching result in API response.');
                                 }

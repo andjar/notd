@@ -113,7 +113,18 @@ if ($method === 'GET') {
                 $count_stmt->execute();
                 $total = (int)$count_stmt->fetchColumn();
 
-                $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, Pg.name as page_name, Prop.value as status FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages Pg ON N.page_id = Pg.id WHERE Prop.name = 'status' GROUP BY N.id ORDER BY N.updated_at DESC LIMIT ? OFFSET ?");
+                $stmt = $pdo->prepare(<<<SQL
+SELECT N.id as note_id, N.content, N.page_id, Pg.name as page_name, Prop.value as status
+FROM Notes N
+JOIN Pages Pg ON N.page_id = Pg.id
+JOIN Properties Prop ON Prop.note_id = N.id AND Prop.name = 'status'
+  AND Prop.id = (
+    SELECT MAX(p2.id) FROM Properties p2 WHERE p2.note_id = N.id AND p2.name = 'status'
+  )
+ORDER BY N.updated_at DESC
+LIMIT ? OFFSET ?
+SQL
+                );
                 $stmt->execute([$per_page, $offset]);
                 $results = $stmt->fetchAll();
                 foreach ($results as &$result) $result['content_snippet'] = get_content_snippet($result['content'], '{status::' . $result['status'] . '}');
