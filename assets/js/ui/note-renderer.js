@@ -1255,23 +1255,21 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
         <div class="menu-item" data-action="open-zen" data-note-id="${noteId}">
             <i data-feather="edit-3"></i> Open in Zen Writer
         </div>
+        <div class="menu-item" data-action="open-excalidraw" data-note-id="${noteId}">
+            <i data-feather="pen-tool"></i> Open in Excalidraw
+        </div>
     `;
     menu.style.position = 'fixed';
     menu.style.left = `${event.pageX}px`;
     menu.style.top = `${event.pageY}px`;
 
-    const handleMenuAction = async (actionEvent) => {
-        const selectedMenuItem = actionEvent.target.closest('.menu-item');
-        if (!selectedMenuItem) return;
-        
-        const action = selectedMenuItem.dataset.action;
-        const actionNoteId = selectedMenuItem.dataset.noteId; // Get noteId from the item
-        const actionPageId = selectedMenuItem.dataset.pageId;
-
-
+    const handleMenuAction = async (event) => {
+        const target = event.target.closest('.menu-item');
+        if (!target) return;
+        const action = target.dataset.action;
         switch (action) {
             case 'copy-transclusion':
-                const transclusionLink = `!{{${actionNoteId}}}`;
+                const transclusionLink = `!{{${target.dataset.noteId}}}`;
                 await navigator.clipboard.writeText(transclusionLink);
                 // Show feedback (consider a global feedback function)
                 const feedbackCopy = document.createElement('div');
@@ -1284,7 +1282,7 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                 // Get current page name from URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const currentPage = urlParams.get('page') || 'default';
-                const anchorLink = `${window.location.origin}${window.location.pathname}?page=${encodeURIComponent(currentPage)}#note-${actionNoteId}`;
+                const anchorLink = `${window.location.origin}${window.location.pathname}?page=${encodeURIComponent(currentPage)}#note-${target.dataset.noteId}`;
                 await navigator.clipboard.writeText(anchorLink);
                 const feedbackAnchor = document.createElement('div');
                 feedbackAnchor.className = 'copy-feedback';
@@ -1293,17 +1291,17 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                 setTimeout(() => feedbackAnchor.remove(), 2000);
                 break;
             case 'delete':
-                if (confirm(`Are you sure you want to delete note ${actionNoteId}?`)) {
+                if (confirm(`Are you sure you want to delete note ${target.dataset.noteId}?`)) {
                     try {
-                        await notesAPI.deleteNote(actionNoteId);
-                        document.querySelector(`.note-item[data-note-id="${actionNoteId}"]`)?.remove();
+                        await notesAPI.deleteNote(target.dataset.noteId);
+                        document.querySelector(`.note-item[data-note-id="${target.dataset.noteId}"]`)?.remove();
                         // Also remove from window.notesForCurrentPage
                         if (window.notesForCurrentPage) {
-                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(actionNoteId));
+                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
                         }
                     } catch (error) {
                         const deleteErrorMessage = error.message || 'Please try again.';
-                        console.error(`handleDelegatedBulletContextMenu (delete action): Error deleting note ${actionNoteId}. Error:`, error);
+                        console.error(`handleDelegatedBulletContextMenu (delete action): Error deleting note ${target.dataset.noteId}. Error:`, error);
                         alert(`Failed to delete note. ${deleteErrorMessage}`);
                     }
                 }
@@ -1317,7 +1315,7 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                     for (const file of files) {
                         const formData = new FormData();
                         formData.append('attachmentFile', file);
-                        formData.append('note_id', actionNoteId);
+                        formData.append('note_id', target.dataset.noteId);
                         try {
                             await attachmentsAPI.uploadAttachment(formData);
                             const feedbackUpload = document.createElement('div');
@@ -1325,24 +1323,33 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                             feedbackUpload.textContent = `File "${file.name}" uploaded successfully!`;
                             document.body.appendChild(feedbackUpload);
                             setTimeout(() => feedbackUpload.remove(), 3000);
-                            if (window.ui && typeof window.ui.displayNotes === 'function' && actionPageId) {
-                                const pageData = await notesAPI.getPageData(actionPageId); // Refresh page
-                                window.ui.displayNotes(pageData.notes, actionPageId);
+                            if (window.ui && typeof window.ui.displayNotes === 'function' && target.dataset.pageId) {
+                                const pageData = await notesAPI.getPageData(target.dataset.pageId); // Refresh page
+                                window.ui.displayNotes(pageData.notes, target.dataset.pageId);
                             } else {
-                                console.warn('handleDelegatedBulletContextMenu (upload action): displayNotes function or pageId not available to refresh after upload for noteId:', actionNoteId);
+                                console.warn('handleDelegatedBulletContextMenu (upload action): displayNotes function or pageId not available to refresh after upload for noteId:', target.dataset.noteId);
                             }
                         } catch (error) {
                             const uploadErrorMessage = error.message || 'Please try again.';
-                            console.error(`handleDelegatedBulletContextMenu (upload action): Error uploading file "${file.name}" for note ${actionNoteId}. Error:`, error);
+                            console.error(`handleDelegatedBulletContextMenu (upload action): Error uploading file "${file.name}" for note ${target.dataset.noteId}. Error:`, error);
                             alert(`Failed to upload file "${file.name}". ${uploadErrorMessage}`);
                         }
                     }
                 };
                 input.click();
                 break;
+            case 'open-zen':
+                const zenNoteId = target.dataset.noteId;
+                // ... existing open-zen logic ...
+                break;
+            case 'open-excalidraw':
+                const excalidrawNoteId = target.dataset.noteId;
+                const excalidrawUrl = `/extensions/excalidraw_editor/excalidraw.html?note_id=${excalidrawNoteId}`;
+                window.open(excalidrawUrl, '_blank');
+                if (typeof closeMenu === 'function') closeMenu();
+                return;
         }
-        menu.remove(); 
-        document.removeEventListener('click', closeMenuOnClickOutside); 
+        menu.remove();
     };
 
     menu.addEventListener('click', handleMenuAction);

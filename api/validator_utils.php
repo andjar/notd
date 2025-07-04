@@ -1,6 +1,7 @@
 <?php
+namespace App;
 
-if (!class_exists('Validator')) {
+if (!class_exists('App\\Validator')) {
     class Validator {
 
         public static function sanitizeString($str) {

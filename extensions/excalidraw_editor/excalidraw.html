@@ -3,6 +3,7 @@
 <head>
   <title>Excalidraw Editor</title>
   <meta charset="UTF-8" />
+  <link rel="stylesheet" href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css" />
   <style>
     body, html {
       margin: 0;
@@ -51,143 +52,132 @@
       min-height: 0; /* Important for flex children that might overflow */
     }
   </style>
-  <!-- Ensure api_client.js is loaded BEFORE the main logic script -->
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.0.0",
+        "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
+        "react-dom": "https://esm.sh/react-dom@19.0.0",
+        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client"
+      }
+    }
+  </script>
   <script src="../../assets/js/api_client.js" type="module"></script>
-  <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 </head>
-<body x-data="excalidrawEditor()" x-init="init()">
+<body>
   <div class="controls">
-    <button id="save-to-note-btn" @click="saveDrawing()" :disabled="isSaving || !currentNoteId || !excalidrawAPI">
-      <span x-text="isSaving ? 'Saving...' : 'Save as Attachment'"></span>
-    </button>
-    <span id="note-id-display" x-text="noteIdDisplay"></span>
-    <span x-show="errorMessage" class="error-message" x-text="errorMessage"></span>
-    <span x-show="successMessage" class="success-message" x-text="successMessage"></span>
+    <button id="save-to-note-btn" disabled>Save as Attachment</button>
+    <span id="note-id-display">Note ID: (loading...)</span>
+    <span id="error-message" class="error-message" style="display:none"></span>
+    <span id="success-message" class="success-message" style="display:none"></span>
   </div>
   <div id="excalidraw-container"></div>
 
-  <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
-  <script src="./excalidraw.production.min.js"></script>
-  
-  <!-- Main logic for the extension, including save functionality -->
-  <script src="main.js" type="module"></script>
-  
-  <!-- Alpine.js Component -->
   <script type="module">
+    import * as ExcalidrawLib from 'https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.js?external=react,react-dom';
+    import React from "react";
+    import { createRoot } from "react-dom/client";
     import { attachmentsAPI } from '../../assets/js/api_client.js';
 
-    function excalidrawEditor() {
-      return {
-        currentNoteId: null,
-        excalidrawAPI: null,
-        isSaving: false,
-        errorMessage: '',
-        successMessage: '',
-        noteIdDisplay: 'Note ID: (loading...)',
+    const excalidrawContainer = document.getElementById('excalidraw-container');
+    const saveBtn = document.getElementById('save-to-note-btn');
+    const noteIdDisplay = document.getElementById('note-id-display');
+    const errorMessage = document.getElementById('error-message');
+    const successMessage = document.getElementById('success-message');
 
-        init() {
-          this.retrieveNoteId();
-          this.setupExcalidrawAPI();
-        },
+    let currentNoteId = null;
+    let excalidrawAPI = null;
+    let isSaving = false;
 
-        retrieveNoteId() {
-          try {
-            const urlParams = new URLSearchParams(window.location.search);
-            this.currentNoteId = urlParams.get('note_id');
-            if (this.currentNoteId) {
-              this.noteIdDisplay = `Note ID: ${this.currentNoteId}`;
-              console.log('Current Note ID:', this.currentNoteId);
-            } else {
-              this.noteIdDisplay = 'Note ID: Not Provided!';
-              this.errorMessage = 'Note ID not found in URL parameters.';
-              console.error('Note ID not found in URL parameters.');
+    // Helper to update UI state
+    function updateUI() {
+        noteIdDisplay.textContent = currentNoteId ? `Note ID: ${currentNoteId}` : 'Note ID: Not Provided!';
+        saveBtn.disabled = isSaving || !currentNoteId || !excalidrawAPI;
+        errorMessage.style.display = errorMessage.textContent ? '' : 'none';
+        successMessage.style.display = successMessage.textContent ? '' : 'none';
+    }
+
+    // Retrieve note_id from URL
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentNoteId = urlParams.get('note_id');
+    } catch (e) {
+        currentNoteId = null;
+    }
+
+    // Initialize Excalidraw and store its API
+    if (excalidrawContainer) {
+        const App = () => React.createElement(
+            ExcalidrawLib.Excalidraw,
+            {
+                excalidrawAPI: (api) => {
+                    excalidrawAPI = api;
+                    updateUI();
+                }
             }
-          } catch (e) {
-            console.error("Error parsing URL parameters:", e);
-            this.noteIdDisplay = 'Note ID: Error';
-            this.errorMessage = 'Error reading Note ID from URL.';
-          }
-        },
+        );
+        const root = createRoot(excalidrawContainer);
+        root.render(React.createElement(App));
+    } else {
+        excalidrawContainer.innerHTML = 'Error: Excalidraw could not be initialized.';
+    }
 
-        setupExcalidrawAPI() {
-          // Wait for the main.js to set up Excalidraw and expose the API
-          const checkAPI = setInterval(() => {
-            if (window.excalidrawAPI) {
-              this.excalidrawAPI = window.excalidrawAPI;
-              clearInterval(checkAPI);
-              console.log('Excalidraw API connected to Alpine.js');
-            }
-          }, 100);
-        },
-
-        async saveDrawing() {
-          if (!this.currentNoteId) {
-            this.errorMessage = 'Error: Note ID is missing. Cannot save attachment.';
+    // Save button click handler
+    saveBtn.addEventListener('click', async () => {
+        if (!currentNoteId) {
+            errorMessage.textContent = 'Error: Note ID is missing. Cannot save attachment.';
+            successMessage.textContent = '';
+            updateUI();
             return;
-          }
-          if (!this.excalidrawAPI) {
-            this.errorMessage = 'Error: Excalidraw API is not available. Cannot save.';
+        }
+        if (!excalidrawAPI) {
+            errorMessage.textContent = 'Error: Excalidraw API is not available. Cannot save.';
+            successMessage.textContent = '';
+            updateUI();
             return;
-          }
-
-          this.isSaving = true;
-          this.errorMessage = '';
-          this.successMessage = '';
-
-          try {
-            // Get all elements from Excalidraw scene
-            const elements = this.excalidrawAPI.getSceneElements();
+        }
+        isSaving = true;
+        errorMessage.textContent = '';
+        successMessage.textContent = '';
+        updateUI();
+        try {
+            const elements = excalidrawAPI.getSceneElements();
             if (!elements || elements.length === 0) {
-              this.errorMessage = "The canvas is empty. Nothing to save.";
-              return;
+                errorMessage.textContent = 'The canvas is empty. Nothing to save.';
+                updateUI();
+                isSaving = false;
+                return;
             }
-            
-            const appState = this.excalidrawAPI.getAppState();
-
-            // Use Excalidraw's exportToBlob utility
-            const blob = await window.ExcalidrawLib.exportToBlob({
-              elements: elements,
-              mimeType: 'image/png',
-              appState: {
-                ...appState,
-                exportWithDarkMode: appState.theme === 'dark',
-              },
+            const appState = excalidrawAPI.getAppState();
+            const blob = await ExcalidrawLib.exportToBlob({
+                elements,
+                mimeType: 'image/png',
+                appState: {
+                    ...appState,
+                    exportWithDarkMode: appState.theme === 'dark',
+                },
             });
-
-            if (!blob) {
-              throw new Error('Failed to export drawing to Blob.');
-            }
-
-            // Prepare FormData
+            if (!blob) throw new Error('Failed to export drawing to Blob.');
             const formData = new FormData();
-            formData.append('note_id', this.currentNoteId);
+            formData.append('note_id', currentNoteId);
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const filename = `excalidraw_${timestamp}.png`;
             formData.append('attachmentFile', blob, filename);
-
-            console.log('FormData prepared for upload:', { note_id: this.currentNoteId, filename });
-
-            // Call attachmentsAPI.uploadAttachment
             if (!attachmentsAPI || !attachmentsAPI.uploadAttachment) {
-              throw new Error('attachmentsAPI or uploadAttachment function is not available.');
+                throw new Error('attachmentsAPI or uploadAttachment function is not available.');
             }
-            
-            const result = await attachmentsAPI.uploadAttachment(formData);
-            console.log('Attachment upload result:', result);
-            this.successMessage = 'Drawing saved successfully as an attachment!';
-
-          } catch (error) {
-            console.error('Error saving Excalidraw drawing:', error);
-            this.errorMessage = `Error saving drawing: ${error.message}`;
-          } finally {
-            this.isSaving = false;
-          }
+            await attachmentsAPI.uploadAttachment(formData);
+            successMessage.textContent = 'Drawing saved successfully as an attachment!';
+        } catch (error) {
+            errorMessage.textContent = `Error saving drawing: ${error.message}`;
+        } finally {
+            isSaving = false;
+            updateUI();
         }
-      };
-    }
-    
-    window.excalidrawEditor = excalidrawEditor;
+    });
+
+    // Initial UI update
+    updateUI();
   </script>
 </body>
 </html>

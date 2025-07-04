@@ -78,6 +78,8 @@
                     pomodorosCompleted: 0,
                     timerInterval: null,
                     startButtonText: 'Start',
+                    startTimestamp: null,      // NEW: wall clock start time
+                    remainingTime: 25 * 60,    // NEW: time left when paused/stopped
                 },
                 noteProperties: '',
                 // DOM Elements are accessed via x-ref if needed, or direct binding
@@ -98,41 +100,39 @@
                 },
 
                 startTimer() {
-                    if (this.timer.timerState === 'running' && this.timer.currentSessionType === 'work') return;
-
-                    if (this.timer.timerState === 'stopped' || this.timer.timerState === 'paused') {
-                        if (this.timer.timerState === 'stopped') {
-                            if (this.timer.currentSessionType === 'work') {
-                                this.timer.currentTime = this.config.workDurationSeconds;
-                            } else if (this.timer.currentSessionType === 'shortBreak') {
-                                this.timer.currentTime = this.config.shortBreakDurationSeconds;
-                            } else if (this.timer.currentSessionType === 'longBreak') {
-                                this.timer.currentTime = this.config.longBreakDurationSeconds;
-                            }
-                        }
+                    // If starting a new session, set remainingTime to full duration
+                    if (this.timer.timerState === 'stopped') {
+                        this.timer.remainingTime = this.getDurationForSessionType(this.timer.currentSessionType) * 60;
                     }
-
+                    // If resuming from pause, remainingTime is already set
+                    this.timer.startTimestamp = Date.now();
                     this.timer.timerState = 'running';
                     this.timer.startButtonText = 'Pause';
-                    console.log(`Starting ${this.timer.currentSessionType} session. Duration: ${this.timer.currentTime}s. State: ${this.timer.timerState}`);
 
-                    // Update display immediately is handled by x-text
+                    // Immediately update currentTime for UI
+                    this.timer.currentTime = this.timer.remainingTime;
+
+                    // Clear any previous interval
+                    if (this.timer.timerInterval) clearInterval(this.timer.timerInterval);
+
                     this.timer.timerInterval = setInterval(() => {
-                        this.timer.currentTime--;
-                        // Update display is handled by x-text
+                        const elapsed = Math.floor((Date.now() - this.timer.startTimestamp) / 1000);
+                        this.timer.currentTime = this.timer.remainingTime - elapsed;
                         if (this.timer.currentTime <= 0) {
+                            this.timer.currentTime = 0;
                             clearInterval(this.timer.timerInterval);
                             this.handleSessionEnd();
                         }
-                    }, 1000);
+                    }, 500); // update twice per second for smoothness
                 },
 
                 pauseTimer() {
                     if (this.timer.timerState === 'running') {
+                        const elapsed = Math.floor((Date.now() - this.timer.startTimestamp) / 1000);
+                        this.timer.remainingTime = this.timer.remainingTime - elapsed;
                         clearInterval(this.timer.timerInterval);
                         this.timer.timerState = 'paused';
                         this.timer.startButtonText = 'Resume';
-                        console.log('Timer paused');
                     }
                 },
 
@@ -141,9 +141,8 @@
                     this.timer.timerState = 'stopped';
                     this.timer.currentSessionType = 'work';
                     this.timer.currentTime = this.config.workDurationSeconds;
-                    this.timer.pomodorosCompleted = 0;
+                    this.timer.remainingTime = this.config.workDurationSeconds;
                     this.timer.startButtonText = 'Start';
-                    console.log('Timer reset');
                 },
 
                 async logSession(sessionType, durationMinutes, customProperties) {
@@ -244,12 +243,16 @@
                     const nextType = this.getNextSessionType(this._cycleIndex);
                     this.timer.currentSessionType = nextType;
 
+                    // Set up for next session
                     if (this.timer.currentSessionType === 'work') {
                         this.timer.currentTime = this.config.workDurationSeconds;
+                        this.timer.remainingTime = this.config.workDurationSeconds;
                     } else if (this.timer.currentSessionType === 'shortBreak') {
                         this.timer.currentTime = this.config.shortBreakDurationSeconds;
+                        this.timer.remainingTime = this.config.shortBreakDurationSeconds;
                     } else if (this.timer.currentSessionType === 'longBreak') {
                         this.timer.currentTime = this.config.longBreakDurationSeconds;
+                        this.timer.remainingTime = this.config.longBreakDurationSeconds;
                     }
                     console.log(`Next session: ${this.timer.currentSessionType}. Pomodoros: ${this.timer.pomodorosCompleted}`);
                     this.startTimer(); // Automatically start the next timer

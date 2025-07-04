@@ -79,7 +79,7 @@ if (!isset($input['page_name']) || !is_string($input['page_name']) || empty(trim
     \App\ApiResponse::error('page_name is required and must be a non-empty string.', 400);
     exit;
 }
-$page_name = Validator::sanitizeString($input['page_name']);
+$page_name = \Validator::sanitizeString($input['page_name']);
 
 try {
     $pdo->beginTransaction();
@@ -133,7 +133,7 @@ try {
     // Process batch operations directly
     if (!empty($batch_operations)) {
         try {
-            $appended_notes_results = _handleBatchOperations($pdo, $dataManager, $batch_operations);
+            $appended_notes_results = _handleBatchOperations($pdo, $dataManager, $batch_operations, false);
 
             // If we get here, the batch operations were successful (or at least did not throw an exception)
             // The _handleBatchOperations function now returns results directly or throws an exception.

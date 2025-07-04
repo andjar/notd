@@ -1,0 +1,144 @@
+/* Zen Markdown Editor Styles */
+:root {
+  --zen-bg: #f9f9f6;
+  --zen-fg: #222;
+  --zen-muted: #b0b0b0;
+  --zen-accent: #4f8cff;
+  --zen-font: 'Inter', 'Lora', serif;
+  --zen-canvas-width: 700px;
+  --zen-canvas-padding: 2.5rem 2rem;
+  --zen-radius: 18px;
+  --zen-shadow: 0 4px 32px 0 rgba(0,0,0,0.07);
+}
+
+body.zen-bg {
+  background: var(--zen-bg);
+  color: var(--zen-fg);
+  font-family: var(--zen-font);
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zen-container {
+  width: 100vw;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.zen-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
+}
+
+.zen-save-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: var(--zen-radius);
+  transition: background 0.2s;
+  color: var(--zen-accent);
+}
+.zen-save-btn:hover {
+  background: #e6f0ff;
+}
+
+.zen-canvas-wrapper {
+  display: flex;
+  gap: 2rem;
+  background: white;
+  border-radius: var(--zen-radius);
+  box-shadow: var(--zen-shadow);
+  padding: 0;
+  min-height: 60vh;
+}
+
+.zen-canvas {
+  flex: 1 1 50%;
+  min-height: 60vh;
+  max-width: var(--zen-canvas-width);
+  padding: var(--zen-canvas-padding);
+  font-size: 1.25rem;
+  line-height: 1.7;
+  outline: none;
+  border: none;
+  background: transparent;
+  color: var(--zen-fg);
+  resize: none;
+  font-family: var(--zen-font);
+  letter-spacing: 0.01em;
+  word-break: break-word;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  border-right: 1px solid #f0f0f0;
+}
+
+.zen-preview {
+  flex: 1 1 50%;
+  min-height: 60vh;
+  max-width: var(--zen-canvas-width);
+  padding: var(--zen-canvas-padding);
+  font-size: 1.25rem;
+  line-height: 1.7;
+  color: var(--zen-fg);
+  font-family: var(--zen-font);
+  background: #fcfcfa;
+  border-radius: var(--zen-radius);
+  overflow-y: auto;
+}
+
+/* Markdown Syntax Highlighting */
+.zen-muted {
+  color: var(--zen-muted);
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+.zen-preview h1, .zen-preview h2, .zen-preview h3, .zen-preview h4, .zen-preview h5, .zen-preview h6 {
+  margin: 1.5rem 0 1rem 0;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.zen-preview h1 { font-size: 2.5rem; }
+.zen-preview h2 { font-size: 2rem; }
+.zen-preview h3 { font-size: 1.5rem; }
+
+.zen-preview p {
+  margin: 1rem 0;
+}
+.zen-preview strong {
+  font-weight: 700;
+}
+.zen-preview em {
+  font-style: italic;
+}
+.zen-preview code {
+  background: #f4f4f4;
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  font-size: 1em;
+  font-family: 'Fira Mono', monospace;
+  color: #b84d00;
+}
+.zen-preview blockquote {
+  border-left: 3px solid var(--zen-accent);
+  margin: 1.5em 0;
+  padding: 0.5em 1em;
+  color: #666;
+  background: #f7faff;
+  border-radius: 8px;
+}
+.zen-preview ul, .zen-preview ol {
+  margin: 1em 0 1em 2em;
+}
+.zen-preview hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 2em 0;
+} 

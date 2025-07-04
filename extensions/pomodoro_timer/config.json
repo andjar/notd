@@ -1,6 +1,6 @@
 {
     "featherIcon": "clock",
-    "workDurationMinutes": 25,
+    "workDurationMinutes": 2,
     "shortBreakDurationMinutes": 5,
     "longBreakDurationMinutes": 15,
     "pomodorosBeforeLongBreak": 4,
