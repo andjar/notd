@@ -7,7 +7,7 @@
     <?php include '../../assets/css/theme_loader.php'; ?>
     <link rel="stylesheet" type="text/css" href="../../assets/css/style.css">
     <link rel="stylesheet" type="text/css" href="style.css">
-    <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer></script>
 </head>
 <body>
     <div id="pomodoro-container" x-data="pomodoroTimer()">
@@ -146,20 +146,103 @@
                     console.log('Timer reset');
                 },
 
+                async logSession(sessionType, durationMinutes, customProperties) {
+                    console.log(`Logging session: ${sessionType}, Duration: ${durationMinutes} mins`, customProperties);
+                    const now = new Date();
+                    // --- Page Name Logic ---
+                    let pageTemplate = this.config.pageTemplate || '<today>';
+                    let todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+                    let pageName = pageTemplate
+                        .replace(/<today>/g, todayStr)
+                        .replace(/<year>/g, now.getFullYear())
+                        .replace(/<month>/g, (now.getMonth() + 1).toString().padStart(2, '0'))
+                        .replace(/<day>/g, now.getDate().toString().padStart(2, '0'));
+
+                    // --- Date Placeholder for Note ---
+                    let dateStr = todayStr;
+
+                    let noteTitle = '';
+                    let pomodoroType = '';
+
+                    switch (sessionType) {
+                        case 'work':
+                            noteTitle = `Pomodoro Work Session - ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                            pomodoroType = 'work';
+                            break;
+                        case 'shortBreak':
+                            noteTitle = `Short Break - ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                            pomodoroType = 'short_break';
+                            break;
+                        case 'longBreak':
+                            noteTitle = `Long Break - ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                            pomodoroType = 'long_break';
+                            break;
+                    }
+
+                    // Prepare custom properties as {name::<value>} pairs
+                    let customPropsString = '';
+                    for (const key in customProperties) {
+                        customPropsString += `{${key}::${customProperties[key]}}\n`;
+                    }
+
+                    // Structured properties for duration and pomodoro_type
+                    const durationProp = `{duration::${durationMinutes}}`;
+                    const pomodoroTypeProp = `{pomodoro_type::${pomodoroType}}`;
+
+                    // Use template from config if available
+                    let content = '';
+                    if (this.config.noteTemplate) {
+                        content = this.config.noteTemplate
+                            .replace(/\{noteTitle\}/g, noteTitle)
+                            .replace(/\{date\}/g, dateStr)
+                            .replace(/\{duration\}/g, durationProp)
+                            .replace(/\{pomodoroType\}/g, pomodoroTypeProp)
+                            .replace(/\{customProperties\}/g, customPropsString.trim());
+                    } else {
+                        content = `## ${noteTitle}\n\n${dateStr}\n${durationProp}\n${pomodoroTypeProp}\n${customPropsString}`;
+                    }
+
+                    try {
+                        const response = await fetch(`../../api/v1/append_to_page.php`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                page_name: pageName,
+                                notes: content.trim()
+                            })
+                        });
+                        if (response.ok) {
+                            const responseData = await response.json();
+                            if (responseData && responseData.status === 'success' && responseData.data && responseData.data.appended_notes) {
+                                console.log('Pomodoro session logged successfully to page:', pageName, responseData.data.appended_notes);
+                            } else {
+                                console.error('Failed to log session: API response error or invalid data structure.', responseData);
+                            }
+                        } else {
+                            console.error('Failed to log session:', response.status, await response.text());
+                        }
+                    } catch (error) {
+                        console.error('Error logging session:', error);
+                    }
+                },
+
+                // --- Cycle Logic ---
+                getNextSessionType(currentIndex) {
+                    if (Array.isArray(this.config.cycle) && this.config.cycle.length > 0) {
+                        return this.config.cycle[currentIndex % this.config.cycle.length];
+                    }
+                    // Fallback to default logic
+                    return (currentIndex % 2 === 0) ? 'work' : 'shortBreak';
+                },
                 handleSessionEnd() {
                     console.log(`${this.timer.currentSessionType} session ended.`);
                     this.logSession(this.timer.currentSessionType, this.getDurationForSessionType(this.timer.currentSessionType), this.getCustomProperties());
 
-                    if (this.timer.currentSessionType === 'work') {
-                        this.timer.pomodorosCompleted++;
-                        if (this.timer.pomodorosCompleted % this.config.pomodorosBeforeLongBreak === 0) {
-                            this.timer.currentSessionType = 'longBreak';
-                        } else {
-                            this.timer.currentSessionType = 'shortBreak';
-                        }
-                    } else {
-                        this.timer.currentSessionType = 'work';
-                    }
+                    // --- Use cycle array for next session ---
+                    if (!this._cycleIndex) this._cycleIndex = 0;
+                    this._cycleIndex = (this._cycleIndex || 0) + 1;
+                    const nextType = this.getNextSessionType(this._cycleIndex);
+                    this.timer.currentSessionType = nextType;
 
                     if (this.timer.currentSessionType === 'work') {
                         this.timer.currentTime = this.config.workDurationSeconds;
@@ -190,59 +273,6 @@
                         }
                     });
                     return properties;
-                },
-
-                async logSession(sessionType, durationMinutes, customProperties) {
-                    console.log(`Logging session: ${sessionType}, Duration: ${durationMinutes} mins`, customProperties);
-                    const today = new Date();
-                    const pageTitle = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
-                    const now = new Date();
-                    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-                    let noteTitle = '';
-                    let pomodoroType = '';
-
-                    switch (sessionType) {
-                        case 'work':
-                            noteTitle = `Pomodoro Work Session - ${timeString}`;
-                            pomodoroType = 'work';
-                            break;
-                        case 'shortBreak':
-                            noteTitle = `Short Break - ${timeString}`;
-                            pomodoroType = 'short_break';
-                            break;
-                        case 'longBreak':
-                            noteTitle = `Long Break - ${timeString}`;
-                            pomodoroType = 'long_break';
-                            break;
-                    }
-
-                    let content = `## ${noteTitle}\n\nDuration: ${durationMinutes} minutes\npomodoro_type: ${pomodoroType}\n`;
-                    for (const key in customProperties) {
-                        content += `${key}: ${customProperties[key]}\n`;
-                    }
-
-                    try {
-                        const response = await fetch(`../../api/v1/append_to_page.php`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                page_name: pageTitle,
-                                notes: content.trim()
-                            })
-                        });
-                        if (response.ok) {
-                            const responseData = await response.json();
-                            if (responseData && responseData.status === 'success' && responseData.data && responseData.data.appended_notes) {
-                                console.log('Pomodoro session logged successfully to page:', pageTitle, responseData.data.appended_notes);
-                            } else {
-                                console.error('Failed to log session: API response error or invalid data structure.', responseData);
-                            }
-                        } else {
-                            console.error('Failed to log session:', response.status, await response.text());
-                        }
-                    } catch (error) {
-                        console.error('Error logging session:', error);
-                    }
                 },
 
                 // --- Initialization ---

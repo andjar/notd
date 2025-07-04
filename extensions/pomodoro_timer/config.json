@@ -3,5 +3,8 @@
     "workDurationMinutes": 25,
     "shortBreakDurationMinutes": 5,
     "longBreakDurationMinutes": 15,
-    "pomodorosBeforeLongBreak": 4
+    "pomodorosBeforeLongBreak": 4,
+    "noteTemplate": "## {noteTitle}\n\n{date}\n{duration}\n{pomodoroType}\n{customProperties}",
+    "pageTemplate": "<today>/pomodoro",
+    "cycle": ["work", "short_break", "work", "long_break"]
 }
