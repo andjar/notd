@@ -69,12 +69,12 @@ export default function calendarComponent() {
         },
         
         prevMonth() {
-            this.currentDate.setMonth(this.currentDate.getMonth() - 1);
+            this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() - 1, 1);
             this.buildMonth();
         },
         
         nextMonth() {
-            this.currentDate.setMonth(this.currentDate.getMonth() + 1);
+            this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + 1, 1);
             this.buildMonth();
         },
         
