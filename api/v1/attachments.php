@@ -5,9 +5,16 @@ namespace App;
 use PDO;
 
 error_log("=== ATTACHMENTS.PHP START ===");
-error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
-error_log("POST data: " . print_r($_POST, true));
-error_log("FILES data: " . print_r($_FILES, true));
+if (isset($_SERVER['REQUEST_METHOD'])) {
+    error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
+} else {
+    error_log("REQUEST_METHOD: Not set (possibly included outside of a direct web request context)");
+}
+// Only log POST and FILES if it's a POST request, otherwise they might not be relevant or set
+if (($_SERVER['REQUEST_METHOD'] ?? null) === 'POST') {
+    error_log("POST data: " . print_r($_POST, true));
+    error_log("FILES data: " . print_r($_FILES, true));
+}
 
 ob_start(); // Start output buffering
 
@@ -90,10 +97,10 @@ class AttachmentManager {
         
         if (class_exists('finfo')) {
             try {
-                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $finfo = new \finfo(FILEINFO_MIME_TYPE); // Use global namespace for finfo
                 $mime_type = $finfo->file($file['tmp_name']);
                 error_log("MIME type detected via finfo: " . $mime_type);
-            } catch (Exception $e) {
+            } catch (\Exception $e) { // Also use global Exception
                 error_log("finfo failed: " . $e->getMessage());
                 $mime_type = null;
             }
@@ -481,6 +488,15 @@ private function handleDeleteRequest() {
 }
 
 // Initialize and handle the request
-$pdo = get_db_connection();
-$attachmentManager = new \App\AttachmentManager($pdo);
-$attachmentManager->handleRequest();
+// Only run this if the script is likely being called as a web endpoint
+if (isset($_SERVER['REQUEST_METHOD']) && php_sapi_name() !== 'cli') {
+    error_log("attachments.php: Detected web request context, proceeding with request handling.");
+    $pdo = get_db_connection();
+    $attachmentManager = new \App\AttachmentManager($pdo);
+    $attachmentManager->handleRequest();
+} else {
+    error_log("attachments.php: Not in a direct web request context or REQUEST_METHOD not set. Skipping auto-execution of handleRequest.");
+    // This else block is important for CLI or include-only scenarios.
+    // For example, test scripts can now include this file to access the AttachmentManager class
+    // without triggering the request handling logic automatically.
+}

@@ -77,7 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const appState = excalidrawAPI.getAppState();
-            const blob = await window.Excalidraw.exportToBlob({
+            const appState = excalidrawAPI.getAppState();
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+            // Export PNG
+            const pngBlob = await window.Excalidraw.exportToBlob({
                 elements,
                 mimeType: 'image/png',
                 appState: {
@@ -85,17 +89,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     exportWithDarkMode: appState.theme === 'dark',
                 },
             });
-            if (!blob) throw new Error('Failed to export drawing to Blob.');
+            if (!pngBlob) throw new Error('Failed to export drawing to PNG Blob.');
+
+            // Export JSON
+            const jsonString = JSON.stringify(elements, null, 2);
+            const jsonBlob = new Blob([jsonString], { type: 'application/json' });
+            if (!jsonBlob) throw new Error('Failed to create JSON Blob for scene data.');
+
             const formData = new FormData();
             formData.append('note_id', currentNoteId);
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `excalidraw_${timestamp}.png`;
-            formData.append('attachmentFile', blob, filename);
+
+            const pngFilename = `excalidraw_${timestamp}.png`;
+            const jsonFilename = `excalidraw_${timestamp}.excalidraw`; // Using .excalidraw extension for scene file
+
+            formData.append('attachmentFile[]', pngBlob, pngFilename);
+            formData.append('attachmentFile[]', jsonBlob, jsonFilename);
+
             if (!window.attachmentsAPI || !window.attachmentsAPI.uploadAttachment) {
                 throw new Error('attachmentsAPI or uploadAttachment function is not available.');
             }
             await window.attachmentsAPI.uploadAttachment(formData);
-            successMessage.textContent = 'Drawing saved successfully as an attachment!';
+            successMessage.textContent = 'Drawing and scene data saved successfully as attachments!';
         } catch (error) {
             errorMessage.textContent = `Error saving drawing: ${error.message}`;
         } finally {
