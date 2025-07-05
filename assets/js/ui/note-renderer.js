@@ -879,19 +879,7 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
             return;
         }
         
-        // If attachments are found, ensure the main container is visible (it was reset above)
-        // and the inner attachmentsContainer will be 'flex'
-
-        const attachmentsContainer = document.createElement('div');
-        // The class 'note-attachments' might already be on the 'container' element itself.
-        // If 'container' is just a generic div, then adding this class to a child is appropriate.
-        // Based on existing code, `container` IS the element with class `note-attachments`.
-        // So, we should append items directly to `container` or manage `attachmentsContainer` carefully.
-        // For now, let's assume `container` is the one to be styled and filled.
-        // Re-evaluating: The original code appends `attachmentsContainer` to `container`. This is fine.
-
-        container.appendChild(attachmentsContainer); // This was the original structure.
-
+        // Append note-attachment-item elements directly to container for vertical stacking
         noteAttachments.forEach(attachment => {
             const attachmentEl = document.createElement('div');
             attachmentEl.className = 'note-attachment-item';
@@ -933,11 +921,11 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
                 </button>
             `;
 
-            attachmentsContainer.appendChild(attachmentEl);
+            container.appendChild(attachmentEl);
         });
 
         // Add delegated event listener for Edit in Excalidraw buttons
-        attachmentsContainer.addEventListener('click', function(e) {
+        container.addEventListener('click', function(e) {
             const btn = e.target.closest('.attachment-edit-excalidraw-btn');
             if (btn) {
                 const noteId = btn.getAttribute('data-note-id');
@@ -948,17 +936,9 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
             }
         });
 
-        if (attachmentsContainer.children.length > 0) {
-            // The main `container` should be visible (already set by `container.style.display = '';`)
-            // The `attachmentsContainer` (inner list) can be flex if it has items.
-            attachmentsContainer.style.display = 'flex'; // This was on attachmentsContainer before
-            container.style.display = 'flex'; // Ensure the main container is also flex if it wasn't.
-                                               // Or, if `container` is already styled by CSS, this might be redundant
-                                               // or conflict. Let's assume `container`'s display is managed by its parent or CSS.
-                                               // The original code set `attachmentsContainer.style.display = 'flex'`.
+        if (container.children.length > 0) {
+            container.style.display = 'flex'; // Ensure the main container is flex (column by CSS)
         } else {
-            // This case should be caught by `if (!noteAttachments || noteAttachments.length === 0)` above.
-            // If somehow it's reached, hide the main container.
             container.style.display = 'none';
         }
 
@@ -1419,15 +1399,10 @@ async function handleDelegatedAttachmentDelete(targetElement) {
         await attachmentsAPI.deleteAttachment(attachmentId, noteId);
         attachmentItem?.remove();
 
-        const attachmentsContainer = targetElement.closest('.note-attachments');
-        if (attachmentsContainer && attachmentsContainer.children.length === 0) {
-            attachmentsContainer.style.display = 'none';
-        }
-
         if (window.notesForCurrentPage) {
             const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
             if (noteToUpdate) {
-                const remaining = attachmentsContainer ? attachmentsContainer.children.length : 0;
+                const remaining = attachmentItem ? 0 : 1;
                 noteToUpdate.has_attachments = remaining > 0;
             }
         }
