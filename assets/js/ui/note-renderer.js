@@ -1399,10 +1399,20 @@ async function handleDelegatedAttachmentDelete(targetElement) {
         await attachmentsAPI.deleteAttachment(attachmentId, noteId);
         attachmentItem?.remove();
 
+        // Find the attachments container
+        const noteItem = targetElement.closest('.note-item');
+        const attachmentsContainer = noteItem?.querySelector('.note-attachments');
+        let remaining = 0;
+        if (attachmentsContainer) {
+            remaining = attachmentsContainer.querySelectorAll('.note-attachment-item').length;
+            if (remaining === 0) {
+                attachmentsContainer.style.display = 'none';
+            }
+        }
+
         if (window.notesForCurrentPage) {
             const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
             if (noteToUpdate) {
-                const remaining = attachmentItem ? 0 : 1;
                 noteToUpdate.has_attachments = remaining > 0;
             }
         }
