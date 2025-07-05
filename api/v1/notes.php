@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../pattern_processor.php';
@@ -10,8 +13,9 @@ require_once __DIR__ . '/batch_operations.php';
 error_log("Notes API Request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
 error_log("Input data: " . json_encode($input ?? []));
 
+// Create a fresh database connection for this request to avoid locking issues
 $pdo = get_db_connection();
-$dataManager = new DataManager($pdo);
+$dataManager = new \App\DataManager($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -36,8 +40,8 @@ if (!function_exists('_indexPropertiesFromContent')) {
             }
         }
 
-        // Instantiate the pattern processor. It gets PDO from get_db_connection()
-        $patternProcessor = getPatternProcessor();
+        // Instantiate the pattern processor with the existing PDO connection to avoid database locks
+        $patternProcessor = new \App\PatternProcessor($pdo);
 
         // Process the content to extract properties and potentially modified content
         // Pass $pdo in context for handlers that might need it directly.
@@ -270,23 +274,48 @@ if (!function_exists('_deleteNoteInBatch')) {
 if (!function_exists('_handleBatchOperations')) {
     function _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties = false) {
         if (!is_array($operations)) {
-            ApiResponse::error('Batch request validation failed: "operations" must be an array.', 400);
+            \App\ApiResponse::error('Batch request validation failed: "operations" must be an array.', 400);
             return;
         }
 
         $results = [];
         $tempIdMap = [];
         
-        // Process operations in a safe order: Delete -> Create -> Update
-        $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
+        try {
+            // Process operations in a safe order: Delete -> Create -> Update
+            $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
             $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
             $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
 
-            foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
-            foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
-            foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+            foreach ($deleteOps as $op) {
+                $result = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
+                $results[] = $result;
+                if ($result['status'] === 'error') {
+                    error_log("Batch delete operation failed: " . json_encode($result));
+                }
+            }
+            
+            foreach ($createOps as $op) {
+                $result = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+                $results[] = $result;
+                if ($result['status'] === 'error') {
+                    error_log("Batch create operation failed: " . json_encode($result));
+                }
+            }
+            
+            foreach ($updateOps as $op) {
+                $result = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+                $results[] = $result;
+                if ($result['status'] === 'error') {
+                    error_log("Batch update operation failed: " . json_encode($result));
+                }
+            }
             
             return $results;
+        } catch (Exception $e) {
+            error_log("Batch operations failed with exception: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
 
@@ -302,34 +331,57 @@ if ($method === 'GET') {
             $noteId = (int)$_GET['id'];
             $note = $dataManager->getNoteById($noteId, $includeInternal, $includeParentProperties);
             if ($note) {
-                ApiResponse::success($note);
+                \App\ApiResponse::success($note);
             } else {
-                ApiResponse::error('Note not found', 404);
+                \App\ApiResponse::error('Note not found', 404);
             }
         } elseif (isset($_GET['page_id'])) {
             $pageId = (int)$_GET['page_id'];
             $notes = $dataManager->getNotesByPageId($pageId, $includeInternal);
-            ApiResponse::success($notes);
+            \App\ApiResponse::success($notes);
         } else {
-             ApiResponse::error('Missing required parameter: id or page_id', 400);
+             \App\ApiResponse::error('Missing required parameter: id or page_id', 400);
         }
     } catch (Exception $e) {
         error_log("API Error in notes.php (GET): " . $e->getMessage());
-        ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
+        \App\ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
     }
 } elseif ($method === 'POST') {
     if (isset($input['action']) && $input['action'] === 'batch') {
         $includeParentProperties = (bool)($input['include_parent_properties'] ?? false);
-        $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? [], $includeParentProperties);
-        ApiResponse::success(['results' => $results]);
-        return;
+        
+        // Add retry logic for database locking issues
+        $maxRetries = 3;
+        $retryDelay = 100; // milliseconds
+        
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $results = _handleBatchOperations($pdo, $dataManager, $input['operations'] ?? [], $includeParentProperties);
+                close_db_connection($pdo);
+                \App\ApiResponse::success(['results' => $results]);
+                return;
+            } catch (Exception $e) {
+                $errorMessage = $e->getMessage();
+                if (strpos($errorMessage, 'database is locked') !== false && $attempt < $maxRetries) {
+                    error_log("Database locked, retrying batch operation (attempt $attempt/$maxRetries)");
+                    usleep($retryDelay * 1000); // Convert to microseconds
+                    $retryDelay *= 2; // Exponential backoff
+                    continue;
+                }
+                // If it's not a locking issue or we've exhausted retries, throw the error
+                error_log("Batch operation failed after $attempt attempts: " . $errorMessage);
+                close_db_connection($pdo);
+                \App\ApiResponse::error('Batch operation failed: ' . $errorMessage, 500);
+                return;
+            }
+        }
     }
-    ApiResponse::error('This endpoint now primarily uses batch operations. Please use the batch action.', 400);
+    \App\ApiResponse::error('This endpoint now primarily uses batch operations. Please use the batch action.', 400);
 
 } elseif ($method === 'PUT') {
-    ApiResponse::error('PUT is deprecated. Please use POST with batch operations for updates.', 405);
+    \App\ApiResponse::error('PUT is deprecated. Please use POST with batch operations for updates.', 405);
 } elseif ($method === 'DELETE') {
-    ApiResponse::error('DELETE is deprecated. Please use POST with batch operations for deletions.', 405);
+    \App\ApiResponse::error('DELETE is deprecated. Please use POST with batch operations for deletions.', 405);
 } else {
-    ApiResponse::error('Method not allowed', 405);
+    \App\ApiResponse::error('Method not allowed', 405);
 }

@@ -1,0 +1,1772 @@
+openapi: 3.0.3
+info:
+  title: Notd Outliner API
+  description: |
+    A RESTful API for a PHP-based outliner application that runs offline using phpdesktop.
+    
+    ## Overview
+    This API provides endpoints for managing pages, notes, properties, attachments, and more in a hierarchical outliner structure.
+    
+    ## Key Features
+    - **Content-first Property Model**: Properties are parsed from content using pattern matching
+    - **Hierarchical Structure**: Notes can be nested under pages and other notes
+    - **Property System**: Supports different property weights (public, internal, system)
+    - **Full-text Search**: Powered by SQLite FTS4
+    - **File Attachments**: Support for various file types
+    - **Templates**: Reusable content templates for notes and pages
+    - **Webhooks**: Real-time event notifications
+    - **Batch Operations**: Efficient bulk operations for notes
+    
+    ## Authentication
+    This API does not require authentication as it's designed for offline use.
+    
+    ## Base URL
+    The API is served from the `/api/v1/` path relative to your application root.
+    
+    ## Response Format
+    All responses follow a consistent JSON format:
+    ```json
+    {
+      "status": "success|error",
+      "data": {...},
+      "message": "Error message (if applicable)"
+    }
+    ```
+    
+    ## Property System
+    Properties are extracted from content using patterns like `{key::value}`:
+    - `{key::value}` - Public property (weight 2)
+    - `{key:::value}` - Internal property (weight 3) 
+    - `{key::::value}` - System log property (weight 4)
+    
+    ## Task States
+    Supported task statuses: TODO, DOING, DONE, SOMEDAY, WAITING, CANCELLED, NLR
+  version: 1.0.0
+  contact:
+    name: API Support
+    url: https://github.com/your-repo/notd
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: /api/v1
+    description: API v1 base URL
+
+paths:
+  /ping:
+    get:
+      summary: Health check endpoint
+      description: Simple endpoint to verify the API is running
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "pong"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T10:30:00Z"
+
+  /recent_pages:
+    get:
+      summary: Get recent pages
+      description: |
+        Returns the 7 most recently updated pages, ordered by updated_at timestamp in descending order.
+        This endpoint is useful for displaying recent activity in the sidebar or navigation.
+      responses:
+        '200':
+          description: Recent pages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      recent_pages:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              description: Page ID
+                            name:
+                              type: string
+                              description: Page name
+                            updated_at:
+                              type: string
+                              format: date-time
+                              description: Last update timestamp
+                          required:
+                            - id
+                            - name
+                            - updated_at
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /pages:
+    get:
+      summary: List or retrieve pages
+      description: |
+        Retrieve pages with various filtering options. If a specific page name is provided, 
+        it will be created if it doesn't exist.
+      parameters:
+        - name: name
+          in: query
+          description: Specific page name to retrieve/create
+          required: false
+          schema:
+            type: string
+        - name: id
+          in: query
+          description: Page ID to retrieve
+          required: false
+          schema:
+            type: integer
+        - name: date
+          in: query
+          description: Get pages with a specific date property (YYYY-MM-DD format)
+          required: false
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: exclude_journal
+          in: query
+          description: Exclude journal pages (those with {type::journal} property)
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Pages retrieved successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Page'
+                  - $ref: '#/components/schemas/PageList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Create a new page
+      description: Create a new page with the specified name and content
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Page name (must be unique)
+                content:
+                  type: string
+                  description: Page content (can include properties)
+      responses:
+        '201':
+          description: Page created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Page'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Page with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    put:
+      summary: Update an existing page
+      description: Update a page's name and/or content
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: Page ID to update
+                name:
+                  type: string
+                  description: New page name
+                content:
+                  type: string
+                  description: New page content
+      responses:
+        '200':
+          description: Page updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Page'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    delete:
+      summary: Delete a page
+      description: Delete a page and all its associated notes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: Page ID to delete
+      responses:
+        '200':
+          description: Page deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_page_id:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /notes:
+    get:
+      summary: Retrieve notes
+      description: Get notes by ID or by page ID
+      parameters:
+        - name: id
+          in: query
+          description: Specific note ID to retrieve
+          required: false
+          schema:
+            type: integer
+        - name: page_id
+          in: query
+          description: Get all notes for a specific page
+          required: false
+          schema:
+            type: integer
+        - name: include_internal
+          in: query
+          description: Include internal properties in the response
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: include_parent_properties
+          in: query
+          description: Include properties from parent notes
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Notes retrieved successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Note'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Note'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Perform batch operations on notes
+      description: |
+        Execute multiple note operations (create, update, delete) in a single request.
+        This is the primary method for note operations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+                - operations
+              properties:
+                action:
+                  type: string
+                  enum: [batch]
+                  description: Must be 'batch' for batch operations
+                operations:
+                  type: array
+                  description: Array of operations to perform
+                  items:
+                    $ref: '#/components/schemas/BatchOperation'
+                include_parent_properties:
+                  type: boolean
+                  description: Include parent properties in responses
+                  default: false
+      responses:
+        '200':
+          description: Batch operations completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchOperationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /append_to_page:
+    post:
+      summary: Append notes to a page
+      description: |
+        Create a page if it doesn't exist and append one or more notes to it.
+        This is a convenience endpoint that combines page creation and note creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - page_name
+                - notes
+              properties:
+                page_name:
+                  type: string
+                  description: Name of the page to append to (will be created if it doesn't exist)
+                notes:
+                  oneOf:
+                    - type: string
+                      description: Single note content
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/NoteInput'
+      responses:
+        '200':
+          description: Notes appended successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  page:
+                    $ref: '#/components/schemas/Page'
+                  appended_notes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchOperationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /batch_operations:
+    post:
+      summary: Execute batch operations
+      description: |
+        Execute multiple operations (create, update, delete) on notes in a single request.
+        This endpoint provides retry logic for database locking issues.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - operations
+              properties:
+                operations:
+                  type: array
+                  description: Array of operations to perform
+                  items:
+                    $ref: '#/components/schemas/BatchOperation'
+                include_parent_properties:
+                  type: boolean
+                  description: Include parent properties in responses
+                  default: false
+      responses:
+        '200':
+          description: Batch operations completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchOperationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '503':
+          description: Service unavailable due to database locks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /properties:
+    get:
+      summary: Get properties for an entity
+      description: Retrieve properties for a note or page
+      parameters:
+        - name: entity_type
+          in: query
+          description: Type of entity (note or page)
+          required: true
+          schema:
+            type: string
+            enum: [note, page]
+        - name: entity_id
+          in: query
+          description: ID of the entity
+          required: true
+          schema:
+            type: integer
+        - name: include_hidden
+          in: query
+          description: Include hidden/internal properties
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Properties retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          description: Method not allowed (read-only endpoint)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search:
+    get:
+      summary: Search notes and pages
+      description: |
+        Perform various types of searches including full-text search, backlinks, tasks, and favorites.
+      parameters:
+        - name: q
+          in: query
+          description: Full-text search query
+          required: false
+          schema:
+            type: string
+        - name: backlinks_for_page_name
+          in: query
+          description: Find notes that link to a specific page
+          required: false
+          schema:
+            type: string
+        - name: tasks
+          in: query
+          description: Find notes with specific task status (or 'all' for all tasks)
+          required: false
+          schema:
+            type: string
+            enum: [TODO, DOING, DONE, SOMEDAY, WAITING, CANCELLED, ALL]
+        - name: favorites
+          in: query
+          description: Find pages marked as favorites
+          required: false
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: include_parent_properties
+          in: query
+          description: Include properties from parent notes
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchResult'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /query_notes:
+    post:
+      summary: Execute custom SQL queries
+      description: |
+        Execute safe, predefined SQL queries to find notes. Only SELECT queries are allowed
+        with specific patterns to prevent SQL injection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sql_query
+              properties:
+                sql_query:
+                  type: string
+                  description: |
+                    SQL query to execute. Must follow allowed patterns:
+                    - SELECT id FROM Notes WHERE ...
+                    - SELECT (DISTINCT)? N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE ...
+                    - SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE ...)
+                page:
+                  type: integer
+                  description: Page number for pagination
+                  default: 1
+                  minimum: 1
+                per_page:
+                  type: integer
+                  description: Number of items per page
+                  default: 20
+                  minimum: 1
+                  maximum: 100
+                include_properties:
+                  type: boolean
+                  description: Include properties in the response
+                  default: true
+      responses:
+        '200':
+          description: Query executed successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Note'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /child_pages:
+    get:
+      summary: Get child pages
+      description: Retrieve direct child pages of a namespace
+      parameters:
+        - name: namespace
+          in: query
+          description: Parent namespace/page name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Child pages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    updated_at:
+                      type: string
+                      format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /attachments:
+    get:
+      summary: List attachments
+      description: Retrieve attachments with optional filtering and pagination
+      parameters:
+        - name: note_id
+          in: query
+          description: Get attachments for a specific note
+          required: false
+          schema:
+            type: integer
+        - name: sort_by
+          in: query
+          description: Sort field
+          required: false
+          schema:
+            type: string
+            enum: [id, name, path, type, size, created_at]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: filter_by_name
+          in: query
+          description: Filter by attachment name
+          required: false
+          schema:
+            type: string
+        - name: filter_by_type
+          in: query
+          description: Filter by MIME type
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Attachments retrieved successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Attachment'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Upload one or more attachments
+      description: |
+        Upload one or more file attachments to a note. You can upload multiple files in a single request by repeating the `attachmentFile` field in the multipart form data. This is used, for example, to upload both a PNG image and an editable Excalidraw JSON file for a drawing. Each file will be saved as a separate attachment for the note.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - note_id
+                - attachmentFile
+              properties:
+                note_id:
+                  type: integer
+                  description: ID of the note to attach the file(s) to
+                attachmentFile:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: |
+                    One or more files to upload (max 10MB each). Repeat this field to upload multiple files (e.g., both a PNG and a .excalidraw JSON file).
+      responses:
+        '201':
+          description: Attachments uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attachments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    delete:
+      summary: Delete an attachment
+      description: Delete an attachment and its associated file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - attachment_id
+                - note_id
+              properties:
+                attachment_id:
+                  type: integer
+                  description: ID of the attachment to delete
+                note_id:
+                  type: integer
+                  description: ID of the note (for verification)
+      responses:
+        '200':
+          description: Attachment deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_attachment_id:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /templates:
+    get:
+      summary: List templates
+      description: Retrieve available templates for notes or pages
+      parameters:
+        - name: type
+          in: query
+          description: Template type
+          required: false
+          schema:
+            type: string
+            enum: [note, page]
+            default: note
+      responses:
+        '200':
+          description: Templates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Template'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Manage templates
+      description: |
+        Create, update, or delete templates. Use the `_method` field to override the HTTP method.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  description: Create template
+                  required:
+                    - type
+                    - name
+                    - content
+                  properties:
+                    type:
+                      type: string
+                      enum: [note, page]
+                    name:
+                      type: string
+                      description: Template name
+                    content:
+                      type: string
+                      description: Template content
+                - type: object
+                  description: Update template
+                  required:
+                    - _method
+                    - type
+                    - current_name
+                    - content
+                  properties:
+                    _method:
+                      type: string
+                      enum: [PUT]
+                    type:
+                      type: string
+                      enum: [note, page]
+                    current_name:
+                      type: string
+                      description: Current template name
+                    new_name:
+                      type: string
+                      description: New template name (optional)
+                    content:
+                      type: string
+                      description: New template content
+                - type: object
+                  description: Delete template
+                  required:
+                    - _method
+                    - type
+                    - name
+                  properties:
+                    _method:
+                      type: string
+                      enum: [DELETE]
+                    type:
+                      type: string
+                      enum: [note, page]
+                    name:
+                      type: string
+                      description: Template name to delete
+      responses:
+        '200':
+          description: Template operation completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '405':
+          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /extensions:
+    get:
+      summary: List active extensions
+      description: Retrieve information about active extensions
+      responses:
+        '200':
+          description: Extensions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extensions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Extension'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /webhooks:
+    get:
+      summary: List webhooks
+      description: Retrieve all webhook configurations
+      responses:
+        '200':
+          description: Webhooks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Webhook'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Create a webhook
+      description: Create a new webhook configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - entity_type
+                - property_names
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: Webhook endpoint URL
+                entity_type:
+                  type: string
+                  enum: [note, page]
+                  description: Type of entity to monitor
+                property_names:
+                  oneOf:
+                    - type: string
+                      enum: ["*"]
+                      description: Monitor all properties
+                    - type: array
+                      items:
+                        type: string
+                      description: Array of property names to monitor
+                event_types:
+                  type: array
+                  items:
+                    type: string
+                    enum: [property_change, entity_create, entity_update, entity_delete]
+                  default: ["property_change"]
+                  description: Types of events to trigger the webhook
+      responses:
+        '201':
+          description: Webhook created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /webhooks/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Webhook ID
+
+    get:
+      summary: Get webhook details
+      description: Retrieve details of a specific webhook
+      responses:
+        '200':
+          description: Webhook details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    put:
+      summary: Update webhook
+      description: Update an existing webhook configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                entity_type:
+                  type: string
+                  enum: [note, page]
+                property_names:
+                  oneOf:
+                    - type: string
+                      enum: ["*"]
+                    - type: array
+                      items:
+                        type: string
+                event_types:
+                  type: array
+                  items:
+                    type: string
+                    enum: [property_change, entity_create, entity_update, entity_delete]
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Webhook updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    delete:
+      summary: Delete webhook
+      description: Delete a webhook configuration
+      responses:
+        '200':
+          description: Webhook deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /webhooks/{id}/test:
+    post:
+      summary: Test webhook
+      description: Send a test event to verify webhook configuration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Webhook ID
+      responses:
+        '200':
+          description: Test event sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  response_code:
+                    type: integer
+                  response_body:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /webhooks/{id}/history:
+    get:
+      summary: Get webhook history
+      description: Retrieve the event history for a webhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Webhook ID
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Webhook history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookEvent'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  schemas:
+    Page:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique page identifier
+        name:
+          type: string
+          description: Page name (unique)
+        content:
+          type: string
+          nullable: true
+          description: Page content (can include properties)
+        alias:
+          type: string
+          nullable: true
+          description: Page alias
+        active:
+          type: integer
+          description: Whether the page is active (1) or deleted (0)
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        properties:
+          type: object
+          description: Properties extracted from content
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Property'
+        notes:
+          type: array
+          description: Notes belonging to this page (when includeNotes=true)
+          items:
+            $ref: '#/components/schemas/Note'
+      required:
+        - id
+        - name
+        - active
+        - created_at
+        - updated_at
+
+    PageList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Page'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Note:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique note identifier
+        page_id:
+          type: integer
+          description: ID of the page this note belongs to
+        parent_note_id:
+          type: integer
+          nullable: true
+          description: ID of the parent note (for nested notes)
+        content:
+          type: string
+          nullable: true
+          description: Note content (can include properties)
+        internal:
+          type: integer
+          description: Whether the note is marked as internal (1) or not (0)
+        order_index:
+          type: integer
+          description: Order of the note within its container
+        collapsed:
+          type: integer
+          description: Whether the note is collapsed (1) or expanded (0)
+        active:
+          type: integer
+          description: Whether the note is active (1) or deleted (0)
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        has_attachments:
+          type: boolean
+          description: Whether the note has file attachments
+        properties:
+          type: object
+          description: Properties extracted from content
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Property'
+        parent_properties:
+          type: object
+          description: Properties inherited from parent notes
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Property'
+      required:
+        - id
+        - page_id
+        - internal
+        - order_index
+        - collapsed
+        - active
+        - created_at
+        - updated_at
+        - has_attachments
+
+    NoteInput:
+      type: object
+      properties:
+        content:
+          type: string
+          description: Note content
+        parent_note_id:
+          type: integer
+          nullable: true
+          description: ID of the parent note
+        order_index:
+          type: integer
+          description: Order within the container
+        collapsed:
+          type: integer
+          description: Whether the note is collapsed
+        client_temp_id:
+          type: string
+          description: Temporary ID for client-side tracking
+
+    Property:
+      type: object
+      properties:
+        value:
+          type: string
+          description: Property value
+        internal:
+          type: boolean
+          description: Whether this is an internal property (weight > 2)
+      required:
+        - value
+
+    BatchOperation:
+      type: object
+      required:
+        - type
+        - payload
+      properties:
+        type:
+          type: string
+          enum: [create, update, delete]
+          description: Type of operation
+        payload:
+          oneOf:
+            - $ref: '#/components/schemas/CreateNotePayload'
+            - $ref: '#/components/schemas/UpdateNotePayload'
+            - $ref: '#/components/schemas/DeleteNotePayload'
+
+    CreateNotePayload:
+      type: object
+      required:
+        - page_id
+        - content
+      properties:
+        page_id:
+          type: integer
+          description: ID of the page to create the note in
+        content:
+          type: string
+          description: Note content
+        parent_note_id:
+          type: integer
+          nullable: true
+          description: ID of the parent note
+        order_index:
+          type: integer
+          description: Order within the container
+        collapsed:
+          type: integer
+          description: Whether the note is collapsed
+        client_temp_id:
+          type: string
+          description: Temporary ID for client-side tracking
+
+    UpdateNotePayload:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+          description: Note ID (can be temporary ID from create operation)
+        content:
+          type: string
+          description: New note content
+        parent_note_id:
+          type: integer
+          nullable: true
+          description: New parent note ID
+        order_index:
+          type: integer
+          description: New order index
+        collapsed:
+          type: integer
+          description: Whether the note is collapsed
+        page_id:
+          type: integer
+          description: New page ID
+
+    DeleteNotePayload:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+          description: Note ID (can be temporary ID from create operation)
+
+    BatchOperationResult:
+      type: object
+      required:
+        - type
+        - status
+      properties:
+        type:
+          type: string
+          enum: [create, update, delete]
+          description: Type of operation
+        status:
+          type: string
+          enum: [success, error, warning]
+          description: Operation status
+        message:
+          type: string
+          description: Status message
+        note:
+          $ref: '#/components/schemas/Note'
+          description: Note data (for create/update operations)
+        deleted_note_id:
+          type: integer
+          description: ID of deleted note (for delete operations)
+        client_temp_id:
+          type: string
+          description: Client temporary ID (for create operations)
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+          description: Note ID (for error cases)
+
+    SearchResult:
+      type: object
+      properties:
+        note_id:
+          type: integer
+          description: Note ID (for note search results)
+        page_id:
+          type: integer
+          description: Page ID (for page search results)
+        content:
+          type: string
+          description: Note content
+        page_name:
+          type: string
+          description: Name of the page containing the note
+        content_snippet:
+          type: string
+          description: Highlighted snippet showing search match
+        status:
+          type: string
+          description: Task status (for task search results)
+        properties:
+          type: object
+          description: Note properties
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Property'
+        parent_properties:
+          type: object
+          description: Properties from parent notes
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Property'
+
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique attachment identifier
+        note_id:
+          type: integer
+          description: ID of the note this attachment belongs to
+        name:
+          type: string
+          description: Original filename
+        path:
+          type: string
+          description: Relative path to the file
+        type:
+          type: string
+          description: MIME type
+        size:
+          type: integer
+          description: File size in bytes
+        url:
+          type: string
+          format: uri
+          description: Full URL to access the file
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+      required:
+        - id
+        - note_id
+        - name
+        - path
+        - type
+        - created_at
+
+    Template:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Template name
+        content:
+          type: string
+          description: Template content with placeholders
+      required:
+        - name
+        - content
+
+    Extension:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Extension name
+        featherIcon:
+          type: string
+          description: Feather icon name for the extension
+      required:
+        - name
+        - featherIcon
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique webhook identifier
+        url:
+          type: string
+          format: uri
+          description: Webhook endpoint URL
+        secret:
+          type: string
+          description: Secret for webhook signature verification
+        entity_type:
+          type: string
+          enum: [note, page]
+          description: Type of entity to monitor
+        property_names:
+          oneOf:
+            - type: string
+              enum: ["*"]
+            - type: array
+              items:
+                type: string
+          description: Property names to monitor
+        event_types:
+          type: array
+          items:
+            type: string
+            enum: [property_change, entity_create, entity_update, entity_delete]
+          description: Types of events to trigger the webhook
+        active:
+          type: integer
+          description: Whether the webhook is active (1) or disabled (0)
+        verified:
+          type: integer
+          description: Whether the webhook endpoint has been verified (1) or not (0)
+        last_verified:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last verification timestamp
+        last_triggered:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last trigger timestamp
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - id
+        - url
+        - entity_type
+        - property_names
+        - event_types
+        - active
+        - verified
+        - created_at
+        - updated_at
+
+    WebhookEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique event identifier
+        webhook_id:
+          type: integer
+          description: ID of the webhook that triggered this event
+        event_type:
+          type: string
+          description: Type of event
+        payload:
+          type: string
+          description: JSON payload that was sent
+        response_code:
+          type: integer
+          description: HTTP response code from the webhook endpoint
+        response_body:
+          type: string
+          description: Response body from the webhook endpoint
+        success:
+          type: integer
+          description: Whether the webhook call was successful (1) or failed (0)
+        created_at:
+          type: string
+          format: date-time
+          description: Event timestamp
+      required:
+        - id
+        - webhook_id
+        - event_type
+        - success
+        - created_at
+
+    Pagination:
+      type: object
+      properties:
+        total_items:
+          type: integer
+          description: Total number of items
+        current_page:
+          type: integer
+          description: Current page number
+        per_page:
+          type: integer
+          description: Number of items per page
+        total_pages:
+          type: integer
+          description: Total number of pages
+      required:
+        - total_items
+        - current_page
+        - per_page
+        - total_pages
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [error]
+          description: Response status
+        message:
+          type: string
+          description: Error message
+        details:
+          oneOf:
+            - type: string
+            - type: object
+            - type: array
+          description: Additional error details
+      required:
+        - status
+        - message
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    # No authentication required for this offline API
+    none: {}
+
+security:
+  - none: []
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Pages
+    description: Page management operations
+  - name: Notes
+    description: Note management operations
+  - name: Properties
+    description: Property management operations
+  - name: Search
+    description: Search and query operations
+  - name: Attachments
+    description: File attachment operations
+  - name: Templates
+    description: Template management operations
+  - name: Extensions
+    description: Extension information
+  - name: Webhooks
+    description: Webhook management operations 

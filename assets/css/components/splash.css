@@ -1,0 +1,177 @@
+/* ========== SPLASH SCREEN ANIMATIONS ========== */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-20px) scale(1.05);
+  }
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg) translateX(105px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(105px) rotate(-360deg);
+  }
+}
+
+/* ========== SPLASH SCREEN STYLES ========== */
+#splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at center,
+    var(--ls-gray-1) 0%,
+    var(--ls-gray-3) 70%,
+    var(--ls-gray-4) 100%
+  );
+  display: flex; /* Kept for existing centering, will be overridden by orb logic */
+  justify-content: center; /* Kept for existing centering */
+  align-items: center; /* Kept for existing centering */
+  z-index: 9999;
+  transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+  visibility: visible;
+  opacity: 1;
+  overflow: hidden; /* Prevent scrollbars from animated elements */
+}
+
+#splash-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Remove old .splash-content if it exists */
+.splash-content {
+  display: none;
+}
+
+#splash-background-bubbles-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Bubbles are contained */
+}
+
+.splash-bubble {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  /* Animation will set specific colors, sizes, positions */
+  /* filter: blur(2px); /* Soft edges, can be adjusted */
+}
+
+#splash-orb-container {
+  position: relative; /* For z-indexing above bubbles */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+}
+
+#splash-orb-inner-core {
+  position: relative;
+  width: 220px; /* Adjust size as needed */
+  height: 220px; /* Adjust size as needed */
+  background-color: var(--ls-splash-orb-bg);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+  padding: 20px;
+}
+
+#splash-orb-text-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.splash-logo-svg {
+  width: 50px;
+  height: 50px;
+  margin-bottom: 5px;
+}
+
+#splash-orb-text {
+  color: var(--ls-splash-orb-text-color);
+  font-family: var(--ls-header-font-family);
+  font-size: 1.5em;
+  font-weight: 400;
+  text-align: center;
+  line-height: 1.3;
+}
+
+#splash-orb-perimeter-dots {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Dots are visual only */
+}
+
+.splash-orb-dot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background-color: var(--ls-splash-orb-dot-color);
+  border-radius: 50%;
+  opacity: 0;
+  /* Animation will set transform and opacity */
+}
+
+/* Time and Date Container */
+.time-date-container {
+  text-align: center;
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+.clock {
+  font-size: 64px;
+  font-weight: 300;
+  color: var(--ls-gray-8);
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.date {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--ls-gray-7);
+  margin-top: 5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Dark theme adjustments for splash screen */
+[data-theme="dark"] #splash-screen {
+  background: linear-gradient(135deg, var(--ls-accent-9), var(--ls-accent-10));
+}
+
+[data-theme="dark"] .clock {
+  color: var(--ls-gray-3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .date {
+  color: var(--ls-gray-4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+} 

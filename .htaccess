@@ -9,7 +9,14 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_URI} !^/api/
 RewriteRule ^(.*)$ index.php?path=$1 [QSA,L]
 
-# --- OR, if using API endpoints directly (alternative to above for API calls) ---
-# Example: Route /api/notes to /api/notes.php
-# RewriteCond %{REQUEST_FILENAME}.php -f
-# RewriteRule ^api/([a-zA-Z0-9_-]+)$ api/$1.php [L]
+# --- API endpoint routing ---
+# Route /api/v1/endpoint to /api/v1/endpoint.php if it exists
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{DOCUMENT_ROOT}/api/v1/$1.php -f
+RewriteRule ^api/v1/([a-zA-Z0-9_-]+)$ api/v1/$1.php [L]
+
+# Fallback for direct .php file access in api directory (optional, but might cover other cases)
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/api/$1.php -f
+RewriteRule ^api/([a-zA-Z0-9_-]+)$ api/$1.php [L]

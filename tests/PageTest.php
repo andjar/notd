@@ -13,7 +13,7 @@ class PageTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = new PDO('sqlite:' . DB_PATH);
+        $this->pdo = new \PDO('sqlite:' . DB_PATH);
         $this->dm = new DataManager($this->pdo);
     }
 

@@ -1,7 +1,8 @@
-import { currentPageId, setCurrentPagePassword } from './state.js';
+import { getCurrentPageId, setCurrentPagePassword } from './state.js';
 import { ui, hidePagePropertiesModal, promptForEncryptionPassword } from '../ui.js';
 import { pagesAPI, notesAPI } from '../api_client.js';
 import { encrypt } from '../utils.js'; // Import encrypt from utils.js
+import { pageCache } from './page-cache.js';
 
 // Stores the full page content while the modal is open
 let pageContentForModal = '';
@@ -11,12 +12,20 @@ let pageContentForModal = '';
 async function _updatePageContent(newContent) {
     try {
         ui.updateSaveStatusIndicator('pending');
-        const updatedPage = await pagesAPI.updatePage(currentPageId, { content: newContent });
+        const updatedPage = await pagesAPI.updatePage(getCurrentPageId(), { content: newContent });
         pageContentForModal = updatedPage.content || '';
         // The properties are now derived from the returned content, so we pass the new properties to the UI.
         displayPageProperties(updatedPage.properties || {});
-        ui.renderPageInlineProperties(updatedPage.properties || {}, ui.domRefs.pagePropertiesContainer);
+        // Properties are rendered server-side, no need for client-side rendering
         ui.updateSaveStatusIndicator('saved');
+        
+        // **CACHE INVALIDATION**: Invalidate cache after page content update
+        const appStore = window.Alpine.store('app');
+        if (appStore.currentPageName) {
+            pageCache.removePage(appStore.currentPageName);
+            console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName} (page content update)`);
+        }
+        
         hidePagePropertiesModal();
     } catch (error) {
         console.error("Failed to update page content:", error);
@@ -30,7 +39,7 @@ async function _updatePageContent(newContent) {
 export async function displayPageProperties(properties) {
     // When the modal is opened, fetch the LATEST page content to work with.
     try {
-        const pageData = await pagesAPI.getPageById(currentPageId);
+        const pageData = await pagesAPI.getPageById(getCurrentPageId());
         pageContentForModal = pageData.content || '';
     } catch (error) {
         console.error("Could not fetch page data for property editor:", error);
@@ -88,7 +97,7 @@ async function handleEncryptPage() {
         textarea.value = newContent; // Update the textarea immediately
 
         // 2. Encrypt all notes for the current page
-        const notes = await notesAPI.getPageData(currentPageId);
+        const notes = await notesAPI.getPageData(getCurrentPageId());
         const batchUpdates = notes.map(note => {
             if (note.is_encrypted) return null; // Already encrypted, skip
             return {
@@ -104,6 +113,13 @@ async function handleEncryptPage() {
         if (batchUpdates.length > 0) {
             // **FIX**: The batchUpdateNotes function expects the array of operations directly.
             await notesAPI.batchUpdateNotes(batchUpdates);
+            
+            // **CACHE INVALIDATION**: Invalidate cache after batch operations
+            const appStore = window.Alpine.store('app');
+            if (appStore.currentPageName) {
+                pageCache.removePage(appStore.currentPageName);
+                console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName} (property editor)`);
+            }
         }
 
         // 3. Save the page content with the new property AND save the password in state

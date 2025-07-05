@@ -1,0 +1,214 @@
+/* ========== ENHANCED NOTE STYLING ========== */
+.note-content h1,
+.note-content h2,
+.note-content h3,
+.note-content h4,
+.note-content h5,
+.note-content h6 {
+  border-bottom: 1px solid var(--ls-secondary-border-color);
+  padding-bottom: var(--ls-space-1);
+  margin-bottom: var(--ls-space-2);
+  font-family: var(--ls-header-font-family);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  list-style: none;
+}
+
+.note-content h1 {
+  font-size: var(--ls-font-size-2xl);
+}
+
+.note-content h2 {
+  font-size: var(--ls-font-size-xl);
+}
+
+.note-content h3 {
+  font-size: var(--ls-font-size-lg);
+}
+
+.note-content h4 {
+  font-size: var(--ls-font-size-base);
+  font-weight: var(--ls-font-weight-semibold);
+}
+
+.note-content h5 {
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-semibold);
+}
+
+.note-content h6 {
+  font-size: var(--ls-font-size-xs);
+  font-weight: var(--ls-font-weight-semibold);
+}
+
+/* Note Properties */
+.note-properties {
+  font-size: var(--ls-font-size-sm);
+  color: var(--ls-secondary-text-color);
+  margin-top: var(--ls-space-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ls-space-1);
+}
+
+.note-properties .property-item {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--ls-tertiary-background-color);
+  padding: var(--ls-space-1);
+  border-radius: var(--ls-border-radius-low);
+}
+
+.note-properties .property-key {
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-accent-10);
+  margin-right: var(--ls-space-1);
+}
+
+.note-properties .property-value {
+}
+
+/* Add Root Note Button */
+#add-root-note-btn {
+  position: static;
+  margin-top: var(--ls-space-4);
+  margin-left: var(--bullet-left-indent);
+  background: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-secondary-border-color);
+  color: var(--ls-secondary-text-color);
+  font-size: var(--ls-font-size-sm);
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--ls-transition-fast);
+  z-index: auto;
+}
+
+#add-root-note-btn:hover {
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  border-color: var(--ls-border-color);
+  transform: scale(1.05);
+}
+
+/* Note Attachments */
+.note-attachments {
+  display: none;
+  flex-direction: column;
+  gap: var(--ls-space-2);
+  margin-top: var(--ls-space-3);
+  padding-top: var(--ls-space-3);
+  border-top: 1px solid var(--ls-secondary-border-color);
+}
+
+.note-attachment-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-3);
+  padding: var(--ls-space-2);
+  background-color: var(--ls-secondary-background-color);
+  border-radius: var(--ls-border-radius-medium);
+  border: 1px solid var(--ls-secondary-border-color);
+  transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.note-attachment-item:hover {
+  background-color: var(--ls-tertiary-background-color);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+.attachment-preview {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--ls-tertiary-background-color);
+  border-radius: var(--ls-border-radius-low);
+  overflow: hidden;
+}
+
+.attachment-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-preview-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--ls-secondary-text-color);
+}
+
+.attachment-info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ls-space-1);
+  overflow: hidden;
+}
+
+.attachment-name {
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-name:hover {
+  color: var(--ls-accent-10);
+  text-decoration: underline;
+}
+
+.attachment-meta {
+  font-size: var(--ls-font-size-xs);
+  color: var(--ls-secondary-text-color);
+}
+
+.attachment-delete-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--ls-tertiary-text-color);
+  cursor: pointer;
+  padding: var(--ls-space-1);
+  border-radius: var(--ls-border-radius-low);
+}
+
+.attachment-delete-btn:hover {
+  color: var(--color-error, var(--ls-button-danger-bg));
+  background-color: var(--ls-modal-close-danger-hover-bg);
+}
+
+/* Drag and Drop */
+.note-content-wrapper.dragover {
+  background-color: var(--ls-accent-3);
+  outline: 2px dashed var(--ls-accent-9);
+  outline-offset: -4px;
+}
+
+.note-ghost {
+  opacity: 0.5;
+  background: var(--ls-tertiary-background-color);
+  border: 2px dashed var(--ls-border-color);
+  border-radius: var(--ls-border-radius-low);
+}
+
+.note-chosen {
+  box-shadow: var(--ls-shadow-md);
+  background: var(--ls-secondary-background-color);
+}
+
+.note-drag {
+  opacity: 0.9;
+  box-shadow: var(--ls-shadow-lg);
+  z-index: var(--ls-z-index-dropdown);
+} 

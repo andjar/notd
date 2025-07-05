@@ -13,6 +13,8 @@ import { initGlobalEventListeners } from './event-handlers.js';
 import { initGlobalSearch, initPageSearchModal } from './search.js';
 import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js';
 import { pagesAPI } from '../api_client.js'; // Import pagesAPI
+import { calendarCache } from './calendar-cache.js';
+import { initBacklinksModal } from './backlinks-modal.js';
 
 // Import UI module
 import { ui } from '../ui.js';
@@ -22,6 +24,9 @@ window.createPageWithContent = async (pageName, initialContent = '') => {
     try {
         const newPage = await pagesAPI.createPage(pageName, initialContent);
         if (newPage && newPage.id) {
+            // Add new page to calendar cache if it's a date-based page
+            calendarCache.addPage(newPage);
+            
             await loadPage(newPage.name, true);
             return true;
         } else {
@@ -40,23 +45,22 @@ window.createPageWithContent = async (pageName, initialContent = '') => {
  * This function sets up UI components, event listeners, and loads the initial page.
  */
 export async function initializeApp() {
-    const splashScreen = document.getElementById('splash-screen');
-    if (splashScreen) splashScreen.classList.remove('hidden'); 
+    // Remove manual splash screen class manipulation - let Alpine.js handle it
+    // const splashScreen = document.getElementById('splash-screen');
+    // if (splashScreen) splashScreen.classList.remove('hidden'); 
     
     try {
-        // **FIX**: Initialize the sidebar here, after the DOM is loaded
-        // but before other components that might depend on it.
-        await sidebarState.init(); 
+        // Sidebar is now handled by Alpine.js component
+        // await sidebarState.init(); // Removed - conflicts with Alpine.js 
         
         ui.initPagePropertiesModal();
         ui.updateSaveStatusIndicator('saved');
         
         initGlobalSearch();
         initPageSearchModal();
+        initBacklinksModal();
         
-        if (ui.calendarWidget && typeof ui.calendarWidget.init === 'function') {
-            ui.calendarWidget.init();
-        }
+        // Calendar is now handled by Alpine.js component
         
         initGlobalEventListeners();
         initSuggestionUI();
@@ -69,23 +73,26 @@ export async function initializeApp() {
         await fetchAndDisplayPages(initialPageName);
         await prefetchRecentPagesData(); 
         
-        const initialSaveIndicator = document.getElementById('save-status-indicator');
-        if (initialSaveIndicator) {
-            initialSaveIndicator.classList.add('status-hidden'); 
-        }
+        // Save status indicator is now always visible
+        // const initialSaveIndicator = document.getElementById('save-status-indicator');
+        // if (initialSaveIndicator) {
+        //     initialSaveIndicator.classList.add('status-hidden'); 
+        // }
         
         console.log('App initialized successfully');
         
     } catch (error) { 
         console.error('Failed to initialize application:', error);
-        if (splashScreen) splashScreen.classList.add('hidden');
+        // Remove manual splash screen class manipulation
+        // if (splashScreen) splashScreen.classList.add('hidden');
         document.body.innerHTML = `<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>${error.message}</p><p>Check console for details.</p></div>`;
     } finally {
-        if (splashScreen) {
-            if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
-                window.splashAnimations.stop();
-            }
-            splashScreen.classList.add('hidden');
-        }
+        // Remove manual splash screen class manipulation - let Alpine.js handle it
+        // if (splashScreen) {
+        //     if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
+        //         window.splashAnimations.stop();
+        //     }
+        //     splashScreen.classList.add('hidden');
+        // }
     }
 }

@@ -5,7 +5,7 @@ export const domRefs = {
     pageContent: document.getElementById('page-content'),
     pageTitle: document.getElementById('page-title'),
     pageTitleContainer: document.querySelector('.page-title-container'),
-    pagePropertiesContainer: document.getElementById('page-properties-container'),
+
     pageListContainer: document.getElementById('page-list'),
     addRootNoteBtn: document.getElementById('add-root-note-btn'),
     toggleLeftSidebarBtn: document.getElementById('toggle-left-sidebar-btn'),
@@ -18,8 +18,12 @@ export const domRefs = {
     // **FIX**: Corrected the ID to match the HTML
     extensionIconsContainer: document.getElementById('extension-icons-container'),
     backlinksContainer: document.getElementById('backlinks-container'),
+    openBacklinksModalBtn: document.getElementById('open-backlinks-modal-btn'),
     
     // Modals
+    backlinksModal: document.getElementById('backlinks-modal'),
+    backlinksModalClose: document.getElementById('backlinks-modal-close'),
+    backlinksModalContent: document.getElementById('backlinks-modal-content'),
     pagePropertiesModal: document.getElementById('page-properties-modal'),
     pagePropertiesModalClose: document.getElementById('page-properties-modal-close'),
     pagePropertiesList: document.getElementById('page-properties-list'),
@@ -37,6 +41,12 @@ export const domRefs = {
     passwordInput: document.getElementById('password-input'),
     passwordSubmit: document.getElementById('password-submit'),
     passwordCancel: document.getElementById('password-cancel'),
+
+    // Note Search Modal
+    noteSearchModal: document.getElementById('note-search-modal'),
+    noteSearchModalInput: document.getElementById('note-search-modal-input'),
+    noteSearchModalResults: document.getElementById('note-search-modal-results'),
+    noteSearchModalCancel: document.getElementById('note-search-modal-cancel'),
 
     // Encryption Modal Elements
     encryptionPasswordModal: document.getElementById('encryption-password-modal'),

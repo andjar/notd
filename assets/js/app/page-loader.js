@@ -1,20 +1,9 @@
 // assets/js/app/page-loader.js
 
-import {
-    setCurrentPageId,
-    setCurrentPageName,
-    setNotesForCurrentPage,
-    hasPageCache,
-    getPageCache,
-    setPageCache,
-    CACHE_MAX_AGE_MS,
-    MAX_PREFETCH_PAGES,
-    currentPageName,
-    notesForCurrentPage,
-    currentPageId,
-    setCurrentPagePassword,
-    getCurrentPagePassword
-} from './state.js';
+// Get Alpine store reference
+function getAppStore() {
+    return window.Alpine.store('app');
+}
 
 import { decrypt } from '../utils.js';
 import { notesAPI, pagesAPI, searchAPI, queryAPI, apiRequest } from '../api_client.js';
@@ -23,6 +12,9 @@ import { ui } from '../ui.js';
 import { parseProperties, parseContent, cleanProperties } from '../utils/content-parser.js';
 import { handleNoteAction } from './note-actions.js';
 import { promptForPagePassword } from '../ui.js';
+import { pageCache } from './page-cache.js';
+import { recentHistory } from './recent-history.js';
+import { calendarCache } from './calendar-cache.js';
 
 // --- Restored Utility Functions ---
 export function getPreviousDayPageName(currentDateStr) {
@@ -50,7 +42,7 @@ export async function handleTransclusions() {
         try {
             const note = await notesAPI.getNote(blockId);
             if (note && note.content) {
-                ui.renderTransclusion(placeholder, note.content, blockId);
+                await ui.renderTransclusion(placeholder, note.content, blockId, note);
             } else {
                 placeholder.textContent = 'Block not found.';
                 placeholder.classList.add('error');
@@ -78,7 +70,7 @@ async function displayBacklinks(pageName) {
         }
         const html = backlinksData.map(link => `
             <div class="backlink-item">
-                <a href="#" class="page-link" data-page-name="${link.page_name}">${link.page_name}</a>
+                <a href="page.php?page=${encodeURIComponent(link.page_name)}" class="page-link">${link.page_name}</a>
                 <div class="backlink-snippet">${link.content_snippet || ''}</div>
             </div>
         `).join('');
@@ -107,13 +99,12 @@ async function displayChildPages(namespace) {
             childPages.forEach(page => {
                 const item = document.createElement('li');
                 const link = document.createElement('a');
-                link.href = '#';
+                link.href = `page.php?page=${encodeURIComponent(page.name)}`;
                 const displayName = page.name.includes('/') ? 
                     page.name.substring(page.name.lastIndexOf('/') + 1) : 
                     page.name;
                 link.textContent = displayName;
                 link.className = 'child-page-link';
-                link.dataset.pageName = page.name;
                 item.appendChild(link);
                 list.appendChild(item);
             });
@@ -162,7 +153,8 @@ export async function handleSqlQueries() {
 // --- Page Loading and Rendering ---
 
 async function handleCreateAndFocusFirstNote() {
-    if (!currentPageId) return;
+    const appStore = getAppStore();
+    if (!appStore.currentPageId) return;
     await handleAddRootNote();
 }
 
@@ -176,31 +168,32 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
 
     const pageContentDiv = ui.domRefs.pageContent;
     const pageTitleDiv = ui.domRefs.pageTitle;
-    const pagePropertiesContainer = ui.domRefs.pagePropertiesContainer;
 
-    if (!pageContentDiv || !pageTitleDiv || !pagePropertiesContainer) {
+    if (!pageContentDiv || !pageTitleDiv) {
         console.error('[DEBUG] Missing required DOM elements:', { 
             hasPageContent: Boolean(pageContentDiv),
-            hasPageTitle: Boolean(pageTitleDiv),
-            hasPropertiesContainer: Boolean(pagePropertiesContainer)
+            hasPageTitle: Boolean(pageTitleDiv)
         });
         return;
     }
 
-    // Set page title
-    pageTitleDiv.textContent = pageData.name;
+    // Page title is now set by PHP, no need to set it here
 
-    // Render properties
-    ui.renderPageInlineProperties(pageProperties, pagePropertiesContainer);
+    // Properties are now rendered server-side in page.php, no need for client-side rendering
 
     // Render main content - clean properties from content before rendering
     const contentWithoutProperties = pageData.content ? pageData.content.replace(/\{[^}]+\}/g, '').trim() : '';
-    pageContentDiv.innerHTML = contentWithoutProperties ? parseContent(contentWithoutProperties) : '';
+    if (contentWithoutProperties) {
+        pageContentDiv.innerHTML = parseContent(contentWithoutProperties);
+        pageContentDiv.style.display = 'block'; // Show the element when it has content
+    } else {
+        pageContentDiv.style.display = 'none'; // Hide the element when it's empty
+    }
 
-    // Update sidebars
-    ui.displayFavorites();
-    ui.displayBacklinksInSidebar(pageData.name);
-    ui.displayChildPagesInSidebar(pageData.name);
+    // Update sidebars - disabled old DOM manipulation that conflicts with Alpine.js
+    // ui.displayFavorites();
+    // ui.displayBacklinksInSidebar(pageData.name);
+    // ui.displayChildPagesInSidebar(pageData.name);
 
     // Render notes
     if (pageData.notes && pageData.notes.length > 0) {
@@ -220,7 +213,8 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                 valueLength: pageEncryptProperty.value?.length
             });
 
-            let password = getCurrentPagePassword();
+            const appStore = getAppStore();
+            let password = appStore.pagePassword;
             const pageHash = pageEncryptProperty.value;
 
             if (!password) {
@@ -236,24 +230,24 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                             expectedHash: pageHash
                         });
                         alert("Wrong password!");
-                        setCurrentPagePassword(null);
+                        appStore.setPagePassword(null);
                         pageContentDiv.innerHTML = '<p>Decryption failed: Incorrect password.</p>';
-                        setNotesForCurrentPage([]);
-                        ui.displayNotes([], currentPageId);
+                        appStore.setNotes([]);
+                        ui.displayNotes([], appStore.currentPageId);
                         return; // Stop rendering
                     }
                     console.log('[DEBUG] Password verified, setting current password');
-                    setCurrentPagePassword(password);
+                    appStore.setPagePassword(password);
                 } catch (error) {
                     console.error("[DEBUG] Password prompt failed:", error);
                     pageContentDiv.innerHTML = '<p>Password entry cancelled. Cannot display page.</p>';
-                    setNotesForCurrentPage([]);
-                    ui.displayNotes([], currentPageId);
+                    appStore.setNotes([]);
+                    ui.displayNotes([], appStore.currentPageId);
                     return; // Stop rendering
                 }
             }
 
-            const currentPassword = getCurrentPagePassword();
+            const currentPassword = appStore.pagePassword;
             const currentPasswordHash = currentPassword ? sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(currentPassword)) : null;
 
             if (currentPasswordHash !== pageHash) {
@@ -261,10 +255,10 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                     storedHash: currentPasswordHash,
                     expectedHash: pageHash
                 });
-                setCurrentPagePassword(null);
+                appStore.setPagePassword(null);
                 pageContentDiv.innerHTML = '<p>Decryption failed: Stored password is incorrect for this page. Please reload.</p>';
-                setNotesForCurrentPage([]);
-                ui.displayNotes([], currentPageId);
+                appStore.setNotes([]);
+                ui.displayNotes([], appStore.currentPageId);
                 return;
             }
 
@@ -318,31 +312,37 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
         }
         
         console.log('[DEBUG] Setting notes for current page and displaying');
-        setNotesForCurrentPage(notesToRender);
-        ui.displayNotes(notesToRender, currentPageId);
+        const appStore = getAppStore();
+        appStore.setNotes(notesToRender);
+        ui.displayNotes(notesToRender, appStore.currentPageId);
         if (focusFirstNote && pageData.notes[0]) {
             handleNoteAction('focus', pageData.notes[0].id);
         }
     } else {
         console.log('[DEBUG] No notes to render');
-        setNotesForCurrentPage([]);
-        ui.displayNotes([], currentPageId); // Clear notes view
+        const appStore = getAppStore();
+        appStore.setNotes([]);
+        ui.displayNotes([], appStore.currentPageId); // Clear notes view
         if (focusFirstNote) {
             await handleNoteAction('create', null);
         }
     }
 
     console.log('[DEBUG] Rendering additional page elements');
-    displayBacklinks(pageData.name);
-    displayChildPages(pageData.name);
+    // displayBacklinks(pageData.name); // Disabled - conflicts with Alpine.js
+    // displayChildPages(pageData.name); // Disabled - conflicts with Alpine.js
     handleTransclusions();
     handleSqlQueries();
+    
+    // Handle URL anchor highlighting after notes are rendered
+    handleUrlAnchor();
     
     console.log('[DEBUG] Starting prefetch of linked pages');
     prefetchLinkedPagesData();
     console.log('[DEBUG] _renderPageContent complete');
 
-    if (notesForCurrentPage.length === 0 && pageData.id) {
+    const appStore = getAppStore();
+    if (appStore.notes.length === 0 && pageData.id) {
         await handleCreateAndFocusFirstNote();
     } else if (focusFirstNote && ui.domRefs.notesContainer) {
         const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
@@ -350,20 +350,18 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     }
 }
 
-async function _processAndRenderPage(pageData, updateHistory, focusFirstNote) {
-    setCurrentPageName(pageData.name);
-    setCurrentPageId(pageData.id);
-    setNotesForCurrentPage(pageData.notes || []);
-    setCurrentPagePassword(null); // Reset password for new page
+async function _processAndRenderPage(pageData, focusFirstNote) {
+    const appStore = getAppStore();
+    appStore.setCurrentPageName(pageData.name);
+    appStore.setCurrentPageId(pageData.id);
+    appStore.setNotes(pageData.notes || []);
+    appStore.setPagePassword(null); // Reset password for new page
 
-    if (updateHistory) {
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.set('page', pageData.name);
-        history.pushState({ pageName: pageData.name }, '', newUrl.toString());
-    }
+    // Add to recent history
+    recentHistory.addPage(pageData.name);
 
     ui.updatePageTitle(pageData.name);
-    if (ui.calendarWidget && ui.calendarWidget.setCurrentPage) ui.calendarWidget.setCurrentPage(pageData.name);
+    // Calendar current page is handled by Alpine.js component
     
     const pageProperties = pageData.properties || {};
     
@@ -378,6 +376,11 @@ async function _fetchPageFromNetwork(pageName) {
         if (String(error.message).includes('404')) {
              console.warn(`Page "${pageName}" not found, creating it.`);
              pageDetails = await pagesAPI.createPage(pageName);
+             
+             // Add new page to calendar cache if it's a date-based page
+             if (pageDetails && pageDetails.id) {
+                 calendarCache.addPage(pageDetails);
+             }
         } else {
             console.error(`Fatal: Failed to GET page "${pageName}":`, error);
             throw error;
@@ -397,46 +400,42 @@ async function _fetchPageFromNetwork(pageName) {
     // This check is now mostly for safety, as `notes` is explicitly assigned above.
     combinedPageData.notes = Array.isArray(combinedPageData.notes) ? combinedPageData.notes : [];
     
-    setPageCache(pageName, { ...combinedPageData, timestamp: Date.now() });
+    // Cache the page data for future loads
+    pageCache.setPage(pageName, combinedPageData);
+    
     return combinedPageData;
 }
 
-export async function loadPage(pageName, focusFirstNote = false, updateHistory = true, providedPageData = null) {
+export async function loadPage(pageName, focusFirstNote = false, providedPageData = null) {
     if (window.blockPageLoad) return;
     window.blockPageLoad = true;
     
     pageName = pageName || getInitialPage();
 
-    // Hide splash screen at the start of page load
-    const splashScreen = document.getElementById('splash-screen');
-    if (splashScreen) {
-        splashScreen.classList.add('hidden');
-        if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
-            window.splashAnimations.stop();
-        }
-    }
-
     try {
         let pageData = providedPageData;
-        const cachedPage = getPageCache(pageName);
-
-        if (!pageData && cachedPage && (Date.now() - cachedPage.timestamp < CACHE_MAX_AGE_MS)) {
-            pageData = cachedPage;
+        
+        // Check localStorage cache first
+        if (!pageData) {
+            pageData = pageCache.getPage(pageName);
         }
         
         if (!pageData) {
             console.log('[page-loader] Attempting to show loading message. notesContainer:', ui.domRefs.notesContainer);
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
             pageData = await _fetchPageFromNetwork(pageName);
+        } else {
+            console.log('[page-loader] Using cached page data for:', pageName);
         }
         
-        await _processAndRenderPage(pageData, updateHistory, focusFirstNote);
+        await _processAndRenderPage(pageData, focusFirstNote);
     } catch (error) {
         console.error('[page-loader] Error object received:', error);
         console.error(`Error loading page ${pageName}:`, error);
-        setCurrentPageName(`Error: ${pageName}`);
-        setCurrentPageId(null);
-        ui.updatePageTitle(currentPageName);
+        const appStore = getAppStore();
+        appStore.setCurrentPageName(`Error: ${pageName}`);
+        appStore.setCurrentPageId(null);
+        ui.updatePageTitle(appStore.currentPageName);
         console.log('[page-loader] Attempting to display error message. notesContainer:', ui.domRefs.notesContainer);
         try {
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
@@ -450,11 +449,12 @@ export async function loadPage(pageName, focusFirstNote = false, updateHistory =
 }
 
 export async function prefetchLinkedPagesData() {
-    if (!notesForCurrentPage) return;
+    const appStore = getAppStore();
+    if (!appStore.notes) return;
     const linkedPageNames = new Set();
     const pageLinkRegex = /\[\[([^\]]+)\]\]/g;
 
-    notesForCurrentPage.forEach(note => {
+    appStore.notes.forEach(note => {
         if (note.content) {
             [...note.content.matchAll(pageLinkRegex)].forEach(match => {
                 const pageName = match[1].trim().split('|')[0].trim();
@@ -465,8 +465,8 @@ export async function prefetchLinkedPagesData() {
 
     let prefetchCounter = 0;
     for (const name of linkedPageNames) {
-        if (prefetchCounter >= MAX_PREFETCH_PAGES) break;
-        if (name === currentPageName || hasPageCache(name)) continue;
+        if (prefetchCounter >= appStore.MAX_PREFETCH_PAGES) break;
+        if (name === appStore.currentPageName || appStore.hasPageCache(name)) continue;
         
         try {
             await _fetchPageFromNetwork(name);
@@ -478,9 +478,10 @@ export async function prefetchLinkedPagesData() {
 
 export async function prefetchRecentPagesData() {
     try {
-        const { pages } = await pagesAPI.getPages({ sort_by: 'updated_at', sort_order: 'desc', per_page: MAX_PREFETCH_PAGES });
+        const appStore = getAppStore();
+        const { pages } = await pagesAPI.getPages({ sort_by: 'updated_at', sort_order: 'desc', per_page: appStore.MAX_PREFETCH_PAGES });
         for (const page of pages) {
-            if (page.name === currentPageName || hasPageCache(page.name)) continue;
+            if (page.name === appStore.currentPageName || appStore.hasPageCache(page.name)) continue;
             try {
                 await _fetchPageFromNetwork(page.name);
             } catch (error) {
@@ -494,8 +495,9 @@ export async function prefetchRecentPagesData() {
 
 export async function fetchAndDisplayPages(activePageName) {
     try {
+        const appStore = getAppStore();
         const { pages } = await pagesAPI.getPages({ per_page: 20, sort_by: 'updated_at', sort_order: 'desc' });
-        ui.updatePageList(pages, activePageName || currentPageName);
+        ui.updatePageList(pages, activePageName || appStore.currentPageName);
     } catch (error) {
         console.error('Error fetching pages for sidebar:', error);
         if (ui.domRefs.pageListContainer) {
@@ -506,4 +508,69 @@ export async function fetchAndDisplayPages(activePageName) {
 
 export function getInitialPage() {
     return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Handles URL anchor highlighting for specific notes
+ * Parses the URL hash for #note-{id} and highlights the corresponding note
+ */
+export function handleUrlAnchor() {
+    const hash = window.location.hash;
+    if (!hash) return;
+    
+    // Parse hash for note anchor (e.g., #note-532)
+    const noteMatch = hash.match(/^#note-(\d+)$/);
+    if (!noteMatch) return;
+    
+    const noteId = noteMatch[1];
+    console.log(`[URL Anchor] Looking for note with ID: ${noteId}`);
+    
+    // Find the note element in the DOM
+    const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
+    if (!noteElement) {
+        console.warn(`[URL Anchor] Note element with ID ${noteId} not found in DOM`);
+        // Try again after a short delay in case the note is still loading
+        setTimeout(() => {
+            const retryElement = document.querySelector(`[data-note-id="${noteId}"]`);
+            if (retryElement) {
+                console.log(`[URL Anchor] Found note ${noteId} on retry`);
+                highlightNoteElement(retryElement);
+            }
+        }, 500);
+        return;
+    }
+    
+    highlightNoteElement(noteElement);
+}
+
+/**
+ * Highlights a note element with animation and scrolling
+ * @param {HTMLElement} noteElement - The note element to highlight
+ */
+function highlightNoteElement(noteElement) {
+    const noteId = noteElement.dataset.noteId;
+    
+    // Add highlighting class
+    noteElement.classList.add('anchor-highlight');
+    
+    // Scroll to the note with smooth animation and offset
+    const headerHeight = 80; // Approximate header height
+    const elementTop = noteElement.offsetTop;
+    const elementHeight = noteElement.offsetHeight;
+    const windowHeight = window.innerHeight;
+    
+    // Calculate scroll position to center the element with some offset from top
+    const scrollTop = elementTop - headerHeight - (windowHeight / 2) + (elementHeight / 2);
+    
+    window.scrollTo({
+        top: Math.max(0, scrollTop),
+        behavior: 'smooth'
+    });
+    
+    // Remove the highlight class after animation completes
+    setTimeout(() => {
+        noteElement.classList.remove('anchor-highlight');
+    }, 3000); // Keep highlight for 3 seconds
+    
+    console.log(`[URL Anchor] Successfully highlighted note ${noteId}`);
 }

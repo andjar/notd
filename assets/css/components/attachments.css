@@ -1,0 +1,120 @@
+/* Styles for attachments */
+.note-attachments {
+  display: flex; /* This will be the main container for attachment items */
+  flex-direction: column; /* Stack attachment items vertically */
+  gap: var(--spacing-small);
+  padding: var(--spacing-small) 0;
+}
+
+.note-attachment-item {
+  display: flex;
+  align-items: center;
+  background-color: var(--color-background-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-medium);
+  padding: var(--spacing-small);
+  transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.note-attachment-item:hover {
+  background-color: var(--color-background-tertiary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.attachment-preview {
+  margin-right: var(--spacing-small);
+  flex-shrink: 0; /* Prevent icon/preview from shrinking */
+  width: 40px; /* Fixed width for preview area */
+  height: 40px; /* Fixed height for preview area */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-background-tertiary); /* Slight background for the preview box */
+  border-radius: var(--border-radius-small);
+}
+
+.attachment-preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--border-radius-small);
+}
+
+.attachment-preview-icon {
+  font-size: 1.5em; /* Adjust icon size as needed */
+  color: var(--color-icon-primary);
+}
+
+.attachment-info {
+  flex-grow: 1; /* Allow info section to take available space */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevents long names from breaking layout */
+}
+
+.attachment-name {
+  font-size: var(--font-size-medium);
+  color: var(--color-text-link);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-name:hover {
+  text-decoration: underline;
+}
+
+/* Specific styling for Excalidraw edit button and its contained link */
+.attachment-edit-excalidraw-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-link);
+  padding: 0;
+  margin-bottom: var(--spacing-xsmall); /* Space between button and filename link */
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--font-size-medium);
+  font-weight: 500;
+}
+.attachment-edit-excalidraw-btn:hover {
+  text-decoration: underline;
+}
+.attachment-edit-excalidraw-btn .feather {
+  width: var(--font-size-medium);
+  height: var(--font-size-medium);
+  vertical-align: text-bottom;
+  margin-right: var(--spacing-xsmall);
+}
+
+/* Style for the Excalidraw filename link when it's part of the Excalidraw block */
+.attachment-edit-excalidraw-btn + .attachment-name {
+  font-size: var(--font-size-small); /* Smaller font for the filename below the edit button */
+  color: var(--color-text-secondary);
+}
+
+
+.attachment-meta {
+  font-size: var(--font-size-xsmall);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xxsmall);
+}
+
+.attachment-delete-btn {
+  background: none;
+  border: none;
+  color: var(--color-icon-danger);
+  cursor: pointer;
+  padding: var(--spacing-xsmall);
+  margin-left: var(--spacing-small);
+}
+
+.attachment-delete-btn:hover {
+  color: var(--color-icon-danger-hover);
+}
+
+.attachment-delete-btn .feather {
+  width: 18px; /* Adjust as needed */
+  height: 18px; /* Adjust as needed */
+}
