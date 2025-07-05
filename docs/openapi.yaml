@@ -763,8 +763,9 @@ paths:
           $ref: '#/components/responses/ServerError'
 
     post:
-      summary: Upload an attachment
-      description: Upload a file attachment to a note
+      summary: Upload one or more attachments
+      description: |
+        Upload one or more file attachments to a note. You can upload multiple files in a single request by repeating the `attachmentFile` field in the multipart form data. This is used, for example, to upload both a PNG image and an editable Excalidraw JSON file for a drawing. Each file will be saved as a separate attachment for the note.
       requestBody:
         required: true
         content:
@@ -777,18 +778,26 @@ paths:
               properties:
                 note_id:
                   type: integer
-                  description: ID of the note to attach the file to
+                  description: ID of the note to attach the file(s) to
                 attachmentFile:
-                  type: string
-                  format: binary
-                  description: File to upload (max 10MB)
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: |
+                    One or more files to upload (max 10MB each). Repeat this field to upload multiple files (e.g., both a PNG and a .excalidraw JSON file).
       responses:
         '201':
-          description: Attachment uploaded successfully
+          description: Attachments uploaded successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Attachment'
+                type: object
+                properties:
+                  attachments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':

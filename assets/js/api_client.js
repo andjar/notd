@@ -247,7 +247,6 @@ const favoritesAPI = {
     addFavorite: (pageName) => apiRequest('favorites.php', 'POST', { page_name: pageName }),
     removeFavorite: (pageName) => apiRequest('favorites.php', 'POST', { _method: 'DELETE', page_name: pageName })
 };
-
 export {
     pagesAPI,
     notesAPI,

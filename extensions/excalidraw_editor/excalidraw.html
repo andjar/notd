@@ -149,6 +149,7 @@
                 return;
             }
             const appState = excalidrawAPI.getAppState();
+            // Export PNG
             const blob = await ExcalidrawLib.exportToBlob({
                 elements,
                 mimeType: 'image/png',
@@ -158,16 +159,35 @@
                 },
             });
             if (!blob) throw new Error('Failed to export drawing to Blob.');
+            // Export JSON
+            const jsonString = JSON.stringify({
+                type: 'excalidraw',
+                version: 2,
+                source: window.location.origin,
+                elements,
+                appState,
+            }, null, 2);
+            const jsonBlob = new Blob([jsonString], { type: 'application/json' });
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filenamePng = `excalidraw_${timestamp}.png`;
+            const filenameJson = `excalidraw_${timestamp}.excalidraw`;
             const formData = new FormData();
             formData.append('note_id', currentNoteId);
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `excalidraw_${timestamp}.png`;
-            formData.append('attachmentFile', blob, filename);
+            formData.append('attachmentFile', blob, filenamePng);
+            formData.append('attachmentFile', jsonBlob, filenameJson);
+            // Debug: log all files in FormData
+            for (let [key, value] of formData.entries()) {
+                if (value instanceof File || value instanceof Blob) {
+                    console.log(`FormData: ${key} = ${value.name || '(blob)'} (${value.type}, ${value.size} bytes)`);
+                } else {
+                    console.log(`FormData: ${key} = ${value}`);
+                }
+            }
             if (!attachmentsAPI || !attachmentsAPI.uploadAttachment) {
                 throw new Error('attachmentsAPI or uploadAttachment function is not available.');
             }
             await attachmentsAPI.uploadAttachment(formData);
-            successMessage.textContent = 'Drawing saved successfully as an attachment!';
+            successMessage.textContent = 'Drawing saved successfully as PNG and editable Excalidraw!';
         } catch (error) {
             errorMessage.textContent = `Error saving drawing: ${error.message}`;
         } finally {

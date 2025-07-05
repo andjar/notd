@@ -246,29 +246,29 @@ function renderNote(note, nestingLevel = 0) {
 
         const files = Array.from(e.dataTransfer.files);
         if (files.length > 0 && note.id && !String(note.id).startsWith('temp-')) {
+            const formData = new FormData();
             for (const file of files) {
-                const formData = new FormData();
                 formData.append('attachmentFile', file);
-                formData.append('note_id', note.id);
-                try {
-                    await attachmentsAPI.uploadAttachment(formData);
-                    const feedback = document.createElement('div');
-                    feedback.className = 'copy-feedback'; 
-                    feedback.textContent = `File "${file.name}" uploaded!`;
-                    document.body.appendChild(feedback);
-                    setTimeout(() => feedback.remove(), 3000);
-                    
-                    if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
-                         const pageData = await notesAPI.getPageData(window.currentPageId);
-                         window.notesForCurrentPage = pageData.notes; 
-                         window.ui.displayNotes(pageData.notes, window.currentPageId); 
-                    } else {
-                        console.warn('displayNotes function not available for page refresh after D&D upload.')
-                    }
-                } catch (error) {
-                    console.error('Error uploading file via drag & drop:', error);
-                    alert(`Failed to upload file "${file.name}": ${error.message}`);
+            }
+            formData.append('note_id', note.id);
+            try {
+                await attachmentsAPI.uploadAttachment(formData);
+                const feedback = document.createElement('div');
+                feedback.className = 'copy-feedback'; 
+                feedback.textContent = `Uploaded ${files.length} file${files.length > 1 ? 's' : ''}!`;
+                document.body.appendChild(feedback);
+                setTimeout(() => feedback.remove(), 3000);
+                
+                if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
+                     const pageData = await notesAPI.getPageData(window.currentPageId);
+                     window.notesForCurrentPage = pageData.notes; 
+                     window.ui.displayNotes(pageData.notes, window.currentPageId); 
+                } else {
+                    console.warn('displayNotes function not available for page refresh after D&D upload.')
                 }
+            } catch (error) {
+                console.error('Error uploading file(s) via drag & drop:', error);
+                alert(`Failed to upload file(s): ${error.message}`);
             }
         } else if (String(note.id).startsWith('temp-')) {
             alert('Please save the note (by adding some content) before adding attachments.');
@@ -899,25 +899,33 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
 
             let previewEl = '';
             const isImage = attachment.type && attachment.type.startsWith('image/');
+            const isExcalidraw = attachment.name.endsWith('.excalidraw') || attachment.name.endsWith('.json');
 
             if (isImage) {
                 previewEl = `<img src="${attachment.url}" alt="${attachment.name}" class="attachment-preview-image">`;
+            } else if (isExcalidraw) {
+                previewEl = `<i data-feather="pen-tool" class="attachment-preview-icon"></i>`;
             } else {
                 previewEl = `<i data-feather="file" class="attachment-preview-icon"></i>`;
             }
 
-            const linkEl = document.createElement('a');
-            linkEl.href = attachment.url;
-            linkEl.className = 'attachment-name';
-            if (!isImage) {
-                linkEl.target = '_blank'; 
+            let linkHtml = '';
+            if (isImage) {
+                linkHtml = `<a href="${attachment.url}" class="attachment-name delegated-attachment-image" data-attachment-url="${attachment.url}">${attachment.name}</a>`;
+            } else if (isExcalidraw) {
+                // Button to open in Excalidraw editor, passing note_id and attachment id
+                linkHtml = `<button class="attachment-edit-excalidraw-btn" data-note-id="${noteId}" data-attachment-id="${attachment.id}">
+                    <i data-feather="edit-3"></i> Edit in Excalidraw
+                </button>
+                <a href="${attachment.url}" class="attachment-name" target="_blank">${attachment.name}</a>`;
+            } else {
+                linkHtml = `<a href="${attachment.url}" class="attachment-name" target="_blank">${attachment.name}</a>`;
             }
-            linkEl.textContent = attachment.name;
 
             attachmentEl.innerHTML = `
                 <div class="attachment-preview">${previewEl}</div>
                 <div class="attachment-info">
-                    ${linkEl.outerHTML} 
+                    ${linkHtml}
                     <span class="attachment-meta">${attachment.type} - ${new Date(attachment.created_at).toLocaleDateString()}</span>
                 </div>
                 <button class="attachment-delete-btn" data-attachment-id="${attachment.id}" data-note-id="${noteId}">
@@ -926,13 +934,17 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
             `;
 
             attachmentsContainer.appendChild(attachmentEl);
+        });
 
-            if (isImage) {
-                const imageLink = attachmentEl.querySelector('.attachment-name');
-                if (imageLink) {
-                    imageLink.dataset.attachmentUrl = attachment.url;
-                    imageLink.classList.add('delegated-attachment-image');
-                }
+        // Add delegated event listener for Edit in Excalidraw buttons
+        attachmentsContainer.addEventListener('click', function(e) {
+            const btn = e.target.closest('.attachment-edit-excalidraw-btn');
+            if (btn) {
+                const noteId = btn.getAttribute('data-note-id');
+                const attachmentId = btn.getAttribute('data-attachment-id');
+                // Open excalidraw editor with note_id and attachment_id as query params
+                const url = `/extensions/excalidraw_editor/excalidraw.html?note_id=${encodeURIComponent(noteId)}&attachment_id=${encodeURIComponent(attachmentId)}`;
+                window.open(url, '_blank');
             }
         });
 
@@ -1340,8 +1352,10 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                 break;
             case 'open-zen':
                 const zenNoteId = target.dataset.noteId;
-                // ... existing open-zen logic ...
-                break;
+                const zenUrl = `/extensions/zen/index.html?note_id=${zenNoteId}`;
+                window.open(zenUrl, '_blank');
+                if (typeof closeMenu === 'function') closeMenu();
+                return;
             case 'open-excalidraw':
                 const excalidrawNoteId = target.dataset.noteId;
                 const excalidrawUrl = `/extensions/excalidraw_editor/excalidraw.html?note_id=${excalidrawNoteId}`;
