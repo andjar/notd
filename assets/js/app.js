@@ -143,8 +143,9 @@ Alpine.store('app', {
 // Alpine.start() is automatically called by the CDN version
 
 // Page management
-import { loadPage } from './app/page-loader.js';
+import { loadPage, refreshNotesStoreAndReloadView } from './app/page-loader.js';
 window.loadPage = loadPage;
+window.refreshNotesStoreAndReloadView = refreshNotesStoreAndReloadView;
 
 // UI and event handling
 import { ui } from './ui.js';
@@ -202,18 +203,24 @@ if (notesContainer) {
     notesContainer.addEventListener('keydown', handleNoteKeyDown);
 
     // Click handler for task checkboxes is now in `ui.initializeDelegatedNoteEventListeners`
+    // which itself is largely replaced by x-on in noteComponent template.
+    // Task checkbox clicks are handled by x-on in the (future) noteComponent template for tasks.
     
-    // Input handler for debounced saving of content
+    // Input handler for debounced saving of content -- THIS IS NOW REDUNDANT
+    // noteComponent.handleInput calls debouncedSaveNote.
+    /*
     notesContainer.addEventListener('input', (e) => {
         if (e.target.matches('.note-content.edit-mode')) {
             const noteItem = e.target.closest('.note-item');
             if (noteItem) {
                 const contentDiv = e.target;
-                contentDiv.dataset.rawContent = ui.normalizeNewlines(ui.getRawTextWithNewlines(contentDiv));
+                // The rawContent dataset is less critical now as noteComponent.note.content is the source of truth
+                // contentDiv.dataset.rawContent = ui.normalizeNewlines(ui.getRawTextWithNewlines(contentDiv));
                 debouncedSaveNote(noteItem);
             }
         }
     });
+    */
 }
 
 // --- Drag and Drop for File Uploads ---

@@ -861,15 +861,15 @@ export const ui = {
     buildNoteTree,
     initializeDragAndDrop,
     handleNoteDrop,
-    renderNote,
-    parseAndRenderContent,
-    switchToEditMode,
-    getRawTextWithNewlines,
-    normalizeNewlines,
-    renderAttachments,
-    renderProperties,
-    initializeDelegatedNoteEventListeners,
-    renderTransclusion,
+    // renderNote, // Replaced by Alpine template
+    parseAndRenderContent, // Still used
+    // switchToEditMode, // Replaced by Alpine component logic
+    getRawTextWithNewlines, // Still used
+    normalizeNewlines, // Still used
+    // renderAttachments, // Replaced by Alpine component logic
+    renderProperties, // Page-level, keep for now
+    // initializeDelegatedNoteEventListeners, // Replaced by x-on in Alpine
+    renderTransclusion, // Still used
     domRefs,
     updatePageTitle,
     updatePageList,

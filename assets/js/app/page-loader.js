@@ -313,10 +313,15 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
         
         console.log('[DEBUG] Setting notes for current page and displaying');
         const appStore = getAppStore();
-        appStore.setNotes(notesToRender);
-        ui.displayNotes(notesToRender, appStore.currentPageId);
-        if (focusFirstNote && pageData.notes[0]) {
-            handleNoteAction('focus', pageData.notes[0].id);
+
+        // Build the tree before setting it to the store
+        const noteTree = ui.buildNoteTree(notesToRender); // ui.buildNoteTree is from note-elements.js
+        appStore.setNotes(noteTree); // Set the TREE to the store
+
+        // ui.displayNotes(notesToRender, appStore.currentPageId); // This line is now redundant
+                                                              // as Alpine will render from the store.
+        if (focusFirstNote && noteTree[0]) { // Check noteTree for first note
+            handleNoteAction('focus', noteTree[0].id);
         }
     } else {
         console.log('[DEBUG] No notes to render');
@@ -345,10 +350,45 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     if (appStore.notes.length === 0 && pageData.id) {
         await handleCreateAndFocusFirstNote();
     } else if (focusFirstNote && ui.domRefs.notesContainer) {
-        const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
-        if (firstNoteContent) ui.switchToEditMode(firstNoteContent);
+        // switchToEditMode is now part of noteComponent, focusing logic might need adjustment if directly called.
+        // For now, initial focus on first note is handled by handleNoteAction('focus', noteTree[0].id);
+        // const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content.rendered-mode');
+        // if (firstNoteContent) {
+        //     const noteComponentInstance = Alpine.$data(firstNoteContent.closest('.note-item'));
+        //     if (noteComponentInstance) noteComponentInstance.editNote();
+        // }
     }
 }
+
+/**
+ * Fetches notes for the current page, rebuilds the note tree, and updates the Alpine store.
+ * This is used to refresh the notes view without a full page reload, e.g., after drag-and-drop.
+ */
+export async function refreshNotesStoreAndReloadView() {
+    const appStore = getAppStore();
+    if (!appStore.currentPageId) {
+        console.warn("Cannot refresh notes store: currentPageId is not set.");
+        return;
+    }
+
+    try {
+        const notesData = await notesAPI.getPageData(appStore.currentPageId); // getPageData returns flat list of notes
+        const noteTree = ui.buildNoteTree(notesData); // buildNoteTree is in note-elements.js, accessed via ui object
+        appStore.setNotes(noteTree); // Update the store, Alpine will re-render
+
+        // Re-initialize drag and drop as DOM might have changed significantly
+        if (window.initializeDragAndDrop) {
+            window.initializeDragAndDrop();
+        }
+
+        console.log("Notes store refreshed and view reloaded for page:", appStore.currentPageName);
+    } catch (error) {
+        console.error("Error refreshing notes store:", error);
+        // Optionally, notify the user or attempt a fallback full reload
+        // alert("Error updating note positions. Please try refreshing the page.");
+    }
+}
+
 
 async function _processAndRenderPage(pageData, focusFirstNote) {
     const appStore = getAppStore();

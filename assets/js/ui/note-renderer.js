@@ -1025,24 +1025,38 @@ function renderProperties(container, properties) {
 
 
 export {
-    renderNote,
-    parseAndRenderContent,
-    switchToEditMode,
-    switchToRenderedMode,
-    getRawTextWithNewlines,
-    normalizeNewlines,
-    renderAttachments,
-    renderProperties,
-    initializeDelegatedNoteEventListeners // Exporting the initializer
+    // renderNote, // No longer needed, replaced by Alpine template in page.php
+    parseAndRenderContent, // Still used by noteComponent and globally
+    // switchToEditMode, // No longer needed, logic moved to noteComponent
+    // switchToRenderedMode, // No longer needed, logic moved to noteComponent
+    getRawTextWithNewlines, // Still used by noteComponent
+    normalizeNewlines, // Still used by noteComponent
+    // renderAttachments, // No longer needed, replaced by Alpine template in noteComponent
+    renderProperties, // Potentially still used for page-level properties, review separately
+    // initializeDelegatedNoteEventListeners // Replaced by x-on directives in Alpine templates
+    renderTransclusion, // Keep for transclusion handling
+    openImageViewerModal, // Keep as utility
+    showConfirmationDialog, // Keep as utility
+    getLinkQueryInfo // Export for noteComponent
 };
 
-// --- Delegated Event Handler Functions ---
+// Expose critical suggestion utilities globally for now, assuming they are not already.
+// Ideally, these would be imported directly or through a service in noteComponent.
+window.getLinkQueryInfo = getLinkQueryInfo;
+if (typeof window.showSuggestions === 'undefined' && typeof showSuggestions !== 'undefined') window.showSuggestions = showSuggestions;
+if (typeof window.hideSuggestions === 'undefined' && typeof hideSuggestions !== 'undefined') window.hideSuggestions = hideSuggestions;
+if (typeof window.navigateSuggestions === 'undefined' && typeof navigateSuggestions !== 'undefined') window.navigateSuggestions = navigateSuggestions;
+if (typeof window.getSelectedSuggestion === 'undefined' && typeof getSelectedSuggestion !== 'undefined') window.getSelectedSuggestion = getSelectedSuggestion;
+
+
+// --- Delegated Event Handler Functions --- (Many of these are now OBSOLETE or moved to noteComponent)
 
 /**
  * Opens a modal to display an image.
  * @param {string} imageUrl The URL of the image to display.
  */
 
+// Keep openImageViewerModal as it's a general utility
 function openImageViewerModal(imageUrl) {
     if (!imageUrl) return;
 
@@ -1068,10 +1082,10 @@ function openImageViewerModal(imageUrl) {
         window.open(imageUrl, '_blank');
     }
 }
+window.openImageViewerModal = openImageViewerModal; // Expose globally if needed by noteComponent
 
 
-// custom confirmation dialog for delete actions
-
+// Keep showConfirmationDialog as it's a general utility
 async function showConfirmationDialog(message) {
     return new Promise((resolve) => {
         // Create modal wrapper
@@ -1145,531 +1159,37 @@ async function showConfirmationDialog(message) {
         document.body.appendChild(modal);
     });
 }
-
-
-
-
-
-async function handleDelegatedCollapseArrowClick(targetElement) {
-    const noteItem = targetElement.closest('.note-item');
-    const noteId = noteItem?.dataset.noteId;
-    if (!noteId) return;
-
-    const childrenContainer = noteItem.querySelector('.note-children');
-    const isCurrentlyCollapsed = noteItem.classList.toggle('collapsed');
-    
-    if (childrenContainer) {
-        childrenContainer.classList.toggle('collapsed', isCurrentlyCollapsed);
-    }
-    targetElement.dataset.collapsed = isCurrentlyCollapsed.toString();
-
-    try {
-        // Use the notesAPI.batchUpdateNotes function
-        const result = await notesAPI.batchUpdateNotes([{
-            type: 'update',
-            payload: {
-                id: noteId,
-                page_id: window.currentPageId,
-                collapsed: isCurrentlyCollapsed ? 1 : 0
-            }
-        }]);
-
-        // Update local cache
-        if (window.notesForCurrentPage) {
-            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-            if (noteToUpdate) {
-                noteToUpdate.collapsed = isCurrentlyCollapsed;
-            }
-        }
-    } catch (error) {
-        const errorMessage = error.message || 'Please try again.';
-        console.error(`handleDelegatedCollapseArrowClick: Error saving collapse state for note ${noteId}. Error:`, error);
-        console.error('Full error details:', {
-            noteId,
-            isCurrentlyCollapsed,
-            currentPageId: window.currentPageId,
-            error
-        });
-        
-        // Revert UI changes on error
-        noteItem.classList.toggle('collapsed'); // Toggle back
-        if (childrenContainer) childrenContainer.classList.toggle('collapsed'); // Toggle back
-        targetElement.dataset.collapsed = (!isCurrentlyCollapsed).toString();
-        
-        // Show feedback to user - using a temporary feedback div for this non-critical error
-        const feedback = document.createElement('div');
-        feedback.className = 'copy-feedback error-feedback'; // Added 'error-feedback' for specific styling
-        feedback.textContent = `Failed to save collapse state: ${errorMessage}`;
-        document.body.appendChild(feedback);
-        setTimeout(() => feedback.remove(), 3000); // Longer timeout for errors
-    }
-}
-
-function handleDelegatedBulletClick(targetElement) {
-    const noteId = targetElement.dataset.noteId;
-    if (!noteId) return;
-
-    if (typeof focusOnNote === 'function') {
-         focusOnNote(noteId);
-    } else if (window.ui && typeof window.ui.focusOnNote === 'function') {
-        window.ui.focusOnNote(noteId);
-    } else {
-        console.warn('focusOnNote function not available.');
-    }
-}
-
-async function handleDelegatedBulletContextMenu(event, targetElement) {
-    event.preventDefault();
-    const noteId = targetElement.dataset.noteId;
-    const notePageId = targetElement.closest('.note-item')?.dataset.pageId; // Assuming pageId might be on note-item
-
-    if (!noteId) return;
-    
-    // Remove any existing context menus
-    document.querySelectorAll('.bullet-context-menu').forEach(menu => menu.remove());
-
-    const menu = document.createElement('div');
-    menu.className = 'bullet-context-menu';
-    // Note: Using data-note-id on menu items to pass noteId to the action handler
-    menu.innerHTML = `
-        <div class="menu-item" data-action="copy-transclusion" data-note-id="${noteId}">
-            <i data-feather="link"></i> Copy transclusion link
-        </div>
-        <div class="menu-item" data-action="copy-anchor-link" data-note-id="${noteId}">
-            <i data-feather="anchor"></i> Copy anchor link
-        </div>
-        <div class="menu-item" data-action="delete" data-note-id="${noteId}">
-            <i data-feather="trash-2"></i> Delete
-        </div>
-        <div class="menu-item" data-action="upload" data-note-id="${noteId}" data-page-id="${notePageId || window.currentPageId}">
-            <i data-feather="upload"></i> Upload attachment
-        </div>
-        <div class="menu-item" data-action="open-zen" data-note-id="${noteId}">
-            <i data-feather="edit-3"></i> Open in Zen Writer
-        </div>
-        <div class="menu-item" data-action="open-excalidraw" data-note-id="${noteId}">
-            <i data-feather="pen-tool"></i> Open in Excalidraw
-        </div>
-    `;
-    menu.style.position = 'fixed';
-    menu.style.left = `${event.pageX}px`;
-    menu.style.top = `${event.pageY}px`;
-
-    const handleMenuAction = async (event) => {
-        const target = event.target.closest('.menu-item');
-        if (!target) return;
-        const action = target.dataset.action;
-        switch (action) {
-            case 'copy-transclusion':
-                const transclusionLink = `!{{${target.dataset.noteId}}}`;
-                await navigator.clipboard.writeText(transclusionLink);
-                // Show feedback (consider a global feedback function)
-                const feedbackCopy = document.createElement('div');
-                feedbackCopy.className = 'copy-feedback';
-                feedbackCopy.textContent = 'Transclusion link copied!';
-                document.body.appendChild(feedbackCopy);
-                setTimeout(() => feedbackCopy.remove(), 2000);
-                break;
-            case 'copy-anchor-link':
-                // Get current page name from URL
-                const urlParams = new URLSearchParams(window.location.search);
-                const currentPage = urlParams.get('page') || 'default';
-                const anchorLink = `${window.location.origin}${window.location.pathname}?page=${encodeURIComponent(currentPage)}#note-${target.dataset.noteId}`;
-                await navigator.clipboard.writeText(anchorLink);
-                const feedbackAnchor = document.createElement('div');
-                feedbackAnchor.className = 'copy-feedback';
-                feedbackAnchor.textContent = 'Anchor link copied!';
-                document.body.appendChild(feedbackAnchor);
-                setTimeout(() => feedbackAnchor.remove(), 2000);
-                break;
-            case 'delete':
-                if (confirm(`Are you sure you want to delete note ${target.dataset.noteId}?`)) {
-                    try {
-                        await notesAPI.deleteNote(target.dataset.noteId);
-                        document.querySelector(`.note-item[data-note-id="${target.dataset.noteId}"]`)?.remove();
-                        // Also remove from window.notesForCurrentPage
-                        if (window.notesForCurrentPage) {
-                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
-                        }
-                    } catch (error) {
-                        const deleteErrorMessage = error.message || 'Please try again.';
-                        console.error(`handleDelegatedBulletContextMenu (delete action): Error deleting note ${target.dataset.noteId}. Error:`, error);
-                        alert(`Failed to delete note. ${deleteErrorMessage}`);
-                    }
-                }
-                break;
-            case 'upload':
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.multiple = true;
-                input.onchange = async (uploadEvent) => {
-                    const files = Array.from(uploadEvent.target.files);
-                    for (const file of files) {
-                        const formData = new FormData();
-                        formData.append('attachmentFile', file);
-                        formData.append('note_id', target.dataset.noteId);
-                        try {
-                            await attachmentsAPI.uploadAttachment(formData);
-                            const feedbackUpload = document.createElement('div');
-                            feedbackUpload.className = 'copy-feedback'; // Success feedback
-                            feedbackUpload.textContent = `File "${file.name}" uploaded successfully!`;
-                            document.body.appendChild(feedbackUpload);
-                            setTimeout(() => feedbackUpload.remove(), 3000);
-                            if (window.ui && typeof window.ui.displayNotes === 'function' && target.dataset.pageId) {
-                                const pageData = await notesAPI.getPageData(target.dataset.pageId); // Refresh page
-                                window.ui.displayNotes(pageData.notes, target.dataset.pageId);
-                            } else {
-                                console.warn('handleDelegatedBulletContextMenu (upload action): displayNotes function or pageId not available to refresh after upload for noteId:', target.dataset.noteId);
-                            }
-                        } catch (error) {
-                            const uploadErrorMessage = error.message || 'Please try again.';
-                            console.error(`handleDelegatedBulletContextMenu (upload action): Error uploading file "${file.name}" for note ${target.dataset.noteId}. Error:`, error);
-                            alert(`Failed to upload file "${file.name}". ${uploadErrorMessage}`);
-                        }
-                    }
-                };
-                input.click();
-                break;
-            case 'open-zen':
-                const zenNoteId = target.dataset.noteId;
-                const zenUrl = `/extensions/zen/index.html?note_id=${zenNoteId}`;
-                window.open(zenUrl, '_blank');
-                if (typeof closeMenu === 'function') closeMenu();
-                return;
-            case 'open-excalidraw':
-                const excalidrawNoteId = target.dataset.noteId;
-                const excalidrawUrl = `/extensions/excalidraw_editor/excalidraw.html?note_id=${excalidrawNoteId}`;
-                window.open(excalidrawUrl, '_blank');
-                if (typeof closeMenu === 'function') closeMenu();
-                return;
-        }
-        menu.remove();
-    };
-
-    menu.addEventListener('click', handleMenuAction);
-
-    const closeMenuOnClickOutside = (closeEvent) => {
-        if (!menu.contains(closeEvent.target)) {
-            menu.remove();
-            document.removeEventListener('click', closeMenuOnClickOutside);
-        }
-    };
-    // Add timeout to allow current event loop to finish before attaching,
-    // preventing immediate close if contextmenu was via click.
-    setTimeout(() => {
-        document.addEventListener('click', closeMenuOnClickOutside);
-    }, 0);
-
-
-    document.body.appendChild(menu);
-    if (typeof feather !== 'undefined') feather.replace();
-}
-
-
-
-
-
-function handleDelegatedNoteContentClick(targetElement) {
-    // Check if the click was on an interactive element within the content that should not trigger edit mode
-    if (targetElement.matches('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image') || 
-        targetElement.closest('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image')) {
-        return;
-    }
-    switchToEditMode(targetElement);
-}
-
-
-
-
-
-async function handleDelegatedAttachmentDelete(targetElement) {
-    const attachmentId = targetElement.dataset.attachmentId;
-    const noteId = targetElement.dataset.noteId;
-    const attachmentItem = targetElement.closest('.note-attachment-item');
-    const attachmentName = attachmentItem?.querySelector('.attachment-name')?.textContent || 'this attachment';
-
-    if (!attachmentId || !noteId) return;
-
-    const confirmed = await showConfirmationDialog(`Are you sure you want to delete "${attachmentName}"?`);
-    if (!confirmed) return;
-
-    try {
-        console.log("Deleting:", { attachmentId, noteId });
-
-        await attachmentsAPI.deleteAttachment(attachmentId, noteId);
-        attachmentItem?.remove();
-
-        // Find the attachments container
-        const noteItem = targetElement.closest('.note-item');
-        const attachmentsContainer = noteItem?.querySelector('.note-attachments');
-        let remaining = 0;
-        if (attachmentsContainer) {
-            remaining = attachmentsContainer.querySelectorAll('.note-attachment-item').length;
-            if (remaining === 0) {
-                attachmentsContainer.style.display = 'none';
-            }
-        }
-
-        if (window.notesForCurrentPage) {
-            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-            if (noteToUpdate) {
-                noteToUpdate.has_attachments = remaining > 0;
-            }
-        }
-    } catch (error) {
-        const msg = error.message || 'Please try again.';
-        console.error(`Failed to delete attachment ${attachmentId} for note ${noteId}:`, error);
-        alert(`Failed to delete attachment "${attachmentName}". ${msg}`);
-    }
-}
-
-
-
-
-function handleDelegatedAttachmentImageView(targetElement) {
-    let attachmentUrl = targetElement.dataset.attachmentUrl;
-    if (!attachmentUrl) {
-        // This logic handles clicking the <img> preview instead of the <a> link.
-        const imgPreview = targetElement.closest('.attachment-preview-image');
-        if (imgPreview) {
-           const attachmentItem = imgPreview.closest('.note-attachment-item');
-           // Find the sibling link that holds the data
-           const linkElement = attachmentItem?.querySelector('.attachment-name[data-attachment-url]');
-           if (linkElement) {
-               attachmentUrl = linkElement.dataset.attachmentUrl;
-           }
-        }
-    }
-
-    if (attachmentUrl) {
-        openImageViewerModal(attachmentUrl);
-    }
-}
-
-async function handleDelegatedTaskCheckboxClick(checkbox) {
-    const noteItem = checkbox.closest('.note-item');
-    const contentEl = noteItem?.querySelector('.note-content');
-    if (!noteItem || !contentEl) return;
-
-    const noteId = noteItem.dataset.noteId;
-    if (!noteId || noteId.startsWith('temp-')) return;
-    
-    let rawContent = contentEl.dataset.rawContent;
-    const currentMarker = checkbox.dataset.markerType.toUpperCase();
-    let newContent;
-    let newMarker;
-
-    // Logic based on current state and the new checked status of the box
-    const isChecked = checkbox.checked;
-
-    if (isChecked) { // The user is checking the box (moving to a "done" state)
-        if (['TODO', 'DOING', 'WAITING', 'SOMEDAY'].includes(currentMarker)) {
-            newMarker = 'DONE';
-        }
-    } else { // The user is un-checking the box (moving to an "active" state)
-        if (currentMarker === 'DONE') {
-            newMarker = 'TODO';
-        }
-    }
-    
-    // If no state change is defined, or for un-clickable types, revert the checkbox and exit
-    if (!newMarker) {
-        checkbox.checked = !isChecked; // Revert visual change
-        return;
-    }
-
-    // Find the original content part by stripping the old marker
-    let contentPart = '';
-    const prefixes = ['TODO ', 'DONE ', 'DOING ', 'SOMEDAY ', 'WAITING ', 'CANCELLED ', 'NLR '];
-    for (const prefix of prefixes) {
-        if (rawContent.startsWith(prefix)) {
-            contentPart = rawContent.substring(prefix.length);
-            break;
-        }
-    }
-    // Fallback if no prefix found
-    if (contentPart === '' && rawContent.includes(' ')) {
-        contentPart = rawContent.substring(rawContent.indexOf(' ') + 1);
-    } else if (contentPart === '') {
-        contentPart = rawContent;
-    }
-
-    newContent = `${newMarker} ${contentPart}`;
-    
-    // Update the raw content dataset for the next save
-    contentEl.dataset.rawContent = newContent;
-    
-    // The visual state of the checkbox is already correct from the user click.
-    // Now, update the rest of the UI optimistically.
-    const taskContainer = checkbox.closest('.task-container');
-    if (taskContainer) {
-        taskContainer.classList.remove(currentMarker.toLowerCase());
-        taskContainer.classList.add(newMarker.toLowerCase());
-        
-        const badge = taskContainer.querySelector('.task-status-badge');
-        badge.className = `task-status-badge ${newMarker.toLowerCase()}`;
-        badge.textContent = newMarker;
-
-        const taskContentDiv = taskContainer.querySelector('.task-content');
-        taskContentDiv.classList.toggle('done-text', newMarker === 'DONE');
-        
-        checkbox.dataset.markerType = newMarker;
-    }
-
-    // Save the change
-    try {
-        await saveNoteImmediately(noteItem);
-    } catch (error) {
-        console.error(`Error saving task state for note ${noteId}:`, error);
-        alert('Failed to save the task state change. Please refresh the page.');
-    }
-}
-
-/**
- * Renders the content of a fetched transclusion into its placeholder.
- * @param {HTMLElement} placeholderEl - The placeholder element to be replaced.
- * @param {string} noteContent - The raw content of the note to be rendered inside the placeholder.
- * @param {string} noteId - The ID of the transcluded note, for creating a link.
- * @param {Object} noteData - The full note data object containing page_id and other information.
- */
-export async function renderTransclusion(placeholderEl, noteContent, noteId, noteData = null) {
-    if (!placeholderEl) return;
-
-    // Create a container for the transcluded content
-    const contentEl = document.createElement('div');
-    contentEl.className = 'transcluded-content';
-    
-    // Parse the fetched note content into HTML
-    const renderedHTML = parseAndRenderContent(noteContent);
-
-    // Create a header with a link to the original note
-    const headerEl = document.createElement('div');
-    headerEl.className = 'transclusion-header';
-    
-    // Create the link - if we have noteData with page_id, create a proper link
-    let linkHref = '#';
-    let linkText = `Note ${noteId}`;
-    
-    if (noteData && noteData.page_id) {
-        try {
-            // Fetch the page information to get the page name
-            const pageData = await pagesAPI.getPageById(noteData.page_id);
-            if (pageData && pageData.name) {
-                linkHref = `page.php?page=${encodeURIComponent(pageData.name)}#note-${noteId}`;
-                linkText = `📄 ${pageData.name}`;
-            } else {
-                // Fallback to page_id if page name not found
-                linkHref = `page.php?page_id=${noteData.page_id}#note-${noteId}`;
-                linkText = `📄 Note ${noteId}`;
-            }
-        } catch (error) {
-            console.error('Error fetching page data for transclusion link:', error);
-            // Fallback to page_id if API call fails
-            linkHref = `page.php?page_id=${noteData.page_id}#note-${noteId}`;
-            linkText = `📄 Note ${noteId}`;
-        }
-    }
-    
-    headerEl.innerHTML = `<a href="${linkHref}" class="transclusion-link" data-note-id="${noteId}" title="Go to original note">${linkText}</a>`;
-
-    const bodyEl = document.createElement('div');
-    bodyEl.className = 'transclusion-body';
-    bodyEl.innerHTML = renderedHTML;
-
-    contentEl.appendChild(headerEl);
-    contentEl.appendChild(bodyEl);
-    
-    // Replace the placeholder with the new content element
-    placeholderEl.replaceWith(contentEl);
-
-    // Re-run Feather icons for the new link icon
-    if (typeof feather !== 'undefined') {
-        feather.replace({ width: '1em', height: '1em' });
-    }
-}
-
-
-/**
- * Initializes delegated event listeners for notes on the provided container.
- * This function should be called once after the main notes container is in the DOM.
- * @param {HTMLElement} notesContainerEl - The main container where notes are rendered.
- */
-function initializeDelegatedNoteEventListeners(notesContainerEl) {
-    if (!notesContainerEl) {
-        console.error("Notes container not provided for event delegation.");
-        return;
-    }
-
-    notesContainerEl.addEventListener('click', (event) => {
-        const target = event.target;
-        
-        // Collapse arrow
-        const collapseArrow = target.closest('.note-collapse-arrow');
-        if (collapseArrow) {
-            event.stopPropagation(); // Keep stopPropagation if it was there for a reason
-            handleDelegatedCollapseArrowClick(collapseArrow);
-            return;
-        }
-
-        // Bullet click
-        const bullet = target.closest('.note-bullet');
-        if (bullet) {
-            event.stopPropagation(); // Keep stopPropagation
-            handleDelegatedBulletClick(bullet);
-            return;
-        }
-
-        // Task checkbox click
-        const checkbox = target.closest('.task-checkbox');
-        if (checkbox) {
-            event.stopPropagation();
-            handleDelegatedTaskCheckboxClick(checkbox);
-            return;
-        }
-
-        // Content click to edit
-        const contentArea = target.closest('.note-content.rendered-mode');
-        if (contentArea) {
-            // No stopPropagation here, allow normal bubbling unless specific condition
-            handleDelegatedNoteContentClick(contentArea);
-            return;
-        }
-        
-        // Attachment delete
-        const deleteBtn = target.closest('.attachment-delete-btn');
-        if (deleteBtn) {
-            handleDelegatedAttachmentDelete(deleteBtn);
-            return;
-        }
-
-        // Markdown-embedded content image click
-        const contentImage = target.closest('.content-image');
-        if (contentImage) {
-            event.preventDefault();
-            const imageUrl = contentImage.dataset.originalSrc;
-            openImageViewerModal(imageUrl);
-            return;
-        }
-
-        // Attachment image view (delegated from .attachment-name or .attachment-preview-image)
-        const imageLink = target.closest('.attachment-name.delegated-attachment-image, .attachment-preview-image');
-        if (imageLink) {
-            event.preventDefault();
-            handleDelegatedAttachmentImageView(imageLink);
-            return;
-        }
-
-
-    });
-
-    notesContainerEl.addEventListener('contextmenu', (event) => {
-        const target = event.target;
-        const bullet = target.closest('.note-bullet');
-        if (bullet) {
-            // event.preventDefault() is handled by handleDelegatedBulletContextMenu
-            handleDelegatedBulletContextMenu(event, bullet);
-        }
-    });
-
-    console.log("Delegated note event listeners initialized.");
-}
+window.showConfirmationDialog = showConfirmationDialog; // Expose globally
+
+
+/*
+// OBSOLETE: Logic moved to noteComponent or handled by Alpine x-on directives
+async function handleDelegatedCollapseArrowClick(targetElement) { ... }
+function handleDelegatedBulletClick(targetElement) { ... }
+async function handleDelegatedBulletContextMenu(event, targetElement) { ... }
+function handleDelegatedNoteContentClick(targetElement) { ... }
+async function handleDelegatedAttachmentDelete(targetElement) { ... }
+function handleDelegatedAttachmentImageView(targetElement) { ... }
+async function handleDelegatedTaskCheckboxClick(checkbox) { ... }
+function initializeDelegatedNoteEventListeners(notesContainerEl) { ... }
+*/
+
+/*
+// OBSOLETE: renderNote is replaced by Alpine template in page.php
+function renderNote(note, nestingLevel = 0) { ... }
+*/
+
+/*
+// OBSOLETE: switchToEditMode logic is now in noteComponent.js
+function switchToEditMode(contentEl) { ... }
+*/
+
+/*
+// OBSOLETE: switchToRenderedMode logic is now in noteComponent.js
+function switchToRenderedMode(contentEl) { ... }
+*/
+
+/*
+// OBSOLETE: renderAttachments is replaced by Alpine template in noteComponent
+async function renderAttachments(container, noteId, has_attachments_flag) { ... }
+*/

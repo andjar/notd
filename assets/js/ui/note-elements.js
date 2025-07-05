@@ -5,119 +5,111 @@
  */
 
 import { domRefs } from './dom-refs.js';
-import { renderNote } from './note-renderer.js';
+// import { renderNote } from './note-renderer.js'; // Obsolete: Alpine handles rendering
 import { calculateOrderIndex } from '../app/order-index-service.js';
-import { setNotesForCurrentPage } from '../app/state.js';
+import { setNotesForCurrentPage } from '../app/state.js'; // Used by page-loader
 
-window.renderNote = renderNote;
+// window.renderNote = renderNote; // Obsolete
 
 /**
- * Displays notes in the container
+ * Displays notes in the container -- OBSOLETE
+ * This function is largely replaced by page-loader.js setting data in Alpine store,
+ * and page.php's Alpine template rendering the notes.
+ * The empty state message is now handled in page.php's template.
  * @param {Array} notesData - Array of note objects
  * @param {number} pageId - Current page ID
  */
+/*
 export function displayNotes(notesData, pageId) {
-    const notesContainer = document.getElementById('notes-container');
-    if (!notesContainer) {
-        console.error('Notes container not found');
-        return;
-    }
-    
-    // Ensure notesData is an array (handle null/undefined)
-    const safeNotesData = Array.isArray(notesData) ? notesData : [];
-    
-    // Clear the container first (removes "Loading page..." message)
-    notesContainer.innerHTML = '';
-    
-    if (safeNotesData.length === 0) {
-        // Update Alpine.js with empty array and update state
-        setNotesForCurrentPage([]);
-        if (notesContainer && notesContainer.__x) {
-            notesContainer.__x.getUnobservedData().notes = [];
-        }
-        // Show empty state message
-        notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
-        return;
-    }
-
-    const sortedNotes = [...safeNotesData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    setNotesForCurrentPage(sortedNotes);
-    
-    // Update Alpine.js data for future use
-    if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
-    }
-    
-    // Render notes using traditional DOM approach since Alpine.js template is not implemented yet
-    renderNotesInContainer(noteTree, notesContainer);
-    
-    // Initialize drag and drop after rendering
-    setTimeout(() => {
-        initializeDragAndDrop();
-    }, 0);
+    // ... (original content commented out as it's obsolete) ...
+    // const notesContainer = document.getElementById('notes-container');
+    // if (!notesContainer) {
+    //     console.error('Notes container not found');
+    //     return;
+    // }
+    // const safeNotesData = Array.isArray(notesData) ? notesData : [];
+    // notesContainer.innerHTML = ''; // Clear loading message
+    // if (safeNotesData.length === 0) {
+    //     // This is now handled by an x-if in page.php
+    //     // setNotesForCurrentPage([]);
+    //     // if (notesContainer && notesContainer.__x) {
+    //     //     notesContainer.__x.getUnobservedData().notes = [];
+    //     // }
+    //     // notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
+    //     return;
+    // }
+    // const sortedNotes = [...safeNotesData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    // const noteTree = buildNoteTree(sortedNotes);
+    // setNotesForCurrentPage(noteTree); // page-loader now calls buildNoteTree and sets the tree to the store
+    // renderNotesInContainer(noteTree, notesContainer); // Alpine renders this now
+    // setTimeout(() => {
+    //     initializeDragAndDrop(); // Called from page.php x-init
+    // }, 0);
 }
+*/
 
 /**
- * Renders notes in the container using traditional DOM manipulation
+ * Renders notes in the container using traditional DOM manipulation -- OBSOLETE
+ * Alpine templates in page.php handle rendering now.
  * @param {Array} noteTree - Tree structure of notes
  * @param {HTMLElement} container - Container element to render notes in
  */
+/*
 function renderNotesInContainer(noteTree, container) {
-    noteTree.forEach(note => {
-        const noteElement = renderNote(note, 0);
-        if (noteElement) {
-            container.appendChild(noteElement);
-        }
-    });
-    
-    // Replace feather icons after rendering
-    if (typeof feather !== 'undefined') {
-        setTimeout(() => {
-            try {
-                feather.replace();
-            } catch (error) {
-                console.warn('Feather icon replacement failed:', error.message);
-            }
-        }, 0);
-    }
+    // ... (original content commented out) ...
+    // noteTree.forEach(note => {
+    //     const noteElement = renderNote(note, 0); // renderNote is also obsolete
+    //     if (noteElement) {
+    //         container.appendChild(noteElement);
+    //     }
+    // });
+    // if (typeof feather !== 'undefined') {
+    //     setTimeout(() => {
+    //         try {
+    //             feather.replace();
+    //         } catch (error) {
+    //             console.warn('Feather icon replacement failed:', error.message);
+    //         }
+    //     }, 0);
+    // }
 }
+*/
 
 /**
- * Adds a new note element to the DOM in its correct sorted position.
+ * Adds a new note element to the DOM in its correct sorted position. -- OBSOLETE / NEEDS REFACTOR FOR STORE
+ * Current add operations (e.g. handleAddRootNote) typically reload page data,
+ * which rebuilds the store's note tree via page-loader.js.
+ * Optimistic updates would require careful manipulation of the store's tree.
  * @param {Object} noteData - The data for the new note.
  * @returns {HTMLElement|null} The newly created note element.
  */
+/*
 export function addNoteElement(noteData) {
-    if (!noteData) return null;
-    window.notesForCurrentPage.push(noteData);
-    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    const notesContainer = document.getElementById('notes-container');
-    if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
-    }
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    // if (!noteData) return null;
+    // // This manipulated a global window.notesForCurrentPage and poked Alpine data.
+    // // Proper way is to update Alpine.store('app').notes and let Alpine render.
+    // // If store holds a tree, this function would need to insert into the tree.
+    // console.warn("addNoteElement is likely obsolete or needs significant refactor for Alpine store tree structure.");
     return null;
 }
+*/
 
 /**
- * Removes a note element from the DOM.
+ * Removes a note element from the DOM. -- OBSOLETE / NEEDS REFACTOR FOR STORE
+ * Current delete operations typically reload page data or directly modify the store.
  * @param {string} noteId - The ID of the note to remove.
  */
+/*
 export function removeNoteElement(noteId) {
-    window.notesForCurrentPage = window.notesForCurrentPage.filter(note => String(note.id) !== String(noteId));
-    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    const notesContainer = document.getElementById('notes-container');
-    if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
-    }
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    // // This manipulated a global window.notesForCurrentPage and poked Alpine data.
+    // // Proper way is to update Alpine.store('app').notes and let Alpine render.
+    // // If store holds a tree, this function would need to remove from the tree.
+    // console.warn("removeNoteElement is likely obsolete or needs significant refactor for Alpine store tree structure.");
 }
+*/
 
 /**
- * Builds a tree structure from flat note array
+ * Builds a tree structure from flat note array. IMPORTANT: THIS IS STILL USED by page-loader.js.
  * @param {Array} notes - Flat array of note objects
  * @param {number|null} [parentId=null] - Parent note ID
  * @returns {Array} Tree structure of notes
@@ -199,12 +191,22 @@ export async function handleNoteDrop(evt) {
 
     try {
         await window.notesAPI.batchUpdateNotes(operations);
-        // On success, we can just do a light DOM update if needed, but a reload is safest.
-        await window.loadPage(window.currentPageName, false, false); // Reload without adding to history
+        // On success, refresh the notes store and let Alpine re-render
+        if (window.refreshNotesStoreAndReloadView) { // Ensure function exists (imported from page-loader)
+            await window.refreshNotesStoreAndReloadView();
+        } else {
+            console.warn('refreshNotesStoreAndReloadView function not available. Falling back to full page reload.');
+            await window.loadPage(window.currentPageName, false, false); // Fallback
+        }
     } catch (error) {
         console.error("Failed to save note drop changes:", error);
         alert("Could not save new note positions. Reverting.");
-        await window.loadPage(window.currentPageName, false, false);
+        // Revert by reloading the original page state
+        if (window.refreshNotesStoreAndReloadView) {
+            await window.refreshNotesStoreAndReloadView(); // Try to refresh to original state
+        } else {
+            await window.loadPage(window.currentPageName, false, false); // Fallback
+        }
     }
 }
 
