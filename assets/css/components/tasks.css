@@ -46,21 +46,21 @@
 }
 
 .task-checkbox:checked {
-  background-color: var(--ls-task-done-badge-bg);
+  background-color: transparent;
   border-color: var(--ls-accent-10);
 }
 
 .task-checkbox:checked::after {
   content: "";
   display: block;
-  width: 3px;
-  height: 6px;
-  border: solid var(--ls-task-checkbox-checkmark-color);
-  border-width: 0 2px 2px 0;
+  width: 5px;
+  height: 10px;
+  border: solid var(--ls-accent-10);
+  border-width: 0 2.5px 2.5px 0;
   transform: rotate(45deg) translate(-50%, -50%);
   position: absolute;
   top: 45%;
-  left: 30%;
+  left: 20%;
 }
 
 .task-checkbox:disabled {
@@ -72,35 +72,39 @@
 /* Task Keywords */
 .task-content .task-keyword {
   font-weight: var(--ls-font-weight-semibold);
-  padding: 1px 5px;
-  border-radius: var(--ls-border-radius-low);
-  margin-right: var(--ls-space-1);
+  padding: 0; /* No padding */
+  border-radius: 0; /* No radius */
+  margin-right: var(--ls-space-2);
   display: inline-block;
   line-height: 1.2;
-  font-size: var(--ls-font-size-sm);
+  font-size: var(--ls-font-size-base); /* Match the main text size */
+  background-color: transparent !important; /* Crucial: no background! */
+  text-transform: uppercase;
 }
 
 .task-content .task-keyword.todo,
-.task-content .task-keyword.later,
-.task-content .task-keyword.now,
+.task-content .task-keyword.someday {
+  color: var(--ls-accent-10);
+  font-style: normal;
+}
+
 .task-content .task-keyword.doing {
-  background-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 90%);
-  color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 30%);
+  color: var(--ls-accent-10); /* Use your primary accent color */
 }
 
-.task-content .task-keyword.later {
-  background-color: var(--ls-task-keyword-later-bg);
-  color: var(--ls-task-keyword-later-text);
+.task-content .task-keyword.waiting {
+  color: var(--ls-task-keyword-waiting-color); /* Theme variable */
 }
 
-.task-content.done-text .task-keyword.done,
-.task-content.cancelled-text .task-keyword.cancelled {
-  background-color: var(--ls-gray-3);
-  color: var(--ls-tertiary-text-color);
-  text-decoration: none;
+.task-content .task-keyword.done,
+.task-content .task-keyword.cancelled,
+.task-content .task-keyword.nlr {
+  color: var(--ls-secondary-text-color); /* Muted gray color */
+  text-decoration: none !important; /* Ensure the keyword itself is not struck through */
 }
 
 /* Task Status Badges */
+/*
 .task-status-badge {
   font-size: 9px;
   font-weight: var(--ls-font-weight-bold);
@@ -146,6 +150,7 @@
   background: #95a5a6;
   color: #fff;
 }
+*/
 
 /* Task Content */
 .task-content {
@@ -157,27 +162,17 @@
 }
 
 /* Task Content States */
-.task-content.done-text {
+.task-content.done-text,
+.task-content.cancelled-text,
+.task-content.nlr-text {
   text-decoration: line-through;
+  color: var(--ls-secondary-text-color); /* This is correct, it mutes the entire line */
   opacity: 0.75;
-  color: var(--ls-secondary-text-color);
-}
-
-.task-content.cancelled-text {
-  text-decoration: line-through;
-  opacity: 0.6;
-  color: var(--ls-tertiary-text-color);
 }
 
 .task-content.waiting-text {
+  text-decoration: none;
   color: var(--ls-secondary-text-color);
-  font-style: italic;
-}
-
-.task-content.nlr-text {
-  text-decoration: line-through;
-  opacity: 0.5;
-  color: var(--ls-tertiary-text-color);
   font-style: italic;
 }
 

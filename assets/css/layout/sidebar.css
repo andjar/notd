@@ -147,16 +147,20 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
   right: 15px;
 }
 
+#right-sidebar-content {
+  padding-top: 21px;
+}
+
 /* Sidebar section headers */
 .sidebar-section h3,
 .sidebar-section h4 {
   font-weight: 600;
   font-size: 0.85rem;
-  color: var(--text-muted, var(--ls-secondary-text-color));
+  color: var(--ls-secondary-text-color);
   text-transform: uppercase;
   margin-bottom: 0.5rem;
   padding-bottom: 0.25rem;
-  border-bottom: 1px solid var(--sidebar-border, var(--ls-secondary-border-color));
+  border-bottom: 1px solid var(--ls-secondary-border-color);
   letter-spacing: 0.05em;
 }
 
@@ -205,11 +209,10 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 .sidebar-list-link.active {
-  background-color: var(--ls-accent-3);
-  color: var(--ls-accent-11);
+  background-color: var(--ls-quaternary-background-color, #f5f6fa);
+  color: var(--ls-primary-text-color);
   font-weight: var(--ls-font-weight-medium);
-  opacity: 1;
-  box-shadow: inset 2px 0 0 0 var(--ls-accent-10);
+  box-shadow: none;
 }
 
 .sidebar-list-icon {
@@ -276,11 +279,10 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 .recent-page-link.active {
-  background-color: var(--ls-accent-3);
-  color: var(--ls-accent-11);
+  background-color: var(--ls-quaternary-background-color, #f5f6fa);
+  color: var(--ls-primary-text-color);
   font-weight: var(--ls-font-weight-medium);
-  opacity: 1;
-  box-shadow: inset 2px 0 0 0 var(--ls-accent-10);
+  box-shadow: none;
 }
 
 .recent-page-icon {
@@ -684,4 +686,12 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 .sidebar-footer .action-button i {
   width: 16px;
   height: 16px;
-} 
+}
+
+.right-sidebar.hidden {
+  display: none !important;
+}
+
+/*
+  TODO: Unify sidebar icons. For consistency, use a single icon set (e.g., Feather Icons) and stick to one style (outlined or filled). Consider changing the favorite icon from a hollow star to a filled one, or vice versa, to match the document icons.
+*/

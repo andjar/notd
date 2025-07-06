@@ -91,8 +91,8 @@
 
 .calendar-day.today {
     font-weight: var(--ls-font-weight-bold);
-    color: var(--ls-accent-10);
-    border: 1px solid var(--ls-accent-10);
+    color: var(--ls-secondary-text-color);
+    border: 1px solid var(--ls-gray-4);
 }
 
 .calendar-day.has-content {
@@ -109,17 +109,17 @@
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background-color: var(--ls-accent-9);
+    background-color: var(--ls-gray-5);
 }
 
 .calendar-day.current-page {
-    background-color: var(--ls-accent-3);
-    color: var(--ls-accent-text-color);
+    background-color: var(--ls-tertiary-background-color);
+    color: var(--ls-primary-text-color);
     font-weight: var(--ls-font-weight-bold);
 }
 
 .calendar-day.current-page.has-content::after {
-    background-color: var(--ls-accent-text-color);
+    background-color: var(--ls-primary-text-color);
 }
 
 @keyframes pulse-glow {
@@ -142,10 +142,10 @@
 }
 
 [data-theme="dark"] .calendar-day.today {
-    color: var(--ls-accent-10);
-    border-color: var(--ls-accent-10);
+    color: var(--ls-secondary-text-color);
+    border-color: var(--ls-gray-6);
 }
 
 [data-theme="dark"] .calendar-day.has-content::after {
-    background-color: var(--ls-accent-10);
+    background-color: var(--ls-gray-6);
 } 

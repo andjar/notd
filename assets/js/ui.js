@@ -194,7 +194,7 @@ function renderPageInlineProperties(properties, targetContainer) {
             propItem.className = 'property-inline';
 
             if (key === 'favorite' && String(instance.value).toLowerCase() === 'true') {
-                propItem.innerHTML = `<span class="property-favorite">⭐</span>`;
+                propItem.innerHTML = `<span class="property-favorite"></span>`;
             } else {
                 propItem.innerHTML = `<span class="property-key">${key}:</span> <span class="property-value">${instance.value}</span>`;
             }

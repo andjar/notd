@@ -686,9 +686,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container todo">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="TODO" />
-                    <span class="task-status-badge todo">TODO</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword todo">TODO</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('DOING ')) {
@@ -697,9 +698,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container doing">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="DOING" />
-                    <span class="task-status-badge doing">DOING</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword doing">DOING</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('SOMEDAY ')) {
@@ -708,9 +710,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container someday">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="SOMEDAY" />
-                    <span class="task-status-badge someday">SOMEDAY</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword someday">SOMEDAY</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('DONE ')) {
@@ -719,9 +722,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container done">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="DONE" checked />
-                    <span class="task-status-badge done">DONE</span>
                 </div>
-                <div class="task-content done-text">${taskContent}</div>
+                <div class="task-content done-text">
+                    <span class="task-keyword done">DONE</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('WAITING ')) {
@@ -730,9 +734,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container waiting">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="WAITING" />
-                    <span class="task-status-badge waiting">WAITING</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword waiting">WAITING</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('CANCELLED ')) {
@@ -741,9 +746,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container cancelled">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="CANCELLED" checked disabled />
-                    <span class="task-status-badge cancelled">CANCELLED</span>
                 </div>
-                <div class="task-content cancelled-text">${taskContent}</div>
+                <div class="task-content cancelled-text">
+                    <span class="task-keyword cancelled">CANCELLED</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('NLR ')) {
@@ -752,9 +758,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container nlr">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="NLR" checked disabled />
-                    <span class="task-status-badge nlr">NLR</span>
                 </div>
-                <div class="task-content nlr-text">${taskContent}</div>
+                <div class="task-content nlr-text">
+                    <span class="task-keyword nlr">NLR</span> ${taskContent}
+                </div>
             </div>
         `;
     } else {
@@ -997,7 +1004,7 @@ function renderProperties(container, properties) {
             }
 
             if (name.toLowerCase() === 'favorite' && String(valueToRender).toLowerCase() === 'true') {
-                htmlToSet += `<span class="${itemClass} favorite"><span class="property-favorite">⭐</span></span>`;
+                htmlToSet += `<span class="${itemClass} favorite"><span class="property-favorite"><i data-feather="star"></span></span>`;
             } else if (name.startsWith('tag::') || name.toLowerCase() === 'tags' || name.toLowerCase() === 'tag') {
                 htmlToSet += `<span class="${itemClass} tag">
                     <span class="property-key">#</span>
@@ -1371,8 +1378,8 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
 
 function handleDelegatedNoteContentClick(targetElement) {
     // Check if the click was on an interactive element within the content that should not trigger edit mode
-    if (targetElement.matches('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image') || 
-        targetElement.closest('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image')) {
+    if (targetElement.matches('.task-checkbox, .page-link, .property-inline, .sql-query-placeholder, .transclusion-placeholder, .content-image') || 
+        targetElement.closest('.task-checkbox, .page-link, .property-inline, .sql-query-placeholder, .transclusion-placeholder, .content-image')) {
         return;
     }
     switchToEditMode(targetElement);
@@ -1506,13 +1513,14 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
         taskContainer.classList.remove(currentMarker.toLowerCase());
         taskContainer.classList.add(newMarker.toLowerCase());
         
-        const badge = taskContainer.querySelector('.task-status-badge');
-        badge.className = `task-status-badge ${newMarker.toLowerCase()}`;
-        badge.textContent = newMarker;
-
         const taskContentDiv = taskContainer.querySelector('.task-content');
         taskContentDiv.classList.toggle('done-text', newMarker === 'DONE');
-        
+        // Update the keyword span
+        const keywordSpan = taskContentDiv.querySelector('.task-keyword');
+        if (keywordSpan) {
+            keywordSpan.className = `task-keyword ${newMarker.toLowerCase()}`;
+            keywordSpan.textContent = newMarker;
+        }
         checkbox.dataset.markerType = newMarker;
     }
 

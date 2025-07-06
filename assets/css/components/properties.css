@@ -18,30 +18,13 @@
 }
 
 .property-key {
-  color: var(--ls-accent-10);
+  color: var(--ls-accent-10); 
   font-weight: var(--ls-font-weight-medium);
   margin-right: 2px;
 }
 
 .property-value {
   color: var(--ls-primary-text-color);
-}
-
-.property-tag {
-  background: var(--ls-property-tag-bg, var(--ls-accent-3));
-  color: var(--ls-property-tag-text, var(--ls-accent-11));
-  border-radius: var(--ls-border-radius-low);
-  padding: 2px 6px;
-  font-size: 0.85em;
-  font-weight: var(--ls-font-weight-medium);
-}
-
-.property-tag .property-key {
-  color: var(--ls-property-tag-text, var(--ls-accent-11));
-}
-
-.property-tag .property-value {
-  color: var(--ls-property-tag-text, var(--ls-accent-11));
 }
 
 .property-inline.alias-property {
@@ -340,4 +323,45 @@
   background: var(--ls-primary-background-color);
   color: var(--ls-primary-text-color);
   border-color: var(--ls-border-color);
+}
+
+/*
+ * =======================================================
+ *  REFACTOR: Lightweight, Logseq-style Tags (#tag)
+ * =======================================================
+ * This specifically targets tags that are rendered as properties,
+ * like the example: #test
+*/
+
+/* 1. Target the specific container for tags rendered as properties. */
+.property-inline.property-tag {
+    /* Reset the pill look completely */
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important; /* Remove all padding */
+    
+    /* Make it look and feel like a single, unified link */
+    color: var(--ls-link-text-color); /* Use your standard link/accent color */
+    font-weight: var(--ls-font-weight-normal);
+    opacity: var(--ls-tag-text-opacity, 0.8); /* Make it slightly muted */
+    cursor: pointer;
+}
+
+/* 2. Merge the '#' (key) and 'test' (value) to look like one word. */
+.property-inline.property-tag .property-key {
+    margin-right: 0; /* REMOVE the space between '#' and 'test' */
+    color: inherit; /* Make the '#' have the same color as the text */
+    font-weight: inherit;
+}
+
+.property-inline.property-tag .property-value {
+    /* This will already inherit the color, which is what we want. */
+}
+
+/* 3. Add a clean hover effect. */
+.property-inline.property-tag:hover {
+    color: var(--ls-link-text-hover-color);
+    text-decoration: underline;
+    opacity: var(--ls-tag-text-hover-opacity, 1);
 } 

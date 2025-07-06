@@ -264,6 +264,8 @@
   gap: var(--ls-space-1);
 }
 
+/* Remove sidebar list item overrides from forms.css to allow harmonized sidebar styles */
+/*
 #page-list a {
   color: var(--ls-primary-text-color);
   text-decoration: none;
@@ -279,6 +281,7 @@
 #page-list a.active {
   background-color: var(--ls-accent-3);
 }
+*/
 
 .no-pages-message {
   color: var(--ls-tertiary-text-color);

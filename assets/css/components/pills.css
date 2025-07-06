@@ -11,8 +11,11 @@
 }
 
 .pill.pill-task-todo {
-  background-color: var(--ls-accent-3);
-  color: var(--ls-accent-11);
+  background-color: #eaf1fb;
+  color: var(--ls-accent-10);
+  border: 1.5px solid var(--ls-accent-3);
+  font-weight: var(--ls-font-weight-medium);
+  box-shadow: none;
 }
 
 .pill.pill-task-done {
@@ -46,20 +49,31 @@
 }
 
 .pill.pill-tag {
-  background-color: var(--ls-tertiary-background-color);
+  background-color: transparent;
   color: var(--ls-secondary-text-color);
-  border: 1px solid var(--ls-secondary-border-color);
+  border: none;
+  padding: 0 2px;
+  font-weight: var(--ls-font-weight-normal);
+  box-shadow: none !important;
+}
+
+.pill.pill-tag:hover {
+  transform: none;
+  text-decoration: underline;
+  color: var(--ls-primary-text-color);
 }
 
 .pill.pill-property {
-  background-color: var(--ls-tertiary-background-color);
-  color: var(--ls-accent-10);
-  border: 1px solid var(--ls-secondary-border-color);
+  background-color: transparent;
+  color: var(--ls-secondary-text-color);
+  border: none;
+  padding: 0 2px;
+  font-weight: var(--ls-font-weight-normal);
+  box-shadow: none !important;
 }
 
-.pill:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--ls-shadow-sm);
+.pill.pill-property:hover {
+  transform: none;
 }
 
 /* ========== INLINE PROPERTIES ========== */
@@ -89,23 +103,6 @@
 
 .property-value {
   color: var(--ls-primary-text-color);
-}
-
-.property-tag {
-  background: var(--ls-property-tag-bg, var(--ls-accent-3));
-  color: var(--ls-property-tag-text, var(--ls-accent-11));
-  border-radius: var(--ls-border-radius-low);
-  padding: 2px 6px;
-  font-size: 0.85em;
-  font-weight: var(--ls-font-weight-medium);
-}
-
-.property-tag .property-key {
-  color: var(--ls-property-tag-text, var(--ls-accent-11));
-}
-
-.property-tag .property-value {
-  color: var(--ls-property-tag-text, var(--ls-accent-11));
 }
 
 .property-inline.alias-property {
@@ -180,4 +177,5 @@
 .note-content h6 {
   font-size: var(--ls-font-size-xs);
   font-weight: var(--ls-font-weight-semibold);
-} 
+}
+

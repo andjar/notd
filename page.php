@@ -157,7 +157,7 @@ function renderPageProperties($properties, $renderInternal = false) {
             
             $hasVisibleProperties = true;
             if ($key === 'favorite' && strtolower($instance['value']) === 'true') {
-                $html .= '<li class="pill pill-property"><span class="property-favorite">⭐</span></li>';
+                $html .= '<li class="pill pill-property"><span class="property-favorite"><i data-feather="star"></i></span></li>';
             } else {
                 $html .= '<li class="pill pill-property"><span class="property-key">' . htmlspecialchars($key) . '</span><span class="property-separator">:</span><span class="property-value">' . htmlspecialchars($instance['value']) . '</span></li>';
             }
@@ -382,11 +382,28 @@ function renderBacklinks($backlinks) {
 
         <!-- Main Content -->
         <div id="main-content" class="main-content">
-            <div class="page-title-container">
+            <div class="page-header-container">
                 <h1 id="page-title" class="page-title">
-                    <span class="page-title-content"><?php echo renderPageTitle($pageName); ?></span>
+                    <span class="page-title-content">
+                        <?php echo renderPageTitle($pageName); ?>
+                        <i id="page-properties-gear" class="page-title-gear" data-feather="settings" title="Page Properties"></i>
+                    </span>
                 </h1>
-                <?php echo renderPageProperties($pageProperties, $renderInternal); ?>
+                <div class="page-header-actions">
+                    <span class="favorite-toggle" id="favorite-toggle" title="Toggle favorite">☆</span>
+                    <div class="page-properties">
+                        <?php
+                        // Render properties except 'favorite'
+                        foreach ($pageProperties as $key => $instances) {
+                            if ($key === 'favorite') continue;
+                            foreach ($instances as $instance) {
+                                if ($instance['internal'] && !$renderInternal) continue;
+                                echo '<span>' . htmlspecialchars($key) . ':' . htmlspecialchars($instance['value']) . '</span> ';
+                            }
+                        }
+                        ?>
+                    </div>
+                </div>
             </div>
             <div id="page-content" class="page-content" style="display: none;">
                 <!-- Page content will be rendered here by JavaScript -->
@@ -513,31 +530,33 @@ function renderBacklinks($backlinks) {
             </button>
             <div id="right-sidebar" class="sidebar right-sidebar" :class="{ 'collapsed': rightCollapsed }">
                 <div class="sidebar-content">
-                    <div class="sidebar-section">
-                        <div class="favorites">
-                            <h3>Favorites</h3>
-                            <div id="favorites-container">
-                                <?php echo renderFavorites($favorites, $pageName); ?>
+                    <div id="right-sidebar-content">
+                        <div class="sidebar-section">
+                            <div class="favorites">
+                                <h3>Favorites</h3>
+                                <div id="favorites-container">
+                                    <?php echo renderFavorites($favorites, $pageName); ?>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="sidebar-section">
-                        <div id="backlinks-container" class="backlinks-sidebar">
-                            <div class="backlinks-header">
-                                <h3>Backlinks<?php echo !empty($backlinks) ? ' <span id="open-backlinks-modal-btn" class="backlinks-expand-text" title="View all backlinks">+</span>' : ''; ?></h3>
-                            </div>
-                            <div id="backlinks-list" class="backlinks-list">
-                                <?php echo renderBacklinks($backlinks); ?>
+                        <div class="sidebar-section">
+                            <div id="backlinks-container" class="backlinks-sidebar">
+                                <div class="backlinks-header">
+                                    <h3>Backlinks<?php echo !empty($backlinks) ? ' <span id="open-backlinks-modal-btn" class="backlinks-expand-text" title="View all backlinks">+</span>' : ''; ?></h3>
+                                </div>
+                                <div id="backlinks-list" class="backlinks-list">
+                                    <?php echo renderBacklinks($backlinks); ?>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="sidebar-section">
-                        <div id="child-pages-sidebar" class="child-pages-sidebar">
-                            <?php echo renderChildPagesSidebar($childPages); ?>
+                        <div class="sidebar-section">
+                            <div id="child-pages-sidebar" class="child-pages-sidebar">
+                                <?php echo renderChildPagesSidebar($childPages); ?>
+                            </div>
                         </div>
-                    </div>
-                    <div class="sidebar-section extensions-section">
-                        <div id="extension-icons-container"></div>
+                        <div class="sidebar-section extensions-section">
+                            <div id="extension-icons-container"></div>
+                        </div>
                     </div>
                 </div>
             </div>

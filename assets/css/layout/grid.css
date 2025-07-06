@@ -6,14 +6,19 @@
   min-height: 100vh;
 }
 
+/* In assets/css/layout/grid.css */
+
+/* Find the .main-content rule */
 .main-content {
   grid-area: main-content;
   max-width: var(--ls-main-content-max-width);
   margin: 0 auto;
-  padding: var(--ls-space-6) var(--ls-space-4);
+  padding: 35px 48px;
   width: 100%;
   transition: margin 0.3s ease;
   min-height: 100vh;
+  background: var(--ls-primary-background-color);
+  color: var(--ls-primary-text-color);
 }
 
 /* Responsive Layout Adjustments */
