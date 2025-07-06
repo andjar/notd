@@ -74,7 +74,7 @@ try {
     $paginatedQuery = $sqlQuery . " LIMIT ? OFFSET ?";
     $stmtGetIds = $pdo->prepare($paginatedQuery);
     $stmtGetIds->execute([$perPage, $offset]);
-    $noteIds = $stmtGetIds->fetchAll(PDO::FETCH_COLUMN, 0);
+    $noteIds = $stmtGetIds->fetchAll(\PDO::FETCH_COLUMN, 0);
 
     if (empty($noteIds)) {
         \App\ApiResponse::success(
@@ -88,7 +88,7 @@ try {
     $sqlFetchNotes = "SELECT * FROM Notes WHERE id IN ({$placeholders})";
     $stmtFetchNotes = $pdo->prepare($sqlFetchNotes);
     $stmtFetchNotes->execute($noteIds);
-    $notes = $stmtFetchNotes->fetchAll(PDO::FETCH_ASSOC);
+    $notes = $stmtFetchNotes->fetchAll(\PDO::FETCH_ASSOC);
 
     // If properties are requested, fetch and format them using the DataManager
     if ($includeProperties && !empty($notes)) {
