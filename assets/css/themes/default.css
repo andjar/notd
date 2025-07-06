@@ -1,27 +1,30 @@
 /* Default Theme - Light Mode */
 :root {
-    /* Base Gray Scale */
-    --ls-gray-1: hsl(210 12% 99%);
-    --ls-gray-2: hsl(210 12% 97%);
-    --ls-gray-3: hsl(210 12% 94%);
-    --ls-gray-4: hsl(210 12% 89%);
-    --ls-gray-5: hsl(210 12% 84%);
-    --ls-gray-6: hsl(210 12% 79%);
-    --ls-gray-7: hsl(210 7% 56%);
-    --ls-gray-8: hsl(210 7% 46%);
-    --ls-gray-9: hsl(210 10% 23%);
-    --ls-gray-10: hsl(210 10% 15%);
-    --ls-gray-11: hsl(210 10% 10%);
-    --ls-gray-12: hsl(210 10% 5%);
+    /* Neutral/Gray Palette (Slate-inspired, warmer) */
+    --ls-gray-1: #fbfcfd; /* Lightest background */
+    --ls-gray-2: #f8f9fa; /* Primary Background */
+    --ls-gray-3: #f1f3f5; /* Subtle backgrounds, borders */
+    --ls-gray-4: #eceef0; /* Hover states, borders */
+    --ls-gray-5: #e6e8eb; /* Borders, disabled elements */
+    --ls-gray-6: #dfe3e6; /* Slightly darker border */
+    --ls-gray-7: #d7dbdf; /* Subtle text, icons */
+    --ls-gray-8: #b0b8c1; /* Muted text */
+    --ls-gray-9: #889096; /* Secondary text */
+    --ls-gray-10: #7e868c; /* Tertiary text */
+    --ls-gray-11: #687076; /* Even more muted text */
+    --ls-gray-12: #11181c; /* Primary text */
 
-    /* Accent: Blue */
+    /* Accent Palette (Blue, warmer) */
     --ls-accent-hue: 210;
-    --ls-accent-saturation: 80%;
-    --ls-accent-lightness: 50%;
-    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 95%;
-    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%;
-    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%;
-    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 40%;
+    --ls-accent-saturation: 100%;
+    --ls-accent-3: #edf6ff;  /* Highlight background */
+    --ls-accent-9: #0091ff;  /* Primary interactive color */
+    --ls-accent-10: #0081f1; /* Hover color */
+    --ls-accent-11: #006adc; /* Darker accent for text */
+    --ls-accent-3-hsl: 210 100% 96%;
+    --ls-accent-9-hsl: 210 100% 54%;
+    --ls-accent-10-hsl: 210 100% 49%;
+    --ls-accent-11-hsl: 210 100% 43%;
     
     /* Semantic Colors */
     --ls-primary-background-color: white;
@@ -29,9 +32,9 @@
     --ls-tertiary-background-color: var(--ls-gray-3);
     --ls-quaternary-background-color: var(--ls-gray-4);
     
-    --ls-primary-text-color: var(--ls-gray-11);
-    --ls-secondary-text-color: var(--ls-gray-8);
-    --ls-tertiary-text-color: var(--ls-gray-7);
+    --ls-primary-text-color: var(--ls-gray-12);
+    --ls-secondary-text-color: var(--ls-gray-9);
+    --ls-tertiary-text-color: var(--ls-gray-10);
 
     --ls-border-color: var(--ls-gray-4);
     --ls-guideline-color: var(--ls-gray-4);
@@ -46,7 +49,7 @@
     --ls-accent-11: hsl(var(--ls-accent-11-hsl));
     --ls-accent-transparent: hsla(var(--ls-accent-10-hsl), 0.1);
 
-    --ls-block-bullet-color: var(--ls-gray-5);
+    --ls-block-bullet-color: var(--ls-gray-8);
     --ls-block-bullet-active-color: hsl(var(--ls-accent-10-hsl));
 
     /* Pills & Status */
@@ -54,29 +57,97 @@
     --ls-pill-bg-color: hsl(150, 70%, 90%);
     
     --ls-modal-backdrop-bg: rgba(0, 0, 0, 0.4);
+
+    /* == Synced with Flatly Theme - Extra Variables == */
+    --ls-secondary-border-color: var(--ls-gray-3);
+    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 94%);
+    --ls-page-checkbox-color: var(--ls-accent-9);
+    --ls-page-checkbox-border-color: var(--ls-accent-9);
+    --color-error: #e74c3c;
+    --color-bg-hover: var(--ls-gray-3);
+    --ls-task-done-color: #10b981;
+    --ls-task-done-hover-color: hsl(168, 76%, 38%);
+    --ls-task-cancelled-color: var(--ls-gray-7);
+    --ls-task-cancelled-hover-color: var(--ls-gray-8);
+    --ls-button-danger-color: #dc2626;
+    --ls-button-danger-hover-color: #b91c1c;
+    --ls-button-danger-shadow-color: hsla(0, 80%, 59%, 0.2);
+    --ls-status-success-color: #10b981;
+    --ls-status-success-light-color: hsl(168, 76%, 90%);
+    --ls-calendar-today-bg: var(--ls-accent-3);
+    --ls-calendar-today-text: var(--ls-primary-background-color, black);
+    --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3);
+    --ls-modal-close-danger-hover-bg: rgba(220, 38, 38, 0.1);
+    --ls-button-danger-bg: #dc2626;
+    --ls-button-danger-text: var(--ls-primary-background-color, #ffffff);
+    --ls-button-danger-border-color: #dc2626;
+    --ls-button-danger-hover-bg: #b91c1c;
+    --ls-button-danger-hover-text: var(--ls-button-danger-text, var(--ls-primary-background-color, #ffffff));
+    --ls-button-danger-hover-border-color: #b91c1c;
+    --ls-button-danger-box-shadow: none;
+    --ls-task-done-border-color: #10b981;
+    --ls-task-done-badge-bg: #10b981;
+    --ls-task-done-badge-text: var(--ls-primary-background-color, #ffffff);
+    --ls-task-cancelled-badge-bg: var(--ls-gray-8);
+    --ls-task-cancelled-badge-text: var(--ls-primary-background-color, #ffffff);
+    --ls-transclusion-error-bg: hsl(0 100% 97%);
+    --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
+    --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
+    --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
+    --ls-image-viewer-close-text: var(--ls-primary-text-color);
+    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --ls-property-tag-bg: var(--ls-accent-9);
+    --ls-property-tag-text: #ffffff;
+    --ls-save-status-bg: var(--ls-gray-1);
+    --ls-save-status-spinner-color: var(--ls-accent-9);
+    --ls-save-status-saved-icon-color: #10b981;
+    --ls-save-status-error-icon-color: #e74c3c;
+    --ls-active-nav-item-text-color: #ffffff;
+    --ls-task-checkbox-checkmark-color: #ffffff;
+    --ls-task-keyword-later-bg: hsl(40, 100%, 90%);
+    --ls-task-keyword-later-text: hsl(30, 100%, 30%);
+    --ls-add-property-btn-hover-text-color: #ffffff;
+    --ls-search-selected-item-text-color: #ffffff;
+    --ls-search-selected-create-new-text-color: #ffffff;
+    --ls-toast-feedback-text-color: #ffffff;
+    --ls-focused-parent-bullet-text-color: #ffffff;
+    --ls-show-all-notes-btn-text-color: #ffffff;
+    --ls-task-badge-todo-text-color: #ffffff;
+    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 60%, 0.28);
+    --ls-splash-bubble-color-2: rgba(24, 188, 156, 0.25);
+    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) - 15%), 65%, 0.22);
+    --ls-splash-bubble-color-4: rgba(189, 195, 199, 0.25);
+    --ls-task-keyword-waiting-color: hsl(210, 80%, 50%);
+    --ls-task-keyword-someday-color: #9b59b6;
 }
 
 /* Dark Mode */
 [data-theme="dark"] {
-    /* Base Gray Scale */
-    --ls-gray-1: hsl(210 10% 12%);
-    --ls-gray-2: hsl(210 10% 15%);
-    --ls-gray-3: hsl(210 10% 20%);
-    --ls-gray-4: hsl(210 10% 25%);
-    --ls-gray-5: hsl(210 10% 30%);
-    --ls-gray-6: hsl(210 10% 35%);
-    --ls-gray-7: hsl(210 10% 50%);
-    --ls-gray-8: hsl(210 10% 65%);
-    --ls-gray-9: hsl(210 10% 85%);
-    --ls-gray-10: hsl(210 10% 90%);
-    --ls-gray-11: hsl(210 10% 95%);
-    --ls-gray-12: hsl(210 10% 99%);
+    /* Warmer Slate-inspired dark theme */
+    --ls-gray-1: #151718;
+    --ls-gray-2: #1a1d1e;
+    --ls-gray-3: #202425;
+    --ls-gray-4: #23282a;
+    --ls-gray-5: #2c3136;
+    --ls-gray-6: #363a3f;
+    --ls-gray-7: #3e4347;
+    --ls-gray-8: #62676c;
+    --ls-gray-9: #7a8187;
+    --ls-gray-10: #9ba1a6;
+    --ls-gray-11: #c1c8cd;
+    --ls-gray-12: #eceef0;
     
-    /* Accent: Blue */
-    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 20%;
-    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 70%;
-    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%;
-    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%;
+    /* Accent Palette (Blue, dark) */
+    --ls-accent-hue: 210;
+    --ls-accent-saturation: 100%;
+    --ls-accent-3: #00344b;
+    --ls-accent-9: #53b9fd;
+    --ls-accent-10: #339af0;
+    --ls-accent-11: #228be6;
+    --ls-accent-3-hsl: 210 100% 16%;
+    --ls-accent-9-hsl: 210 97% 65%;
+    --ls-accent-10-hsl: 210 84% 58%;
+    --ls-accent-11-hsl: 210 80% 52%;
 
     /* Semantic Colors */
     --ls-primary-background-color: var(--ls-gray-2);
@@ -84,9 +155,9 @@
     --ls-tertiary-background-color: var(--ls-gray-3);
     --ls-quaternary-background-color: var(--ls-gray-4);
     
-    --ls-primary-text-color: var(--ls-gray-11);
+    --ls-primary-text-color: var(--ls-gray-10);
     --ls-secondary-text-color: var(--ls-gray-8);
-    --ls-tertiary-text-color: var(--ls-gray-7);
+    --ls-tertiary-text-color: var(--ls-gray-8);
 
     --ls-border-color: var(--ls-gray-4);
     --ls-guideline-color: var(--ls-gray-4);
@@ -102,4 +173,68 @@
     --ls-pill-bg-color: hsl(150, 100%, 15%);
     
     --ls-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
+
+    /* == Synced with Flatly Theme - Extra Variables == */
+    --ls-secondary-border-color: var(--ls-gray-5);
+    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 20%);
+    --ls-page-checkbox-color: var(--ls-accent-9);
+    --ls-page-checkbox-border-color: var(--ls-accent-9);
+    --color-error: #e74c3c;
+    --color-bg-hover: var(--ls-gray-3);
+    --ls-task-done-color: #10b981;
+    --ls-task-done-hover-color: hsl(168, 76%, 45%);
+    --ls-task-cancelled-color: var(--ls-gray-7);
+    --ls-task-cancelled-hover-color: var(--ls-gray-6);
+    --ls-button-danger-color: #dc2626;
+    --ls-button-danger-hover-color: #b91c1c;
+    --ls-button-danger-shadow-color: hsla(0, 80%, 59%, 0.2);
+    --ls-status-success-color: #10b981;
+    --ls-status-success-light-color: hsl(168, 76%, 25%);
+    --ls-splash-bg-color: var(--ls-gray-1);
+    --ls-splash-orb-bg-color: var(--ls-accent-10);
+    --ls-calendar-today-bg: var(--ls-accent-3);
+    --ls-calendar-today-text: var(--ls-gray-1);
+    --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.4);
+    --ls-modal-close-danger-hover-bg: rgba(220, 38, 38, 0.15);
+    --ls-button-danger-bg: #dc2626;
+    --ls-button-danger-text: var(--ls-primary-background-color, #ffffff);
+    --ls-button-danger-border-color: #dc2626;
+    --ls-button-danger-hover-bg: #b91c1c;
+    --ls-button-danger-hover-text: var(--ls-button-danger-text, var(--ls-primary-background-color, #ffffff));
+    --ls-button-danger-hover-border-color: #b91c1c;
+    --ls-button-danger-box-shadow: none;
+    --ls-task-done-border-color: #10b981;
+    --ls-task-done-badge-bg: #10b981;
+    --ls-task-done-badge-text: var(--ls-gray-1);
+    --ls-task-cancelled-badge-bg: var(--ls-gray-5);
+    --ls-task-cancelled-badge-text: var(--ls-gray-9);
+    --ls-transclusion-error-bg: hsl(0 80% 15%);
+    --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
+    --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
+    --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.7);
+    --ls-image-viewer-close-text: var(--ls-primary-text-color);
+    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    --ls-property-tag-bg: var(--ls-accent-9);
+    --ls-property-tag-text: #ffffff;
+    --ls-save-status-bg: var(--ls-gray-11);
+    --ls-save-status-spinner-color: var(--ls-accent-9);
+    --ls-save-status-saved-icon-color: #10b981;
+    --ls-save-status-error-icon-color: #e74c3c;
+    --ls-active-nav-item-text-color: #ffffff;
+    --ls-task-checkbox-checkmark-color: #ffffff;
+    --ls-task-keyword-later-bg: hsl(40, 100%, 90%);
+    --ls-task-keyword-later-text: hsl(30, 100%, 30%);
+    --ls-add-property-btn-hover-text-color: #ffffff;
+    --ls-search-selected-item-text-color: #ffffff;
+    --ls-search-selected-create-new-text-color: #ffffff;
+    --ls-toast-feedback-text-color: #ffffff;
+    --ls-focused-parent-bullet-text-color: #ffffff;
+    --ls-show-all-notes-btn-text-color: #ffffff;
+    --ls-task-badge-todo-text-color: #ffffff;
+    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 40%, 0.28);
+    --ls-splash-bubble-color-2: rgba(24, 188, 156, 0.18);
+    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) - 15%), 45%, 0.22);
+    --ls-splash-bubble-color-4: rgba(189, 195, 199, 0.18);
+    --ls-task-keyword-waiting-color: hsl(210, 80%, 60%);
+    --ls-task-keyword-someday-color: #9b59b6;
 }
