@@ -349,12 +349,13 @@ function renderBacklinks($backlinks) {
                                 <button id="next-month-btn" class="arrow-btn" @click="nextMonth()"><i data-feather="chevron-right"></i></button>
                                 <button id="today-btn" class="arrow-btn today-btn" @click="goToday()">Today</button>
                             </div>
-                            <div class="calendar-grid calendar-weekdays">
-                                <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
-                            </div>
                             <div id="calendar-days-grid" class="calendar-grid calendar-days">
-                                <template x-for="(day,index) in days" :key="index">
-                                    <div class="calendar-day" :class="{ 'empty': day.empty, 'today': day.today, 'has-content': day.hasPage, 'current-page': day.isCurrentPage }" x-text="day.empty ? '' : day.day" @click="dayClick(day)"></div>
+                                <template x-for="(cell, index) in calendarCells" :key="index">
+                                    <div
+                                        :class="cell.weekday ? 'calendar-weekday' : 'calendar-day' + (cell.empty ? ' empty' : '') + (cell.today ? ' today' : '') + (cell.hasPage ? ' has-content' : '') + (cell.isCurrentPage ? ' current-page' : '')"
+                                        x-text="cell.weekday ? cell.label : (cell.empty ? '' : cell.day)"
+                                        @click="!cell.weekday && !cell.empty ? dayClick(cell) : null"
+                                    ></div>
                                 </template>
                             </div>
                         </div>

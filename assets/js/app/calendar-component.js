@@ -6,6 +6,8 @@ export default function calendarComponent() {
         days: [],
         isLoading: false,
         currentPageName: '',
+        weekdays: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+        calendarCells: [],
         
         monthYear() {
             return this.currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -59,6 +61,11 @@ export default function calendarComponent() {
                     isCurrentPage: dateStr === this.currentPageName || (page && page.name === this.currentPageName)
                 });
             }
+            // Combine weekdays and days into a single array for the grid
+            this.calendarCells = [
+                ...this.weekdays.map(w => ({ weekday: true, label: w })),
+                ...this.days
+            ];
         },
         
         formatDate(date) {

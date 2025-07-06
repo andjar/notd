@@ -61,11 +61,35 @@
     text-align: center;
 }
 
+.calendar-weekdays,
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--ls-space-1);
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
 .calendar-weekdays {
     font-weight: var(--ls-font-weight-medium);
     color: var(--ls-secondary-text-color);
     margin-bottom: var(--ls-space-1);
     font-size: var(--ls-font-size-xs);
+}
+
+.calendar-weekday {
+    font-weight: var(--ls-font-weight-medium);
+    color: var(--ls-secondary-text-color);
+    font-size: var(--ls-font-size-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    cursor: default;
+    background: none;
+    border: none;
 }
 
 .calendar-day {
@@ -109,7 +133,7 @@
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background-color: var(--ls-gray-5);
+    background-color: var(--ls-gray-7);
 }
 
 .calendar-day.current-page {
