@@ -15,151 +15,6 @@ import { notesAPI as notesAPIClient } from './api_client.js'; // aliased to avoi
 import { loadPage as appLoadPage } from './app/page-loader.js'; // aliased
 import { pageCache as appPageCache } from './app/page-cache.js'; // aliased, though pageCache might not be directly used in notesManager yet
 
-function notesManager() {
-    return {
-        notes: [], // This will be populated by displayNotes via notesContainer.__x.getUnobservedData().notes
-
-        // Alpine Sort plugin calls this handler: handle(itemKey, newPosition, targetSortableElement, sourceSortableElement, newIndexWithinTarget, oldIndexWithinSource)
-        handleDrop(itemKey, newPosition, targetEl, sourceEl) {
-            console.log('[AlpineSort] Drop event:', { itemKey, newPosition, targetEl_dataset_parentId: targetEl.dataset.parentId, targetEl_id: targetEl.id, sourceEl_id: sourceEl.id });
-            const noteId = String(itemKey); // itemKey is note.id, ensure string for comparison
-
-            let newParentId = null;
-            // targetEl is the sortable container (#notes-container or a .note-children div)
-            // data-parent-id is set on .note-children divs
-            if (targetEl.classList.contains('note-children') && targetEl.dataset.parentId) {
-                newParentId = String(targetEl.dataset.parentId);
-            }
-
-            console.log('[AlpineSort] Dragged Note ID:', noteId, 'Target Parent ID:', newParentId, 'New Index in Target:', newPosition);
-
-            let draggedNoteData = null;
-            let originalParentArray = null;
-            let originalNoteIndex = -1;
-
-            const findAndRemoveNote = (notesArr, id) => {
-                for (let i = 0; i < notesArr.length; i++) {
-                    if (String(notesArr[i].id) === id) {
-                        const note = notesArr[i];
-                        originalParentArray = notesArr;
-                        originalNoteIndex = i;
-                        notesArr.splice(i, 1);
-                        return note;
-                    }
-                    if (notesArr[i].children) {
-                        const foundNote = findAndRemoveNote(notesArr[i].children, id);
-                        if (foundNote) return foundNote;
-                    }
-                }
-                return null;
-            };
-
-            draggedNoteData = findAndRemoveNote(this.notes, noteId);
-
-            if (!draggedNoteData) {
-                console.error('[AlpineSort] Critical: Dragged note data not found for ID:', noteId, '. Forcing reload.');
-                appLoadPage(window.currentPageName, false, false);
-                return;
-            }
-
-            draggedNoteData.parent_note_id = newParentId ? parseInt(newParentId) : null;
-
-            let targetArrayForInsertion;
-            if (newParentId) {
-                const findTargetArray = (notesArr, pId) => {
-                    for (let note of notesArr) {
-                        if (String(note.id) === pId) {
-                            if (!note.children) note.children = []; // Ensure children array exists
-                            return note.children;
-                        }
-                        if (note.children) {
-                            const found = findTargetArray(note.children, pId);
-                            if (found) return found;
-                        }
-                    }
-                    return null;
-                };
-                targetArrayForInsertion = findTargetArray(this.notes, newParentId);
-            } else {
-                targetArrayForInsertion = this.notes; // Root
-            }
-
-            if (!targetArrayForInsertion) {
-                console.error('[AlpineSort] Critical: Target array for insertion not found. Parent ID:', newParentId, '. Reverting and forcing reload.');
-                if (originalParentArray && originalNoteIndex !== -1) {
-                    originalParentArray.splice(originalNoteIndex, 0, draggedNoteData); // Put it back
-                }
-                appLoadPage(window.currentPageName, false, false);
-                return;
-            }
-
-            targetArrayForInsertion.splice(newPosition, 0, draggedNoteData);
-
-            const allNotesFlatForCalc = [];
-            function flattenNotesForCalc(notesToFlatten) {
-                for (const note of notesToFlatten) {
-                    allNotesFlatForCalc.push(note);
-                    if (note.children) {
-                        flattenNotesForCalc(note.children);
-                    }
-                }
-            }
-            flattenNotesForCalc(this.notes); // Use the current state of this.notes
-
-            const previousSiblingInTarget = targetArrayForInsertion[newPosition - 1];
-            const nextSiblingInTarget = targetArrayForInsertion[newPosition + 1];
-            const previousSiblingId = previousSiblingInTarget ? String(previousSiblingInTarget.id) : null;
-            const nextSiblingId = nextSiblingInTarget ? String(nextSiblingInTarget.id) : null;
-
-            console.log('[AlpineSort] Calculating order index with:', { newParentIdForCalc: newParentId, previousSiblingId, nextSiblingId, movedNoteId: noteId });
-
-            const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
-                allNotesFlatForCalc,
-                newParentId, // This is the parent_id for the moved note
-                previousSiblingId,
-                nextSiblingId,
-                noteId
-            );
-
-            console.log('[AlpineSort] calculateOrderIndex result:', { targetOrderIndex, siblingUpdates });
-
-            const operations = [
-                { type: 'update', payload: { id: noteId, parent_note_id: newParentId ? parseInt(newParentId) : null, order_index: targetOrderIndex } },
-                ...siblingUpdates.map(upd => ({ type: 'update', payload: { id: String(upd.id), order_index: upd.newOrderIndex } }))
-            ];
-
-            draggedNoteData.order_index = targetOrderIndex;
-            siblingUpdates.forEach(upd => {
-                const sibToUpdate = allNotesFlatForCalc.find(n => String(n.id) === String(upd.id));
-                if (sibToUpdate) sibToUpdate.order_index = upd.newOrderIndex;
-            });
-
-            this.notes = [...this.notes]; // Trigger reactivity for the whole structure
-
-            console.log('[AlpineSort] Sending operations to backend:', operations);
-
-            notesAPIClient.batchUpdateNotes(operations)
-                .then(() => {
-                    console.log('[AlpineSort] Batch update successful.');
-                    if (window.appPageCache && typeof window.appPageCache.removePage === 'function') { // Ensure using imported cache
-                        appPageCache.removePage(window.currentPageName);
-                    }
-                     // UI should be up-to-date due to Alpine's reactivity.
-                     // Re-flatten and sort if local display depends on explicit sort not handled by x-for structure.
-                     // For now, assume direct manipulation of this.notes and children arrays is enough.
-                })
-                .catch(error => {
-                    console.error("[AlpineSort] Failed to save note drop changes:", error);
-                    alert("Could not save new note positions. The page will now reload to ensure data consistency.");
-                    if (window.appPageCache && typeof window.appPageCache.removePage === 'function') {
-                        appPageCache.removePage(window.currentPageName);
-                    }
-                    appLoadPage(window.currentPageName, false, false);
-                });
-        }
-    };
-}
-
 // Wait for Alpine to be available
 document.addEventListener('alpine:init', () => {
 
@@ -292,7 +147,6 @@ Alpine.store('app', {
     Alpine.data('splashScreen', splashScreen);
     Alpine.data('sidebarComponent', sidebarComponent);
     Alpine.data('calendarComponent', calendarComponent);
-    Alpine.data('notesManager', notesManager); // Register the new notesManager
 });
 
 // Alpine.start() is automatically called by the CDN version
@@ -454,3 +308,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.body.innerHTML = `<h1>Application Initialization Failed</h1><p>${error.message}</p><p>Check the console for more details.</p>`;
     }
 });
+
+// Add notesOutliner Alpine component for outliner sorting
+window.notesOutliner = function notesOutliner() {
+    return {
+        notes: window.INITIAL_NOTES,
+        handleDrop: (item, position) => {
+            console.log('Sorted item:', item, 'to position:', position);
+            if (typeof item === 'undefined') {
+                console.error('[Alpine Sort] handleDrop called with undefined item!', { position, notes: this.notes });
+            }
+            // TODO: Implement reordering logic and persistence
+        }
+    };
+};

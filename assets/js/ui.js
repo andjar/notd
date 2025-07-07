@@ -4,7 +4,7 @@
  */
 
 // Import note-related functions that were split into separate modules
-import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree, initializeDragAndDrop, handleNoteDrop } from './ui/note-elements.js';
+import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree } from './ui/note-elements.js';
 import { renderNote, parseAndRenderContent, switchToEditMode, getRawTextWithNewlines, normalizeNewlines, renderAttachments, renderProperties, initializeDelegatedNoteEventListeners, renderTransclusion } from './ui/note-renderer.js';
 import { domRefs } from './ui/dom-refs.js';
 import { pagesAPI } from './api_client.js';
@@ -859,8 +859,6 @@ export const ui = {
     addNoteElement,
     removeNoteElement,
     buildNoteTree,
-    initializeDragAndDrop,
-    handleNoteDrop,
     renderNote,
     parseAndRenderContent,
     switchToEditMode,

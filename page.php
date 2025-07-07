@@ -32,6 +32,21 @@ $recentPages = [];
 $favorites = [];
 $childPages = [];
 $backlinks = [];
+$nestedNotes = [];
+
+// Helper: Build a nested tree from flat notes array
+function buildTree(array $elements, $parentId = null) {
+    $branch = [];
+    foreach ($elements as $element) {
+        if ($element['parent_note_id'] == $parentId) {
+            $children = buildTree($elements, $element['id']);
+            $element['children'] = $children ?: [];
+            $element['collapsed'] = isset($element['collapsed']) ? (bool)$element['collapsed'] : false;
+            $branch[] = $element;
+        }
+    }
+    return $branch;
+}
 
 if ($pdo) {
     // Get current page data
@@ -76,6 +91,12 @@ if ($pdo) {
         $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, P.name as page_name FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages P ON N.page_id = P.id WHERE Prop.name = 'links_to_page' AND Prop.value = ? GROUP BY N.id ORDER BY N.updated_at DESC LIMIT 10");
         $stmt->execute([$pageName]);
         $backlinks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // --- Fetch all notes for this page and build nested tree ---
+        $stmt = $pdo->prepare("SELECT * FROM Notes WHERE page_id = ? AND active = 1 ORDER BY order_index ASC");
+        $stmt->execute([$pageData['id']]);
+        $flatNotes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $nestedNotes = buildTree($flatNotes);
     }
 }
 
@@ -283,7 +304,7 @@ function renderBacklinks($backlinks) {
     <script src="assets/libs/Sortable.min.js"></script>
     <script src="assets/libs/sjcl.js"></script>
     <!-- Alpine Sort Plugin -->
-    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/sort@latest/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/sort@3.x.x/dist/cdn.min.js"></script>
     <!-- Alpine Core -->
     <script type="module" src="assets/js/app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
@@ -295,6 +316,9 @@ function renderBacklinks($backlinks) {
             RENDER_INTERNAL_PROPERTIES: <?php echo json_encode($renderInternal); ?>,
             SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE: <?php echo json_encode($showInternalInEdit); ?>
         };
+    </script>
+    <script>
+        window.INITIAL_NOTES = <?php echo json_encode($nestedNotes, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>;
     </script>
 </head>
 <body>
@@ -414,119 +438,12 @@ function renderBacklinks($backlinks) {
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner"
-                 x-data="notesManager()"
-                 x-sort="handleDrop"
-                 x-sort:group="'notesGroup'">
+                 x-data="notesOutliner()"
+                 x-sort:group="'notesGroup'"
+                 x-sort="handleDrop">
                 <template x-for="note in notes" :key="note.id">
-                    <div class="note-item"
-                        x-data="noteComponent(note, 0, $el)"
-                        :data-note-id="note.id"
-                        x-sort:item="note.id"
-                        :style="`--nesting-level: ${nestingLevel}`"
-                        :class="{ 'has-children': note.children && note.children.length > 0, 'collapsed': note.collapsed, 'encrypted-note': note.is_encrypted, 'decrypted-note': note.is_encrypted && note.content && !note.content.startsWith('{') }">
-
-                        <div class="note-header-row">
-                            <div class="note-controls">
-                                <span class="note-collapse-arrow" x-show="note.children && note.children.length > 0" @click="toggleCollapse()" :data-collapsed="note.collapsed ? 'true' : 'false'">
-                                    <i data-feather="chevron-right"></i>
-                                </span>
-                                <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
-                                <span class="note-bullet" :data-note-id="note.id" x-sort:handle></span>
-                            </div>
-                            <div class="note-content-wrapper">
-                                <div class="note-content rendered-mode"
-                                    x-ref="contentDiv"
-                                    :data-note-id="note.id"
-                                    :data-raw-content="note.content"
-                                    x-html="parseContent(note.content)"
-                                    @click="editNote()"
-                                    @blur="isEditing = false"
-                                    @input="handleInput($event)"
-                                    @paste="handlePaste($event)"
-                                    @keydown="handleNoteKeyDown($event)">
-                                </div>
-                                <div class="note-attachments"></div>
-                            </div>
-                        </div>
-
-                        <div class="note-children" :class="{ 'collapsed': note.collapsed }"
-                             x-sort="handleDrop" x-sort:group="'notesGroup'" :data-parent-id="note.id">
-                            <template x-for="childNote in note.children" :key="childNote.id">
-                                <div class="note-item"
-                                    x-data="noteComponent(childNote, $parent.nestingLevel + 1, $el)"
-                                    :data-note-id="childNote.id"
-                                    x-sort:item="childNote.id"
-                                    :style="`--nesting-level: ${$parent.nestingLevel + 1}`"
-                                    :class="{ 'has-children': childNote.children && childNote.children.length > 0, 'collapsed': childNote.collapsed, 'encrypted-note': childNote.is_encrypted, 'decrypted-note': childNote.is_encrypted && childNote.content && !childNote.content.startsWith('{') }">
-
-                                    <div class="note-header-row">
-                                        <div class="note-controls">
-                                            <span class="note-collapse-arrow" x-show="childNote.children && childNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="childNote.collapsed ? 'true' : 'false'">
-                                                <i data-feather="chevron-right"></i>
-                                            </span>
-                                            <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
-                                            <span class="note-bullet" :data-note-id="childNote.id" x-sort:handle></span>
-                                        </div>
-                                        <div class="note-content-wrapper">
-                                            <div class="note-content rendered-mode"
-                                                x-ref="contentDiv"
-                                                :data-note-id="childNote.id"
-                                                :data-raw-content="childNote.content"
-                                                x-html="parseContent(childNote.content)"
-                                                @click="editNote()"
-                                                @blur="isEditing = false"
-                                                @input="handleInput($event)"
-                                                @paste="handlePaste($event)"
-                                                @keydown="handleNoteKeyDown($event)">
-                                            </div>
-                                            <div class="note-attachments"></div>
-                                        </div>
-                                    </div>
-
-                                    <div class="note-children" :class="{ 'collapsed': childNote.collapsed }"
-                                         x-sort="handleDrop" x-sort:group="'notesGroup'" :data-parent-id="childNote.id">
-                                        <!-- Recursive rendering of grand-children -->
-                                        <template x-for="grandChildNote in childNote.children" :key="grandChildNote.id">
-                                            <div class="note-item"
-                                                x-data="noteComponent(grandChildNote, $parent.$parent.nestingLevel + 2, $el)"
-                                                :data-note-id="grandChildNote.id"
-                                                x-sort:item="grandChildNote.id"
-                                                :style="`--nesting-level: ${$parent.$parent.nestingLevel + 2}`"
-                                                :class="{ 'has-children': grandChildNote.children && grandChildNote.children.length > 0, 'collapsed': grandChildNote.collapsed, 'encrypted-note': grandChildNote.is_encrypted, 'decrypted-note': grandChildNote.is_encrypted && grandChildNote.content && !grandChildNote.content.startsWith('{') }">
-
-                                                <div class="note-header-row">
-                                                    <div class="note-controls">
-                                                        <span class="note-collapse-arrow" x-show="grandChildNote.children && grandChildNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="grandChildNote.collapsed ? 'true' : 'false'">
-                                                            <i data-feather="chevron-right"></i>
-                                                        </span>
-                                                        <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
-                                                        <span class="note-bullet" :data-note-id="grandChildNote.id" x-sort:handle></span>
-                                                    </div>
-                                                    <div class="note-content-wrapper">
-                                                        <div class="note-content rendered-mode"
-                                                            x-ref="contentDiv"
-                                                            :data-note-id="grandChildNote.id"
-                                                            :data-raw-content="grandChildNote.content"
-                                                            x-html="parseContent(grandChildNote.content)"
-                                                            @click="editNote()"
-                                                            @blur="isEditing = false"
-                                                            @input="handleInput($event)"
-                                                            @paste="handlePaste($event)"
-                                                            @keydown="handleNoteKeyDown($event)">
-                                                        </div>
-                                                        <div class="note-attachments"></div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="note-children" :class="{ 'collapsed': grandChildNote.collapsed }">
-                                                    <!-- Further nested children would go here, following the same pattern -->
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
+                    <div x-data="{ isRoot: true }">
+                        <?php include 'templates/_recursive_note_item.php'; ?>
                     </div>
                 </template>
             </div>
