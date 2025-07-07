@@ -211,7 +211,7 @@
 }
 
 .note-content:hover {
-  background-color: var(--ls-tertiary-background-color);
+  /* background-color: var(--ls-tertiary-background-color); Removed for text-field feel */
 }
 
 .note-content:focus {
@@ -222,7 +222,7 @@
 
 /* Note Content Modes */
 .note-content.rendered-mode {
-  cursor: pointer;
+  cursor: text; /* Always text cursor */
   background-color: transparent;
   padding: 4px 8px;
   border-radius: var(--ls-border-radius-low);
@@ -230,7 +230,7 @@
 
 .note-content.rendered-mode:hover {
   cursor: text;
-  background-color: var(--ls-tertiary-background-color);
+  /* background-color: var(--ls-tertiary-background-color); Removed for text-field feel */
 }
 
 .note-content.edit-mode {
