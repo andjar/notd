@@ -728,6 +728,8 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
 }
 
 function handleArrowKey(e, contentDiv) {
+    // Only intercept ArrowUp and ArrowDown for custom navigation
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     e.preventDefault();
     
     // **OPTIMIZATION**: More efficient arrow key navigation inspired by treehouse
@@ -739,43 +741,6 @@ function handleArrowKey(e, contentDiv) {
         nextIndex = currentIndex - 1;
     } else if (e.key === 'ArrowDown' && currentIndex < allVisibleNotesContent.length - 1) {
         nextIndex = currentIndex + 1;
-    } else if (e.key === 'ArrowLeft') {
-        // **NEW**: Treehouse-style - move to parent note
-        const noteItem = contentDiv.closest('.note-item');
-        const parentNote = noteItem?.parentElement?.closest('.note-item');
-        if (parentNote) {
-            const parentContent = parentNote.querySelector('.note-content');
-            if (parentContent) {
-                ui.switchToEditMode(parentContent);
-                const range = document.createRange();
-                const sel = window.getSelection();
-                range.selectNodeContents(parentContent);
-                range.collapse(false);
-                sel.removeAllRanges();
-                sel.addRange(range);
-                return;
-            }
-        }
-    } else if (e.key === 'ArrowRight') {
-        // **NEW**: Treehouse-style - move to first child note
-        const noteItem = contentDiv.closest('.note-item');
-        const childrenContainer = noteItem?.querySelector('.note-children');
-        if (childrenContainer && !childrenContainer.classList.contains('collapsed')) {
-            const firstChild = childrenContainer.querySelector('.note-item');
-            if (firstChild) {
-                const childContent = firstChild.querySelector('.note-content');
-                if (childContent) {
-                    ui.switchToEditMode(childContent);
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    range.selectNodeContents(childContent);
-                    range.collapse(false);
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                    return;
-                }
-            }
-        }
     }
 
     if (nextIndex !== -1) {
@@ -866,9 +831,8 @@ export async function handleNoteKeyDown(e) {
         case 'Tab': return await handleTabKey(e, noteItem, noteData);
         case 'Backspace': return await handleBackspaceKey(e, noteItem, noteData, contentDiv);
         case 'ArrowUp':
-        case 'ArrowDown':
-        case 'ArrowLeft':
-        case 'ArrowRight': return handleArrowKey(e, contentDiv);
+        case 'ArrowDown': return handleArrowKey(e, contentDiv); // Only intercept up/down
+        // ArrowLeft and ArrowRight now use default browser behavior
     }
 }
 
