@@ -1,7 +1,7 @@
 // assets/js/app/event-handlers.js (No changes needed, just verification)
 
 import { getNextDayPageName, getPreviousDayPageName, handleUrlAnchor } from './page-loader.js';
-import { currentPageName } from './state.js';
+import { getCurrentPageName } from './state.js';
 import { ui } from '../ui.js';
 
 export function initGlobalEventListeners() {
@@ -10,14 +10,14 @@ export function initGlobalEventListeners() {
         // Journal navigation shortcuts
         if (e.ctrlKey && e.altKey) {
             const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            if (dateRegex.test(currentPageName)) {
+            if (dateRegex.test(getCurrentPageName())) {
                 if (e.key === 'ArrowRight') {
                     e.preventDefault();
-                    const nextPage = getNextDayPageName(currentPageName);
+                    const nextPage = getNextDayPageName(getCurrentPageName());
                     window.location.href = `page.php?page=${encodeURIComponent(nextPage)}`;
                 } else if (e.key === 'ArrowLeft') {
                     e.preventDefault();
-                    const prevPage = getPreviousDayPageName(currentPageName);
+                    const prevPage = getPreviousDayPageName(getCurrentPageName());
                     window.location.href = `page.php?page=${encodeURIComponent(prevPage)}`;
                 }
             }

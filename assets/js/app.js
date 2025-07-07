@@ -115,10 +115,12 @@ Alpine.store('app', {
   
   // Page cache management
   setPageCache(key, value) {
+    console.log('[CACHE] setPageCache:', key);
     this.pageCache.set(key, value);
   },
   
   getPageCache(key) {
+    console.log('[CACHE] getPageCache:', key);
     return this.pageCache.get(key);
   },
   
@@ -127,6 +129,7 @@ Alpine.store('app', {
   },
   
   deletePageCache(key) {
+    console.log('[CACHE] deletePageCache:', key);
     return this.pageCache.delete(key);
   },
   

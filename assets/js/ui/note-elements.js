@@ -173,12 +173,22 @@ export async function handleNoteDrop(evt) {
     const previousEl = evt.item.previousElementSibling;
     const previousSiblingId = previousEl?.classList.contains('note-item') ? previousEl.dataset.noteId : null;
 
+    // Find the next sibling after the dropped note
+    const nextEl = evt.item.nextElementSibling;
+    const nextSiblingId = nextEl?.classList.contains('note-item') ? nextEl.dataset.noteId : null;
+
+    // Debug: Log drag context
+    console.log('[handleNoteDrop] previousSiblingId:', previousSiblingId, 'nextSiblingId:', nextSiblingId, 'newParentId:', newParentId);
+
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
         window.notesForCurrentPage,
         newParentId,
         previousSiblingId,
-        null
+        nextSiblingId
     );
+
+    // Debug: Log result of calculateOrderIndex
+    console.log('[handleNoteDrop] calculateOrderIndex result:', { targetOrderIndex, siblingUpdates });
     
     // Create a list of all operations needed for the batch update.
     const operations = [
@@ -197,13 +207,26 @@ export async function handleNoteDrop(evt) {
         if(sib) sib.order_index = upd.newOrderIndex;
     });
 
+    // Debug: Log the operations array to verify payload
+    console.log('[handleNoteDrop] Sending operations to backend:', operations);
+
     try {
         await window.notesAPI.batchUpdateNotes(operations);
+        // Debug: Log before clearing cache
+        console.log('[handleNoteDrop] Clearing cache for', window.currentPageName);
+        if (window.pageCache && typeof window.pageCache.removePage === 'function') {
+            window.pageCache.removePage(window.currentPageName);
+        }
+        // Debug: Log after clearing cache
+        console.log('[handleNoteDrop] Cache cleared, reloading page');
         // On success, we can just do a light DOM update if needed, but a reload is safest.
         await window.loadPage(window.currentPageName, false, false); // Reload without adding to history
     } catch (error) {
         console.error("Failed to save note drop changes:", error);
         alert("Could not save new note positions. Reverting.");
+        if (window.pageCache && typeof window.pageCache.removePage === 'function') {
+            window.pageCache.removePage(window.currentPageName);
+        }
         await window.loadPage(window.currentPageName, false, false);
     }
 }
