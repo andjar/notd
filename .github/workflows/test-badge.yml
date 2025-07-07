@@ -1,0 +1,25 @@
+name: Test Badge
+
+on:
+  workflow_run:
+    workflows: ["PHP Tests", "Quick Tests"]
+    types: [completed]
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion != 'skipped'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Generate test badge
+      uses: schneegans/dynamic-badges-action@v1.6.0
+      with:
+        auth: ${{ secrets.GIST_SECRET }}
+        gistID: your-gist-id-here
+        filename: test-status.json
+        label: tests
+        message: ${{ github.event.workflow_run.conclusion }}
+        color: ${{ github.event.workflow_run.conclusion == 'success' && 'green' || 'red' }}
+        namedLogo: github 

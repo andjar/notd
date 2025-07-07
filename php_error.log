@@ -1,0 +1,132 @@
+[05-Jul-2025 00:27:49 UTC] Starting Excalidraw Upload Test...
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 1: Script Start
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 2: After UPLOADS_DIR setup
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 3: After $_POST and $_FILES simulation.
+[05-Jul-2025 00:27:49 UTC] [Test Script] POST data: Array
+(
+    [note_id] => 123
+)
+
+[05-Jul-2025 00:27:49 UTC] [Test Script] FILES data: Array
+(
+    [attachmentFile] => Array
+        (
+            [name] => Array
+                (
+                    [0] => excalidraw_test_01.png
+                    [1] => excalidraw_test_01.excalidraw
+                )
+
+            [type] => Array
+                (
+                    [0] => image/png
+                    [1] => application/json
+                )
+
+            [tmp_name] => Array
+                (
+                    [0] => /tmp/test_png_sHB66o
+                    [1] => /tmp/test_json_pvXud0
+                )
+
+            [error] => Array
+                (
+                    [0] => 0
+                    [1] => 0
+                )
+
+            [size] => Array
+                (
+                    [0] => 17
+                    [1] => 22
+                )
+
+        )
+
+)
+
+[05-Jul-2025 00:27:49 UTC] [Test Script] PDO class exists.
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 4a: Before requiring db_connect.php
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 4b: After requiring db_connect.php
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 4c: After calling get_db_connection() from db_connect.php. Is PDO? Yes
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 4e: Successfully got actual PDO connection.
+[05-Jul-2025 00:27:49 UTC] Using actual PDO connection via db_connect.php.
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 5: After DB Setup block. Is PDO object set? Yes
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 5a: Before requiring response_utils.php
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 5b: After requiring response_utils.php
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 5c: Before requiring validator_utils.php
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 5d: After requiring validator_utils.php
+[05-Jul-2025 00:27:49 UTC] [Test Script] Defined LOG_PATH.
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 6: REQUEST_METHOD is: POST
+[05-Jul-2025 00:27:49 UTC] === ATTACHMENTS.PHP START ===
+[05-Jul-2025 00:27:49 UTC] REQUEST_METHOD: POST
+[05-Jul-2025 00:27:49 UTC] POST data: Array
+(
+    [note_id] => 123
+)
+
+[05-Jul-2025 00:27:49 UTC] FILES data: Array
+(
+    [attachmentFile] => Array
+        (
+            [name] => Array
+                (
+                    [0] => excalidraw_test_01.png
+                    [1] => excalidraw_test_01.excalidraw
+                )
+
+            [type] => Array
+                (
+                    [0] => image/png
+                    [1] => application/json
+                )
+
+            [tmp_name] => Array
+                (
+                    [0] => /tmp/test_png_sHB66o
+                    [1] => /tmp/test_json_pvXud0
+                )
+
+            [error] => Array
+                (
+                    [0] => 0
+                    [1] => 0
+                )
+
+            [size] => Array
+                (
+                    [0] => 17
+                    [1] => 22
+                )
+
+        )
+
+)
+
+[05-Jul-2025 00:27:49 UTC] attachments.php: Not in a direct web request context or REQUEST_METHOD not set. Skipping auto-execution of handleRequest.
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 7: After including attachments.php (it was likely already included by auto-prepend)
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 8: About to instantiate AttachmentManager. Is PDO object valid? Yes
+[05-Jul-2025 00:27:49 UTC] [Test Script] Note with ID 123 already exists in actual DB.
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 9: AttachmentManager instantiated.
+[05-Jul-2025 00:27:49 UTC] === POST METHOD PROCESSING ===
+[05-Jul-2025 00:27:49 UTC] Starting database transaction
+[05-Jul-2025 00:27:49 UTC] Verifying note exists
+[05-Jul-2025 00:27:49 UTC] Starting file validation for: excalidraw_test_01.png
+[05-Jul-2025 00:27:49 UTC] MIME type detected via finfo: text/plain
+[05-Jul-2025 00:27:49 UTC] File validation completed successfully: name=excalidraw_test_01.png, mime_type=text/plain
+[05-Jul-2025 00:27:49 UTC] About to move_uploaded_file: name=excalidraw_test_01.png, tmp_name=/tmp/test_png_sHB66o
+[05-Jul-2025 00:27:49 UTC] move_uploaded_file failed, trying copy() for excalidraw_test_01.png
+[05-Jul-2025 00:27:49 UTC] Starting database transaction
+[05-Jul-2025 00:27:49 UTC] Verifying note exists
+[05-Jul-2025 00:27:49 UTC] Starting file validation for: excalidraw_test_01.excalidraw
+[05-Jul-2025 00:27:49 UTC] MIME type detected via finfo: application/json
+[05-Jul-2025 00:27:49 UTC] File validation completed successfully: name=excalidraw_test_01.excalidraw, mime_type=application/json
+[05-Jul-2025 00:27:49 UTC] About to move_uploaded_file: name=excalidraw_test_01.excalidraw, tmp_name=/tmp/test_json_pvXud0
+[05-Jul-2025 00:27:49 UTC] move_uploaded_file failed, trying copy() for excalidraw_test_01.excalidraw
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 10: AttachmentManager handleRequest called.
+[05-Jul-2025 00:27:49 UTC] [Test Script] Phase 11: Output captured. Output: {"status":"success","data":{"attachments":[{"id":"3","note_id":123,"name":"excalidraw_test_01.png","path":"2025\/07\/6868718578ea5_excalidraw_test_01.png","type":"text\/plain","size":17,"created_at":"2025-07-05T00:27:49+00:00"},{"id":"4","note_id":123,"name":"excalidraw_test_01.excalidraw","path":"2025\/07\/686871857a25a_excalidraw_test_01.excalidraw","type":"application\/json","size":22,"created_at":"2025-07-05T00:27:49+00:00"}]}}
+[05-Jul-2025 00:27:49 UTC] [Test Script] VERIFICATION SUCCESS: Both files found in /app/uploads_test_dir/2025/07.
+[05-Jul-2025 00:27:49 UTC] [Test Script] VERIFICATION SUCCESS: API response indicates 2 attachments.
+[05-Jul-2025 00:27:49 UTC] [Test Script] Saved attachment details: Name: excalidraw_test_01.png, Type: text/plain, Path: 2025/07/6868718578ea5_excalidraw_test_01.png
+[05-Jul-2025 00:27:49 UTC] [Test Script] Saved attachment details: Name: excalidraw_test_01.excalidraw, Type: application/json, Path: 2025/07/686871857a25a_excalidraw_test_01.excalidraw
+[05-Jul-2025 00:27:49 UTC] Excalidraw Upload Test Finished.

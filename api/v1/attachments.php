@@ -1,8 +1,20 @@
 <?php
+
+namespace App;
+
+use PDO;
+
 error_log("=== ATTACHMENTS.PHP START ===");
-error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
-error_log("POST data: " . print_r($_POST, true));
-error_log("FILES data: " . print_r($_FILES, true));
+if (isset($_SERVER['REQUEST_METHOD'])) {
+    error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
+} else {
+    error_log("REQUEST_METHOD: Not set (possibly included outside of a direct web request context)");
+}
+// Only log POST and FILES if it's a POST request, otherwise they might not be relevant or set
+if (($_SERVER['REQUEST_METHOD'] ?? null) === 'POST') {
+    error_log("POST data: " . print_r($_POST, true));
+    error_log("FILES data: " . print_r($_FILES, true));
+}
 
 ob_start(); // Start output buffering
 
@@ -40,12 +52,12 @@ class AttachmentManager {
         if (!file_exists($dir)) {
             if (!mkdir($dir, 0755, true)) {
                 error_log("Failed to create directory: " . $dir);
-                throw new RuntimeException('Failed to create upload directory: ' . $dir);
+                throw new \RuntimeException('Failed to create upload directory: ' . $dir);
             }
         }
         if (!is_writable($dir)) {
             error_log("Directory not writable: " . $dir);
-            throw new RuntimeException('Upload directory is not writable: ' . $dir);
+            throw new \RuntimeException('Upload directory is not writable: ' . $dir);
         }
         return $dir;
     }
@@ -54,7 +66,7 @@ class AttachmentManager {
         error_log("Starting file validation for: " . $file['name']);
         
         if (!isset($file['error']) || is_array($file['error'])) {
-            throw new RuntimeException('Invalid file parameter');
+            throw new \RuntimeException('Invalid file parameter');
         }
 
         switch ($file['error']) {
@@ -62,33 +74,33 @@ class AttachmentManager {
                 break;
             case UPLOAD_ERR_INI_SIZE:
             case UPLOAD_ERR_FORM_SIZE:
-                throw new RuntimeException('File exceeds maximum size limit');
+                throw new \RuntimeException('File exceeds maximum size limit');
             case UPLOAD_ERR_PARTIAL:
-                throw new RuntimeException('File was only partially uploaded');
+                throw new \RuntimeException('File was only partially uploaded');
             case UPLOAD_ERR_NO_FILE:
-                throw new RuntimeException('No file was uploaded');
+                throw new \RuntimeException('No file was uploaded');
             case UPLOAD_ERR_NO_TMP_DIR:
-                throw new RuntimeException('Missing temporary folder');
+                throw new \RuntimeException('Missing temporary folder');
             case UPLOAD_ERR_CANT_WRITE:
-                throw new RuntimeException('Failed to write file to disk');
+                throw new \RuntimeException('Failed to write file to disk');
             case UPLOAD_ERR_EXTENSION:
-                throw new RuntimeException('File upload stopped by extension');
+                throw new \RuntimeException('File upload stopped by extension');
             default:
-                throw new RuntimeException('Unknown upload error');
+                throw new \RuntimeException('Unknown upload error');
         }
 
         if ($file['size'] > self::MAX_FILE_SIZE) {
-            throw new RuntimeException('File exceeds maximum size limit of ' . (self::MAX_FILE_SIZE / 1024 / 1024) . 'MB');
+            throw new \RuntimeException('File exceeds maximum size limit of ' . (self::MAX_FILE_SIZE / 1024 / 1024) . 'MB');
         }
 
         $mime_type = null;
         
         if (class_exists('finfo')) {
             try {
-                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $finfo = new \finfo(FILEINFO_MIME_TYPE); // Use global namespace for finfo
                 $mime_type = $finfo->file($file['tmp_name']);
                 error_log("MIME type detected via finfo: " . $mime_type);
-            } catch (Exception $e) {
+            } catch (\Exception $e) { // Also use global Exception
                 error_log("finfo failed: " . $e->getMessage());
                 $mime_type = null;
             }
@@ -112,12 +124,17 @@ class AttachmentManager {
             $mime_type = $mime_map[$extension] ?? 'application/octet-stream';
             error_log("MIME type detected via extension fallback: " . $mime_type);
         }
-
-        if (!in_array($mime_type, self::ALLOWED_MIME_TYPES)) {
-            throw new RuntimeException('File type not allowed: ' . $mime_type);
+        // Allow .excalidraw files as application/json
+        $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($extension === 'excalidraw') {
+            $mime_type = 'application/json';
         }
 
-        error_log("File validation completed successfully");
+        if (!in_array($mime_type, self::ALLOWED_MIME_TYPES)) {
+            throw new \RuntimeException('File type not allowed: ' . $mime_type);
+        }
+
+        error_log("File validation completed successfully: name={$file['name']}, mime_type={$mime_type}");
         return $mime_type;
     }
 
@@ -157,7 +174,7 @@ public function handleRequest() {
             $this->handleDeleteRequest();
             break;
         default:
-            ApiResponse::error('Method Not Allowed', 405);
+            \App\ApiResponse::error('Method Not Allowed', 405);
     }
 }
 
@@ -168,22 +185,46 @@ public function handleRequest() {
         $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
         if (!empty($errorsPOST)) {
             ob_end_clean();
-            ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
+            \App\ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
             return;
         }
         $note_id = (int)$_POST['note_id'];
 
         if (!isset($_FILES['attachmentFile'])) {
             ob_end_clean();
-            ApiResponse::error('attachmentFile is required.', 400);
+            \App\ApiResponse::error('attachmentFile is required.', 400);
             return;
         }
-        $file = $_FILES['attachmentFile'];
+        $files = $_FILES['attachmentFile'];
+        $savedAttachments = [];
+        if (is_array($files['name'])) {
+            // Multiple files
+            for ($i = 0; $i < count($files['name']); $i++) {
+                $file = [
+                    'name' => $files['name'][$i],
+                    'type' => $files['type'][$i],
+                    'tmp_name' => $files['tmp_name'][$i],
+                    'error' => $files['error'][$i],
+                    'size' => $files['size'][$i],
+                ];
+                $result = $this->processSingleAttachment($note_id, $file);
+                if ($result !== null) {
+                    $savedAttachments[] = $result;
+                }
+            }
+        } else {
+            // Single file
+            $result = $this->processSingleAttachment($note_id, $files);
+            if ($result !== null) {
+                $savedAttachments[] = $result;
+            }
+        }
+        ob_end_clean();
+        \App\ApiResponse::success(['attachments' => $savedAttachments]);
+    }
 
-        error_log("Upload attempt for note_id: $note_id");
-        error_log("File info: " . json_encode($file));
-        error_log("UPLOADS_DIR: " . UPLOADS_DIR);
-
+    // Add a helper to process a single file
+    private function processSingleAttachment($note_id, $file) {
         try {
             error_log("Starting database transaction");
             $this->pdo->beginTransaction();
@@ -192,76 +233,68 @@ public function handleRequest() {
             $note_stmt = $this->pdo->prepare("SELECT id, page_id FROM Notes WHERE id = ?");
             $note_stmt->execute([$note_id]);
             $note = $note_stmt->fetch();
-
             if (!$note) {
-                error_log("Note not found for ID: $note_id");
                 $this->pdo->rollBack();
-                ob_end_clean();
-                ApiResponse::error('Note not found', 404);
-                return;
-            }
-
-            error_log("Note found, starting file validation");
-            $mime_type = $this->validateFile($file);
-            error_log("File validation passed, MIME type: $mime_type");
-
-            if (!file_exists(UPLOADS_DIR)) {
-                if (!mkdir(UPLOADS_DIR, 0755, true)) {
-                    throw new RuntimeException('Failed to create uploads directory');
-                }
+                throw new \RuntimeException('Note not found.');
             }
 
             $year = date('Y');
             $month = date('m');
-            $upload_dir = $this->ensureUploadDirectory($year, $month);
-            $unique_filename = $this->generateUniqueFilename($file['name']);
-            $relative_path = $year . '/' . $month . '/' . $unique_filename;
-            $full_path = $upload_dir . '/' . $unique_filename;
+            $uploadDir = $this->ensureUploadDirectory($year, $month);
+            $original_name = $file['name'];
+            $unique_name = $this->generateUniqueFilename($original_name);
+            $target_path = $uploadDir . '/' . $unique_name;
 
-            error_log("Attempting to move file to: $full_path");
+            $mime_type = $this->validateFile($file);
 
-            if (!move_uploaded_file($file['tmp_name'], $full_path)) {
-                throw new RuntimeException('Failed to move uploaded file to: ' . $full_path);
+            error_log("About to move_uploaded_file: name={$file['name']}, tmp_name={$file['tmp_name']}");
+            if (!file_exists($file['tmp_name'])) {
+                error_log('Temp file does not exist: ' . $file['tmp_name'] . ' for ' . $file['name']);
             }
 
-            $stmt = $this->pdo->prepare(
-                "INSERT INTO Attachments (note_id, name, path, type, created_at) 
-                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)"
-            );
-            $stmt->execute([$note_id, $file['name'], $relative_path, $mime_type]);
+            if (!move_uploaded_file($file['tmp_name'], $target_path)) {
+                // Fallback: try copy if move_uploaded_file fails but file exists
+                if (file_exists($file['tmp_name'])) {
+                    error_log('move_uploaded_file failed, trying copy() for ' . $file['name']);
+                    if (!copy($file['tmp_name'], $target_path)) {
+                        $this->pdo->rollBack();
+                        throw new \RuntimeException('Failed to move or copy uploaded file.');
+                    }
+                    // Optionally, unlink the temp file after copy
+                    @unlink($file['tmp_name']);
+                } else {
+                    $this->pdo->rollBack();
+                    throw new \RuntimeException('Failed to move uploaded file.');
+                }
+            }
+
+            $insert_stmt = $this->pdo->prepare("INSERT INTO Attachments (note_id, name, path, type, size, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))");
+            $insert_stmt->execute([
+                $note_id,
+                $original_name,
+                $year . '/' . $month . '/' . $unique_name,
+                $mime_type,
+                $file['size']
+            ]);
+
             $attachment_id = $this->pdo->lastInsertId();
-
-            $note_update_stmt = $this->pdo->prepare("UPDATE Notes SET updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $note_update_stmt->execute([$note_id]);
-
-            $page_update_stmt = $this->pdo->prepare("UPDATE Pages SET updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $page_update_stmt->execute([$note['page_id']]);
-
-            $attachment_stmt = $this->pdo->prepare("SELECT * FROM Attachments WHERE id = ?");
-            $attachment_stmt->execute([$attachment_id]);
-            $attachment = $attachment_stmt->fetch();
-
             $this->pdo->commit();
-            ApiResponse::success($attachment, 201);
-            ob_end_flush();
-        } catch (RuntimeException $e) {
-            if (isset($full_path) && file_exists($full_path)) {
-                unlink($full_path);
-            }
+
+            return [
+                'id' => $attachment_id,
+                'note_id' => $note_id,
+                'name' => $original_name,
+                'path' => $year . '/' . $month . '/' . $unique_name,
+                'type' => $mime_type,
+                'size' => $file['size'],
+                'created_at' => date('c'),
+            ];
+        } catch (Exception $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            ob_end_clean();
-            ApiResponse::error($e->getMessage(), 400);
-        } catch (PDOException $e) {
-            if (isset($full_path) && file_exists($full_path)) {
-                unlink($full_path);
-            }
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            ob_end_clean();
-            ApiResponse::error('Failed to save attachment: ' . $e->getMessage(), 500);
+            error_log('Error processing attachment: ' . $e->getMessage());
+            return null;
         }
     }
 
@@ -281,13 +314,13 @@ public function handleRequest() {
             $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             foreach ($attachments as &$attachment) {
-                $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path']; 
+                $attachment['url'] = '/uploads/' . $attachment['path']; 
             }
-            ApiResponse::success($attachments);
+            \App\ApiResponse::success($attachments);
             ob_end_flush();
         } catch (PDOException $e) {
             ob_end_clean();
-            ApiResponse::error('Failed to fetch attachments for note_id: ' . $e->getMessage(), 500);
+            \App\ApiResponse::error('Failed to fetch attachments for note_id: ' . $e->getMessage(), 500);
         }
     }
 
@@ -356,10 +389,10 @@ public function handleRequest() {
             $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($attachments as &$attachment) {
-                $attachment['url'] = APP_BASE_URL . 'uploads/' . $attachment['path'];
+                $attachment['url'] = '/uploads/' . $attachment['path'];
             }
             
-            ApiResponse::success([
+            \App\ApiResponse::success([
                 'data' => $attachments,
                 'pagination' => [
                     'total_items' => $totalItems,
@@ -371,7 +404,7 @@ public function handleRequest() {
             ob_end_flush();
         } catch (PDOException $e) {
             ob_end_clean();
-            ApiResponse::error('Failed to fetch all attachments: ' . $e->getMessage(), 500);
+            \App\ApiResponse::error('Failed to fetch all attachments: ' . $e->getMessage(), 500);
         }
     }
 
@@ -400,7 +433,7 @@ private function handleDeleteRequest() {
 
     if (!empty($errors)) {
         ob_end_clean();
-        ApiResponse::error('Invalid input.', 400, $errors);
+        \App\ApiResponse::error('Invalid input.', 400, $errors);
         return;
     }
 
@@ -417,14 +450,14 @@ private function handleDeleteRequest() {
         if (!$attachment) {
             $this->pdo->rollBack();
             ob_end_clean();
-            ApiResponse::error('Attachment not found', 404);
+            \App\ApiResponse::error('Attachment not found', 404);
             return;
         }
 
         $file_path = UPLOADS_DIR . '/' . $attachment['path'];
         if (file_exists($file_path)) {
             if (!unlink($file_path)) {
-                throw new RuntimeException('Failed to delete file from filesystem');
+                throw new \RuntimeException('Failed to delete file from filesystem');
             }
         }
 
@@ -439,7 +472,7 @@ private function handleDeleteRequest() {
 
         $this->pdo->commit();
 
-        ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
+        \App\ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
         ob_end_flush();
 
     } catch (RuntimeException | PDOException $e) {
@@ -447,7 +480,7 @@ private function handleDeleteRequest() {
             $this->pdo->rollBack();
         }
         ob_end_clean();
-        ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
+        \App\ApiResponse::error('Failed to delete attachment: ' . $e->getMessage(), 500);
     }
 }
 
@@ -455,6 +488,15 @@ private function handleDeleteRequest() {
 }
 
 // Initialize and handle the request
-$pdo = get_db_connection();
-$attachmentManager = new AttachmentManager($pdo);
-$attachmentManager->handleRequest();
+// Only run this if the script is likely being called as a web endpoint
+if (isset($_SERVER['REQUEST_METHOD']) && php_sapi_name() !== 'cli') {
+    error_log("attachments.php: Detected web request context, proceeding with request handling.");
+    $pdo = get_db_connection();
+    $attachmentManager = new \App\AttachmentManager($pdo);
+    $attachmentManager->handleRequest();
+} else {
+    error_log("attachments.php: Not in a direct web request context or REQUEST_METHOD not set. Skipping auto-execution of handleRequest.");
+    // This else block is important for CLI or include-only scenarios.
+    // For example, test scripts can now include this file to access the AttachmentManager class
+    // without triggering the request handling logic automatically.
+}

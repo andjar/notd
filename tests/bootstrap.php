@@ -1,65 +1,124 @@
 <?php
-// Override database path for testing
+// Override database path for testing (must be set before config.php is included)
 $GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = getenv('DB_PATH') ?: __DIR__ . '/../db/test_database.sqlite';
 
-// Include config.php which will use the override
+// Always include config.php first (needed for DB_PATH constant)
 require_once __DIR__ . '/../config.php';
 
+// Load composer autoloader if it exists, otherwise manually include required files
+$autoloadPath = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+} else {
+    // Manual includes for testing when autoloader is not available
+    error_log("Loading classes manually for testing...");
+    
+    // Include dependencies first (in correct order to avoid circular dependencies)
+    require_once __DIR__ . '/../api/db_connect.php';
+    require_once __DIR__ . '/../api/response_utils.php';
+    require_once __DIR__ . '/../api/validator_utils.php';
+    
+    // Include only the classes that are actually used by tests
+    require_once __DIR__ . '/../api/data_manager.php';
+    error_log("DataManager file included");
+    
+    require_once __DIR__ . '/../api/property_trigger_service.php';
+    error_log("PropertyTriggerService file included");
+    
+    require_once __DIR__ . '/../api/pattern_processor.php';
+    error_log("PatternProcessor file included");
+    
+    // Verify classes exist
+    error_log("Checking if classes exist:");
+    error_log("DataManager exists: " . (class_exists('App\DataManager') ? 'YES' : 'NO'));
+    error_log("PropertyTriggerService exists: " . (class_exists('App\PropertyTriggerService') ? 'YES' : 'NO'));
+    error_log("PatternProcessor exists: " . (class_exists('App\PatternProcessor') ? 'YES' : 'NO'));
+    
+    error_log("Manual class loading completed");
+}
+
+// Set error reporting to catch any issues
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Initialize test database
+// Ensure the directory exists
+$dbDir = dirname(DB_PATH);
+if (!is_dir($dbDir)) {
+    mkdir($dbDir, 0755, true);
+}
+
 if (file_exists(DB_PATH)) {
     unlink(DB_PATH);
 }
 
-// Create test database structure
-$pdo = new PDO('sqlite:' . DB_PATH);
-$pdo->exec("CREATE TABLE Pages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    content TEXT,
-    alias TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN DEFAULT 1
-)");
+// Create test database structure using the proper schema
+try {
+    $pdo = new PDO('sqlite:' . DB_PATH);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    error_log("Failed to create test database: " . $e->getMessage());
+    throw $e;
+}
 
-$pdo->exec("CREATE TABLE Notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    page_id INTEGER NOT NULL,
-    parent_note_id INTEGER,
-    content TEXT NOT NULL,
-    order_index INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN DEFAULT 1,
-    FOREIGN KEY (page_id) REFERENCES Pages(id),
-    FOREIGN KEY (parent_note_id) REFERENCES Notes(id)
-)");
+// Load and execute the schema
+$schemaPath = __DIR__ . '/../db/schema.sql';
+if (file_exists($schemaPath)) {
+    $schema = file_get_contents($schemaPath);
+    $pdo->exec($schema);
+} else {
+    // Fallback to basic schema if schema.sql doesn't exist
+    $pdo->exec("CREATE TABLE Pages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        content TEXT,
+        alias TEXT,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
 
-$pdo->exec("CREATE TABLE Properties (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    page_id INTEGER,
-    note_id INTEGER,
-    name TEXT NOT NULL,
-    value TEXT NOT NULL,
-    weight INTEGER DEFAULT 2,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN DEFAULT 1,
-    FOREIGN KEY (page_id) REFERENCES Pages(id),
-    FOREIGN KEY (note_id) REFERENCES Notes(id)
-)");
+    $pdo->exec("CREATE TABLE Notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_id INTEGER NOT NULL,
+        parent_note_id INTEGER,
+        content TEXT,
+        internal INTEGER NOT NULL DEFAULT 0,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        collapsed INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (page_id) REFERENCES Pages(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_note_id) REFERENCES Notes(id) ON DELETE CASCADE
+    )");
 
-$pdo->exec("CREATE TABLE Attachments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    note_id INTEGER NOT NULL,
-    file_name TEXT NOT NULL,
-    file_path TEXT NOT NULL,
-    mime_type TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN DEFAULT 1,
-    FOREIGN KEY (note_id) REFERENCES Notes(id)
-)");
+    $pdo->exec("CREATE TABLE Properties (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id INTEGER,
+        page_id INTEGER,
+        name TEXT NOT NULL,
+        value TEXT,
+        weight INTEGER NOT NULL DEFAULT 2,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (note_id) REFERENCES Notes(id) ON DELETE CASCADE,
+        FOREIGN KEY (page_id) REFERENCES Pages(id) ON DELETE CASCADE
+    )");
+
+    $pdo->exec("CREATE TABLE Attachments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id INTEGER,
+        name TEXT NOT NULL,
+        path TEXT NOT NULL UNIQUE,
+        type TEXT,
+        size INTEGER,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (note_id) REFERENCES Notes(id) ON DELETE SET NULL
+    )");
+}
 
 // Seed test data
 $pdo->exec("INSERT INTO Pages (name, content) VALUES ('Home', 'Welcome')");

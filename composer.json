@@ -2,6 +2,7 @@
     "name": "notd/outliner",
     "description": "A small outliner application in PHP+JS+SQLite for offline use",
     "type": "project",
+    "license": "GPL-3.0-or-later",
     "require": {
         "php": ">=7.4"
     },

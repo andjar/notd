@@ -1,5 +1,7 @@
 <?php
 
+namespace App;
+
 class TemplateProcessor {
     private $template_dir;
     private $placeholders = [

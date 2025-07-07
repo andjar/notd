@@ -1,0 +1,68 @@
+/*
+ * =======================================================
+ *  REFINED PAGE HEADER: Hover-to-Reveal Actions
+ * =======================================================
+*/
+
+/* 1. The main container for the entire header area */
+.page-header-container {
+    position: relative; /* Essential for positioning child elements */
+    display: flex;
+    align-items: center; /* Vertically align title and actions */
+    gap: var(--ls-space-2);
+    margin-bottom: 20px; /* The space below the header */
+    border-bottom: 1px solid var(--ls-secondary-border-color);
+    padding-bottom: var(--ls-space-3);
+    min-height: 40px; /* Give it some default height */
+}
+
+/* 2. The always-visible page title */
+#page-title {
+    /* Remove its own margin and border, as the container now handles it */
+    margin: 0;
+    border: none;
+    font-size: var(--ls-page-title-size); /* Keep it large and prominent */
+    font-weight: var(--ls-font-weight-bold);
+    color: var(--ls-primary-text-color);
+}
+
+/* 3. The container for all the actions that will appear on hover */
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--ls-space-3);
+
+    /* --- The Magic --- */
+    opacity: 0; /* Hidden by default */
+    transform: translateX(-8px); /* Start slightly to the left */
+    transition: opacity 150ms ease-in-out, transform 150ms ease-in-out;
+}
+
+/* 4. The reveal on hover */
+.page-header-container:hover .page-header-actions {
+    opacity: 1; /* Fade it in */
+    transform: translateX(0); /* Slide it in from the left */
+}
+
+/* 5. Styling for the individual actions */
+.favorite-toggle {
+    font-size: 1.5em; /* Make the star a bit larger */
+    color: var(--ls-secondary-text-color);
+    cursor: pointer;
+    line-height: 1;
+}
+.favorite-toggle:hover {
+    color: var(--color-yellow-600); /* Or your preferred highlight color */
+}
+
+.page-properties {
+    display: flex;
+    gap: var(--ls-space-2);
+    font-size: var(--ls-font-size-sm);
+    color: var(--ls-secondary-text-color);
+}
+.page-properties > span {
+    background-color: var(--ls-tertiary-background-color);
+    padding: 2px 6px;
+    border-radius: var(--ls-border-radius-low);
+} 

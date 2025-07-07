@@ -1,4 +1,9 @@
 <?php
+
+namespace App;
+
+use PDO;
+
 require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/response_utils.php';
 require_once __DIR__ . '/v1/webhooks.php'; // Include the new WebhooksManager
@@ -13,7 +18,7 @@ class PropertyTriggerService {
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
-        $this->webhooksManager = new WebhooksManager($pdo); // Instantiate WebhooksManager
+        $this->webhooksManager = new \App\WebhooksManager($pdo); // Instantiate WebhooksManager
     }
 
     private function handleInternalPropertyForNote($entityId, $propertyName, $propertyValue) {
@@ -183,6 +188,6 @@ class PropertyTriggerService {
 
 // Initialize and handle the request
 $pdo = get_db_connection();
-$propertyTriggerService = new PropertyTriggerService($pdo);
+$propertyTriggerService = new \App\PropertyTriggerService($pdo);
 // No direct output from this service file. It's a library.
 ?>

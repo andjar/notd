@@ -1,5 +1,9 @@
 <?php
 
+namespace App;
+
+use PDO;
+
 require_once __DIR__ . '/../config.php';
 
 class DataManager {

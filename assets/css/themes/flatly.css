@@ -118,6 +118,9 @@
     --ls-splash-bubble-color-2: rgba(24, 188, 156, 0.25); /* Flatly Turquoise/Success, transparent */
     --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) - 15%), 65%, 0.22);
     --ls-splash-bubble-color-4: rgba(189, 195, 199, 0.25); /* Flatly Silver, transparent */
+
+    --ls-task-keyword-waiting-color: #3498db; /* Peter River */
+    --ls-task-keyword-someday-color: #9b59b6; /* Amethyst */
 }
 
 /* Flatly Theme (Bootswatch) - Dark Mode (derived, as Flatly is light) */
@@ -186,8 +189,8 @@
     --ls-status-success-light-color: hsl(168, 76%, 25%); 
     
     /* Splash Screen - Dark Mode (Example) */
-    --ls-splash-bg-color: var(--ls-gray-1); 
-    --ls-splash-orb-bg-color: rgba(52, 152, 219); 
+    --ls-splash-bg: var(--ls-gray-1); 
+    --ls-splash-orb-bg: rgba(52, 152, 219); 
 
     /* Newly Added Variables - Flatly Dark (Derived) */
     --ls-calendar-today-bg: var(--ls-accent-10);
@@ -237,4 +240,7 @@
     --ls-splash-bubble-color-2: rgba(30, 150, 120, 0.28); /* Darker Turquoise variant */
     --ls-splash-bubble-color-3: hsla(var(--ls-accent-dark-hue), calc(var(--ls-accent-dark-saturation) - 10%), 45%, 0.25);
     --ls-splash-bubble-color-4: rgba(90, 90, 90, 0.25); /* Dark gray */
+
+    --ls-task-keyword-waiting-color: #3498db; /* Peter River (same for dark) */
+    --ls-task-keyword-someday-color: #9b59b6; /* Amethyst (same for dark) */
 } 

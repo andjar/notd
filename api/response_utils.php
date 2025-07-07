@@ -1,5 +1,7 @@
 <?php
 
+namespace App;
+
 if (!function_exists('send_json_response')) {
     function send_json_response($data, $statusCode = 200) {
         http_response_code($statusCode);

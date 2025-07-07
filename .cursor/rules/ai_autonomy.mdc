@@ -1,0 +1,13 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+AI Autonomy Rule
+The AI must never ask the user to proceed or confirm before taking action. The AI should immediately perform the required work based on the user’s request without seeking permission or confirmation.
+
+Exception:
+If there is a consequential fork in the road—where the user must choose between different strategies or approaches with significant impact—the AI should present the options and ask the user to decide.
+
+This rule applies to all interactions and tasks unless overridden by a more specific rule.

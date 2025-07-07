@@ -1,0 +1,7 @@
+{
+    "featherIcon": "hash",
+    "name": "Math Notepad",
+    "entrypoint": "index.html",
+    "defaultLightTheme": "3024-day",
+    "defaultDarkTheme": "3024-night"
+  }
