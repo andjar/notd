@@ -1257,6 +1257,9 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
         <div class="menu-item" data-action="open-excalidraw" data-note-id="${noteId}">
             <i data-feather="pen-tool"></i> Open in Excalidraw
         </div>
+        <div class="menu-item" data-action="open-math-notepad" data-note-id="${noteId}">
+            <i data-feather="hash"></i> Open in Math Notepad
+        </div>
     `;
     menu.style.position = 'fixed';
     menu.style.left = `${event.pageX}px`;
@@ -1347,6 +1350,12 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                 const excalidrawNoteId = target.dataset.noteId;
                 const excalidrawUrl = `/extensions/excalidraw_editor/excalidraw.html?note_id=${excalidrawNoteId}`;
                 window.open(excalidrawUrl, '_blank');
+                if (typeof closeMenu === 'function') closeMenu();
+                return;
+            case 'open-math-notepad':
+                const mathNoteId = target.dataset.noteId;
+                const mathUrl = `/extensions/math_notepad/index.html?note_id=${mathNoteId}`;
+                window.open(mathUrl, '_blank');
                 if (typeof closeMenu === 'function') closeMenu();
                 return;
         }
