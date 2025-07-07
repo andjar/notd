@@ -53,9 +53,9 @@ export function displayNotes(notesData, pageId) {
     renderNotesInContainer(noteTree, notesContainer);
     
     // Initialize drag and drop after rendering
-    setTimeout(() => {
-        initializeDragAndDrop();
-    }, 0);
+    // setTimeout(() => {
+    //     initializeDragAndDrop(); // This is now handled by Alpine x-sort
+    // }, 0);
 }
 
 /**
@@ -134,104 +134,105 @@ export function buildNoteTree(notes, parentId = null) {
         }));
 }
 
-/**
- * Initializes drag and drop functionality for notes using Sortable.js
- */
-export function initializeDragAndDrop() {
-    if (typeof Sortable === 'undefined') return;
+// /**
+//  * Initializes drag and drop functionality for notes using Sortable.js
+//  * This is now handled by Alpine x-sort directives in page.php
+//  */
+// export function initializeDragAndDrop() {
+//     if (typeof Sortable === 'undefined') return;
 
-    const containers = [domRefs.notesContainer, ...document.querySelectorAll('.note-children')];
-    containers.forEach(container => {
-        if (container && !container.classList.contains('ui-sortable')) {
-            Sortable.create(container, {
-                group: 'notes',
-                animation: 150,
-                handle: '.note-bullet',
-                ghostClass: 'note-ghost',
-                onEnd: handleNoteDrop
-            });
-        }
-    });
-}
+//     const containers = [domRefs.notesContainer, ...document.querySelectorAll('.note-children')];
+//     containers.forEach(container => {
+//         if (container && !container.classList.contains('ui-sortable')) {
+//             Sortable.create(container, {
+//                 group: 'notes',
+//                 animation: 150,
+//                 handle: '.note-bullet',
+//                 ghostClass: 'note-ghost',
+//                 onEnd: handleNoteDrop // This is now handleDrop in notesManager Alpine component
+//             });
+//         }
+//     });
+// }
+// window.initializeDragAndDrop = initializeDragAndDrop;
 
-window.initializeDragAndDrop = initializeDragAndDrop;
+// /**
+//  * Handles the logic after a note is dropped via drag-and-drop.
+//  * This functionality is now part of the notesManager Alpine component (handleDrop method).
+//  * @param {Object} evt - The event object from Sortable.js.
+//  */
+// export async function handleNoteDrop(evt) {
+    // const noteId = evt.item.dataset.noteId;
+    // const newParentEl = evt.to.closest('.note-item');
+    // const newParentId = newParentEl ? newParentEl.dataset.noteId : null;
 
-/**
- * Handles the logic after a note is dropped via drag-and-drop.
- * @param {Object} evt - The event object from Sortable.js.
- */
-export async function handleNoteDrop(evt) {
-    const noteId = evt.item.dataset.noteId;
-    const newParentEl = evt.to.closest('.note-item');
-    const newParentId = newParentEl ? newParentEl.dataset.noteId : null;
+    // if (newParentId === noteId || evt.item.contains(evt.to)) {
+    //     evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex]);
+    //     return;
+    // }
 
-    if (newParentId === noteId || evt.item.contains(evt.to)) {
-        evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex]);
-        return;
-    }
+    // const previousEl = evt.item.previousElementSibling;
+    // const previousSiblingId = previousEl?.classList.contains('note-item') ? previousEl.dataset.noteId : null;
 
-    const previousEl = evt.item.previousElementSibling;
-    const previousSiblingId = previousEl?.classList.contains('note-item') ? previousEl.dataset.noteId : null;
+    // // Find the next sibling after the dropped note
+    // const nextEl = evt.item.nextElementSibling;
+    // const nextSiblingId = nextEl?.classList.contains('note-item') ? nextEl.dataset.noteId : null;
 
-    // Find the next sibling after the dropped note
-    const nextEl = evt.item.nextElementSibling;
-    const nextSiblingId = nextEl?.classList.contains('note-item') ? nextEl.dataset.noteId : null;
+    // // Debug: Log drag context
+    // console.log('[handleNoteDrop] previousSiblingId:', previousSiblingId, 'nextSiblingId:', nextSiblingId, 'newParentId:', newParentId);
 
-    // Debug: Log drag context
-    console.log('[handleNoteDrop] previousSiblingId:', previousSiblingId, 'nextSiblingId:', nextSiblingId, 'newParentId:', newParentId);
+    // const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
+    //     window.notesForCurrentPage,
+    //     newParentId,
+    //     previousSiblingId,
+    //     nextSiblingId
+    // );
 
-    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
-        window.notesForCurrentPage,
-        newParentId,
-        previousSiblingId,
-        nextSiblingId
-    );
-
-    // Debug: Log result of calculateOrderIndex
-    console.log('[handleNoteDrop] calculateOrderIndex result:', { targetOrderIndex, siblingUpdates });
+    // // Debug: Log result of calculateOrderIndex
+    // console.log('[handleNoteDrop] calculateOrderIndex result:', { targetOrderIndex, siblingUpdates });
     
-    // Create a list of all operations needed for the batch update.
-    const operations = [
-        { type: 'update', payload: { id: noteId, parent_note_id: newParentId, order_index: targetOrderIndex } },
-        ...siblingUpdates.map(upd => ({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }))
-    ];
+    // // Create a list of all operations needed for the batch update.
+    // const operations = [
+    //     { type: 'update', payload: { id: noteId, parent_note_id: newParentId, order_index: targetOrderIndex } },
+    //     ...siblingUpdates.map(upd => ({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }))
+    // ];
     
-    // Optimistically update local state before calling API
-    const noteToMove = window.notesForCurrentPage.find(n => n.id == noteId);
-    if(noteToMove) {
-        noteToMove.parent_note_id = newParentId;
-        noteToMove.order_index = targetOrderIndex;
-    }
-    siblingUpdates.forEach(upd => {
-        const sib = window.notesForCurrentPage.find(n => n.id == upd.id);
-        if(sib) sib.order_index = upd.newOrderIndex;
-    });
+    // // Optimistically update local state before calling API
+    // const noteToMove = window.notesForCurrentPage.find(n => n.id == noteId);
+    // if(noteToMove) {
+    //     noteToMove.parent_note_id = newParentId;
+    //     noteToMove.order_index = targetOrderIndex;
+    // }
+    // siblingUpdates.forEach(upd => {
+    //     const sib = window.notesForCurrentPage.find(n => n.id == upd.id);
+    //     if(sib) sib.order_index = upd.newOrderIndex;
+    // });
 
-    // Debug: Log the operations array to verify payload
-    console.log('[handleNoteDrop] Sending operations to backend:', operations);
+    // // Debug: Log the operations array to verify payload
+    // console.log('[handleNoteDrop] Sending operations to backend:', operations);
 
-    try {
-        await window.notesAPI.batchUpdateNotes(operations);
-        // Debug: Log before clearing cache
-        console.log('[handleNoteDrop] Clearing cache for', window.currentPageName);
-        if (window.pageCache && typeof window.pageCache.removePage === 'function') {
-            window.pageCache.removePage(window.currentPageName);
-        }
-        // Debug: Log after clearing cache
-        console.log('[handleNoteDrop] Cache cleared, reloading page');
-        // On success, we can just do a light DOM update if needed, but a reload is safest.
-        await window.loadPage(window.currentPageName, false, false); // Reload without adding to history
-    } catch (error) {
-        console.error("Failed to save note drop changes:", error);
-        alert("Could not save new note positions. Reverting.");
-        if (window.pageCache && typeof window.pageCache.removePage === 'function') {
-            window.pageCache.removePage(window.currentPageName);
-        }
-        await window.loadPage(window.currentPageName, false, false);
-    }
-}
+    // try {
+    //     await window.notesAPI.batchUpdateNotes(operations);
+    //     // Debug: Log before clearing cache
+    //     console.log('[handleNoteDrop] Clearing cache for', window.currentPageName);
+    //     if (window.pageCache && typeof window.pageCache.removePage === 'function') {
+    //         window.pageCache.removePage(window.currentPageName);
+    //     }
+    //     // Debug: Log after clearing cache
+    //     console.log('[handleNoteDrop] Cache cleared, reloading page');
+    //     // On success, we can just do a light DOM update if needed, but a reload is safest.
+    //     await window.loadPage(window.currentPageName, false, false); // Reload without adding to history
+    // } catch (error) {
+    //     console.error("Failed to save note drop changes:", error);
+    //     alert("Could not save new note positions. Reverting.");
+    //     if (window.pageCache && typeof window.pageCache.removePage === 'function') {
+    //         window.pageCache.removePage(window.currentPageName);
+    //     }
+    //     await window.loadPage(window.currentPageName, false, false);
+    // }
+// }
 
 
 // These functions are not used by other modules and can be kept internal to this file or moved if needed.
-function updateNoteElement() { /* placeholder if needed */ }
-function moveNoteElement() { /* placeholder if needed */ }
+// function updateNoteElement() { /* placeholder if needed */ }
+// function moveNoteElement() { /* placeholder if needed */ }

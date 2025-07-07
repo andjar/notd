@@ -16,7 +16,12 @@ require_once '../../config.php';
     <link rel="stylesheet" href="../../assets/css/style.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="../../assets/css/components/icons.css">
-    <!-- Remove old Alpine v2 script and add Alpine v3 -->
+
+    <!-- Libraries -->
+    <script src="../../assets/libs/Sortable.min.js"></script>
+    <!-- Alpine Sort Plugin -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/sort@latest/dist/cdn.min.js"></script>
+    <!-- Alpine Core -->
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
 <body>
@@ -39,9 +44,16 @@ require_once '../../config.php';
             <template x-for="column in columns" :key="column.id">
                     <div class="kanban-column" :data-status-id="column.id" :data-status-matcher="column.statusMatcher">
                         <h3 class="kanban-column-title" x-text="column.title"></h3>
-                        <div class="kanban-column-cards" :id="'column-' + column.id">
+                        <div class="kanban-column-cards"
+                             :id="'column-' + column.id"
+                             x-sort="handleKanbanCardDrop"
+                             x-sort:group="'kanbanCardsGroup'"
+                             :data-column-id="column.id">
                             <template x-for="task in column.tasks" :key="task.id">
-                                <div class="kanban-card" :data-note-id="task.id" :data-current-status="getNoteStatus(task)" draggable="true">
+                                <div class="kanban-card"
+                                     :data-note-id="task.id"
+                                     :data-current-status="getNoteStatus(task)"
+                                     x-sort:item="task.id">
                                     <span x-text="getCardDisplayContent(task.content, column.statusMatcher)"></span>
                                     <!-- Add more task details here if needed -->
                                 </div>
@@ -55,11 +67,8 @@ require_once '../../config.php';
         </main>
     </div>
 
-    <!-- SCRIPTS -->
-    <!-- Libraries -->
+    <!-- Other SCRIPTS -->
     <script src="../../assets/libs/feather.min.js"></script>
-    <script src="../../assets/libs/Sortable.min.js"></script>
-    
     <!-- Application-specific JavaScript -->
     <script type="module" src="../../assets/js/utils.js"></script>
     
@@ -197,7 +206,129 @@ require_once '../../config.php';
                         this.isLoading = false;
                         this.$nextTick(() => {
                            if (window.feather) window.feather.replace();
-                           this.initializeSortable();
+                           // Alpine Sort plugin handles initialization via directives
+                        });
+                    }
+                },
+
+                handleKanbanCardDrop(itemKey, newPosition, targetEl, sourceEl) {
+                    const noteId = parseInt(itemKey);
+                    const targetColumnId = targetEl.dataset.columnId;
+
+                    let taskToMove;
+                    let sourceColumn;
+                    let originalTaskIndex = -1;
+
+                    // Find task and source column, and remove task from source
+                    for (let col of this.columns) {
+                        const taskIndex = col.tasks.findIndex(t => t.id === noteId);
+                        if (taskIndex !== -1) {
+                            taskToMove = col.tasks[taskIndex];
+                            sourceColumn = col;
+                            originalTaskIndex = taskIndex;
+                            col.tasks.splice(taskIndex, 1);
+                            break;
+                        }
+                    }
+
+                    if (!taskToMove || !sourceColumn) {
+                        console.error("Failed to find task or source column in Alpine data for Sortable move. Task ID:", noteId);
+                        this.errorMessage = "Error processing card move. Data inconsistency. Please reload.";
+                        // Potentially force a reload here if state is too broken
+                        return;
+                    }
+
+                    const originalTask = { ...taskToMove }; // Shallow copy for potential rollback
+
+                    const targetColumn = this.columns.find(c => c.id === targetColumnId);
+
+                    if (!targetColumn) {
+                        console.error("Failed to find target column in Alpine data. Target Column ID:", targetColumnId);
+                        // Rollback: put task back in source column
+                        sourceColumn.tasks.splice(originalTaskIndex, 0, originalTask);
+                        this.errorMessage = "Error processing card move. Target column not found. Please reload.";
+                        return;
+                    }
+
+                    // Optimistic UI update: Add task to target column
+                    targetColumn.tasks.splice(newPosition, 0, taskToMove);
+
+                    // Ensure reactivity by reassigning arrays if deeply nested changes aren't picked up
+                    // This might be overly aggressive but ensures Alpine sees the change.
+                    sourceColumn.tasks = [...sourceColumn.tasks];
+                    targetColumn.tasks = [...targetColumn.tasks];
+
+
+                    const oldStatus = sourceColumn.statusMatcher.toUpperCase();
+                    const newStatus = targetColumn.statusMatcher.toUpperCase();
+
+                    // If status hasn't changed (moved within the same column, or to another column with same status mapping)
+                    // and we are not persisting intra-column order, then no backend update is needed.
+                    if (oldStatus === newStatus) {
+                        console.log(`Task ${noteId} moved but status remains ${newStatus}. No backend update needed unless order is persisted.`);
+                        // If you were to persist order: get all task IDs in targetColumn.tasks and send to backend.
+                        return;
+                    }
+
+                    console.log(`Task ${noteId} moved from status ${oldStatus} to ${newStatus}. Updating backend.`);
+
+                    let newContent = this.syncContentWithStatus(taskToMove.content, newStatus);
+                    taskToMove.content = newContent; // Update content in the moving task object
+
+                    try {
+                        if (!apiLoaded || !notesAPI) {
+                            throw new Error('Notes API not loaded yet');
+                        }
+
+                        const batchOperation = {
+                            type: 'update',
+                            payload: { id: noteId, content: newContent }
+                        };
+                        notesAPI.batchUpdateNotes([batchOperation]).then(response => {
+                            const results = response.results || response.data?.results;
+                            const updateResult = results?.find(r => r.type === 'update' && r.note && r.note.id === noteId);
+
+                            if (updateResult && updateResult.status === 'success') {
+                                console.log(`Note ${noteId} updated to status ${newStatus} on backend.`);
+                                // Update the task in Alpine data with the potentially modified data from backend
+                                Object.assign(taskToMove, updateResult.note);
+                                taskToMove.status = newStatus; // Explicitly set status if API response doesn't include it under 'status' field
+
+                                // This ensures that if getNoteStatus relies on properties, they are fresh.
+                                // And re-distribute just to be absolutely sure if the backend note object has changes
+                                // that might affect its column placement according to getNoteStatus.
+                                // However, this might be too much if the backend only confirms the content change.
+                                // For now, let's assume the optimistic update is mostly correct.
+                                this.columns.forEach(col => col.tasks = [...col.tasks]);
+
+
+                            } else {
+                                throw new Error('Update failed or no matching result in API response.');
+                            }
+                        }).catch(error => {
+                             console.error(`Failed to update note ${noteId} to status ${newStatus}:`, error);
+                            this.errorMessage = `Failed to update task: ${error.message}. Reverting move.`;
+
+                            // Revert optimistic update
+                            targetColumn.tasks.splice(targetColumn.tasks.findIndex(t => t.id === noteId), 1);
+                            sourceColumn.tasks.splice(originalTaskIndex, 0, originalTask);
+
+                            // Re-assign for reactivity
+                            sourceColumn.tasks = [...sourceColumn.tasks];
+                            targetColumn.tasks = [...targetColumn.tasks];
+                        });
+
+                    } catch (error) { // Catch sync errors from the try block (e.g. API not loaded)
+                        console.error(`Immediate error before API call for note ${noteId} to status ${newStatus}:`, error);
+                        this.errorMessage = `Failed to update task: ${error.message}. Reverting move.`;
+                        // Revert
+                        targetColumn.tasks.splice(targetColumn.tasks.findIndex(t => t.id === noteId), 1);
+                        sourceColumn.tasks.splice(originalTaskIndex, 0, originalTask);
+                        sourceColumn.tasks = [...sourceColumn.tasks];
+                        targetColumn.tasks = [...targetColumn.tasks];
+                    } finally {
+                        this.$nextTick(() => {
+                           if (window.feather) window.feather.replace();
                         });
                     }
                 },
@@ -353,212 +484,7 @@ require_once '../../config.php';
                     targetColumn.tasks.push(task);
                 },
 
-                initializeSortable() {
-                    console.log('Initializing Sortable for columns:', this.columns.length);
-                    
-                    // Destroy existing Sortable instances to prevent duplicates
-                    this.columns.forEach(column => {
-                        const columnEl = document.getElementById('column-' + column.id);
-                        if (columnEl && columnEl.sortable) {
-                            columnEl.sortable.destroy();
-                            console.log('Destroyed existing Sortable for column:', column.id);
-                        }
-                    });
-
-                    // Initialize Sortable for each column
-                    this.columns.forEach(column => {
-                        const columnEl = document.getElementById('column-' + column.id);
-                        if (columnEl) {
-                            console.log('Initializing Sortable for column:', column.id, 'with', column.tasks.length, 'tasks');
-                            this.initSortable(columnEl, column.statusMatcher);
-                        } else {
-                            console.error('Column element not found:', 'column-' + column.id);
-                        }
-                    });
-                },
-
-                initSortable(el, columnStatusMatcher) {
-                    console.log('Creating Sortable instance for element:', el.id, 'with status:', columnStatusMatcher);
-                    const sortableInstance = new Sortable(el, {
-                        group: 'kanban-cards',
-                        animation: 150,
-                        ghostClass: 'kanban-ghost',
-                        chosenClass: 'kanban-chosen',
-                        dragClass: 'kanban-drag',
-                        onEnd: async (evt) => {
-                            const itemEl = evt.item;
-                            const noteId = parseInt(itemEl.dataset.noteId);
-                            const oldStatus = itemEl.dataset.currentStatus.toUpperCase(); // Status the card HAD
-
-                            const targetColumnEl = itemEl.closest('.kanban-column');
-                            const newStatus = targetColumnEl.dataset.statusMatcher.toUpperCase(); // Status of the column it was DROPPED INTO
-
-                            // Find the task in Alpine's data model
-                            let taskToMove;
-                            let sourceColumn;
-                            let targetColumn = this.columns.find(c => c.statusMatcher === newStatus);
-
-                            for (let col of this.columns) {
-                                taskToMove = col.tasks.find(t => t.id === noteId);
-                                if (taskToMove) {
-                                    sourceColumn = col;
-                                    break;
-                                }
-                            }
-
-                            if (!taskToMove || !sourceColumn || !targetColumn) {
-                                console.error("Failed to find task or columns in Alpine data for Sortable move.");
-                                // Revert DOM change by Sortable as a basic measure
-                                evt.from.appendChild(itemEl);
-                                this.errorMessage = "Error processing card move. Data inconsistency.";
-                                return;
-                            }
-
-                            // If dropped in the same column at the same position, do nothing.
-                            // SortableJS handles visual reordering within same list automatically if not cancelling.
-                            // We only care about inter-column moves or status changes.
-                            if (sourceColumn.statusMatcher === newStatus && evt.oldIndex === evt.newIndex) {
-                                 console.log("Task moved within the same column, no status change needed.");
-                                 // Update task order in Alpine data if necessary (complex, requires knowing exact old/new index in data)
-                                 // For now, assume API doesn't care about intra-column order, or it's handled by other means.
-                                return;
-                            }
-
-
-                            // Store the original position for potential rollback
-                            const originalTaskIndex = sourceColumn.tasks.findIndex(t => t.id === noteId);
-                            const originalTask = { ...taskToMove };
-
-                            // Optimistic UI update: Move task in Alpine data model immediately
-                            console.log(`Optimistically moving task ${noteId} from ${sourceColumn.statusMatcher} to ${targetColumn.statusMatcher}`);
-                            
-                            // Remove the task from all columns to prevent duplication
-                            this.columns.forEach(col => {
-                                col.tasks = col.tasks.filter(t => t.id !== noteId);
-                            });
-
-                            // Add to target column (as a new object to ensure Alpine reactivity)
-                            const taskCopy = { ...taskToMove };
-                            targetColumn.tasks.push(taskCopy);
-                            taskToMove = taskCopy;
-
-                            // Final de-duplication pass: ensure no column contains the same task ID more than once
-                            this.columns.forEach(col => {
-                                const seen = new Set();
-                                col.tasks = col.tasks.filter(t => {
-                                    if (seen.has(t.id)) {
-                                        console.warn(`[DEDUP] Duplicate task ${t.id} found in column ${col.statusMatcher}, removing.`);
-                                        return false;
-                                    }
-                                    seen.add(t.id);
-                                    return true;
-                                });
-                            });
-
-                            // After deduplication, always reassign the array to force Alpine reactivity
-                            this.columns.forEach(col => {
-                                col.tasks = [...col.tasks];
-                            });
-                            // Log all column contents for debugging
-                            this.columns.forEach(col => {
-                                const ids = col.tasks.map(t => t.id);
-                                console.log(`[GLOBAL DEDUP] After move/update, column ${col.statusMatcher} has tasks: [${ids.join(', ')}]`);
-                            });
-
-                            // Update task on backend - ensure content and properties are in sync
-                            let newContent = this.syncContentWithStatus(taskToMove.content, newStatus);
-
-                            console.log('Original content:', taskToMove.content);
-                            console.log('New content:', newContent);
-                            console.log('New status:', newStatus);
-
-                            try {
-                                if (!apiLoaded || !notesAPI) {
-                                    throw new Error('Notes API not loaded yet');
-                                }
-                                
-                                const batchOperation = {
-                                    type: 'update',
-                                    payload: { id: noteId, content: newContent }
-                                };
-                                console.log('[BATCH] Sending batchOperation:', batchOperation);
-                                const response = await notesAPI.batchUpdateNotes([batchOperation]);
-                                console.log('[BATCH] Batch update response:', response);
-                                const results = response.results || response.data?.results;
-                                console.log('[BATCH] Results from response:', results);
-                                const updateResult = results?.find(r => r.type === 'update' && r.note && r.note.id === noteId);
-                                console.log('[BATCH] Update result:', updateResult);
-
-                                if (updateResult && updateResult.status === 'success') {
-                                    // Remove all instances of this note from all columns (after backend response)
-                                    this.columns.forEach(col => {
-                                        col.tasks = col.tasks.filter(t => t.id !== noteId);
-                                    });
-                                    // Add the backend-confirmed note object to the target column
-                                    targetColumn.tasks.push({ ...updateResult.note });
-                                    // GLOBAL DEDUPLICATION: ensure only one instance of each task id exists in all columns
-                                    const globalSeen = new Set();
-                                    this.columns.forEach(col => {
-                                        col.tasks = col.tasks.filter(t => {
-                                            if (globalSeen.has(t.id)) return false;
-                                            globalSeen.add(t.id);
-                                            return true;
-                                        });
-                                    });
-                                    // After deduplication, always reassign the array to force Alpine reactivity
-                                    this.columns.forEach(col => {
-                                        col.tasks = [...col.tasks];
-                                    });
-                                    // Log all column contents for debugging
-                                    this.columns.forEach(col => {
-                                        const ids = col.tasks.map(t => t.id);
-                                        console.log(`[GLOBAL DEDUP] After move/update, column ${col.statusMatcher} has tasks: [${ids.join(', ')}]`);
-                                    });
-                                    itemEl.dataset.currentStatus = newStatus;
-                                    console.log(`[BATCH] Note ${noteId} updated to status ${newStatus}.`);
-                                    console.log(`[BATCH] Task content after update:`, updateResult.note.content);
-                                    return;
-                                } else {
-                                    throw new Error('Update failed or no matching result in API response.');
-                                }
-                            } catch (error) {
-                                console.error(`Failed to update note ${noteId} to status ${newStatus}:`, error);
-                                this.errorMessage = `Failed to update task: ${error.message}. Reverting move.`;
-
-                                // Revert the task to its original state
-                                Object.assign(taskToMove, originalTask);
-                                itemEl.dataset.currentStatus = oldStatus;
-                                
-                                // Revert the optimistic update in Alpine data model
-                                console.log(`Reverting optimistic move for task ${noteId} back to ${sourceColumn.statusMatcher}`);
-                                
-                                // Find and remove the task from wherever it currently is
-                                for (let col of this.columns) {
-                                    const taskIndex = col.tasks.findIndex(t => t.id === noteId);
-                                    if (taskIndex !== -1) {
-                                        col.tasks.splice(taskIndex, 1);
-                                        break;
-                                    }
-                                }
-                                
-                                // Restore the original task to the source column
-                                sourceColumn.tasks.splice(originalTaskIndex, 0, originalTask);
-                                
-                                // Revert the DOM change that Sortable.js made
-                                evt.from.appendChild(itemEl);
-                            } finally {
-                                // Ensure feather icons are updated if content changes affect them
-                                this.$nextTick(() => {
-                                   if (window.feather) window.feather.replace();
-                                });
-                            }
-                        }
-                    });
-                    
-                    // Store the sortable instance on the element for cleanup
-                    el.sortable = sortableInstance;
-                    console.log('Sortable instance created and stored for:', el.id);
-                }
+                // initializeSortable() and initSortable() methods are removed as Alpine Sort handles this.
             };
         }
         

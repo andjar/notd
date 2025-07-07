@@ -282,6 +282,9 @@ function renderBacklinks($backlinks) {
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
     <script src="assets/libs/sjcl.js"></script>
+    <!-- Alpine Sort Plugin -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/sort@latest/dist/cdn.min.js"></script>
+    <!-- Alpine Core -->
     <script type="module" src="assets/js/app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     
@@ -410,11 +413,15 @@ function renderBacklinks($backlinks) {
                 <!-- Page content will be rendered here by JavaScript -->
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
-            <div id="notes-container" class="outliner" x-data="{ notes: [] }" x-init="initializeDragAndDrop()">
+            <div id="notes-container" class="outliner"
+                 x-data="notesManager()"
+                 x-sort="handleDrop"
+                 x-sort:group="'notesGroup'">
                 <template x-for="note in notes" :key="note.id">
                     <div class="note-item"
-                        x-data="noteComponent(note, 0)"
+                        x-data="noteComponent(note, 0, $el)"
                         :data-note-id="note.id"
+                        x-sort:item="note.id"
                         :style="`--nesting-level: ${nestingLevel}`"
                         :class="{ 'has-children': note.children && note.children.length > 0, 'collapsed': note.collapsed, 'encrypted-note': note.is_encrypted, 'decrypted-note': note.is_encrypted && note.content && !note.content.startsWith('{') }">
 
@@ -424,7 +431,7 @@ function renderBacklinks($backlinks) {
                                     <i data-feather="chevron-right"></i>
                                 </span>
                                 <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
-                                <span class="note-bullet" :data-note-id="note.id"></span>
+                                <span class="note-bullet" :data-note-id="note.id" x-sort:handle></span>
                             </div>
                             <div class="note-content-wrapper">
                                 <div class="note-content rendered-mode"
@@ -442,11 +449,13 @@ function renderBacklinks($backlinks) {
                             </div>
                         </div>
 
-                        <div class="note-children" :class="{ 'collapsed': note.collapsed }">
+                        <div class="note-children" :class="{ 'collapsed': note.collapsed }"
+                             x-sort="handleDrop" x-sort:group="'notesGroup'" :data-parent-id="note.id">
                             <template x-for="childNote in note.children" :key="childNote.id">
                                 <div class="note-item"
-                                    x-data="noteComponent(childNote, $parent.nestingLevel + 1)"
+                                    x-data="noteComponent(childNote, $parent.nestingLevel + 1, $el)"
                                     :data-note-id="childNote.id"
+                                    x-sort:item="childNote.id"
                                     :style="`--nesting-level: ${$parent.nestingLevel + 1}`"
                                     :class="{ 'has-children': childNote.children && childNote.children.length > 0, 'collapsed': childNote.collapsed, 'encrypted-note': childNote.is_encrypted, 'decrypted-note': childNote.is_encrypted && childNote.content && !childNote.content.startsWith('{') }">
 
@@ -456,7 +465,7 @@ function renderBacklinks($backlinks) {
                                                 <i data-feather="chevron-right"></i>
                                             </span>
                                             <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
-                                            <span class="note-bullet" :data-note-id="childNote.id"></span>
+                                            <span class="note-bullet" :data-note-id="childNote.id" x-sort:handle></span>
                                         </div>
                                         <div class="note-content-wrapper">
                                             <div class="note-content rendered-mode"
@@ -474,12 +483,14 @@ function renderBacklinks($backlinks) {
                                         </div>
                                     </div>
 
-                                    <div class="note-children" :class="{ 'collapsed': childNote.collapsed }">
+                                    <div class="note-children" :class="{ 'collapsed': childNote.collapsed }"
+                                         x-sort="handleDrop" x-sort:group="'notesGroup'" :data-parent-id="childNote.id">
                                         <!-- Recursive rendering of grand-children -->
                                         <template x-for="grandChildNote in childNote.children" :key="grandChildNote.id">
                                             <div class="note-item"
-                                                x-data="noteComponent(grandChildNote, $parent.$parent.nestingLevel + 2)"
+                                                x-data="noteComponent(grandChildNote, $parent.$parent.nestingLevel + 2, $el)"
                                                 :data-note-id="grandChildNote.id"
+                                                x-sort:item="grandChildNote.id"
                                                 :style="`--nesting-level: ${$parent.$parent.nestingLevel + 2}`"
                                                 :class="{ 'has-children': grandChildNote.children && grandChildNote.children.length > 0, 'collapsed': grandChildNote.collapsed, 'encrypted-note': grandChildNote.is_encrypted, 'decrypted-note': grandChildNote.is_encrypted && grandChildNote.content && !grandChildNote.content.startsWith('{') }">
 
@@ -489,7 +500,7 @@ function renderBacklinks($backlinks) {
                                                             <i data-feather="chevron-right"></i>
                                                         </span>
                                                         <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
-                                                        <span class="note-bullet" :data-note-id="grandChildNote.id"></span>
+                                                        <span class="note-bullet" :data-note-id="grandChildNote.id" x-sort:handle></span>
                                                     </div>
                                                     <div class="note-content-wrapper">
                                                         <div class="note-content rendered-mode"
