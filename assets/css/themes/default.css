@@ -190,8 +190,8 @@
     --ls-button-danger-shadow-color: hsla(0, 80%, 59%, 0.2);
     --ls-status-success-color: #10b981;
     --ls-status-success-light-color: hsl(168, 76%, 25%);
-    --ls-splash-bg-color: var(--ls-gray-1);
-    --ls-splash-orb-bg-color: var(--ls-accent-10);
+    --ls-splash-bg: var(--ls-gray-1);
+    --ls-splash-orb-bg: hsl(168, 76%, 25%);
     --ls-calendar-today-bg: var(--ls-accent-3);
     --ls-calendar-today-text: var(--ls-gray-1);
     --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.4);

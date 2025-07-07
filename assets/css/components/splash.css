@@ -82,7 +82,7 @@
   position: relative;
   width: 220px; /* Adjust size as needed */
   height: 220px; /* Adjust size as needed */
-  background-color: var(--ls-splash-orb-bg);
+  background-color: var(--ls-gray-9);
   border-radius: 50%;
   display: flex;
   flex-direction: column;

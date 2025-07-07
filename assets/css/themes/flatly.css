@@ -189,8 +189,8 @@
     --ls-status-success-light-color: hsl(168, 76%, 25%); 
     
     /* Splash Screen - Dark Mode (Example) */
-    --ls-splash-bg-color: var(--ls-gray-1); 
-    --ls-splash-orb-bg-color: rgba(52, 152, 219); 
+    --ls-splash-bg: var(--ls-gray-1); 
+    --ls-splash-orb-bg: rgba(52, 152, 219); 
 
     /* Newly Added Variables - Flatly Dark (Derived) */
     --ls-calendar-today-bg: var(--ls-accent-10);

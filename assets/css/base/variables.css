@@ -92,7 +92,6 @@
   --ls-task-done-badge-text: var(--ls-primary-background-color, #ffffff);
   --ls-task-cancelled-badge-bg: var(--ls-gray-8);
   --ls-task-cancelled-badge-text: var(--ls-primary-background-color, #ffffff);
-  --ls-splash-orb-bg: var(--ls-gray-8);
   --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
   --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
   --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
