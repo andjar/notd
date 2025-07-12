@@ -8,6 +8,7 @@ import { domRefs } from './dom-refs.js';
 import { renderNote } from './note-renderer.js';
 import { calculateOrderIndex } from '../app/order-index-service.js';
 import { setNotesForCurrentPage } from '../app/state.js';
+import { pageCache } from '../app/page-cache.js';
 
 window.renderNote = renderNote;
 
@@ -177,9 +178,6 @@ export async function handleNoteDrop(evt) {
     const nextEl = evt.item.nextElementSibling;
     const nextSiblingId = nextEl?.classList.contains('note-item') ? nextEl.dataset.noteId : null;
 
-    // Debug: Log drag context
-    console.log('[handleNoteDrop] previousSiblingId:', previousSiblingId, 'nextSiblingId:', nextSiblingId, 'newParentId:', newParentId);
-
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
         window.notesForCurrentPage,
         newParentId,
@@ -187,13 +185,13 @@ export async function handleNoteDrop(evt) {
         nextSiblingId
     );
 
-    // Debug: Log result of calculateOrderIndex
-    console.log('[handleNoteDrop] calculateOrderIndex result:', { targetOrderIndex, siblingUpdates });
+    // CRITICAL FIX: Filter out the note being moved from sibling updates to prevent conflicts
+    const filteredSiblingUpdates = siblingUpdates.filter(upd => String(upd.id) !== String(noteId));
     
     // Create a list of all operations needed for the batch update.
     const operations = [
         { type: 'update', payload: { id: noteId, parent_note_id: newParentId, order_index: targetOrderIndex } },
-        ...siblingUpdates.map(upd => ({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }))
+        ...filteredSiblingUpdates.map(upd => ({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }))
     ];
     
     // Optimistically update local state before calling API
@@ -202,31 +200,25 @@ export async function handleNoteDrop(evt) {
         noteToMove.parent_note_id = newParentId;
         noteToMove.order_index = targetOrderIndex;
     }
-    siblingUpdates.forEach(upd => {
+    
+    filteredSiblingUpdates.forEach(upd => {
         const sib = window.notesForCurrentPage.find(n => n.id == upd.id);
-        if(sib) sib.order_index = upd.newOrderIndex;
+        if(sib) {
+            sib.order_index = upd.newOrderIndex;
+        }
     });
-
-    // Debug: Log the operations array to verify payload
-    console.log('[handleNoteDrop] Sending operations to backend:', operations);
 
     try {
         await window.notesAPI.batchUpdateNotes(operations);
-        // Debug: Log before clearing cache
-        console.log('[handleNoteDrop] Clearing cache for', window.currentPageName);
-        if (window.pageCache && typeof window.pageCache.removePage === 'function') {
-            window.pageCache.removePage(window.currentPageName);
-        }
-        // Debug: Log after clearing cache
-        console.log('[handleNoteDrop] Cache cleared, reloading page');
-        // On success, we can just do a light DOM update if needed, but a reload is safest.
-        await window.loadPage(window.currentPageName, false, false); // Reload without adding to history
+        
+        // Clear cache and reload page to get fresh data
+        pageCache.removePage(window.currentPageName);
+        await window.loadPage(window.currentPageName, false, false);
     } catch (error) {
         console.error("Failed to save note drop changes:", error);
         alert("Could not save new note positions. Reverting.");
-        if (window.pageCache && typeof window.pageCache.removePage === 'function') {
-            window.pageCache.removePage(window.currentPageName);
-        }
+        
+        pageCache.removePage(window.currentPageName);
         await window.loadPage(window.currentPageName, false, false);
     }
 }

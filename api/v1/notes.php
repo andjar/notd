@@ -199,11 +199,6 @@ $meta = $metaStmt->fetch(PDO::FETCH_ASSOC);
 $oldIndex = (int)$meta['order_index'];
 $pageId = (int)$meta['page_id'];
 
-// Log values before processing reordering
-error_log("Requested reordering for note ID {$noteId}");
-error_log("Payload order_index = {$payload['order_index']}");
-error_log("Fetched current order_index = {$oldIndex}, page_id = {$pageId}");
-
             if (isset($payload['order_index'])) { $setClauses[] = "order_index = ?"; $executeParams[] = (int)$payload['order_index']; }
             if (isset($payload['collapsed'])) { $setClauses[] = "collapsed = ?"; $executeParams[] = (int)$payload['collapsed']; }
             if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = (int)$payload['page_id']; }
