@@ -123,16 +123,9 @@ function renderNote(note, nestingLevel = 0) {
         noteItemEl.classList.add('encrypted-note');
     }
 
-    // Controls section (drag handle and bullet)
+    // Controls section (bullet)
     const controlsEl = document.createElement('div');
     controlsEl.className = 'note-controls';
-
-    // Drag handle
-    const dragHandleEl = document.createElement('span');
-    dragHandleEl.className = 'note-drag-handle';
-    dragHandleEl.innerHTML = '<i data-feather="menu"></i>';
-    dragHandleEl.style.display = 'none'; // Hide the grip handle
-    controlsEl.appendChild(dragHandleEl);
 
     // Bullet (common to all notes)
     const bulletEl = document.createElement('span');
@@ -149,17 +142,13 @@ function renderNote(note, nestingLevel = 0) {
         arrowEl.dataset.collapsed = note.collapsed ? 'true' : 'false';
 
         const bulletElFromControls = controlsEl.querySelector('.note-bullet');
-        const dragHandle = controlsEl.querySelector('.note-drag-handle');
-        if (dragHandle) {
-            controlsEl.insertBefore(arrowEl, dragHandle);
-        } else if (bulletElFromControls) {
+        if (bulletElFromControls) {
             controlsEl.insertBefore(arrowEl, bulletElFromControls);
         } else {
             controlsEl.appendChild(arrowEl);
         }
     }
     
-    controlsEl.appendChild(dragHandleEl);
     controlsEl.appendChild(bulletEl);
 
     const contentWrapperEl = document.createElement('div');

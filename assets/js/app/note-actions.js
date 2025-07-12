@@ -338,13 +338,6 @@ function createOptimisticNoteElement(noteData, parentId) {
     const controlsEl = document.createElement('div');
     controlsEl.className = 'note-controls';
 
-    // Drag handle (hidden)
-    const dragHandleEl = document.createElement('span');
-    dragHandleEl.className = 'note-drag-handle';
-    dragHandleEl.innerHTML = '<i data-feather="menu"></i>';
-    dragHandleEl.style.display = 'none';
-    controlsEl.appendChild(dragHandleEl);
-
     // Bullet
     const bulletEl = document.createElement('span');
     bulletEl.className = 'note-bullet';

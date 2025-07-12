@@ -423,7 +423,6 @@ function renderBacklinks($backlinks) {
                                 <span class="note-collapse-arrow" x-show="note.children && note.children.length > 0" @click="toggleCollapse()" :data-collapsed="note.collapsed ? 'true' : 'false'">
                                     <i data-feather="chevron-right"></i>
                                 </span>
-                                <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
                                 <span class="note-bullet" :data-note-id="note.id"></span>
                             </div>
                             <div class="note-content-wrapper">
@@ -455,7 +454,6 @@ function renderBacklinks($backlinks) {
                                             <span class="note-collapse-arrow" x-show="childNote.children && childNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="childNote.collapsed ? 'true' : 'false'">
                                                 <i data-feather="chevron-right"></i>
                                             </span>
-                                            <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
                                             <span class="note-bullet" :data-note-id="childNote.id"></span>
                                         </div>
                                         <div class="note-content-wrapper">
@@ -488,7 +486,6 @@ function renderBacklinks($backlinks) {
                                                         <span class="note-collapse-arrow" x-show="grandChildNote.children && grandChildNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="grandChildNote.collapsed ? 'true' : 'false'">
                                                             <i data-feather="chevron-right"></i>
                                                         </span>
-                                                        <span class="note-drag-handle" style="display: none;"><i data-feather="menu"></i></span>
                                                         <span class="note-bullet" :data-note-id="grandChildNote.id"></span>
                                                     </div>
                                                     <div class="note-content-wrapper">
