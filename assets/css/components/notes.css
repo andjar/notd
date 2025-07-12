@@ -176,14 +176,6 @@
   position: relative;
 }
 
-.note-children .note-item::before {
-  display: none;
-}
-
-.note-children > .note-item:last-child::after {
-  display: none;
-}
-
 .note-children.collapsed {
   display: none;
 }
