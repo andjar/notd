@@ -326,6 +326,16 @@ function switchToEditMode(contentEl) {
     contentEl.innerHTML = '';
     contentEl.textContent = textToEdit;
     contentEl.focus();
+    
+    // Position cursor at the end of the text
+    if (textToEdit.length > 0) {
+        const range = document.createRange();
+        const selection = window.getSelection();
+        range.selectNodeContents(contentEl);
+        range.collapse(false); // collapse to end
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
 
     // Helper function for inserting link and updating state
     const insertSelectedPageLink = (selectedPageName) => {
