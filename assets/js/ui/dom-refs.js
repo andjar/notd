@@ -56,4 +56,10 @@ export const domRefs = {
     encryptionPasswordError: document.getElementById('encryption-password-error'),
     confirmEncryptionBtn: document.getElementById('confirm-encryption-btn'),
     cancelEncryptionBtn: document.getElementById('cancel-encryption-btn'),
+
+
+    mobileToolbar: document.getElementById('mobile-bottom-toolbar'),
+    mobileToggleLeftSidebarBtn: document.getElementById('mobile-toggle-left-sidebar-btn'),
+    mobileAddRootNoteBtn: document.getElementById('mobile-add-root-note-btn'),
+    mobileToggleRightSidebarBtn: document.getElementById('mobile-toggle-right-sidebar-btn'),
 };

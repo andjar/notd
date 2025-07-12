@@ -676,5 +676,22 @@ function renderBacklinks($backlinks) {
             </div>
         </div>
     </div>
+
+
+    <!-- Mobile Bottom Toolbar -->
+    <div class="mobile-bottom-toolbar" id="mobile-bottom-toolbar">
+        <button class="mobile-bottom-toolbar__btn" id="mobile-toggle-left-sidebar-btn" title="Open Menu">
+            <i data-feather="menu"></i>
+            <span class="mobile-bottom-toolbar__btn-label">Menu</span>
+        </button>
+        <button class="mobile-bottom-toolbar__btn" id="mobile-add-root-note-btn" title="Add Note">
+            <i data-feather="plus"></i>
+            <span class="mobile-bottom-toolbar__btn-label">Add</span>
+        </button>
+        <button class="mobile-bottom-toolbar__btn" id="mobile-toggle-right-sidebar-btn" title="Open Info">
+            <i data-feather="info"></i>
+            <span class="mobile-bottom-toolbar__btn-label">Info</span>
+        </button>
+    </div>
 </body>
 </html>

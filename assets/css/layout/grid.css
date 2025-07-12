@@ -128,8 +128,8 @@
   }
 }
 
-@media (max-width: 360px) {
-  .sidebar {
-    width: 160px;
+@media (max-width: 600px) {
+  .main-content {
+    padding: var(--ls-space-6);
   }
 } 

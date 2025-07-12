@@ -8,6 +8,9 @@ import noteComponent from './app/note-component.js';
 import { splashScreen } from './app/splash-screen.js';
 import sidebarComponent from './app/sidebar-component.js';
 import calendarComponent from './app/calendar-component.js';
+import { sidebarState } from './app/sidebar.js';
+
+
 
 // Wait for Alpine to be available
 document.addEventListener('alpine:init', () => {
@@ -274,6 +277,50 @@ if (notesContainer) {
         }
     });
 }
+
+// Mobile toolbar event handlers
+const { 
+  mobileToolbar, 
+  mobileToggleLeftSidebarBtn, 
+  mobileAddRootNoteBtn, 
+  mobileToggleRightSidebarBtn, 
+  leftSidebar, 
+  rightSidebar 
+} = ui.domRefs;
+
+if (mobileToolbar) {
+  // Helper: Only one sidebar open at a time on mobile
+  function closeOtherSidebar(side) {
+    if (window.innerWidth > 600) return;
+    if (side === 'left') {
+      // Open left, close right
+      if (rightSidebar && !rightSidebar.classList.contains('collapsed')) {
+        sidebarState.right.toggle();
+      }
+    } else if (side === 'right') {
+      // Open right, close left
+      if (leftSidebar && !leftSidebar.classList.contains('collapsed')) {
+        sidebarState.left.toggle();
+      }
+    }
+  }
+
+  mobileToggleLeftSidebarBtn?.addEventListener('click', () => {
+    if (window.innerWidth > 600) return;
+    sidebarState.left.toggle();
+    closeOtherSidebar('left');
+  });
+  mobileToggleRightSidebarBtn?.addEventListener('click', () => {
+    if (window.innerWidth > 600) return;
+    sidebarState.right.toggle();
+    closeOtherSidebar('right');
+  });
+  mobileAddRootNoteBtn?.addEventListener('click', () => {
+    if (window.innerWidth > 600) return;
+    handleAddRootNote();
+  });
+}
+
 
 // --- Application Startup ---
 document.addEventListener('DOMContentLoaded', async () => {

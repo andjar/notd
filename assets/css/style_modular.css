@@ -28,6 +28,9 @@
 @import url('components/calendar.css');
 @import url('components/icons.css');
 @import url('components/attachments.css');
+@import url('components/mobile-toolbar.css');
+
+
 
 /* Additional component files can be added here as they are created */
 /* @import url('components/search.css'); */
