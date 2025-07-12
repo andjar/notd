@@ -3,9 +3,43 @@
 
 echo "=== QUICK FUNCTIONALITY TEST ===\n";
 
+// Print working directory and include path
+echo "CWD: " . getcwd() . "\n";
+echo "Include path: " . get_include_path() . "\n";
+
+// Print contents of vendor/composer/autoload_psr4.php if it exists
+$autoload_psr4 = __DIR__ . '/../vendor/composer/autoload_psr4.php';
+if (file_exists($autoload_psr4)) {
+    echo "autoload_psr4.php exists. Contents:\n";
+    echo file_get_contents($autoload_psr4) . "\n";
+} else {
+    echo "autoload_psr4.php does NOT exist!\n";
+}
+
+// Check for api/data_manager.php with various case permutations
+$paths = [
+    __DIR__ . '/../api/data_manager.php',
+    __DIR__ . '/../api/DataManager.php',
+    __DIR__ . '/../API/data_manager.php',
+    __DIR__ . '/../API/DataManager.php',
+];
+foreach ($paths as $p) {
+    echo "$p: " . (file_exists($p) ? 'YES' : 'NO') . "\n";
+}
+
+// Check class_exists before loading bootstrap
+$autoloadPath = __DIR__ . '/../vendor/autoload.php';
+echo "class_exists('App\\DataManager') before autoload: " . (class_exists('App\\DataManager') ? 'YES' : 'NO') . "\n";
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+    echo "Composer autoloader loaded\n";
+    echo "class_exists('App\\DataManager') after autoload: " . (class_exists('App\\DataManager') ? 'YES' : 'NO') . "\n";
+}
+
 // Load bootstrap
 echo "1. Loading bootstrap...\n";
 require_once __DIR__ . '/bootstrap.php';
+echo "class_exists('App\\DataManager') after bootstrap: " . (class_exists('App\\DataManager') ? 'YES' : 'NO') . "\n";
 
 // Basic assertions helper
 function assert_equal($expected, $actual, $message) {
