@@ -30,14 +30,44 @@ jobs:
 
     - name: Install dependencies
       run: |
-        composer install --prefer-dist --no-progress
+        composer install --prefer-dist --no-progress --no-dev
         composer require --dev phpunit/phpunit
+
+    - name: Debug composer autoloader
+      run: |
+        echo "Checking if composer autoloader was generated..."
+        ls -la vendor/
+        if [ -f "vendor/autoload.php" ]; then
+          echo "✅ Composer autoloader found"
+        else
+          echo "❌ Composer autoloader NOT found"
+          echo "Generating autoloader manually..."
+          composer dump-autoload --optimize
+        fi
+
+    - name: Debug file structure
+      run: |
+        echo "Checking API files structure..."
+        ls -la api/
+        echo "Checking if classes have proper namespaces..."
+        head -5 api/data_manager.php
+        head -5 api/pattern_processor.php
+        head -5 api/property_trigger_service.php
 
     - name: Create test directories
       run: |
         mkdir -p db
         mkdir -p uploads/test
         mkdir -p coverage
+
+    - name: Run quick functionality test
+      run: |
+        cd tests
+        php quick_test.php
+      env:
+        DB_PATH: ./db/test_database.sqlite
+        UPLOADS_DIR: ./uploads/test
+        APP_ENV: testing
 
     - name: Run ${{ matrix.test-suite }} tests
       run: |
@@ -47,6 +77,17 @@ jobs:
         DB_PATH: ./db/test_database.sqlite
         UPLOADS_DIR: ./uploads/test
         APP_ENV: testing
+
+    - name: Debug test failures
+      if: failure()
+      run: |
+        echo "Tests failed. Running debug scripts..."
+        echo "=== Syntax Validation ==="
+        cd tests
+        php validate_syntax.php
+        echo ""
+        echo "=== Bootstrap Debug ==="
+        php debug_test.php
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
