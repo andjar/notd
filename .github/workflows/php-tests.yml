@@ -51,9 +51,9 @@ jobs:
         echo "Checking API files structure..."
         ls -la api/
         echo "Checking if classes have proper namespaces..."
-        head -5 api/data_manager.php
-        head -5 api/pattern_processor.php
-        head -5 api/property_trigger_service.php
+        head -5 api/DataManager.php
+        head -5 api/PatternProcessor.php
+        head -5 api/PropertyTriggerService.php
 
     - name: Create test directories
       run: |
