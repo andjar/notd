@@ -76,7 +76,7 @@ class PropertyTest extends TestCase
     public function testPropertyExtractionAndSaving()
     {
         // Test the complete flow: content extraction -> property saving -> retrieval
-        require_once __DIR__ . '/../api/pattern_processor.php';
+        require_once __DIR__ . '/../api/PatternProcessor.php';
         
         // Create a test page
         $this->pdo->exec("INSERT INTO Pages (name, content) VALUES ('Extraction Test', 'Test content')");
@@ -132,7 +132,7 @@ class PropertyTest extends TestCase
         // Simulate content update with new properties (replace behavior)
         $newContent = "{status::new} {priority::high} {status::active}";
         
-        require_once __DIR__ . '/../api/pattern_processor.php';
+        require_once __DIR__ . '/../api/PatternProcessor.php';
         $patternProcessor = new PatternProcessor($this->pdo);
         $result = $patternProcessor->processContent($newContent, 'page', $pageId, ['pdo' => $this->pdo]);
         
