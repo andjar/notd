@@ -63,7 +63,7 @@ export function parseContent(text) {
             return `<a href="page.php?page=${encodeURIComponent(url)}" class="page-link">${title}</a>`;
         }
         // Otherwise, treat as external link
-        return `<a href="${url}" target="_blank">${title}</a>`;
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>`;
     });
     // Newlines to <br>
     html = html.replace(/\n/g, '<br>');
