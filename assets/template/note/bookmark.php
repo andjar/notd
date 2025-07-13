@@ -4,8 +4,12 @@
 # Bookmark: {{bookmark_title}}
 
 **URL:** {{url}}
+**Description:** {{description}}
 **Tags:** {{tags}}
 **Added:** {{date}}
 
 ## Notes
-{{notes}} 
+{{notes}}
+
+---
+*Created: {{created_datetime}}*

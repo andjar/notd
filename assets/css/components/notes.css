@@ -1,0 +1,356 @@
+/* === Outliner/Notes System === */
+.outliner {
+  margin-top: var(--ls-space-2);
+  padding: var(--ls-space-1) 0;
+}
+
+#notes-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.note-item {
+  position: relative;
+  --controls-top-offset: calc(
+    var(--ls-font-size-base) - (var(--control-icon-size) / 2)
+  );
+  margin: 0;
+  padding: 0;
+}
+
+.note-header-row {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  padding-left: calc(var(--nesting-level, 0) * var(--ls-indentation-unit));
+  min-height: calc(var(--ls-font-size-base) * 1.3);
+}
+
+.note-controls {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.note-content-wrapper {
+  flex: 1;
+  min-width: 0;
+  padding-left: var(--content-left-padding);
+  padding-top: 0px;
+  padding-bottom: 0px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bullet Controls */
+.note-bullet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: var(--bullet-left-indent);
+  top: var(--controls-top-offset);
+  width: var(--control-icon-size);
+  height: var(--control-icon-size);
+  cursor: pointer;
+  z-index: 2;
+  border-radius: 50%;
+  transition: background-color var(--ls-transition-fast);
+}
+
+.note-bullet::before {
+  content: "";
+  width: var(--bullet-visual-size);
+  height: var(--bullet-visual-size);
+  background-color: var(--ls-block-bullet-color);
+  border-radius: 50%;
+  display: block;
+  transition: all var(--ls-transition-fast);
+}
+
+.note-bullet:hover {
+  background-color: var(--ls-tertiary-background-color);
+}
+
+.note-bullet:hover::before {
+  background-color: var(--ls-block-bullet-active-color);
+  transform: scale(1.2);
+}
+
+.note-item.collapsed > .note-header-row .note-controls .note-bullet {
+  background-color: var(--ls-tertiary-background-color);
+}
+
+.note-item.collapsed > .note-header-row .note-controls .note-bullet::before {
+  background-color: var(--ls-accent-10);
+  box-shadow: 0 0 3px var(--ls-accent-9);
+}
+
+.note-item.collapsed > .note-header-row .note-controls .note-bullet:hover {
+  background-color: var(--ls-tertiary-background-color);
+}
+
+/* Collapse Arrow */
+.note-collapse-arrow {
+  display: none;
+  position: absolute;
+  left: var(--arrow-left-indent);
+  top: var(--controls-top-offset);
+  width: var(--control-icon-size);
+  height: var(--control-icon-size);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  color: var(--ls-secondary-text-color);
+  transition: all var(--ls-transition-fast);
+  z-index: 3;
+}
+
+.note-item.has-children > .note-header-row .note-controls .note-collapse-arrow {
+  display: inline-flex;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+.note-item.has-children:hover
+  > .note-header-row
+  .note-controls
+  .note-collapse-arrow,
+.note-collapse-arrow:hover {
+  display: inline-flex;
+  opacity: 0.7;
+  transform: scale(1.05);
+}
+
+.note-collapse-arrow > svg.feather {
+  width: var(--arrow-visual-size);
+  height: var(--arrow-visual-size);
+  transition: transform var(--ls-transition-fast);
+}
+
+.note-item.collapsed
+  > .note-header-row
+  .note-controls
+  .note-collapse-arrow
+  > svg.feather {
+  transform: rotate(0deg);
+}
+
+.note-item:not(.collapsed)
+  > .note-header-row
+  .note-controls
+  .note-collapse-arrow
+  > svg.feather {
+  transform: rotate(90deg);
+}
+
+/* Thread Lines */
+.note-item.has-children::after {
+  content: "";
+  position: absolute;
+  left: calc(
+    var(--nesting-level, 0) * var(--ls-indentation-unit) +
+      var(--bullet-left-indent) + (var(--control-icon-size) / 2) -
+      (var(--thread-line-width) / 2)
+  );
+  top: calc(var(--controls-top-offset) + var(--control-icon-size) + 2px);
+  bottom: 0;
+  width: var(--thread-line-width);
+  background-color: var(--ls-secondary-border-color);
+  opacity: 0.4;
+  z-index: 1;
+  transition: background-color var(--ls-transition-fast);
+}
+
+.note-item.has-children:hover::after {
+  background-color: var(--ls-accent-9);
+}
+
+/* Note Children */
+.note-children {
+  margin-left: 0;
+  padding-left: 0;
+  position: relative;
+}
+
+.note-children.collapsed {
+  display: none;
+}
+
+.note-item.collapsed > .note-children {
+  display: none;
+}
+
+/* Note Content */
+.note-content {
+  transition: all 0.2s ease;
+  border-radius: var(--ls-border-radius-low);
+  min-height: 18px;
+  padding: 2px 8px;
+  line-height: 1.6;
+}
+
+.note-content[contenteditable="true"]:empty:before {
+  content: attr(data-placeholder);
+  color: var(--ls-tertiary-text-color);
+  font-style: italic;
+  pointer-events: none;
+  display: inline-block;
+  left: var(--ls-space-2);
+}
+
+.note-content:hover {
+  /* background-color: var(--ls-tertiary-background-color); Removed for text-field feel */
+}
+
+.note-content:focus {
+  outline: none;
+  background-color: var(--ls-primary-background-color);
+  box-shadow: 0 0 0 1px var(--ls-accent-10);
+}
+
+/* Note Content Modes */
+.note-content.rendered-mode {
+  cursor: text; /* Always text cursor */
+  background-color: transparent;
+  padding: 4px 8px;
+  border-radius: var(--ls-border-radius-low);
+}
+
+.note-content.rendered-mode:hover {
+  cursor: text;
+  /* background-color: var(--ls-tertiary-background-color); Removed for text-field feel */
+}
+
+.note-content.edit-mode {
+  border: none !important;
+  background-color: transparent !important;
+  padding: 4px 8px;
+  border-radius: var(--ls-border-radius-low);
+  outline: none;
+}
+
+.note-content.edit-mode:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--ls-accent-8);
+}
+
+.note-content:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ls-tertiary-text-color);
+  font-style: italic;
+  pointer-events: none;
+  display: inline-block;
+}
+
+/* Note Focus States */
+.note-item.focused > .note-content-wrapper > .note-content {
+  background-color: var(--ls-block-highlight-color);
+  box-shadow: inset 0 0 0 1px var(--ls-accent-9), 0 0 0 1px var(--ls-accent-9);
+}
+
+.note-item.focused .note-bullet:not(.has-children-bullet)::before {
+  background-color: var(--ls-block-bullet-active-color);
+  transform: scale(1.3);
+}
+
+.note-item.focused .note-bullet.has-children-bullet {
+  background-color: var(--ls-accent-10);
+  color: var(--ls-focused-parent-bullet-text-color);
+}
+
+.note-item.note-hidden {
+  display: none;
+}
+
+.note-item.note-focused {
+  background-color: var(--ls-secondary-background-color);
+  border-radius: var(--ls-border-radius-medium);
+  margin: var(--ls-space-1) 0;
+  padding: var(--ls-space-1);
+  transition: all 0.2s ease;
+}
+
+.note-item.note-focused > .note-content-wrapper > .note-content {
+  background-color: transparent;
+  border: 1px solid var(--ls-accent-10);
+  box-shadow: 0 0 0 2px rgba(var(--ls-accent-10-rgb), 0.1);
+}
+
+/* === Improved bullet alignment for tasks and headers === */
+/* Center bullet for tasks (checkbox + pill) */
+.note-item:has(.task-container) {
+  --controls-top-offset: calc(var(--ls-font-size-base) * 1.4 - (var(--control-icon-size) / 2));
+}
+/* Center bullet for notes starting with headers */
+.note-item:has(.note-content > h1) {
+  --controls-top-offset: calc(var(--ls-font-size-2xl) * 1.1 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h2) {
+  --controls-top-offset: calc(var(--ls-font-size-xl) * 1.1 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h3) {
+  --controls-top-offset: calc(var(--ls-font-size-lg) * 1.1 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h4) {
+  --controls-top-offset: calc(var(--ls-font-size-lg) * 1.1 - (var(--control-icon-size) / 2));
+}
+/* You can add more for h4-h6 if needed, but these are the most visually impactful */
+
+/* Add Root Note Button */
+#add-root-note-btn {
+  position: static;
+  margin-top: var(--ls-space-4);
+  margin-left: var(--bullet-left-indent);
+  background: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-secondary-border-color);
+  color: var(--ls-secondary-text-color);
+  font-size: var(--ls-font-size-sm);
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--ls-transition-fast);
+  z-index: auto;
+  opacity: 0.6;
+}
+
+#add-root-note-btn:hover {
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  border-color: var(--ls-border-color);
+  transform: scale(1.05);
+  opacity: 1;
+}
+
+.note-content h1 {
+  font-size: 2.2rem;
+  font-weight: var(--ls-font-weight-bold);
+  margin-bottom: 48px;
+  line-height: 1.15;
+}
+
+.note-content {
+  font-family: var(--ls-font-family);
+  font-size: var(--ls-font-size-base);
+  line-height: var(--ls-line-height-base);
+  color: var(--ls-primary-text-color);
+}
+
+.note-metadata {
+  font-size: 0.85em;
+  color: var(--ls-secondary-text-color);
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin-top: 8px;
+  margin-right: 16px;
+  font-weight: var(--ls-font-weight-normal);
+} 

@@ -1,0 +1,58 @@
+name: Quick Tests
+
+on:
+  push:
+    branches: [ main, feat/impr ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quick-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: sqlite3, pdo_sqlite, mbstring, json
+
+    - name: Install dependencies
+      run: |
+        composer install --prefer-dist --no-progress
+        composer require --dev phpunit/phpunit
+
+    - name: Create test directories
+      run: |
+        mkdir -p db
+        mkdir -p uploads/test
+
+    - name: Run unit tests only
+      run: |
+        cd tests
+        php run_tests.php unit
+      env:
+        DB_PATH: ./db/test_database.sqlite
+        UPLOADS_DIR: ./uploads/test
+        APP_ENV: testing
+
+    - name: Run integration tests
+      run: |
+        cd tests
+        php run_tests.php integration
+      env:
+        DB_PATH: ./db/test_database.sqlite
+        UPLOADS_DIR: ./uploads/test
+        APP_ENV: testing
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: quick-test-results
+        path: |
+          tests/test-results.xml
+          tests/testdox.txt 

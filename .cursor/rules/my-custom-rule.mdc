@@ -4,8 +4,7 @@ globs:
 alwaysApply: true
 ---
 * This project is for a small outliner in php+js+sqlite. It should run offline using phpdesktop, and we therefore have to avoid using PUT/DELETE.
-* Don't change anything in my code without my authorization.
-* Aim for performance in the code.
+* Aim for optimal performance in the code.
 
 # Always Follow the Flow of Sequential
 - **INTERNAL MONOLOGUE**: All internal reasoning, planning, and self-correction MUST be enclosed within `<think></think>` tags.

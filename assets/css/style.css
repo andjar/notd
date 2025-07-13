@@ -1,4 +1,6 @@
 /* === LogSeq-Inspired Theming System === */
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
+
 :root {
   /* NON-COLOR Variables like Spacing, Typography, Layout, Shadows etc. will remain here */
   /* Color-related variables are now sourced from the active theme CSS */
@@ -13,18 +15,18 @@
   --ls-space-8: calc(var(--ls-space-unit) * 8); /* 32px */
 
   /* Typography */
-  --ls-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+  --ls-font-family: "Ubuntu", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, sans-serif;
-  --ls-header-font-family: "Ubuntu", "Inter", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, sans-serif;
-  --ls-font-size-xs: 0.75rem;
-  --ls-font-size-sm: 0.875rem;
-  --ls-font-size-base: 1rem;
-  --ls-font-size-lg: 1.125rem;
-  --ls-font-size-xl: 1.25rem;
-  --ls-font-size-2xl: 1.5rem;
-  --ls-font-size-3xl: 1.875rem;
-  --ls-page-title-size: 36px; /* From LogSeq */
+  --ls-header-font-family: "Ubuntu", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif; /* Use Inter for headers too - perfect consistency */
+  --ls-font-size-xs: 0.8rem; /* Increased from 0.7rem */
+  --ls-font-size-sm: 0.9rem; /* Increased from 0.8rem */
+  --ls-font-size-base: 1rem; /* Increased from 0.9rem */
+  --ls-font-size-lg: 1.1rem; /* Increased from 1rem */
+  --ls-font-size-xl: 1.2rem; /* Increased from 1.1rem */
+  --ls-font-size-2xl: 1.4rem; /* Increased from 1.3rem */
+  --ls-font-size-3xl: 1.7rem; /* Increased from 1.6rem */
+  --ls-page-title-size: 30px; /* Increased from 28px */
 
   /* Font Weights */
   --ls-font-weight-normal: 400;
@@ -33,11 +35,12 @@
   --ls-font-weight-bold: 700;
 
   /* Layout */
-  --ls-left-sidebar-width: 280px;
+  --ls-left-sidebar-width: 300px; /* Increased for better symmetry */
+  --ls-right-sidebar-width: 300px; /* Match left sidebar width for symmetry */
   --ls-header-height: 3rem;
   --ls-main-content-max-width: 810px;
-  --ls-border-radius-low: 4px;
-  --ls-border-radius-medium: 8px;
+  --ls-border-radius-low: 2px;
+  --ls-border-radius-medium: 4px;
 
   /* Transitions */
   --ls-transition-fast: 150ms ease;
@@ -76,7 +79,7 @@
   --control-vertical-offset: calc(
     (var(--ls-font-size-base) * 1.5 - var(--control-icon-size)) / 2
   ); /* Top padding for controls */
-  --ls-indentation-unit: var(--ls-space-6); /* Main indent per level */
+  --ls-indentation-unit: 32px; /* Increased from 24px for clearer hierarchy */
 
   /* Control positioning - cleaned up and more precise */
   --bullet-left-indent: 1.5em; /* Bullet position */
@@ -103,8 +106,8 @@
   --ls-tag-text-hover-opacity: 1;
 
   /* Calendar specific variables */
-  --ls-calendar-today-bg: var(--ls-accent-10);
-  --ls-calendar-today-text: var(--ls-primary-background-color, #ffffff);
+  --ls-calendar-today-bg: var(--ls-accent-3);
+  --ls-calendar-today-text: var(--ls-primary-background-color, black);
   --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3);
 
   /* Button specific variables */
@@ -178,7 +181,7 @@
 body {
   font-family: var(--ls-font-family);
   font-size: var(--ls-font-size-base);
-  line-height: 1.5;
+  line-height: 1.5; /* Increased from 1.4 for better readability */
   color: var(--ls-primary-text-color);
   background-color: var(--ls-primary-background-color);
 }
@@ -187,7 +190,7 @@ body {
 .app-container {
   display: grid;
   grid-template-columns: var(--ls-left-sidebar-width) 1fr var(
-      --ls-left-sidebar-width
+      --ls-right-sidebar-width
     );
   grid-template-areas: "left-sidebar main-content right-sidebar";
   min-height: 100vh;
@@ -205,7 +208,10 @@ body {
   z-index: var(--ls-z-index-sidebar);
   transition: transform var(--ls-transition-fast);
   background: var(--ls-secondary-background-color);
-  border-right: 1px solid var(--ls-secondary-border-color);
+}
+
+.right-sidebar {
+  width: var(--ls-right-sidebar-width);
 }
 
 .left-sidebar {
@@ -214,48 +220,49 @@ body {
 
 .right-sidebar {
   right: 0;
-  border-right: none;
-  border-left: 1px solid var(--ls-secondary-border-color);
 }
 
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--ls-space-3);
+  padding: var(--ls-space-3); /* Increased padding */
   display: flex;
   flex-direction: column;
-  gap: var(--ls-space-4);
+  gap: var(--ls-space-3); /* Increased gap */
 }
 
 /* Sidebar Sections */
 .sidebar-section {
-  margin-bottom: var(--ls-space-4);
+  margin-bottom: var(--ls-space-1); /* Much tighter margin */
 }
 
 /* Common styles for all sidebar section headers */
 .sidebar-section h4 {
-  font-size: var(--ls-font-size-sm);
+  font-size: var(--ls-font-size-xs);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-secondary-text-color);
-  margin: 0 0 var(--ls-space-2) 0;
-  padding-bottom: var(--ls-space-1);
-  border-bottom: 1px solid var(--ls-secondary-border-color);
+  margin: 0 0 var(--ls-space-1) 0; 
+  padding-bottom: var(--ls-space-1); /* Added some padding for spacing */
+  /* border-bottom: 1px solid var(--ls-secondary-border-color); Removed for cleaner look */
   display: block;
+  letter-spacing: 0.05em; 
+  text-transform: uppercase;
+  opacity: 0.6; /* More muted */
 }
 
 /* Sidebar Lists (Recent Pages and Favorites) */
 .sidebar-list-section {
-  margin-top: var(--ls-space-4);
-  padding: 0 var(--ls-space-2);
+  margin-top: var(--ls-space-1);
+  padding: 0 var(--ls-space-1);
 }
 
 .sidebar-list-section h3 {
   font-size: var(--ls-font-size-sm);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-secondary-text-color);
-  margin-bottom: var(--ls-space-2);
-  padding-bottom: var(--ls-space-1);
-  border-bottom: 1px solid var(--ls-secondary-border-color);
+  margin-bottom: var(--ls-space-1);
+  padding-bottom: var(--ls-space-1); /* Keep padding for spacing */
+  /* border-bottom: 1px solid var(--ls-secondary-border-color); Removed for cleaner look */
 }
 
 .sidebar-list {
@@ -265,29 +272,32 @@ body {
 }
 
 .sidebar-list li {
-  margin-bottom: var(--ls-space-1);
+  margin-bottom: 2px; /* Much tighter spacing */
 }
 
 .sidebar-list-link {
   display: flex;
   align-items: center;
-  gap: var(--ls-space-2);
-  padding: var(--ls-space-1) var(--ls-space-2);
+  gap: var(--ls-space-1);
+  padding: 4px 6px; /* Much tighter padding */
   border-radius: var(--ls-border-radius-low);
-  color: var(--ls-primary-text-color);
+  color: var(--ls-secondary-text-color); /* Muted color */
   text-decoration: none;
   transition: all var(--ls-transition-fast);
+  opacity: 0.7; /* More muted */
 }
 
 .sidebar-list-link:hover {
-  background-color: var(--ls-secondary-background-color);
+  background-color: var(--ls-tertiary-background-color);
   color: var(--ls-primary-text-color);
+  opacity: 1; /* Full opacity on hover */
 }
 
 .sidebar-list-link.active {
-  background-color: var(--ls-tertiary-background-color);
-  color: var(--ls-primary-text-color);
-  font-weight: var(--ls-font-weight-medium);
+  background-color: var(--ls-tertiary-background-color); /* Much more subtle */
+  color: var(--ls-secondary-text-color); /* Muted text */
+  font-weight: var(--ls-font-weight-medium); /* Less bold */
+  box-shadow: inset 2px 0 0 0 var(--ls-secondary-border-color); /* Very subtle bar */
 }
 
 .sidebar-list-icon {
@@ -306,8 +316,7 @@ body {
 .no-items-message {
   color: var(--ls-tertiary-text-color);
   font-size: var(--ls-font-size-sm);
-  padding: var(--ls-space-2);
-  text-align: center;
+  padding: var(--ls-space-1);
 }
 
 /* ===== MOBILE RESPONSIVE SIDEBARS ===== */
@@ -358,8 +367,8 @@ body {
 
 /* Child Pages Container (in main content) */
 #child-pages-container {
-  margin-top: var(--ls-space-6);
-  padding: var(--ls-space-4);
+  margin-top: var(--ls-space-1);
+  padding: var(--ls-space-1);
   background-color: var(--ls-secondary-background-color);
   border-radius: var(--ls-border-radius-medium);
   border: 1px solid var(--ls-secondary-border-color);
@@ -369,8 +378,8 @@ body {
   font-size: var(--ls-font-size-base);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-primary-text-color);
-  margin: 0 0 var(--ls-space-3) 0;
-  padding-bottom: var(--ls-space-2);
+  margin: 0 0 var(--ls-space-1) 0;
+  padding-bottom: var(--ls-space-1);
   border-bottom: 1px solid var(--ls-secondary-border-color);
 }
 
@@ -380,12 +389,12 @@ body {
   margin: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--ls-space-2);
+  gap: var(--ls-space-1);
 }
 
 .child-page-link {
   display: block;
-  padding: var(--ls-space-2);
+  padding: var(--ls-space-1);
   color: var(--ls-primary-text-color);
   text-decoration: none;
   border-radius: var(--ls-border-radius-low);
@@ -401,11 +410,52 @@ body {
   box-shadow: var(--ls-shadow-sm);
 }
 
+/* Child Pages in Sidebar - Consistent with recent pages */
+.child-pages-sidebar .child-page-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.child-pages-sidebar .child-page-link {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+  padding: var(--ls-space-1) var(--ls-space-2);
+  border-radius: var(--ls-border-radius-low);
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  transition: all var(--ls-transition-fast);
+  background-color: transparent;
+  border: none;
+  opacity: 0.7;
+}
+
+.child-pages-sidebar .child-page-link:hover {
+  background-color: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  opacity: 1;
+  transform: none;
+  box-shadow: none;
+}
+
+.child-page-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--ls-secondary-text-color);
+}
+
+.child-page-name {
+  font-size: var(--ls-font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Sidebar Footer */
 .sidebar-footer {
-  padding: var(--ls-space-3);
+  padding: var(--ls-space-1);
   border-top: 1px solid var(--ls-secondary-border-color);
-  background-color: var(--ls-primary-background-color);
 }
 
 .sidebar-footer .action-button {
@@ -413,7 +463,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--ls-space-2);
+  gap: var(--ls-space-1);
 }
 
 .sidebar-footer .action-button i {
@@ -421,43 +471,8 @@ body {
   height: 16px;
 }
 
-/* Sidebar Toggle Buttons */
-.sidebar-toggle {
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 40px;
-  background-color: var(--ls-primary-background-color);
-  border: 1px solid var(--ls-secondary-border-color);
-  border-radius: var(--ls-border-radius-medium);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--ls-z-index-sidebar-toggle);
-  transition: all var(--ls-transition-fast);
-}
-
-.sidebar-toggle:hover {
-  background-color: var(--ls-secondary-background-color);
-}
-
-.sidebar-toggle.left {
-  left: var(--ls-left-sidebar-width);
-}
-
-.sidebar-toggle.right {
-  right: var(--ls-left-sidebar-width);
-}
-
-.left-sidebar.collapsed ~ .sidebar-toggle.left {
-  left: 0;
-}
-
-.right-sidebar.collapsed ~ .sidebar-toggle.right {
-  right: 0;
-}
+/* Older .sidebar-toggle styles removed. Modern .sidebar-toggle-btn styles are used. */
+/* The actual sidebar collapse transforms are below. */
 
 .left-sidebar.collapsed {
   transform: translateX(-100%);
@@ -467,19 +482,11 @@ body {
 }
 
 .sidebar-content {
-  padding: var(--ls-space-3); /* Reduced padding */
+  padding: var(--ls-space-1); /* Reduced padding */
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding: var(--ls-space-3); /* Reduced padding */
-  border-top: 1px solid var(--ls-secondary-border-color); /* Softened border */
-  background: var(--ls-secondary-background-color);
-  flex-shrink: 0;
 }
 
 /* Main Content */
@@ -487,29 +494,42 @@ body {
   grid-area: main-content;
   max-width: var(--ls-main-content-max-width);
   margin: 0 auto;
-  padding: var(--ls-space-4); /* Reduced padding */
+  padding: var(--ls-space-6) var(--ls-space-4); /* Increased padding: Top/Bottom 24px, Left/Right 16px */
   width: 100%;
   transition: margin 0.3s ease;
   min-height: 100vh;
 }
 
+/* When only left sidebar is open */
 .left-sidebar:not(.collapsed) ~ .main-content {
   margin-left: var(--ls-left-sidebar-width);
+  margin-right: auto;
 }
+
+/* When only right sidebar is open */
 .right-sidebar:not(.collapsed) ~ .main-content {
-  margin-right: var(--ls-left-sidebar-width);
+  margin-left: auto;
+  margin-right: var(--ls-right-sidebar-width);
+}
+
+/* When both sidebars are open - center the content in the remaining space */
+.left-sidebar:not(.collapsed) ~ .right-sidebar:not(.collapsed) ~ .main-content,
+.right-sidebar:not(.collapsed) ~ .left-sidebar:not(.collapsed) ~ .main-content {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: calc(100vw - var(--ls-left-sidebar-width) - var(--ls-right-sidebar-width) - var(--ls-space-8));
 }
 
 /* App Header */
 .app-header {
-  padding-top: var(--ls-space-4); /* Reduced padding */
-  padding-bottom: var(--ls-space-3); /* Reduced padding */
-  margin-bottom: var(--ls-space-3); /* Reduced margin */
+  padding-top: var(--ls-space-1); /* Much tighter padding */
+  padding-bottom: var(--ls-space-1); /* Much tighter padding */
+  margin-bottom: var(--ls-space-1); /* Much tighter margin */
 }
 
 .app-header-main {
   text-align: center;
-  margin-bottom: var(--ls-space-2);
+  margin-bottom: var(--ls-space-1);
 }
 
 .app-title-main {
@@ -532,98 +552,38 @@ body {
   text-align: center;
 }
 
-/* Calendar Widget */
-.calendar-widget {
-  background-color: var(--ls-tertiary-background-color);
-  border-radius: var(--ls-border-radius-medium);
-  padding: var(--ls-space-3); /* Reduced padding */
-  margin-bottom: var(--ls-space-4); /* Reduced margin */
-}
-.calendar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--ls-space-4);
-}
-.calendar-grid {
-  display: grid;
-  gap: var(--ls-space-2);
-}
-.calendar-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: var(--ls-font-size-sm);
-  color: var(--ls-secondary-text-color);
-}
-.calendar-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: var(--ls-space-1);
-}
-.calendar-day {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--ls-border-radius-low);
-  cursor: pointer;
-  transition: background-color var(--ls-transition-fast),
-    color var(--ls-transition-fast);
-  font-size: var(--ls-font-size-sm);
-  color: var(--ls-secondary-text-color);
-}
-.calendar-day:hover {
-  background-color: var(--ls-gray-4);
-  color: var(--ls-primary-text-color);
-}
-.calendar-day.today {
-  background-color: var(--ls-calendar-today-bg);
-  color: var(--ls-calendar-today-text);
-  font-weight: var(--ls-font-weight-medium);
-}
-.calendar-day.current-page {
-  background-color: var(--ls-tertiary-background-color);
-  color: var(--ls-primary-text-color);
-  font-weight: var(--ls-font-weight-medium);
-  border: 1px solid var(--ls-accent-10);
-  box-shadow: var(--ls-calendar-current-page-glow);
-}
-.calendar-day.today.current-page {
-  background-color: var(--ls-calendar-today-bg);
-  color: var(--ls-calendar-today-text);
-  border: 1px solid var(--ls-accent-9);
-  box-shadow: var(
-    --ls-calendar-current-page-glow
-  ); /* Consider a brighter variant if needed */
-}
 
 /* Search Section */
 .search-section {
-  margin-bottom: var(--ls-space-4); /* Reduced margin */
+  margin-bottom: var(--ls-space-2); /* Much tighter margin */
   border-bottom: 1px solid var(--ls-border-color);
-  padding-bottom: var(--ls-space-3); /* Reduced padding */
+  padding-bottom: var(--ls-space-2); /* Much tighter padding */
 }
+
 .search-input {
   width: 100%;
   padding: var(--ls-space-2) var(--ls-space-3);
   border: 1px solid var(--ls-border-color);
   border-radius: var(--ls-border-radius-medium);
-  background: var(--ls-primary-background-color);
+  background: var(--ls-secondary-background-color); /* Light gray background */
   color: var(--ls-primary-text-color);
   font-size: var(--ls-font-size-sm);
   transition: border-color var(--ls-transition-fast),
     box-shadow var(--ls-transition-fast);
   box-shadow: none;
 }
+
 .search-input:focus {
   outline: none;
   border-color: var(--ls-accent-10);
   box-shadow: 0 0 0 2px hsl(var(--ls-accent-10-hsl) / 0.2);
+  background: var(--ls-primary-background-color); /* Return to white on focus */
 }
+
 .search-input::placeholder {
   color: var(--ls-tertiary-text-color);
 }
+
 .search-results {
   margin-top: var(--ls-space-3);
   max-height: 300px;
@@ -633,27 +593,33 @@ body {
   border-radius: var(--ls-border-radius-medium);
   display: none;
 }
+
 .search-results.has-results {
   display: block;
 }
+
 .search-result-item {
   padding: var(--ls-space-2) var(--ls-space-3);
   border-bottom: 1px solid var(--ls-secondary-border-color);
   cursor: pointer;
   transition: background-color var(--ls-transition-fast);
 }
+
 .search-result-item:last-child {
   border-bottom: none;
 }
+
 .search-result-item:hover {
   background: var(--ls-secondary-background-color);
 }
+
 .search-result-title {
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-primary-text-color);
   margin-bottom: var(--ls-space-1);
   font-size: var(--ls-font-size-sm);
 }
+
 .search-result-parent-props {
   margin: var(--ls-space-1) 0;
   display: flex;
@@ -684,12 +650,25 @@ body {
   line-height: 1.4;
 }
 
+.search-result-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: all var(--ls-transition-fast);
+}
+
+.search-result-link:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
 /* New Page Form */
 .new-page-form {
   display: flex;
   gap: var(--ls-space-2);
   margin-bottom: var(--ls-space-4); /* Reduced margin */
 }
+
 .new-page-form input {
   flex: 1;
   padding: var(--ls-space-2) var(--ls-space-3);
@@ -700,6 +679,7 @@ body {
   font-size: var(--ls-font-size-sm);
   box-shadow: none;
 }
+
 .new-page-form input:focus {
   outline: none;
   border-color: var(--ls-accent-10);
@@ -712,6 +692,7 @@ body {
   flex-direction: column;
   gap: var(--ls-space-1);
 }
+
 #page-list a {
   color: var(--ls-primary-text-color);
   text-decoration: none;
@@ -719,12 +700,13 @@ body {
   border-radius: var(--ls-border-radius-low);
   transition: background-color var(--ls-transition-fast);
 }
+
 #page-list a:hover {
   background-color: var(--ls-tertiary-background-color);
 }
+
 #page-list a.active {
-  background-color: var(--ls-accent-10);
-  color: var(--ls-active-nav-item-text-color);
+  background-color: var(--ls-accent-3);
 }
 
 /* Outliner / Notes Container */
@@ -736,9 +718,8 @@ body {
 .note-item {
   position: relative;
   --controls-top-offset: calc(
-    (var(--ls-space-1) * 1.5) + (var(--ls-font-size-base) * 0.8) -
-      (var(--control-icon-size) / 2)
-  ); /* Adjusted for slightly less top padding */
+    var(--ls-font-size-base) - (var(--control-icon-size) / 2)
+  ); /* Center bullets with text baseline */
   margin: 0; /* Rely on parent gap for inter-item spacing */
   padding: 0; /* No internal padding for note-item itself */
 }
@@ -761,8 +742,8 @@ body {
   flex: 1;
   min-width: 0;
   padding-left: var(--content-left-padding);
-  padding-top: 2px; /* Reduced padding-top significantly */
-  padding-bottom: 2px; /* Reduced padding-bottom significantly */
+  padding-top: 0px; /* Removed padding-top completely */
+  padding-bottom: 0px; /* Removed padding-bottom completely */
   display: flex;
   flex-direction: column;
 }
@@ -816,7 +797,7 @@ body {
   background-color: var(--ls-tertiary-background-color);
 }
 
-/* Arrow: More prominent, appears for parent items with better positioning */
+/* Arrow: Subtle, appears only on hover for parent items */
 .note-collapse-arrow {
   display: none; /* Hidden by default */
   position: absolute;
@@ -829,10 +810,10 @@ body {
   cursor: pointer;
   border-radius: 50%;
 
-  /* More prominent default state */
-  opacity: 0.6; /* More visible than before */
+  /* Very subtle default state */
+  opacity: 0; /* Completely hidden by default */
   pointer-events: none;
-  color: var(--ls-secondary-text-color); /* Stronger color */
+  color: var(--ls-secondary-text-color);
 
   transition: all var(--ls-transition-fast);
   z-index: 3; /* Above bullet and thread */
@@ -841,19 +822,19 @@ body {
 /* Show arrow for items with children */
 .note-item.has-children > .note-header-row .note-controls .note-collapse-arrow {
   display: inline-flex;
-  opacity: 0.2; /* More visible by default */
+  opacity: 0; /* Still hidden by default */
   pointer-events: auto;
 }
 
-/* Arrow becomes very prominent on hover */
+/* Arrow becomes visible on hover */
 .note-item.has-children:hover
   > .note-header-row
   .note-controls
   .note-collapse-arrow,
 .note-collapse-arrow:hover {
   display: inline-flex;
-  opacity: 1;
-  transform: scale(1.1);
+  opacity: 0.7; /* Subtle but visible */
+  transform: scale(1.05);
 }
 
 .note-collapse-arrow > svg.feather {
@@ -894,7 +875,8 @@ body {
   /* Extend to the bottom of the children container */
   bottom: 0;
   width: var(--thread-line-width);
-  background-color: var(--ls-guideline-color);
+  background-color: var(--ls-secondary-border-color); /* Much lighter default color */
+  opacity: 0.4; /* Make them even more subtle */
   z-index: 1; /* Behind controls */
   transition: background-color var(--ls-transition-fast);
 }
@@ -933,9 +915,9 @@ body {
 .note-content {
   transition: all 0.2s ease;
   border-radius: var(--ls-border-radius-low);
-  min-height: 20px; /* Or var(--ls-line-height-base) if defined */
-  padding: 6px 8px; /* Standardized padding */
-  line-height: 1.6; /* From original .note-content, ensure consistency */
+  min-height: 18px; /* Increased from 16px for better touch targets */
+  padding: 3px 8px; /* Increased padding slightly for better readability */
+  line-height: 1.6; /* Increased for better readability */
 }
 
 .note-content[contenteditable="true"]:empty:before {
@@ -1206,24 +1188,7 @@ body {
   background-color: var(--ls-tertiary-background-color);
 }
 
-/* Page Properties */
-#page-properties {
-  margin: var(--ls-space-1) 0;
-}
-.page-properties-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ls-space-1); /* Reduced gap */
-  margin-bottom: var(--ls-space-2); /* Reduced margin */
-}
-.page-property-item {
-  background-color: var(--ls-tertiary-background-color);
-  display: flex;
-  align-items: center;
-  gap: var(--ls-space-1); /* Reduced gap */
-  padding: var(--ls-space-1) var(--ls-space-2); /* Reduced padding */
-  border-radius: var(--ls-border-radius-low);
-}
+/* Old page properties styles removed - using new pill system */
 .page-property-key {
   color: var(--ls-accent-10);
   font-weight: var(--ls-font-weight-medium);
@@ -1255,67 +1220,191 @@ body {
   color: var(--ls-add-property-btn-hover-text-color);
 }
 
-/* Transclusion and SQL Query Placeholder Styles - Minimalistic */
+/* Transclusion and SQL Query Placeholder Styles - Elegant and Minimalistic */
 .transclusion-placeholder,
 .sql-query-placeholder {
-  padding: var(--ls-space-1); /* Reduced padding */
+  padding: var(--ls-space-3);
   color: var(--ls-secondary-text-color);
   font-style: italic;
-  border: 1px dashed var(--ls-secondary-border-color); /* Softened border */
-  background-color: transparent;
-  border-radius: var(--ls-border-radius-low);
-  margin-bottom: var(--ls-space-1); /* Reduced margin */
+  border: 1px solid var(--ls-secondary-border-color);
+  background-color: var(--ls-tertiary-background-color);
+  border-radius: var(--ls-border-radius-medium);
+  margin: var(--ls-space-2) 0;
+  position: relative;
+  transition: all var(--ls-transition-fast);
+}
+
+.transclusion-placeholder::before,
+.sql-query-placeholder::before {
+  content: "↗";
+  position: absolute;
+  top: var(--ls-space-2);
+  right: var(--ls-space-2);
+  font-size: var(--ls-font-size-sm);
+  color: var(--ls-accent-9);
+  opacity: 0.6;
+  font-style: normal;
+}
+
+.transclusion-placeholder:hover,
+.sql-query-placeholder:hover {
+  border-color: var(--ls-accent-8);
+  background-color: var(--ls-secondary-background-color);
 }
 
 .transclusion-placeholder.error {
-  border-color: var(--color-error); /* Keep error distinct */
+  border-color: var(--color-error);
   background: var(--ls-transclusion-error-bg);
   color: var(--color-error);
-  font-style: normal; /* Error message should not be italic */
+  font-style: normal;
+}
+
+.transclusion-placeholder.error::before {
+  content: "⚠";
+  color: var(--color-error);
 }
 
 /* Styles for when SQL query content has loaded */
 .sql-query-placeholder.loaded {
-  border: none; /* Remove border */
-  padding: 0; /* Remove padding */
+  border: none;
+  padding: 0;
   background-color: transparent;
-  font-style: normal; /* Reset font style */
-  margin-top: var(--ls-space-2); /* Maintain spacing if needed */
-  margin-bottom: 0; /* Reset bottom margin as content will have its own */
+  font-style: normal;
+  margin: var(--ls-space-3) 0;
 }
 
+.sql-query-placeholder.loaded::before {
+  display: none;
+}
+
+/* Transcluded Content - Elegant Container */
 .transcluded-content {
-  background-color: var(
-    --ls-secondary-background-color
-  ); /* Softened background */
-  border: 1px solid var(--ls-secondary-border-color); /* Subtle border for the content box */
-  border-radius: var(--ls-border-radius-low);
-  margin-top: 0; /* Placeholder margin-bottom handles spacing */
-  box-shadow: none; /* Ensure no strong shadows */
+  position: relative;
+  background-color: var(--ls-primary-background-color);
+  border: 1px solid var(--ls-accent-4);
+  border-left: 3px solid var(--ls-accent-9);
+  border-radius: var(--ls-border-radius-medium);
+  margin: var(--ls-space-3) 0;
+  box-shadow: var(--ls-shadow-sm);
+  transition: all var(--ls-transition-fast);
+  overflow: hidden;
 }
 
+.transcluded-content:hover {
+  border-color: var(--ls-accent-8);
+  border-left-color: var(--ls-accent-10);
+  box-shadow: var(--ls-shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Transclusion Header - Elegant and Informative */
 .transclusion-header {
-  background-color: var(
-    --ls-quaternary-background-color,
-    var(--ls-tertiary-background-color)
-  ); /* Use quaternary if available, else tertiary */
-  border-bottom: 1px solid var(--ls-border-color);
-  padding: var(--ls-space-1) var(--ls-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+  background: linear-gradient(135deg, var(--ls-accent-2), var(--ls-accent-3));
+  border-bottom: 1px solid var(--ls-accent-4);
+  padding: var(--ls-space-2) var(--ls-space-3);
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-medium);
 }
 
 .transclusion-link {
-  color: var(--ls-link-text-color);
+  color: var(--ls-accent-11);
   text-decoration: none;
-  font-size: var(--ls-font-size-sm); /* Slightly smaller for header */
+  font-weight: var(--ls-font-weight-medium);
+  transition: all var(--ls-transition-fast);
+  border-radius: var(--ls-border-radius-low);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .transclusion-link:hover {
-  color: var(--ls-link-text-hover-color);
-  text-decoration: underline;
+  color: var(--ls-accent-12);
+  background-color: rgba(255, 255, 255, 0.2);
+  text-decoration: none;
+  transform: translateX(2px);
 }
 
+/* Transclusion Body - Clean Content Area */
 .transclusion-body {
-  padding: var(--ls-space-1); /* Reduced padding */
+  padding: var(--ls-space-3);
+  background-color: var(--ls-primary-background-color);
+  line-height: 1.6;
+}
+
+/* URL Anchor Highlighting */
+.note-item.anchor-highlight {
+  background-color: var(--ls-accent-3);
+  animation: anchorPulse 1s ease-out;
+}
+
+@keyframes anchorPulse {
+  0% {
+    background-color: var(--ls-accent-2);
+  }
+  50% {
+    background-color: var(--ls-accent-3);
+  }
+  100% {
+    background-color: var(--ls-accent-3);
+  }
+}
+
+/* Dark theme adjustments for anchor highlighting */
+[data-theme="dark"] .note-item.anchor-highlight {
+  background-color: var(--ls-accent-4);
+  box-shadow: 0 0 0 2px var(--ls-accent-8);
+}
+
+[data-theme="dark"] .note-item.anchor-highlight {
+  animation: anchorPulseDark 2s ease-out;
+}
+
+@keyframes anchorPulseDark {
+  0% {
+    background-color: var(--ls-accent-3);
+    box-shadow: 0 0 0 4px var(--ls-accent-7);
+  }
+  50% {
+    background-color: var(--ls-accent-4);
+    box-shadow: 0 0 0 2px var(--ls-accent-8);
+  }
+  100% {
+    background-color: var(--ls-accent-4);
+    box-shadow: 0 0 0 2px var(--ls-accent-8);
+  }
+}
+
+/* Dark theme adjustments for transclusions */
+[data-theme="dark"] .transclusion-placeholder,
+[data-theme="dark"] .sql-query-placeholder {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-border-color);
+}
+
+[data-theme="dark"] .transcluded-content {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-accent-6);
+  border-left-color: var(--ls-accent-8);
+}
+
+[data-theme="dark"] .transclusion-header {
+  background: linear-gradient(135deg, var(--ls-accent-3), var(--ls-accent-4));
+  border-bottom-color: var(--ls-accent-5);
+}
+
+[data-theme="dark"] .transclusion-link {
+  color: var(--ls-accent-10);
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .transclusion-link:hover {
+  color: var(--ls-accent-11);
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .transclusion-body {
+  background-color: var(--ls-secondary-background-color);
 }
 
 /* .sql-query-results is a .note-children div, so it should inherit default note-children styling. */
@@ -1372,17 +1461,19 @@ textarea:focus {
 .button:hover,
 .action-button:hover {
   background-color: var(--ls-tertiary-background-color);
-  border-color: var(--ls-gray-7);
+  border-color: var(--ls-accent-9); /* Using accent for hover border on default */
 }
-.button.primary-button,
+/* Note: .button.primary-button selector seems unused, .action-button.primary is used. */
 .action-button.primary {
   background-color: var(--ls-accent-10);
   border-color: var(--ls-accent-10);
+  color: var(--ls-active-nav-item-text-color, #fff); /* Ensure contrast text color */
 }
-.button.primary-button:hover,
+
 .action-button.primary:hover {
   background-color: var(--ls-accent-11);
   border-color: var(--ls-accent-11);
+  color: var(--ls-active-nav-item-text-color, #fff); /* Ensure contrast text color on hover */
 }
 
 /* Styles from original file that might need to be adapted or were intentionally kept */
@@ -1415,47 +1506,51 @@ textarea:focus {
 }
 
 /* Sidebar Toggle Buttons */
-.sidebar-toggle {
+/* This is the modern .sidebar-toggle-btn section that should be kept */
+.sidebar-toggle-btn {
   position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 40px;
-  background: var(--ls-primary-background-color);
-  border: 1px solid var(--ls-border-color);
-  border-radius: var(--ls-border-radius-medium);
+  width: 36px; 
+  height: 36px; 
+  background: transparent; 
+  border: none; 
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--ls-z-index-modal);
-  box-shadow: var(--ls-shadow-sm);
+  z-index: calc(var(--ls-z-index-sticky) + 1); 
   transition: all var(--ls-transition-normal);
+  font-size: 24px; 
+  color: var(--ls-secondary-text-color);
+  padding: 0; 
+  box-shadow: none; 
 }
 
-.sidebar-toggle:hover {
-  background: var(--ls-secondary-background-color);
+.sidebar-toggle-btn:hover {
+  background: transparent; 
+  color: var(--ls-primary-text-color); 
+  transform: scale(1.1);
 }
 
-.sidebar-toggle.left {
-  left: 0;
+#toggle-left-sidebar-btn {
+  top: 15px;
+  left: 15px; 
 }
 
-.sidebar-toggle.right {
-  right: 0;
-  border-radius: var(--ls-border-radius-low) 0 0 var(--ls-border-radius-low);
-  border-left: none;
-  border-right: 1px solid var(--ls-border-color);
+#toggle-right-sidebar-btn {
+  top: 15px;
+  right: 15px; 
 }
 
-/* When sidebars are collapsed, adjust toggle button positions */
-.left-sidebar.collapsed ~ .sidebar-toggle.left {
-  left: 0;
+body.left-sidebar-collapsed #toggle-left-sidebar-btn {
+  top: 15px;
+  left: 15px; 
 }
 
-.right-sidebar.collapsed ~ .sidebar-toggle.right {
-  right: 0;
+body.right-sidebar-collapsed #toggle-right-sidebar-btn {
+  top: 15px;
+  right: 15px; 
 }
+
 
 /* Responsive Design - Using LS variables now */
 @media (max-width: 1200px) {
@@ -1493,16 +1588,21 @@ textarea:focus {
     margin-right: 220px;
   }
 
-  .sidebar-toggle {
-    width: 20px;
-    height: 40px;
+  /* .sidebar-toggle specific styles were here, but already removed as part of older toggle cleanup */
+  /* .sidebar-toggle-btn specific responsive styles are below */
+
+  .sidebar-toggle-btn { /* This selector for .sidebar-toggle-btn was .sidebar-toggle in original responsive block */
+    width: 24px; /* Adjusted from original .sidebar-toggle: width: 20px; */
+    height: 40px; /* Kept from original .sidebar-toggle: height: 40px; */
+    /* font-size: 14px; This was for the old .sidebar-toggle-btn, the new one is icon based */
+  }
+  
+  /* If the icons themselves need resizing for mobile in .sidebar-toggle-btn: */
+  .sidebar-toggle-btn svg.feather {
+    width: 20px; /* Example size for mobile */
+    height: 20px; /* Example size for mobile */
   }
 
-  .sidebar-toggle-btn {
-    width: 24px;
-    height: 40px;
-    font-size: 14px;
-  }
 
   .app-title-main {
     font-size: var(--ls-font-size-3xl);
@@ -1568,7 +1668,7 @@ textarea:focus {
 #page-title {
   font-family: var(--ls-header-font-family);
   font-size: var(--ls-page-title-size);
-  font-weight: var(--ls-font-weight-semibold);
+  font-weight: var(--ls-font-weight-semibold); /* Reduced from bold for elegance */
   color: var(--ls-primary-text-color);
   line-height: 1.2;
   border-bottom: 1px solid var(--ls-secondary-border-color);
@@ -1679,31 +1779,27 @@ textarea:focus {
   height: 18px;
 }
 
-/* Styles for the list and items within the page properties modal remain */
+/* Page Properties Modal - Keep only modal-specific styles */
 #page-properties-list {
-  display: flex; /* Arrange pills in a row */
-  flex-wrap: wrap; /* Allow pills to wrap to the next line */
-  gap: var(--ls-space-2); /* Space between pills */
-  margin-bottom: var(--ls-space-4); /* Ensure space before actions */
-  padding: 0; /* Remove any default padding */
-  list-style: none; /* Ensure no list bullets if it were a ul/ol */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ls-space-2);
+  margin-bottom: var(--ls-space-4);
+  padding: 0;
+  list-style: none;
 }
 
-/* Styles for individual property pills in the modal - TO MATCH INLINE PILLS */
 #page-properties-list .page-property-item {
-  /* Match .property-item.tag and .property-inline styles exactly */
   background-color: var(--ls-tertiary-background-color);
   color: var(--ls-accent-10);
-  border-radius: var(
-    --ls-border-radius-low
-  ); /* Use low instead of full for consistency */
-  padding: 2px 6px; /* Exact match to inline properties */
-  font-size: 0.9em; /* Match .property-item.tag */
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.9em;
   display: inline-flex;
   align-items: center;
-  gap: 2px; /* Small gap, similar to inline */
-  border: 1px solid var(--ls-border-color); /* Match .property-inline border */
-  margin-right: 4px; /* Match .property-item.tag margin */
+  gap: 2px;
+  border: 1px solid var(--ls-border-color);
+  margin-right: 4px;
 }
 
 #page-properties-list .page-property-key {
@@ -1985,10 +2081,32 @@ textarea:focus {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 .page-search-results-list li {
-  padding: var(--ls-space-3) var(--ls-space-4);
+  padding: 0;
   border-bottom: 1px solid var(--ls-secondary-border-color);
-  cursor: pointer;
   transition: all var(--ls-transition-fast);
+}
+
+.page-search-results-list li:last-child {
+  border-bottom: none;
+}
+
+.page-search-result-link {
+  display: block;
+  padding: var(--ls-space-3) var(--ls-space-4);
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  transition: all var(--ls-transition-fast);
+}
+
+.page-search-result-link:hover {
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+}
+
+.create-new-link {
+  color: var(--ls-accent-9);
+  font-style: italic;
 }
 .page-search-results-list li:last-child {
   border-bottom: none;
@@ -1997,10 +2115,6 @@ textarea:focus {
 .page-search-results-list li.selected {
   background: var(--ls-secondary-background-color);
   transform: translateX(2px);
-}
-.page-search-results-list li.selected {
-  background: var(--ls-accent-10);
-  color: var(--ls-search-selected-item-text-color);
 }
 .page-search-results-list li.create-new-option {
   font-style: italic;
@@ -2151,7 +2265,7 @@ textarea:focus {
 #notes-container {
   display: flex;
   flex-direction: column;
-  gap: var(--ls-space-1); /* This provides inter-item spacing */
+  /* Removed gap - using margin-bottom on individual notes for precise control */
 }
 
 /* Breadcrumbs Container */
@@ -2283,6 +2397,21 @@ textarea:focus {
 
 /* Styling for .note-item no longer needs ::after or padding-left for indentation directly */
 .notes-container > .note-item {
+  margin-bottom: 1px; /* Extremely tight spacing between notes */
+}
+
+.note-content h1,
+.note-content h2,
+.note-content h3,
+.note-content h4,
+.note-content h5,
+.note-content h6 {
+  margin-bottom: var(--ls-space-3); /* Consistent spacing after headers */
+  margin-top: var(--ls-space-4); /* Space before headers */
+}
+
+.task-container {
+  margin-bottom: var(--ls-space-2); /* Consistent spacing between tasks */
 }
 
 /* Drag over effect for attachment drop zones */
@@ -2339,55 +2468,8 @@ textarea:focus {
 }
 
 /* Essential UI Styles - moved from ui.js injections */
-
-/* Bullet Context Menu */
-.bullet-context-menu {
-  background: var(--ls-primary-background-color);
-  border: 1px solid var(--ls-border-color);
-  border-radius: var(--ls-border-radius-medium);
-  box-shadow: var(--ls-shadow-lg);
-  padding: var(--ls-space-1);
-  z-index: var(--ls-z-index-popover);
-  min-width: 180px;
-  position: fixed;
-}
-.bullet-context-menu .menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--ls-space-2);
-  padding: var(--ls-space-2);
-  border-radius: var(--ls-border-radius-low);
-  cursor: pointer;
-  transition: background-color var(--ls-transition-fast);
-  font-size: var(--ls-font-size-sm);
-  color: var(--ls-primary-text-color);
-}
-.bullet-context-menu .menu-item:hover {
-  background-color: var(--ls-secondary-background-color);
-  color: var(--ls-primary-text-color);
-}
-.bullet-context-menu .menu-item svg.feather {
-  width: 16px;
-  height: 16px;
-  color: var(--ls-secondary-text-color);
-}
-.bullet-context-menu .menu-item:hover svg.feather {
-  color: var(--ls-primary-text-color);
-}
-
-/* Copy Feedback Toast */
-.copy-feedback {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: var(--ls-accent-10);
-  color: var(--ls-toast-feedback-text-color);
-  padding: var(--ls-space-2) var(--ls-space-4);
-  border-radius: var(--ls-border-radius-medium);
-  animation: fadeInOutToast 3s ease-in-out;
-  z-index: var(--ls-z-index-tooltip);
-  font-size: var(--ls-font-size-sm);
-}
+/* Redundant Bullet Context Menu and Copy Feedback Toast removed from here. */
+/* Their primary definitions are kept earlier in the file. */
 
 /* Task Container Improvements */
 .task-container {
@@ -2488,9 +2570,9 @@ textarea:focus {
 .note-content {
   transition: all 0.2s ease;
   border-radius: var(--ls-border-radius-low);
-  min-height: 20px; /* Or var(--ls-line-height-base) if defined */
-  padding: 6px 8px; /* Standardized padding */
-  line-height: 1.6; /* From original .note-content, ensure consistency */
+  min-height: 18px; /* Increased from 16px for better touch targets */
+  padding: 3px 8px; /* Increased padding slightly for better readability */
+  line-height: 1.4; /* Increased from 1.3 for better readability */
 }
 
 /* Site-wide heading styles */
@@ -2506,6 +2588,8 @@ h6 {
   font-family: var(--ls-header-font-family);
   font-weight: var(--ls-font-weight-medium);
   color: var(--ls-primary-text-color);
+  /* Remove any bullet styling for headers */
+  list-style: none;
 }
 
 h1 {
@@ -2750,13 +2834,6 @@ h6 {
   transform: rotate(90deg); /* Down when expanded */
 }
 
-/* Task-specific vertical alignment for bullet/arrow */
-.note-item:has(.task-container) {
-  --controls-top-offset: calc(
-    (2 * var(--ls-space-1)) + 23px - (var(--control-icon-size) / 2)
-  ); /* Align bullet/arrow with checkbox center */
-}
-
 /* Sidebar Toggle Buttons */
 .sidebar-toggle-btn {
   position: fixed;
@@ -2890,8 +2967,8 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 .splash-logo-svg {
-  width: 50px;
-  height: 50px;
+  width: 30px;
+  height: 30px;
   margin-bottom: 5px;
 }
 
@@ -3091,7 +3168,6 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 #backlinks-container {
   display: flex;
   flex-direction: column;
-  gap: var(--ls-space-3);
 }
 
 .backlink-item {
@@ -3227,6 +3303,221 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
   .backlinks-section h4 {
     font-size: var(--ls-font-size-base);
   }
+}
+
+/* Backlinks in Sidebar - Consistent with recent pages */
+.backlinks-sidebar .backlinks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  text-align: left;
+}
+
+.backlinks-sidebar .backlink-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+  padding: var(--ls-space-1) var(--ls-space-2);
+  border-radius: var(--ls-border-radius-low);
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  transition: all var(--ls-transition-fast);
+  background-color: transparent;
+  border: none;
+  opacity: 0.7;
+  margin: 0;
+}
+
+.backlinks-sidebar .backlink-item:hover {
+  background-color: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  opacity: 1;
+  transform: none;
+  box-shadow: none;
+}
+
+.backlinks-sidebar .backlink-item::before {
+  display: none;
+}
+
+.backlinks-sidebar .backlink-item .page-link {
+  margin: 0;
+  padding: 0;
+  background: none;
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-normal);
+  text-align: left;
+}
+
+.backlinks-sidebar .backlink-item .page-link:hover {
+  background: none;
+  transform: none;
+}
+
+.backlinks-sidebar .backlink-snippet {
+  display: none;
+}
+
+/* Backlinks Header with Expand Text */
+.backlinks-header {
+  margin-bottom: var(--ls-space-3);
+}
+
+.backlinks-header h3 {
+  margin: 0;
+  font-size: var(--ls-font-size-lg);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-primary-text-color);
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+}
+
+.backlinks-expand-text {
+  color: var(--ls-secondary-text-color);
+  cursor: pointer;
+  font-weight: var(--ls-font-weight-normal);
+  font-size: var(--ls-font-size-base);
+  transition: all var(--ls-transition-fast);
+  opacity: 0.7;
+  user-select: none;
+}
+
+.backlinks-expand-text:hover {
+  color: var(--ls-primary-text-color);
+  opacity: 1;
+}
+
+/* Backlinks Modal Styles */
+.backlinks-modal-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--ls-space-2);
+}
+
+.backlinks-modal-content .backlink-item {
+  background-color: var(--ls-tertiary-background-color);
+  border: 1px solid var(--ls-secondary-border-color);
+  border-radius: var(--ls-border-radius-medium);
+  padding: var(--ls-space-4);
+  margin-bottom: var(--ls-space-3);
+  transition: all var(--ls-transition-fast);
+}
+
+.backlinks-modal-content .backlink-item:hover {
+  background-color: var(--ls-quaternary-background-color);
+  border-color: var(--ls-accent-9);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+.backlinks-modal-content .backlink-item .page-link {
+  display: block;
+  font-weight: var(--ls-font-weight-semibold);
+  color: var(--ls-link-text-color);
+  text-decoration: none;
+  font-size: var(--ls-font-size-base);
+  margin-bottom: var(--ls-space-2);
+  padding: var(--ls-space-2);
+  border-radius: var(--ls-border-radius-low);
+  background-color: var(--ls-secondary-background-color);
+  transition: all var(--ls-transition-fast);
+}
+
+.backlinks-modal-content .backlink-item .page-link:hover {
+  color: var(--ls-link-text-hover-color);
+  background-color: var(--ls-accent-3);
+  text-decoration: none;
+}
+
+.backlinks-modal-content .backlink-snippet {
+  display: block;
+  font-size: var(--ls-font-size-sm);
+  color: var(--ls-secondary-text-color);
+  line-height: 1.5;
+  padding: var(--ls-space-3);
+  background-color: var(--ls-primary-background-color);
+  border-radius: var(--ls-border-radius-low);
+  border-left: 3px solid var(--ls-guideline-color);
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: var(--ls-space-2);
+}
+
+.backlinks-modal-content .backlink-snippet code,
+.backlinks-modal-content .backlink-snippet .wiki-link {
+  background-color: var(--ls-accent-3);
+  color: var(--ls-accent-11);
+  padding: 1px 4px;
+  border-radius: var(--ls-border-radius-low);
+  font-weight: var(--ls-font-weight-medium);
+  font-size: 0.9em;
+}
+
+/* Dark theme adjustments for backlinks modal */
+[data-theme="dark"] .backlinks-modal-content .backlink-item {
+  background-color: var(--ls-secondary-background-color);
+  border-color: var(--ls-secondary-border-color);
+}
+
+[data-theme="dark"] .backlinks-modal-content .backlink-item:hover {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-accent-9);
+}
+
+[data-theme="dark"] .backlinks-modal-content .backlink-snippet {
+  background-color: var(--ls-tertiary-background-color);
+  border-left-color: var(--ls-secondary-border-color);
+}
+
+/* Loading and Error States for Backlinks Modal */
+.loading-state,
+.error-state,
+.no-backlinks-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ls-space-8);
+  text-align: center;
+  color: var(--ls-secondary-text-color);
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--ls-border-color);
+  border-top: 2px solid var(--ls-accent-10);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--ls-space-3);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-state {
+  color: var(--color-error, #dc2626);
+}
+
+.no-backlinks-state {
+  color: var(--ls-tertiary-text-color);
+  font-style: italic;
+}
+
+.backlink-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--ls-secondary-text-color);
+}
+
+.backlink-name {
+  font-size: var(--ls-font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Template Menu Styles */
@@ -3394,7 +3685,7 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 #toggle-splash-btn {
   position: fixed;
   bottom: 20px;
-  padding: 8px;
+  padding: 12px; /* Increased from 8px for better clickability */
   border-radius: 50%;
   background: var(--ls-primary-background-color);
   box-shadow: var(--ls-shadow-md);
@@ -3404,6 +3695,9 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+  width: 44px; /* Increased size */
+  height: 44px; /* Increased size */
+  border: 1px solid var(--ls-secondary-border-color); /* Add subtle border */
 }
 
 #save-status-indicator {
@@ -3411,19 +3705,20 @@ body.right-sidebar-collapsed #toggle-right-sidebar-btn {
 }
 
 #toggle-splash-btn {
-  right: 60px;
+  right: 74px; /* Adjusted position for larger button */
 }
 
 #save-status-indicator:hover,
 #toggle-splash-btn:hover {
   transform: scale(1.05);
   background: var(--ls-secondary-background-color);
+  box-shadow: var(--ls-shadow-lg); /* Enhanced shadow on hover */
 }
 
 #save-status-indicator svg,
 #toggle-splash-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 20px; /* Increased icon size */
+  height: 20px; /* Increased icon size */
   color: var(--ls-primary-text-color);
 }
 
@@ -3673,10 +3968,8 @@ a[href^="https://"]:visited
 
 /* Right Sidebar Favorites */
 #favorites-container {
-  padding-top: 25px;
   display: flex;
   flex-direction: column; /* Stack items vertically */
-  gap: 8px; /* Space between favorite links and button */
 }
 
 .favorite-page-link {
@@ -4136,6 +4429,22 @@ ul.child-page-list li:last-child {
   background: var(--ls-secondary-background-color);
 }
 
+/* Namespace links in page title */
+.namespace-link {
+  color: var(--ls-primary-text-color);
+  text-decoration: none;
+  transition: color var(--ls-transition-fast);
+}
+
+.namespace-link:hover {
+  color: var(--ls-primary-color);
+  text-decoration: underline;
+}
+
+.namespace-link:visited {
+  color: var(--ls-primary-text-color);
+}
+
 /* Favorites and Backlinks in Right Sidebar */
 .favorites-sidebar,
 .backlinks-sidebar {
@@ -4238,7 +4547,7 @@ ul.child-page-list li:last-child {
 /* ========== ROOT VARIABLES (for easy theming) ========== */
 :root {
   --sidebar-width-left: 320px; /* Wider left sidebar */
-  --sidebar-width-right: 260px;
+  --sidebar-width-right: 320px;
   --sidebar-bg: #f9fafb;
   --sidebar-border: #e5e7eb;
   --sidebar-shadow: rgba(0, 0, 0, 0.05);
@@ -4279,8 +4588,6 @@ html {
   height: 100vh;
 
   background: var(--sidebar-bg);
-  border: 1px solid var(--sidebar-border);
-  box-shadow: 1px 0 8px var(--sidebar-shadow);
   display: flex;
   flex-direction: column;
   padding: 1.25rem 1rem;
@@ -4299,17 +4606,6 @@ html {
 .sidebar::-webkit-scrollbar-thumb {
   background-color: var(--sidebar-border);
   border-radius: 4px;
-}
-
-.left-sidebar {
-  left: 0;
-  border-right: 1px solid var(--sidebar-border);
-}
-
-.right-sidebar {
-  right: 0;
-  border-left: 1px solid var(--sidebar-border);
-  box-shadow: -1px 0 8px var(--sidebar-shadow);
 }
 
 /* ========== SIDEBAR CONTENT ========== */
@@ -4447,16 +4743,7 @@ html {
   font-size: 0.9rem;
 }
 
-.sidebar-list-link:hover {
-  background-color: #f0f4ff;
-  color: var(--primary-color);
-}
-
-.sidebar-list-link.active {
-  background-color: #dbeafe;
-  font-weight: 600;
-  color: var(--primary-color);
-}
+/* Legacy blue sidebar styles removed - using muted gray styles above */
 
 .sidebar-list-icon {
   width: 16px;
@@ -4467,16 +4754,17 @@ html {
 /* ========== FOOTER BUTTON ========== */
 .sidebar-footer {
   margin-top: auto;
+  padding: var(--ls-space-1); /* Much tighter padding */
 }
 
 .full-width-button {
   width: 100%;
-  padding: 0.65rem 1rem;
-  background: var(--primary-color);
-  border: none;
+  padding: 0.5rem 0.75rem; /* Reduced padding */
+  background: var(--ls-tertiary-background-color); /* Much more muted */
+  border: 1px solid var(--ls-secondary-border-color);
   border-radius: 6px;
-  font-size: 0.95rem;
-  color: white;
+  font-size: 0.9rem; /* Smaller font */
+  color: var(--ls-secondary-text-color); /* Muted text */
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -4486,13 +4774,12 @@ html {
 }
 
 .full-width-button:hover {
-  background-color: #2563eb;
+  background-color: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
 }
 
 /* ========== MAIN CONTENT ========== */
 .main-content {
-  margin-left: var(--sidebar-width-left);
-  margin-right: var(--sidebar-width-right);
   padding: 1.5rem 2rem;
   min-height: 100vh;
   background: white;
@@ -4502,9 +4789,11 @@ html {
 /* ========== PAGE TITLE ========== */
 .page-title-container {
   margin-bottom: 1rem;
-  border-bottom: 1px solid var(--sidebar-border);
-  padding-bottom: 0.75rem;
+  border-bottom: none;
+  padding-bottom: 0;
 }
+
+
 
 .page-title {
   margin: 0;
@@ -4513,36 +4802,34 @@ html {
   color: var(--text-primary);
 }
 
-.page-properties-inline {
-  margin-top: 0.5rem;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
+/* Old page properties inline styles removed - using new pill system */
 
 /* ========== BUTTON TO ADD NOTES ========== */
 #add-root-note-btn {
-  position: fixed;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--primary-color);
-  border: none;
-  color: white;
-  font-size: 1.5rem;
-  width: 3.6rem;
-  height: 3.6rem;
+  position: static; /* Remove fixed positioning */
+  margin-top: var(--ls-space-4); /* Space above the button */
+  margin-left: var(--bullet-left-indent); /* Align with bullet position */
+  background: var(--ls-tertiary-background-color); /* Grey background */
+  border: 1px solid var(--ls-secondary-border-color); /* Subtle border */
+  color: var(--ls-secondary-text-color); /* Grey text */
+  font-size: var(--ls-font-size-sm); /* Smaller font */
+  width: 2rem; /* Much smaller width */
+  height: 2rem; /* Much smaller height */
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 5px 10px rgba(59, 130, 246, 0.5);
+  box-shadow: none; /* Remove shadow */
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.3s ease;
-  z-index: 1500;
+  transition: all var(--ls-transition-fast);
+  z-index: auto; /* Remove high z-index */
 }
 
 #add-root-note-btn:hover {
-  background: #2563eb;
+  background: var(--ls-secondary-background-color);
+  color: var(--ls-primary-text-color);
+  border-color: var(--ls-border-color);
+  transform: scale(1.05);
 }
 
 /* ========== RESPONSIVE ========== */
@@ -4651,4 +4938,210 @@ html {
 
 .backlinks-list:empty {
   display: none;
+}
+
+/* Ensure headers don't get bullet styling from note items */
+.note-content h1,
+.note-content h2,
+.note-content h3,
+.note-content h4,
+.note-content h5,
+.note-content h6 {
+  /* Override any bullet positioning */
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+/* ========== CONSISTENT PILL STYLE SYSTEM ========== */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--ls-border-radius-low);
+  padding: 2px 6px;
+  font-size: 0.85em;
+  font-weight: var(--ls-font-weight-medium);
+  white-space: nowrap;
+  transition: all var(--ls-transition-fast);
+}
+
+/* Task pill variants */
+.pill.pill-task-todo {
+  background-color: var(--ls-accent-3);
+  color: var(--ls-accent-11);
+}
+
+.pill.pill-task-done {
+  background-color: var(--ls-task-done-badge-bg);
+  color: var(--ls-task-done-badge-text);
+}
+
+.pill.pill-task-cancelled {
+  background-color: var(--ls-task-cancelled-badge-bg);
+  color: var(--ls-task-cancelled-badge-text);
+}
+
+.pill.pill-task-doing {
+  background-color: #f39c12;
+  color: #fff;
+}
+
+.pill.pill-task-someday {
+  background-color: #9b59b6;
+  color: #fff;
+}
+
+.pill.pill-task-waiting {
+  background-color: #3498db;
+  color: #fff;
+}
+
+.pill.pill-task-nlr {
+  background-color: #95a5a6;
+  color: #fff;
+}
+
+/* Tag pill variant */
+.pill.pill-tag {
+  background-color: var(--ls-tertiary-background-color);
+  color: var(--ls-secondary-text-color);
+  border: 1px solid var(--ls-secondary-border-color);
+}
+
+/* Property pill variant */
+.pill.pill-property {
+  background-color: var(--ls-tertiary-background-color);
+  color: var(--ls-accent-10);
+  border: 1px solid var(--ls-secondary-border-color);
+}
+
+/* Property elements within pills */
+.pill.pill-property .property-key {
+  color: var(--ls-accent-10);
+  font-weight: var(--ls-font-weight-medium);
+  margin-right: 4px;
+}
+
+.pill.pill-property .property-separator {
+  color: var(--ls-secondary-text-color);
+  opacity: 0.6;
+  margin: 0 2px;
+}
+
+.pill.pill-property .property-value {
+  color: var(--ls-primary-text-color);
+  font-weight: var(--ls-font-weight-normal);
+}
+
+.pill.pill-property .property-favorite {
+  color: #f39c12;
+}
+
+/* Hover states */
+.pill:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--ls-shadow-sm);
+}
+
+/* ========== PAGE PROPERTIES PILLS ========== */
+.page-properties-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--ls-space-2);
+  margin-bottom: var(--ls-space-4);
+  padding: 0;
+  list-style: none;
+}
+
+/* === Improved bullet alignment for tasks and headers === */
+/* Center bullet for tasks (checkbox + pill) */
+.note-item:has(.task-container) {
+  --controls-top-offset: calc((var(--ls-font-size-base) * 2.8) / 2 - (var(--control-icon-size) / 2));
+}
+/* Center bullet for notes starting with headers */
+.note-item:has(.note-content > h1) {
+  --controls-top-offset: calc((var(--ls-font-size-2xl) * 3.2) / 2 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h2) {
+  --controls-top-offset: calc((var(--ls-font-size-xl) * 3.6) / 2 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h3) {
+  --controls-top-offset: calc((var(--ls-font-size-lg) * 3.6) / 2 - (var(--control-icon-size) / 2));
+}
+.note-item:has(.note-content > h4) {
+  --controls-top-offset: calc((var(--ls-font-size-lg) * 3.6) / 2 - (var(--control-icon-size) / 2));
+}
+/* You can add more for h4-h6 if needed, but these are the most visually impactful */
+
+
+/* FROM app.css: Template Autocomplete Styles */
+.template-autocomplete-dropdown {
+    position: absolute;
+    background-color: var(--ls-primary-background-color);
+    border: 1px solid var(--ls-border-color);
+    border-radius: var(--ls-border-radius-low); /* Assuming 4px maps to low */
+    box-shadow: var(--ls-shadow-sm); /* Using a standard small shadow */
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: var(--ls-z-index-dropdown, 1000); /* Use variable with fallback */
+    min-width: 200px;
+}
+
+.template-autocomplete-dropdown ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.template-autocomplete-dropdown li {
+    padding: var(--ls-space-2) var(--ls-space-3); /* Using space variables ~8px 12px */
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: var(--ls-primary-text-color); /* Ensure text color is themed */
+}
+
+.template-autocomplete-dropdown li:hover,
+.template-autocomplete-dropdown li.selected {
+    background-color: var(--ls-tertiary-background-color); /* For general hover */
+}
+
+.template-autocomplete-dropdown li.selected {
+    background-color: var(--ls-accent-3); /* More prominent for selected */
+    color: var(--ls-accent-11); /* Ensure selected text is readable */
+}
+
+.template-autocomplete-dropdown li:not(:last-child) {
+    border-bottom: 1px solid var(--ls-secondary-border-color);
+}
+
+
+/* FROM notes.css: Encrypted note styles */
+.note-item.encrypted-note {
+    position: relative;
+}
+
+.note-item.encrypted-note::before {
+    content: '🔒';
+    position: absolute;
+    left: -20px; /* This positioning might need review relative to new outliner styles */
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: var(--ls-font-size-sm); /* Using a theme font size variable */
+    opacity: 0.7;
+    color: var(--ls-secondary-text-color); /* Give the icon a theme color */
+}
+
+.note-item.needs-password .note-content {
+    color: var(--ls-tertiary-text-color); /* Use a muted text color */
+    font-style: italic;
+}
+
+.note-item.decryption-failed .note-content {
+    color: var(--color-error, #d32f2f); /* Use the theme's error color, with fallback */
+    font-style: italic;
+    font-weight: var(--ls-font-weight-medium); /* Make it slightly more prominent */
+}
+
+.note-item.decrypted-note .note-content {
+    color: inherit; /* This is fine, it will inherit the normal note content color */
 }

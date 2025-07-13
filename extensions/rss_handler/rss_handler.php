@@ -13,7 +13,23 @@ function log_message($level, $message) {
         return;
     }
     $timestamp = date('Y-m-d H:i:s');
-    fwrite(($level === 'ERROR' || $level === 'WARNING' ? STDERR : STDOUT), "[$timestamp] [$level] $message\n");
+    $output = "[$timestamp] [$level] $message\n";
+    if (php_sapi_name() === 'cli') {
+        // CLI: Use STDOUT/STDERR if defined, else echo
+        if (defined('STDOUT') && ($level === 'INFO' || $level === 'DEBUG')) {
+            fwrite(STDOUT, $output);
+        } elseif (defined('STDERR') && ($level === 'ERROR' || $level === 'WARNING')) {
+            fwrite(STDERR, $output);
+        } else {
+            echo $output;
+        }
+    } else {
+        // Web: Only log errors/warnings to error_log, never echo
+        if ($level === 'ERROR' || $level === 'WARNING') {
+            error_log($output);
+        }
+        // Do not echo anything in web context
+    }
 }
 
 // --- SimplePie Library Loading ---
@@ -330,6 +346,11 @@ function main() {
             continue;
         }
         
+        // Replace <today> in page_name_for_feed with current date (Y-m-d)
+        if (!empty($page_name_for_feed)) {
+            $page_name_for_feed = str_replace('<today>', date('Y-m-d'), $page_name_for_feed);
+        }
+        
         // Check for page_name_for_feed, and use default_page_name_for_rss from config
         if (empty($page_name_for_feed)) {
             log_message('ERROR', "No page_name specified for feed $feed_url and no default_page_name_for_rss is set. Skipping feed.");
@@ -350,8 +371,11 @@ function main() {
 if (php_sapi_name() === 'cli') {
     main();
 } else {
-    log_message('ERROR', 'This script is intended for command-line execution only.');
-    http_response_code(403); // Forbidden
+    // Web context: set header and output JSON error only
+    if (!headers_sent()) {
+        http_response_code(403); // Forbidden
+        header('Content-Type: application/json');
+    }
     echo json_encode(['error' => 'This script is intended for command-line execution only.']);
 }
 

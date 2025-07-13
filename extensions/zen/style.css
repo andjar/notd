@@ -1,0 +1,324 @@
+/* Zen Markdown Editor Styles - Fullscreen Zen, 66ch Optimal Column Width, Centered */
+:root {
+  --zen-bg: #f9f9f6;
+  --zen-fg: #222;
+  --zen-muted: #b0b0b0;
+  --zen-accent: #4f8cff;
+  --zen-link: #d16ba5;
+  --zen-code: #3a8bbb;
+  --zen-font: 'Inter', 'Lora', 'Segoe UI', Arial, sans-serif;
+  --zen-mono: 'Fira Mono', 'Consolas', monospace;
+  --zen-writing-width: 66ch;
+  --zen-writing-padding: 2.5rem;
+}
+
+body {
+  background: var(--zen-bg);
+  color: var(--zen-fg);
+  font-family: var(--zen-font);
+  min-height: 100vh;
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#zen-textarea, .CodeMirror {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  min-width: 100vw;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1.8;
+  color: var(--zen-fg);
+  font-family: var(--zen-font);
+  z-index: 1;
+  resize: none;
+  overflow: auto;
+  transition: background 0.3s, color 0.3s;
+  padding: 0;
+}
+
+/* Center and narrow the writing area, with extra padding */
+.CodeMirror-scroll {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  height: 100vh !important;
+  min-height: 100vh;
+  background: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--zen-muted) var(--zen-bg);
+}
+.CodeMirror-sizer, .CodeMirror-lines {
+  max-width: var(--zen-writing-width);
+  width: 100%;
+  margin: 0 auto !important;
+  display: block !important;
+  padding: 4rem var(--zen-writing-padding) 2rem var(--zen-writing-padding);
+  box-sizing: border-box;
+}
+
+/* Remove gutter space */
+.CodeMirror-gutters {
+  display: none !important;
+}
+
+/* Minimal zen scrollbar */
+.CodeMirror-scroll::-webkit-scrollbar {
+  width: 8px;
+  background: var(--zen-bg);
+}
+.CodeMirror-scroll::-webkit-scrollbar-thumb {
+  background: var(--zen-muted);
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.CodeMirror-scroll::-webkit-scrollbar-thumb:hover {
+  opacity: 1;
+}
+
+.zen-floating-buttons {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  z-index: 10;
+}
+
+.zen-save-btn, .zen-theme-toggle {
+  background: rgba(255,255,255,0.7);
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: var(--zen-accent);
+  border-radius: 50%;
+  width: 3.2rem;
+  height: 3.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.07);
+  transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+  opacity: 0.85;
+  padding: 0;
+}
+.zen-save-btn:hover, .zen-theme-toggle:hover {
+  background: var(--zen-accent);
+  color: #fff;
+  opacity: 1;
+}
+
+body.zen-dark .zen-save-btn, body.zen-dark .zen-theme-toggle {
+  background: rgba(40,40,40,0.7);
+  color: var(--zen-accent);
+}
+body.zen-dark .zen-save-btn:hover, body.zen-dark .zen-theme-toggle:hover {
+  background: var(--zen-accent);
+  color: #23272e;
+}
+
+.zen-floating-buttons button svg,
+.zen-floating-buttons button span svg {
+  display: block;
+  margin: auto;
+  width: 1.8rem;
+  height: 1.8rem;
+  pointer-events: none;
+}
+
+/* Muted Markdown symbols and zen look (keep from before) */
+.cm-header {
+  color: var(--zen-accent) !important;
+  font-weight: 700;
+  opacity: 1;
+}
+.cm-header-1 { font-size: 2.5rem; }
+.cm-header-2 { font-size: 2rem; }
+.cm-header-3 { font-size: 1.5rem; }
+.cm-strong {
+  color: var(--zen-accent);
+  font-weight: 700;
+}
+.cm-em {
+  color: var(--zen-accent);
+  font-style: italic;
+}
+.cm-link {
+  color: var(--zen-link);
+  text-decoration: underline;
+}
+.cm-comment {
+  color: var(--zen-muted);
+  opacity: 0.7;
+}
+.cm-quote {
+  color: #666;
+  font-style: italic;
+}
+.cm-variable-2 {
+  color: var(--zen-accent);
+}
+.cm-atom {
+  color: var(--zen-code);
+  font-family: var(--zen-mono);
+}
+
+/* Zen Markdown Editor Styles - Textarea + Preview */
+:root {
+  --zen-bg: #f9f9f6;
+  --zen-fg: #222;
+  --zen-muted: #b0b0b0;
+  --zen-accent: #4f8cff;
+  --zen-link: #d16ba5;
+  --zen-code: #3a8bbb;
+  --zen-font: 'Inter', 'Lora', 'Segoe UI', Arial, sans-serif;
+  --zen-mono: 'Fira Mono', 'Consolas', monospace;
+  --zen-canvas-width: 800px;
+  --zen-canvas-padding: 2.5rem 2.5rem 1.5rem 2.5rem;
+  --zen-radius: 18px;
+  --zen-shadow: 0 4px 32px 0 rgba(0,0,0,0.07);
+}
+
+body.zen-bg {
+  background: var(--zen-bg);
+  color: var(--zen-fg);
+  font-family: var(--zen-font);
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zen-container {
+  width: 100vw;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.zen-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
+}
+
+.zen-canvas-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: var(--zen-radius);
+  box-shadow: var(--zen-shadow);
+  padding: 0;
+  min-height: 70vh;
+  justify-content: center;
+  align-items: center;
+}
+
+.zen-textarea {
+  width: 100%;
+  max-width: var(--zen-canvas-width);
+  min-height: 30vh;
+  height: 30vh;
+  padding: var(--zen-canvas-padding);
+  font-size: 1.25rem;
+  line-height: 1.8;
+  outline: none;
+  border: none;
+  background: transparent;
+  color: var(--zen-fg);
+  font-family: var(--zen-font);
+  letter-spacing: 0.01em;
+  word-break: break-word;
+  white-space: pre-wrap;
+  resize: vertical;
+  margin: 0 auto 2rem auto;
+  border-radius: var(--zen-radius);
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.03);
+  transition: box-shadow 0.2s;
+}
+.zen-textarea:focus {
+  box-shadow: 0 4px 16px 0 rgba(79,140,255,0.10);
+}
+
+.zen-preview {
+  width: 100%;
+  max-width: var(--zen-canvas-width);
+  min-height: 30vh;
+  padding: var(--zen-canvas-padding);
+  font-size: 1.25rem;
+  line-height: 1.8;
+  color: var(--zen-fg);
+  font-family: var(--zen-font);
+  background: #fcfcfa;
+  border-radius: var(--zen-radius);
+  overflow-y: auto;
+  margin: 0 auto 1.5rem auto;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.02);
+}
+
+/* Markdown Syntax Highlighting */
+.zen-md-muted {
+  color: var(--zen-muted);
+  opacity: 0.7;
+  font-weight: 400;
+}
+.zen-md-header {
+  color: var(--zen-accent);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.zen-md-bold {
+  color: var(--zen-accent);
+  font-weight: 700;
+}
+.zen-md-italic {
+  color: var(--zen-accent);
+  font-style: italic;
+}
+.zen-md-link {
+  color: var(--zen-link);
+  text-decoration: underline;
+}
+.zen-md-code {
+  font-family: var(--zen-mono);
+  background: #f4f4f4;
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  color: var(--zen-code);
+  font-size: 1em;
+}
+.zen-md-list {
+  color: var(--zen-accent);
+  font-weight: 700;
+  margin-right: 0.5em;
+}
+.zen-preview ul, .zen-preview ol {
+  margin: 1em 0 1em 2em;
+}
+.zen-preview li {
+  margin: 0.5em 0;
+}
+.zen-preview blockquote {
+  border-left: 3px solid var(--zen-accent);
+  margin: 1.5em 0;
+  padding: 0.5em 1em;
+  color: #666;
+  background: #f7faff;
+  border-radius: 8px;
+}
+.zen-preview hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 2em 0;
+} 

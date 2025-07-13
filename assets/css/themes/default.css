@@ -1,32 +1,31 @@
 /* Default Theme - Light Mode */
 :root {
-    /* Base Gray Scale */
-    --ls-gray-1: hsl(0 0% 99%);
-    --ls-gray-2: hsl(0 0% 97.3%);
-    --ls-gray-3: hsl(0 0% 95.1%);
-    --ls-gray-4: hsl(0 0% 93.0%);
-    --ls-gray-5: hsl(0 0% 90.9%);
-    --ls-gray-6: hsl(0 0% 88.7%);
-    --ls-gray-7: hsl(0 0% 85.8%);
-    --ls-gray-8: hsl(0 0% 78.0%);
-    --ls-gray-9: hsl(0 0% 56.1%);
-    --ls-gray-10: hsl(0 0% 52.3%);
-    --ls-gray-11: hsl(0 0% 43.5%);
-    --ls-gray-12: hsl(0 0% 9%);
+    /* Neutral/Gray Palette (Slate-inspired, warmer) */
+    --ls-gray-1: #fbfcfd; /* Lightest background */
+    --ls-gray-2: #f8f9fa; /* Primary Background */
+    --ls-gray-3: #f1f3f5; /* Subtle backgrounds, borders */
+    --ls-gray-4: #eceef0; /* Hover states, borders */
+    --ls-gray-5: #e6e8eb; /* Borders, disabled elements */
+    --ls-gray-6: #dfe3e6; /* Slightly darker border */
+    --ls-gray-7: #d7dbdf; /* Subtle text, icons */
+    --ls-gray-8: #b0b8c1; /* Muted text */
+    --ls-gray-9: #889096; /* Secondary text */
+    --ls-gray-10: #7e868c; /* Tertiary text */
+    --ls-gray-11: #687076; /* Even more muted text */
+    --ls-gray-12: #11181c; /* Primary text */
 
-    /* Accent Colors */
+    /* Accent Palette (Blue, warmer) */
     --ls-accent-hue: 210;
     --ls-accent-saturation: 100%;
-    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 95%;
-    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%;
-    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%;
-    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 40%;
+    --ls-accent-3: #edf6ff;  /* Highlight background */
+    --ls-accent-9: #0091ff;  /* Primary interactive color */
+    --ls-accent-10: #0081f1; /* Hover color */
+    --ls-accent-11: #006adc; /* Darker accent for text */
+    --ls-accent-3-hsl: 210 100% 96%;
+    --ls-accent-9-hsl: 210 100% 54%;
+    --ls-accent-10-hsl: 210 100% 49%;
+    --ls-accent-11-hsl: 210 100% 43%;
     
-    --ls-accent-3: hsl(var(--ls-accent-3-hsl));
-    --ls-accent-9: hsl(var(--ls-accent-9-hsl));
-    --ls-accent-10: hsl(var(--ls-accent-10-hsl));
-    --ls-accent-11: hsl(var(--ls-accent-11-hsl));
-
     /* Semantic Colors */
     --ls-primary-background-color: white;
     --ls-secondary-background-color: var(--ls-gray-2);
@@ -34,209 +33,208 @@
     --ls-quaternary-background-color: var(--ls-gray-4);
     
     --ls-primary-text-color: var(--ls-gray-12);
-    --ls-secondary-text-color: var(--ls-gray-11);
-    --ls-tertiary-text-color: var(--ls-gray-9);
+    --ls-secondary-text-color: var(--ls-gray-9);
+    --ls-tertiary-text-color: var(--ls-gray-10);
 
-    --ls-border-color: var(--ls-gray-6);
-    --ls-secondary-border-color: var(--ls-gray-4);
+    --ls-border-color: var(--ls-gray-4);
     --ls-guideline-color: var(--ls-gray-4);
     
-    --ls-link-text-color: var(--ls-accent-10);
-    --ls-link-text-hover-color: var(--ls-accent-11);
+    --ls-link-text-color: hsl(var(--ls-accent-10-hsl));
+    --ls-link-text-hover-color: hsl(var(--ls-accent-11-hsl));
     
+    --ls-accent-text-color: white;
+    --ls-accent-3: hsl(var(--ls-accent-3-hsl));
+    --ls-accent-9: hsl(var(--ls-accent-9-hsl));
+    --ls-accent-10: hsl(var(--ls-accent-10-hsl));
+    --ls-accent-11: hsl(var(--ls-accent-11-hsl));
+    --ls-accent-transparent: hsla(var(--ls-accent-10-hsl), 0.1);
+
     --ls-block-bullet-color: var(--ls-gray-8);
-    --ls-block-bullet-active-color: var(--ls-accent-10);
-    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 92%);
+    --ls-block-bullet-active-color: hsl(var(--ls-accent-10-hsl));
+
+    /* Pills & Status */
+    --ls-pill-text-color: hsl(150, 100%, 20%);
+    --ls-pill-bg-color: hsl(150, 70%, 90%);
     
+    --ls-modal-backdrop-bg: rgba(0, 0, 0, 0.4);
+
+    /* == Synced with Flatly Theme - Extra Variables == */
+    --ls-secondary-border-color: var(--ls-gray-3);
+    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 94%);
     --ls-page-checkbox-color: var(--ls-accent-9);
     --ls-page-checkbox-border-color: var(--ls-accent-9);
-
-    --color-error: hsl(0 70% 50%);
+    --color-error: #e74c3c;
     --color-bg-hover: var(--ls-gray-3);
-
-    /* Task and Status Colors */
     --ls-task-done-color: #10b981;
-    --ls-task-done-hover-color: #059669;
-    --ls-task-cancelled-color: var(--ls-gray-8);
-    --ls-task-cancelled-hover-color: var(--ls-gray-9);
-    
-    /* Button Colors */
+    --ls-task-done-hover-color: hsl(168, 76%, 38%);
+    --ls-task-cancelled-color: var(--ls-gray-7);
+    --ls-task-cancelled-hover-color: var(--ls-gray-8);
     --ls-button-danger-color: #dc2626;
     --ls-button-danger-hover-color: #b91c1c;
-    --ls-button-danger-shadow-color: rgba(220, 38, 38, 0.3);
-    
-    /* Status Colors */
-    --ls-status-success-color: hsl(145, 63%, 42%);
-    --ls-status-success-light-color: hsl(145, 63%, 92%);
-    
-    /* Splash Screen Colors */
-    --ls-splash-bg-color: rgb(50, 30, 45);
-    --ls-splash-orb-bg-color: rgba(40, 20, 35, 0.6);
-
-    /* Newly Added Variables - Default Light */
-    --ls-calendar-today-bg: var(--ls-accent-10);
-    --ls-calendar-today-text: white;
+    --ls-button-danger-shadow-color: hsla(0, 80%, 59%, 0.2);
+    --ls-status-success-color: #10b981;
+    --ls-status-success-light-color: hsl(168, 76%, 90%);
+    --ls-calendar-today-bg: var(--ls-accent-3);
+    --ls-calendar-today-text: var(--ls-primary-background-color, black);
     --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3);
-    --ls-modal-close-danger-hover-bg: hsla(0, 70%, 50%, 0.1);
-    --ls-button-danger-bg: hsl(0, 70%, 50%);
-    --ls-button-danger-text: white;
-    --ls-button-danger-border-color: hsl(0, 70%, 50%);
-    --ls-button-danger-hover-bg: hsl(0, 70%, 40%);
-    --ls-button-danger-hover-text: white;
-    --ls-button-danger-hover-border-color: hsl(0, 70%, 40%);
-    --ls-button-danger-box-shadow: 0 2px 4px hsla(0, 70%, 50%, 0.2);
-    --ls-task-done-border-color: var(--ls-task-done-color, #10b981);
-    --ls-task-done-badge-bg: var(--ls-task-done-color, #10b981);
-    --ls-task-done-badge-text: white;
+    --ls-modal-close-danger-hover-bg: rgba(220, 38, 38, 0.1);
+    --ls-button-danger-bg: #dc2626;
+    --ls-button-danger-text: var(--ls-primary-background-color, #ffffff);
+    --ls-button-danger-border-color: #dc2626;
+    --ls-button-danger-hover-bg: #b91c1c;
+    --ls-button-danger-hover-text: var(--ls-button-danger-text, var(--ls-primary-background-color, #ffffff));
+    --ls-button-danger-hover-border-color: #b91c1c;
+    --ls-button-danger-box-shadow: none;
+    --ls-task-done-border-color: #10b981;
+    --ls-task-done-badge-bg: #10b981;
+    --ls-task-done-badge-text: var(--ls-primary-background-color, #ffffff);
     --ls-task-cancelled-badge-bg: var(--ls-gray-8);
-    --ls-task-cancelled-badge-text: var(--ls-gray-12);
-    --ls-transclusion-error-bg: hsl(0, 100%, 97%);
-    --ls-splash-orb-text-color: white;
+    --ls-task-cancelled-badge-text: var(--ls-primary-background-color, #ffffff);
+    --ls-transclusion-error-bg: hsl(0 100% 97%);
+    --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
     --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
     --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
-    --ls-image-viewer-close-text: white;
-    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    --ls-image-viewer-close-text: var(--ls-primary-text-color);
+    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     --ls-property-tag-bg: var(--ls-accent-9);
-    --ls-property-tag-text: var(--ls-gray-1);
-    --ls-save-status-bg: var(--ls-gray-2);
-    --ls-save-status-spinner-color: var(--ls-gray-10);
-    --ls-save-status-saved-icon-color: var(--ls-green-7);
-    --ls-save-status-error-icon-color: var(--ls-red-7);
-
-    /* == Newly Added Variables - Default Light == */
-    --ls-active-nav-item-text-color: var(--ls-gray-1); /* Text on active nav item (accent bg) */
-    --ls-task-checkbox-checkmark-color: var(--ls-gray-1); /* Checkmark in task checkbox */
-    --ls-task-keyword-later-bg: hsl(45, 90%, 90%); /* Light yellow */
-    --ls-task-keyword-later-text: hsl(45, 70%, 30%); /* Dark yellow-brown */
-    --ls-add-property-btn-hover-text-color: var(--ls-gray-1); /* Text on add property btn hover (accent bg) */
-    --ls-search-selected-item-text-color: var(--ls-gray-1); /* Text on selected search item (accent bg) */
-    --ls-search-selected-create-new-text-color: var(--ls-gray-1); /* Text for 'create new' in search (accent bg) */
-    --ls-toast-feedback-text-color: var(--ls-gray-1); /* Text on toast/feedback popups (accent bg) */
-    --ls-focused-parent-bullet-text-color: var(--ls-gray-1); /* Text on focused parent bullet (accent bg) */
-    --ls-show-all-notes-btn-text-color: var(--ls-gray-1); /* Text on 'show all notes' button (accent bg) */
-    --ls-task-badge-todo-text-color: var(--ls-gray-1); /* Text on TODO badge (accent bg) */
-
-    /* == Splash Screen Animated Bubble Colors - Default Light == */
-    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 60%, 0.25);
-    --ls-splash-bubble-color-2: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 70%, 0.2);
-    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) - 10%), 65%, 0.22);
-    --ls-splash-bubble-color-4: hsla(var(--ls-gray-hue), var(--ls-gray-saturation), 50%, 0.18);
+    --ls-property-tag-text: #ffffff;
+    --ls-save-status-bg: var(--ls-gray-1);
+    --ls-save-status-spinner-color: var(--ls-accent-9);
+    --ls-save-status-saved-icon-color: #10b981;
+    --ls-save-status-error-icon-color: #e74c3c;
+    --ls-active-nav-item-text-color: #ffffff;
+    --ls-task-checkbox-checkmark-color: #ffffff;
+    --ls-task-keyword-later-bg: hsl(40, 100%, 90%);
+    --ls-task-keyword-later-text: hsl(30, 100%, 30%);
+    --ls-add-property-btn-hover-text-color: #ffffff;
+    --ls-search-selected-item-text-color: #ffffff;
+    --ls-search-selected-create-new-text-color: #ffffff;
+    --ls-toast-feedback-text-color: #ffffff;
+    --ls-focused-parent-bullet-text-color: #ffffff;
+    --ls-show-all-notes-btn-text-color: #ffffff;
+    --ls-task-badge-todo-text-color: #ffffff;
+    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 60%, 0.28);
+    --ls-splash-bubble-color-2: rgba(24, 188, 156, 0.25);
+    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) - 15%), 65%, 0.22);
+    --ls-splash-bubble-color-4: rgba(189, 195, 199, 0.25);
+    --ls-task-keyword-waiting-color: hsl(210, 80%, 50%);
+    --ls-task-keyword-someday-color: #9b59b6;
 }
 
 /* Dark Mode */
 [data-theme="dark"] {
-    /* Base Gray Scale */
-    --ls-gray-1: hsl(210 10% 12%);
-    --ls-gray-2: hsl(210 10% 15%);
-    --ls-gray-3: hsl(210 10% 20%);
-    --ls-gray-4: hsl(210 10% 25%);
-    --ls-gray-5: hsl(210 10% 30%);
-    --ls-gray-6: hsl(210 10% 35%);
-    --ls-gray-7: hsl(210 10% 40%);
-    --ls-gray-8: hsl(210 10% 50%);
-    --ls-gray-9: hsl(210 10% 65%);
-    --ls-gray-10: hsl(210 10% 75%);
-    --ls-gray-11: hsl(210 10% 85%);
-    --ls-gray-12: hsl(210 10% 95%);
-
-    /* Accent Colors - Dark Mode */
-    --ls-accent-3-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 20%;
-    --ls-accent-9-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 70%;
-    --ls-accent-10-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 60%;
-    --ls-accent-11-hsl: var(--ls-accent-hue) var(--ls-accent-saturation) 50%;
-
-    /* Semantic Colors - Dark Mode */
-    --ls-primary-background-color: #002b36;
-    --ls-secondary-background-color: #023643;
-    --ls-tertiary-background-color: #08404f;
-    --ls-quaternary-background-color: #094b5a;
+    /* Warmer Slate-inspired dark theme */
+    --ls-gray-1: #151718;
+    --ls-gray-2: #1a1d1e;
+    --ls-gray-3: #202425;
+    --ls-gray-4: #23282a;
+    --ls-gray-5: #2c3136;
+    --ls-gray-6: #363a3f;
+    --ls-gray-7: #3e4347;
+    --ls-gray-8: #62676c;
+    --ls-gray-9: #7a8187;
+    --ls-gray-10: #9ba1a6;
+    --ls-gray-11: #c1c8cd;
+    --ls-gray-12: #eceef0;
     
-    --ls-primary-text-color: #a4b5b6;
-    --ls-secondary-text-color: #dfdfdf;
-    --ls-tertiary-text-color: #93a1a1;
+    /* Accent Palette (Blue, dark) */
+    --ls-accent-hue: 210;
+    --ls-accent-saturation: 100%;
+    --ls-accent-3: #00344b;
+    --ls-accent-9: #53b9fd;
+    --ls-accent-10: #339af0;
+    --ls-accent-11: #228be6;
+    --ls-accent-3-hsl: 210 100% 16%;
+    --ls-accent-9-hsl: 210 97% 65%;
+    --ls-accent-10-hsl: 210 84% 58%;
+    --ls-accent-11-hsl: 210 80% 52%;
 
-    --ls-border-color: #0e5263;
-    --ls-secondary-border-color: #126277;
-    --ls-guideline-color: #0b4a5a;
+    /* Semantic Colors */
+    --ls-primary-background-color: var(--ls-gray-2);
+    --ls-secondary-background-color: var(--ls-gray-1);
+    --ls-tertiary-background-color: var(--ls-gray-3);
+    --ls-quaternary-background-color: var(--ls-gray-4);
     
-    --ls-link-text-color: #8abbbb;
-    --ls-link-text-hover-color: #d0e8e8;
-    
-    --ls-block-bullet-color: #608e91;
-    --ls-block-bullet-active-color: var(--ls-accent-10);
-    --ls-block-highlight-color: #0a3d4b;
-    
-    --ls-page-checkbox-color: #6093a0;
-    --ls-page-checkbox-border-color: var(--ls-primary-background-color);
+    --ls-primary-text-color: var(--ls-gray-10);
+    --ls-secondary-text-color: var(--ls-gray-8);
+    --ls-tertiary-text-color: var(--ls-gray-8);
 
-    --color-error: hsl(0 70% 60%);
+    --ls-border-color: var(--ls-gray-4);
+    --ls-guideline-color: var(--ls-gray-4);
+    
+    --ls-accent-text-color: var(--ls-gray-12);
+    --ls-accent-transparent: hsla(var(--ls-accent-10-hsl), 0.15);
+
+    --ls-block-bullet-color: var(--ls-gray-6);
+    --ls-block-bullet-active-color: hsl(var(--ls-accent-10-hsl));
+
+    /* Pills & Status */
+    --ls-pill-text-color: hsl(150, 70%, 80%);
+    --ls-pill-bg-color: hsl(150, 100%, 15%);
+    
+    --ls-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
+
+    /* == Synced with Flatly Theme - Extra Variables == */
+    --ls-secondary-border-color: var(--ls-gray-5);
+    --ls-block-highlight-color: hsl(var(--ls-accent-hue) var(--ls-accent-saturation) 20%);
+    --ls-page-checkbox-color: var(--ls-accent-9);
+    --ls-page-checkbox-border-color: var(--ls-accent-9);
+    --color-error: #e74c3c;
     --color-bg-hover: var(--ls-gray-3);
-
-    /* Task and Status Colors - Dark Mode */
     --ls-task-done-color: #10b981;
-    --ls-task-done-hover-color: #059669;
-    --ls-task-cancelled-color: var(--ls-gray-8);
-    --ls-task-cancelled-hover-color: var(--ls-gray-9);
-    
-    /* Button Colors - Dark Mode */
-    --ls-button-danger-color: #ef4444;
-    --ls-button-danger-hover-color: #dc2626;
-    --ls-button-danger-shadow-color: rgba(239, 68, 68, 0.3);
-    
-    /* Status Colors - Dark Mode */
-    --ls-status-success-color: hsl(145, 50%, 70%);
-    --ls-status-success-light-color: hsl(145, 50%, 20%);
-    
-    /* Splash Screen Colors - Dark Mode */
-    --ls-splash-bg-color: rgb(30, 20, 35);
-    --ls-splash-orb-bg-color: rgba(25, 15, 30, 0.8);
-
-    /* Newly Added Variables - Default Dark */
-    --ls-calendar-today-bg: var(--ls-accent-10);
-    --ls-calendar-today-text: var(--ls-gray-12);
+    --ls-task-done-hover-color: hsl(168, 76%, 45%);
+    --ls-task-cancelled-color: var(--ls-gray-7);
+    --ls-task-cancelled-hover-color: var(--ls-gray-6);
+    --ls-button-danger-color: #dc2626;
+    --ls-button-danger-hover-color: #b91c1c;
+    --ls-button-danger-shadow-color: hsla(0, 80%, 59%, 0.2);
+    --ls-status-success-color: #10b981;
+    --ls-status-success-light-color: hsl(168, 76%, 25%);
+    --ls-splash-bg: var(--ls-gray-1);
+    --ls-splash-orb-bg: hsl(168, 76%, 25%);
+    --ls-calendar-today-bg: var(--ls-accent-3);
+    --ls-calendar-today-text: var(--ls-gray-1);
     --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.4);
-    --ls-modal-close-danger-hover-bg: hsla(0, 70%, 60%, 0.15);
-    --ls-button-danger-bg: hsl(0, 70%, 60%);
-    --ls-button-danger-text: var(--ls-gray-12);
-    --ls-button-danger-border-color: hsl(0, 70%, 60%);
-    --ls-button-danger-hover-bg: hsl(0, 70%, 50%);
-    --ls-button-danger-hover-text: var(--ls-gray-12);
-    --ls-button-danger-hover-border-color: hsl(0, 70%, 50%);
-    --ls-button-danger-box-shadow: 0 2px 4px hsla(0, 70%, 60%, 0.2);
-    --ls-task-done-border-color: var(--ls-task-done-color, #10b981);
-    --ls-task-done-badge-bg: var(--ls-task-done-color, #10b981);
-    --ls-task-done-badge-text: var(--ls-gray-12);
-    --ls-task-cancelled-badge-bg: var(--ls-gray-6);
-    --ls-task-cancelled-badge-text: var(--ls-gray-11);
-    --ls-transclusion-error-bg: hsl(0, 100%, 15%);
-    --ls-splash-orb-text-color: var(--ls-gray-12);
-    --ls-splash-orb-dot-color: rgba(220, 220, 220, 0.6);
+    --ls-modal-close-danger-hover-bg: rgba(220, 38, 38, 0.15);
+    --ls-button-danger-bg: #dc2626;
+    --ls-button-danger-text: var(--ls-primary-background-color, #ffffff);
+    --ls-button-danger-border-color: #dc2626;
+    --ls-button-danger-hover-bg: #b91c1c;
+    --ls-button-danger-hover-text: var(--ls-button-danger-text, var(--ls-primary-background-color, #ffffff));
+    --ls-button-danger-hover-border-color: #b91c1c;
+    --ls-button-danger-box-shadow: none;
+    --ls-task-done-border-color: #10b981;
+    --ls-task-done-badge-bg: #10b981;
+    --ls-task-done-badge-text: var(--ls-gray-1);
+    --ls-task-cancelled-badge-bg: var(--ls-gray-5);
+    --ls-task-cancelled-badge-text: var(--ls-gray-9);
+    --ls-transclusion-error-bg: hsl(0 80% 15%);
+    --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
+    --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
     --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.7);
-    --ls-image-viewer-close-text: var(--ls-gray-12);
-    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    --ls-image-viewer-close-text: var(--ls-primary-text-color);
+    --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
     --ls-property-tag-bg: var(--ls-accent-9);
-    --ls-property-tag-text: var(--ls-gray-13);
-    --ls-save-status-bg: var(--ls-gray-12);
-    --ls-save-status-spinner-color: var(--ls-gray-5);
-    --ls-save-status-saved-icon-color: var(--ls-green-9);
-    --ls-save-status-error-icon-color: var(--ls-red-9);
-
-    /* == Newly Added Variables - Default Dark == */
-    --ls-active-nav-item-text-color: var(--ls-gray-13); /* Text on active nav item (accent bg) */
-    --ls-task-checkbox-checkmark-color: var(--ls-gray-13); /* Checkmark in task checkbox */
-    --ls-task-keyword-later-bg: hsl(45, 40%, 20%); /* Darker, less saturated yellow */
-    --ls-task-keyword-later-text: hsl(45, 70%, 80%); /* Lighter yellow-brown text */
-    --ls-add-property-btn-hover-text-color: var(--ls-gray-13); /* Text on add property btn hover (accent bg) */
-    --ls-search-selected-item-text-color: var(--ls-gray-13); /* Text on selected search item (accent bg) */
-    --ls-search-selected-create-new-text-color: var(--ls-gray-13); /* Text for 'create new' in search (accent bg) */
-    --ls-toast-feedback-text-color: var(--ls-gray-13); /* Text on toast/feedback popups (accent bg) */
-    --ls-focused-parent-bullet-text-color: var(--ls-gray-13); /* Text on focused parent bullet (accent bg) */
-    --ls-show-all-notes-btn-text-color: var(--ls-gray-13); /* Text on 'show all notes' button (accent bg) */
-    --ls-task-badge-todo-text-color: var(--ls-gray-13); /* Text on TODO badge (accent bg) */
-
-    /* == Splash Screen Animated Bubble Colors - Default Dark == */
-    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 35%, 0.25);
-    --ls-splash-bubble-color-2: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 45%, 0.2);
-    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) - 10%), 40%, 0.22);
-    --ls-splash-bubble-color-4: hsla(var(--ls-gray-hue), var(--ls-gray-saturation), 25%, 0.18);
-} 
+    --ls-property-tag-text: #ffffff;
+    --ls-save-status-bg: var(--ls-gray-11);
+    --ls-save-status-spinner-color: var(--ls-accent-9);
+    --ls-save-status-saved-icon-color: #10b981;
+    --ls-save-status-error-icon-color: #e74c3c;
+    --ls-active-nav-item-text-color: #ffffff;
+    --ls-task-checkbox-checkmark-color: #ffffff;
+    --ls-task-keyword-later-bg: hsl(40, 100%, 90%);
+    --ls-task-keyword-later-text: hsl(30, 100%, 30%);
+    --ls-add-property-btn-hover-text-color: #ffffff;
+    --ls-search-selected-item-text-color: #ffffff;
+    --ls-search-selected-create-new-text-color: #ffffff;
+    --ls-toast-feedback-text-color: #ffffff;
+    --ls-focused-parent-bullet-text-color: #ffffff;
+    --ls-show-all-notes-btn-text-color: #ffffff;
+    --ls-task-badge-todo-text-color: #ffffff;
+    --ls-splash-bubble-color-1: hsla(var(--ls-accent-hue), var(--ls-accent-saturation), 40%, 0.28);
+    --ls-splash-bubble-color-2: rgba(24, 188, 156, 0.18);
+    --ls-splash-bubble-color-3: hsla(var(--ls-accent-hue), calc(var(--ls-accent-saturation) - 15%), 45%, 0.22);
+    --ls-splash-bubble-color-4: rgba(189, 195, 199, 0.18);
+    --ls-task-keyword-waiting-color: hsl(210, 80%, 60%);
+    --ls-task-keyword-someday-color: #9b59b6;
+}

@@ -1,9 +1,13 @@
 <?php
+
+namespace App;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
-require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../validator_utils.php';
+require_once __DIR__ . '/../PatternProcessor.php';
 
 // New "Smart Property Indexer"
 // This function is the single source of truth for processing properties from content.
@@ -18,8 +22,8 @@ if (!function_exists('_indexPropertiesFromContent')) {
             }
         }
 
-        // Instantiate the pattern processor. It gets PDO from get_db_connection()
-        $patternProcessor = getPatternProcessor();
+        // Instantiate the pattern processor with the existing PDO connection to avoid database locks
+        $patternProcessor = new \App\PatternProcessor($pdo);
 
         // Process the content to extract properties and potentially modified content
         // Pass $pdo in context for handlers that might need it directly.
@@ -61,21 +65,21 @@ if (!function_exists('_indexPropertiesFromContent')) {
 
 header('Content-Type: application/json');
 $pdo = get_db_connection();
-$dataManager = new DataManager($pdo);
+$dataManager = new \App\DataManager($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
 if ($method !== 'POST') {
-    ApiResponse::error('Method not allowed. Only POST is supported.', 405);
+    \App\ApiResponse::error('Method not allowed. Only POST is supported.', 405);
     exit;
 }
 
 // 1. Validate input
 if (!isset($input['page_name']) || !is_string($input['page_name']) || empty(trim($input['page_name']))) {
-    ApiResponse::error('page_name is required and must be a non-empty string.', 400);
+    \App\ApiResponse::error('page_name is required and must be a non-empty string.', 400);
     exit;
 }
-$page_name = Validator::sanitizeString($input['page_name']);
+$page_name = \Validator::sanitizeString($input['page_name']);
 
 try {
     $pdo->beginTransaction();
@@ -129,7 +133,7 @@ try {
     // Process batch operations directly
     if (!empty($batch_operations)) {
         try {
-            $appended_notes_results = _handleBatchOperations($pdo, $dataManager, $batch_operations);
+            $appended_notes_results = _handleBatchOperations($pdo, $dataManager, $batch_operations, false);
 
             // If we get here, the batch operations were successful (or at least did not throw an exception)
             // The _handleBatchOperations function now returns results directly or throws an exception.
@@ -140,7 +144,7 @@ try {
             // Re-fetch page_data to include any new properties
             $final_page_data = $dataManager->getPageDetailsById($page_id, true);
 
-            ApiResponse::success([
+            \App\ApiResponse::success([
                 'message' => ($page_data ? 'Page retrieved' : 'Page created') . ' and notes appended successfully.',
                 'page' => $final_page_data,
                 'appended_notes' => $appended_notes_results
@@ -163,5 +167,5 @@ try {
         $pdo->rollBack();
     }
     error_log("Error in append_to_page.php: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
-    ApiResponse::error('An error occurred: ' . $e->getMessage(), 500);
+    \App\ApiResponse::error('An error occurred: ' . $e->getMessage(), 500);
 }

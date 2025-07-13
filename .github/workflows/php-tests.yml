@@ -1,8 +1,12 @@
 name: PHP Tests
 
+permissions:
+  issues: write
+  pull-requests: write
+
 on:
   push:
-    branches: [ main, feat/impr ]
+    branches: [ main, feat/impr, migr/** ]
   pull_request:
     branches: [ main ]
 
@@ -10,33 +14,152 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        php-version: ['8.1', '8.2']
+        test-suite: ['unit', 'integration', 'performance']
+
     steps:
     - uses: actions/checkout@v4
 
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: '8.1'
-        extensions: sqlite3, pdo_sqlite
-        coverage: none
+        php-version: ${{ matrix.php-version }}
+        extensions: sqlite3, pdo_sqlite, mbstring, json
+        coverage: xdebug
 
-    - name: Install PHPUnit
+    - name: Validate composer.json
+      run: composer validate --strict
+
+    - name: Install dependencies
       run: |
+        composer install --prefer-dist --no-progress --no-dev
         composer require --dev phpunit/phpunit
-        composer install
+        composer dump-autoload
 
-    - name: Create test database directory
-      run: mkdir -p db
-
-    - name: Run tests
+    - name: Debug composer autoloader
       run: |
-        php test_runner.php
+        echo "Checking if composer autoloader was generated..."
+        ls -la vendor/
+        if [ -f "vendor/autoload.php" ]; then
+          echo "✅ Composer autoloader found"
+        else
+          echo "❌ Composer autoloader NOT found"
+          echo "Generating autoloader manually..."
+          composer dump-autoload --optimize
+        fi
+
+    - name: Debug file structure
+      run: |
+        echo "Checking API files structure..."
+        ls -la api/
+        echo "Checking if classes have proper namespaces..."
+        head -5 api/DataManager.php
+        head -5 api/PatternProcessor.php
+        head -5 api/PropertyTriggerService.php
+
+    - name: Create test directories
+      run: |
+        mkdir -p db
+        mkdir -p uploads/test
+        mkdir -p coverage
+
+    - name: Run quick functionality test
+      run: |
+        cd tests
+        php quick_test.php
       env:
         DB_PATH: ./db/test_database.sqlite
+        UPLOADS_DIR: ./uploads/test
+        APP_ENV: testing
 
-    - name: Display test results
+    - name: Start PHP built-in server
+      run: php -S localhost:80 -t . > /dev/null 2>&1 &
+
+    - name: Run ${{ matrix.test-suite }} tests
       run: |
-        echo "Test execution completed"
-        if [ -f "test_results.json" ]; then
-          cat test_results.json
-        fi
+        cd tests
+        php run_tests.php ${{ matrix.test-suite }}
+      env:
+        DB_PATH: ./db/test_database.sqlite
+        UPLOADS_DIR: ./uploads/test
+        APP_ENV: testing
+
+    - name: Debug test failures
+      if: failure()
+      run: |
+        echo "Tests failed. Running debug scripts..."
+        echo "=== Syntax Validation ==="
+        cd tests
+        php validate_syntax.php
+        echo ""
+        echo "=== Bootstrap Debug ==="
+        php debug_test.php
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: matrix.test-suite == 'unit' && matrix.php-version == '8.1'
+      with:
+        file: ./tests/coverage.txt
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.php-version }}-${{ matrix.test-suite }}
+        path: |
+          tests/test-results.xml
+          tests/coverage/
+          tests/testdox.html
+          tests/testdox.txt
+
+  test-summary:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Download all test results
+      uses: actions/download-artifact@v4
+      with:
+        path: test-results
+
+    - name: Generate test summary
+      run: |
+        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| PHP Version | Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------------|------------|--------|" >> $GITHUB_STEP_SUMMARY
+        
+        for result in test-results/*; do
+          if [ -d "$result" ]; then
+            suite=$(basename "$result" | sed 's/test-results-.*-//')
+            version=$(basename "$result" | sed 's/test-results-\(.*\)-.*/\1/')
+            
+            if [ -f "$result/test-results.xml" ]; then
+              status="✅ Passed"
+            else
+              status="❌ Failed"
+            fi
+            
+            echo "| $version | $suite | $status |" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          })

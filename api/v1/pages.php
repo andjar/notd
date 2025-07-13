@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 // api/v1/pages.php
 
 /**
@@ -7,16 +10,16 @@
  */
 
 require_once __DIR__ . '/../db_connect.php';
-require_once __DIR__ . '/../data_manager.php';
-require_once __DIR__ . '/../pattern_processor.php';
+require_once __DIR__ . '/../DataManager.php';
+require_once __DIR__ . '/../PatternProcessor.php';
 require_once __DIR__ . '/../response_utils.php';
 
 if (!function_exists('_indexPropertiesFromContent')) {
     function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
         // For pages, we don't have the 'encrypted' property check or 'internal' flag update as for notes.
 
-        // Instantiate the pattern processor. It gets PDO from get_db_connection()
-        $patternProcessor = getPatternProcessor();
+        // Instantiate the pattern processor with the existing PDO connection to avoid database locks
+        $patternProcessor = new \App\PatternProcessor($pdo);
 
         // Process the content to extract properties and potentially modified content
         // Pass $pdo in context for handlers that might need it directly.
@@ -48,7 +51,7 @@ if ($method === 'POST' && isset($input['_method'])) {
 }
 
 $pdo = get_db_connection();
-$dataManager = new DataManager($pdo);
+$dataManager = new \App\DataManager($pdo);
 // $propertyParser = new PropertyParser($pdo); // Removed global instantiation
 
 try {
@@ -65,17 +68,17 @@ try {
                     $pdo->commit();
                     $page = $dataManager->getPageByName($pageName); // Re-fetch the newly created page
                 }
-                ApiResponse::success($page, 200);
+                \App\ApiResponse::success($page, 200);
             } elseif (isset($_GET['id'])) {
                 $page = $dataManager->getPageById((int)$_GET['id']);
                 if ($page) {
-                    ApiResponse::success($page);
+                    \App\ApiResponse::success($page);
                 } else {
-                    ApiResponse::error('Page not found', 404);
+                    \App\ApiResponse::error('Page not found', 404);
                 }
             } elseif (isset($_GET['date'])) {
                 $pages = $dataManager->getPagesByDate($_GET['date']);
-                ApiResponse::success($pages);
+                \App\ApiResponse::success($pages);
             } else {
                 $page = $_GET['page'] ?? 1;
                 $per_page = $_GET['per_page'] ?? 20;
@@ -85,7 +88,7 @@ try {
                 $result = $dataManager->getPages((int)$page, (int)$per_page, $options);
                 
                 // This now returns the correct, non-double-wrapped structure
-                ApiResponse::success($result['data'], 200, ['pagination' => $result['pagination']]);
+                \App\ApiResponse::success($result['data'], 200, ['pagination' => $result['pagination']]);
             }
             break;
 
@@ -94,10 +97,10 @@ try {
             $content = $input['content'] ?? null;
 
             if (!$name) {
-                ApiResponse::error('Page name is required.', 400);
+                \App\ApiResponse::error('Page name is required.', 400);
             }
             if ($dataManager->getPageByName($name)) {
-                ApiResponse::error('Page with this name already exists.', 409);
+                \App\ApiResponse::error('Page with this name already exists.', 409);
             }
 
             $pdo->beginTransaction();
@@ -111,19 +114,19 @@ try {
             $pdo->commit();
 
             $newPage = $dataManager->getPageById($pageId);
-            ApiResponse::success($newPage, 201);
+            \App\ApiResponse::success($newPage, 201);
             break;
 
         case 'PUT': // Update
             $pageId = $input['id'] ?? null;
             if (!$pageId) {
-                ApiResponse::error('Page ID is required for update.', 400);
+                \App\ApiResponse::error('Page ID is required for update.', 400);
             }
 
             // Fetch existing page to ensure it exists
             $page = $dataManager->getPageById($pageId);
             if (!$page) {
-                ApiResponse::error('Page not found.', 404);
+                \App\ApiResponse::error('Page not found.', 404);
             }
 
             $newName = $input['name'] ?? $page['name'];
@@ -140,26 +143,26 @@ try {
             $pdo->commit();
             
             $updatedPage = $dataManager->getPageById($pageId);
-            ApiResponse::success($updatedPage);
+            \App\ApiResponse::success($updatedPage);
             break;
 
         case 'DELETE':
             $pageId = $input['id'] ?? null;
             if (!$pageId) {
-                ApiResponse::error('Page ID is required for deletion.', 400);
+                \App\ApiResponse::error('Page ID is required for deletion.', 400);
             }
             $stmt = $pdo->prepare("DELETE FROM Pages WHERE id = :id");
             $stmt->execute([':id' => $pageId]);
 
             if ($stmt->rowCount() > 0) {
-                ApiResponse::success(['deleted_page_id' => $pageId]);
+                \App\ApiResponse::success(['deleted_page_id' => $pageId]);
             } else {
-                ApiResponse::error('Page not found.', 404);
+                \App\ApiResponse::error('Page not found.', 404);
             }
             break;
 
         default:
-            ApiResponse::error('Method not supported.', 405);
+            \App\ApiResponse::error('Method not supported.', 405);
             break;
     }
 } catch (Exception $e) {

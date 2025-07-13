@@ -1,0 +1,55 @@
+/* ========== MOBILE BOTTOM TOOLBAR ========== */
+
+@media (max-width: 600px) {
+  .mobile-bottom-toolbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 56px;
+    background: var(--ls-primary-background-color);
+    border-top: 1px solid var(--ls-secondary-border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 10000;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+  }
+  .mobile-bottom-toolbar__btn {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: none;
+    border: none;
+    color: var(--ls-primary-text-color);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    outline: none;
+    padding: 0;
+  }
+  .mobile-bottom-toolbar__btn:active,
+  .mobile-bottom-toolbar__btn:focus {
+    background: var(--ls-tertiary-background-color);
+  }
+  .mobile-bottom-toolbar__btn .icon {
+    font-size: 1.6rem;
+    margin-bottom: 2px;
+  }
+  .mobile-bottom-toolbar__btn-label {
+    font-size: 0.75rem;
+    line-height: 1;
+    margin-top: 0;
+    color: var(--ls-secondary-text-color);
+  }
+}
+
+@media (min-width: 601px) {
+  .mobile-bottom-toolbar {
+    display: none !important;
+  }
+}

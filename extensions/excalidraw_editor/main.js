@@ -5,135 +5,119 @@ const ExcalidrawLib = window.ExcalidrawLib;
 
 document.addEventListener('DOMContentLoaded', () => {
     const excalidrawContainer = document.getElementById('excalidraw-container');
-    const saveButton = document.getElementById('save-to-note-btn');
+    const saveBtn = document.getElementById('save-to-note-btn');
     const noteIdDisplay = document.getElementById('note-id-display');
+    const errorMessage = document.getElementById('error-message');
+    const successMessage = document.getElementById('success-message');
 
     let currentNoteId = null;
-    let excalidrawAPI = null; // To store the Excalidraw API instance
+    let excalidrawAPI = null;
+    let isSaving = false;
 
-    // 1. Initialize Excalidraw and store its API
-    if (excalidrawContainer && ExcalidrawLib) {
-        const excalidrawProps = {
-            // initialData: { ... } // Optionally load initial data
-            onChange: (elements, appState) => {
-                // console.log("Elements:", elements);
-                // console.log("State:", appState);
-            },
-            onPointerUpdate: (payload) => {
-                // console.log("Pointer Update:", payload);
-            },
-            // Store the Excalidraw API once it's available
-            excalidrawAPI: (api) => {
-                excalidrawAPI = api;
-                console.log("Excalidraw API initialized");
-            }
-        };
-        ReactDOM.render(
-            React.createElement(ExcalidrawLib.Excalidraw, excalidrawProps),
-            excalidrawContainer
-        );
-    } else {
-        console.error('Excalidraw container or ExcalidrawLib not found.');
-        if (excalidrawContainer) {
-            excalidrawContainer.innerHTML = 'Error: Excalidraw could not be initialized.';
-        }
-        return; // Stop if Excalidraw cannot be initialized
+    // Helper to update UI state
+    function updateUI() {
+        noteIdDisplay.textContent = currentNoteId ? `Note ID: ${currentNoteId}` : 'Note ID: Not Provided!';
+        saveBtn.disabled = isSaving || !currentNoteId || !excalidrawAPI;
+        errorMessage.style.display = errorMessage.textContent ? '' : 'none';
+        successMessage.style.display = successMessage.textContent ? '' : 'none';
     }
 
-    // 2. Retrieve note_id from URL
+    // Retrieve note_id from URL
     try {
         const urlParams = new URLSearchParams(window.location.search);
         currentNoteId = urlParams.get('note_id');
-        if (currentNoteId) {
-            noteIdDisplay.textContent = `Note ID: ${currentNoteId}`;
-            console.log('Current Note ID:', currentNoteId);
-        } else {
-            noteIdDisplay.textContent = 'Note ID: Not Provided!';
-            console.error('Note ID not found in URL parameters.');
-            saveButton.disabled = true; // Disable save if no note_id
-            saveButton.title = "Cannot save: Note ID is missing in the URL.";
-        }
     } catch (e) {
-        console.error("Error parsing URL parameters:", e);
-        noteIdDisplay.textContent = 'Note ID: Error';
-        saveButton.disabled = true;
-        saveButton.title = "Cannot save: Error reading Note ID from URL.";
+        currentNoteId = null;
     }
 
+    // Initialize Excalidraw and store its API
+    if (excalidrawContainer && window.Excalidraw) {
+        const excalidrawProps = {
+            onChange: () => {},
+            onPointerUpdate: () => {},
+            excalidrawAPI: (api) => {
+                excalidrawAPI = api;
+                window.excalidrawAPI = api;
+                updateUI();
+            }
+        };
+        ReactDOM.render(
+            React.createElement(window.Excalidraw, excalidrawProps),
+            excalidrawContainer
+        );
+    } else {
+        excalidrawContainer.innerHTML = 'Error: Excalidraw could not be initialized.';
+        return;
+    }
 
-    // 3. Handle "Save as Attachment" button click
-    saveButton.addEventListener('click', async () => {
+    // Save button click handler
+    saveBtn.addEventListener('click', async () => {
         if (!currentNoteId) {
-            alert('Error: Note ID is missing. Cannot save attachment.');
+            errorMessage.textContent = 'Error: Note ID is missing. Cannot save attachment.';
+            successMessage.textContent = '';
+            updateUI();
             return;
         }
         if (!excalidrawAPI) {
-            alert('Error: Excalidraw API is not available. Cannot save.');
+            errorMessage.textContent = 'Error: Excalidraw API is not available. Cannot save.';
+            successMessage.textContent = '';
+            updateUI();
             return;
         }
-
-        saveButton.disabled = true;
-        saveButton.textContent = 'Saving...';
-
+        isSaving = true;
+        errorMessage.textContent = '';
+        successMessage.textContent = '';
+        updateUI();
         try {
-            // 4. Export drawing as PNG Blob
-            // Get all elements from Excalidraw scene
             const elements = excalidrawAPI.getSceneElements();
             if (!elements || elements.length === 0) {
-                alert("The canvas is empty. Nothing to save.");
-                saveButton.disabled = false;
-                saveButton.textContent = 'Save as Attachment';
+                errorMessage.textContent = 'The canvas is empty. Nothing to save.';
+                updateUI();
+                isSaving = false;
                 return;
             }
-            
             const appState = excalidrawAPI.getAppState();
+            const appState = excalidrawAPI.getAppState();
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-            // Use Excalidraw's exportToBlob utility
-            const blob = await ExcalidrawLib.exportToBlob({
-                elements: elements,
+            // Export PNG
+            const pngBlob = await window.Excalidraw.exportToBlob({
+                elements,
                 mimeType: 'image/png',
                 appState: {
                     ...appState,
-                    // Ensure options like viewBackgroundColor are set if you want them in the export
-                    // For example, to ensure transparent background is not used if not desired:
-                    // viewBackgroundColor: appState.viewBackgroundColor || '#ffffff', 
-                    exportWithDarkMode: appState.theme === 'dark', // Example: export dark mode if active
+                    exportWithDarkMode: appState.theme === 'dark',
                 },
-                // files: excalidrawAPI.getFiles() // Include if you support images within Excalidraw
             });
+            if (!pngBlob) throw new Error('Failed to export drawing to PNG Blob.');
 
-            if (!blob) {
-                throw new Error('Failed to export drawing to Blob.');
-            }
+            // Export JSON
+            const jsonString = JSON.stringify(elements, null, 2);
+            const jsonBlob = new Blob([jsonString], { type: 'application/json' });
+            if (!jsonBlob) throw new Error('Failed to create JSON Blob for scene data.');
 
-            // 5. Prepare FormData
             const formData = new FormData();
             formData.append('note_id', currentNoteId);
-            // Use a filename like "excalidraw_drawing_TIMESTAMP.png"
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `excalidraw_${timestamp}.png`;
-            formData.append('attachmentFile', blob, filename);
 
-            console.log('FormData prepared for upload:', { note_id: currentNoteId, filename });
+            const pngFilename = `excalidraw_${timestamp}.png`;
+            const jsonFilename = `excalidraw_${timestamp}.excalidraw`; // Using .excalidraw extension for scene file
 
-            // 6. Call attachmentsAPI.uploadAttachment
-            // Ensure attachmentsAPI is available (loaded from api_client.js)
-            if (!attachmentsAPI || !attachmentsAPI.uploadAttachment) {
-                 throw new Error('attachmentsAPI or uploadAttachment function is not available. Ensure api_client.js is loaded correctly.');
+            formData.append('attachmentFile[]', pngBlob, pngFilename);
+            formData.append('attachmentFile[]', jsonBlob, jsonFilename);
+
+            if (!window.attachmentsAPI || !window.attachmentsAPI.uploadAttachment) {
+                throw new Error('attachmentsAPI or uploadAttachment function is not available.');
             }
-            
-            const result = await attachmentsAPI.uploadAttachment(formData);
-            console.log('Attachment upload result:', result);
-            alert('Drawing saved successfully as an attachment!');
-            // Optionally, you could close the extension window or redirect,
-            // or clear the canvas if it's meant for single use.
-
+            await window.attachmentsAPI.uploadAttachment(formData);
+            successMessage.textContent = 'Drawing and scene data saved successfully as attachments!';
         } catch (error) {
-            console.error('Error saving Excalidraw drawing:', error);
-            alert(`Error saving drawing: ${error.message}`);
+            errorMessage.textContent = `Error saving drawing: ${error.message}`;
         } finally {
-            saveButton.disabled = false;
-            saveButton.textContent = 'Save as Attachment';
+            isSaving = false;
+            updateUI();
         }
     });
+
+    // Initial UI update
+    updateUI();
 });

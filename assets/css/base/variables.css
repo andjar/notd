@@ -1,0 +1,133 @@
+/* === Root Variables and Theming System === */
+:root {
+  /* Spacing */
+  --ls-space-unit: 0.22rem;
+  --ls-space-1: var(--ls-space-unit);
+  --ls-space-2: calc(var(--ls-space-unit) * 2);
+  --ls-space-3: calc(var(--ls-space-unit) * 3);
+  --ls-space-4: calc(var(--ls-space-unit) * 4);
+  --ls-space-6: calc(var(--ls-space-unit) * 6);
+  --ls-space-8: calc(var(--ls-space-unit) * 8);
+
+  /* Typography */
+  --ls-font-family: 'Inter', 'Lato', 'Open Sans', 'Segoe UI', Arial, sans-serif;
+  --ls-header-font-family: 'Inter', 'Lato', 'Open Sans', 'Segoe UI', Arial, sans-serif;
+  --ls-font-size-xs: 0.8rem;
+  --ls-font-size-sm: 0.9rem;
+  --ls-font-size-base: 1rem;
+  --ls-font-size-lg: 1.1rem;
+  --ls-font-size-xl: 1.2rem;
+  --ls-font-size-2xl: 1.4rem;
+  --ls-font-size-3xl: 1.7rem;
+  --ls-page-title-size: 30px;
+
+  --ls-font-weight-normal: 400;
+  --ls-font-weight-medium: 500;
+  --ls-font-weight-semibold: 600;
+  --ls-font-weight-bold: 700;
+
+  /* Layout */
+  --ls-left-sidebar-width: 300px;
+  --ls-right-sidebar-width: 300px;
+  --ls-header-height: 3rem;
+  --ls-main-content-max-width: 810px;
+  --ls-border-radius-low: 2px;
+  --ls-border-radius-medium: 4px;
+
+  /* Transitions */
+  --ls-transition-fast: 150ms ease;
+  --ls-transition-normal: 250ms ease;
+
+  /* Shadows */
+  --ls-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --ls-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --ls-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* Z-index layers */
+  --ls-z-index-dropdown: 1000;
+  --ls-z-index-sticky: 1020;
+  --ls-z-index-modal: 1050;
+  --ls-z-index-popover: 1060;
+  --ls-z-index-tooltip: 1070;
+
+  /* Outliner Controls */
+  --control-area-width: calc(var(--ls-space-6) * 0.8);
+  --arrow-left-in-item: 0.3em;
+  --bullet-left-in-item: 1.5em;
+  --control-icon-container-size: 1.2em;
+  --arrow-icon-visual-size: 0.8em;
+  --bullet-dot-visual-size: 6px;
+  --controls-container-width: calc(var(--ls-space-6) * 1.2);
+  --control-icon-size: 16px;
+  --control-vertical-offset: calc((var(--ls-font-size-base) * 1.5 - var(--control-icon-size)) / 2);
+  --ls-indentation-unit: 32px;
+  --bullet-left-indent: 1.5em;
+  --arrow-left-indent: 0.8em;
+  --content-left-padding: 2.4em;
+  --bullet-visual-size: 6px;
+  --arrow-visual-size: 0.7em;
+  --thread-line-width: 1px;
+
+  /* Tag, Calendar, Button, Transclusion, Modal, Toast, etc. */
+  --ls-tag-text-color: var(--ls-link-text-color);
+  --ls-tag-text-hover-color: var(--ls-link-text-hover-color);
+  --ls-tag-text-opacity: 0.8;
+  --ls-tag-text-hover-opacity: 1;
+  --ls-calendar-today-bg: var(--ls-accent-3);
+  --ls-calendar-today-text: var(--ls-primary-background-color, black);
+  --ls-calendar-current-page-glow: 0 0 8px hsl(var(--ls-accent-10-hsl) / 0.3);
+  --ls-button-danger-color: #dc2626;
+  --ls-button-danger-text: var(--ls-primary-background-color, #ffffff);
+  --ls-button-danger-hover-color: #b91c1c;
+  --ls-button-danger-hover-text: var(--ls-button-danger-text, var(--ls-primary-background-color, #ffffff));
+  --ls-button-danger-box-shadow: none;
+  --ls-transclusion-error-bg: hsl(0 100% 97%);
+  --ls-modal-close-danger-hover-bg: rgba(220, 38, 38, 0.1);
+  --ls-button-danger-bg: #dc2626;
+  --ls-button-danger-border-color: #dc2626;
+  --ls-button-danger-hover-bg: #b91c1c;
+  --ls-button-danger-hover-border-color: #b91c1c;
+  --ls-task-done-border-color: #10b981;
+  --ls-task-done-badge-bg: #10b981;
+  --ls-task-done-badge-text: var(--ls-primary-background-color, #ffffff);
+  --ls-task-cancelled-badge-bg: var(--ls-gray-8);
+  --ls-task-cancelled-badge-text: var(--ls-primary-background-color, #ffffff);
+  --ls-splash-orb-text-color: var(--ls-primary-background-color, #ffffff);
+  --ls-splash-orb-dot-color: rgba(255, 255, 255, 0.7);
+  --ls-generic-modal-backdrop-bg: rgba(0, 0, 0, 0.6);
+  --ls-image-viewer-close-text: var(--ls-primary-text-color);
+  --ls-image-viewer-close-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --ls-active-nav-item-text-color: #ffffff;
+  --ls-task-checkbox-checkmark-color: #ffffff;
+  --ls-task-keyword-later-bg: hsl(40, 100%, 90%);
+  --ls-task-keyword-later-text: hsl(30, 100%, 30%);
+  --ls-add-property-btn-hover-text-color: #ffffff;
+  --ls-search-selected-item-text-color: #ffffff;
+  --ls-search-selected-create-new-text-color: #ffffff;
+  --ls-toast-feedback-text-color: #ffffff;
+  --ls-focused-parent-bullet-text-color: #ffffff;
+  --ls-show-all-notes-btn-text-color: #ffffff;
+  --ls-task-badge-todo-text-color: #ffffff;
+  --ls-splash-bubble-color-1: rgba(255, 100, 0, 0.35);
+  --ls-splash-bubble-color-2: rgba(230, 50, 50, 0.35);
+  --ls-splash-bubble-color-3: rgba(200, 0, 100, 0.3);
+  --ls-splash-bubble-color-4: rgba(255, 150, 50, 0.3);
+
+  /* Color Palette */
+  --ls-primary-background-color: #F8F9FA;
+  --ls-primary-text-color: #212529;
+  --ls-secondary-text-color: #6c757d;
+  --ls-secondary-background-color: #f1f3f5;
+  --ls-secondary-border-color: #e0e3e7;
+  --ls-accent-3: #b3c7e6; /* Muted blue for backgrounds */
+  --ls-accent-10: #3b5b8c; /* Muted blue for text */
+  --ls-accent-11: #23406c; /* Slightly darker for contrast */
+  --ls-link-text-color: #3b5b8c;
+  --ls-link-text-hover-color: #23406c;
+  --ls-border-color: #e0e3e7;
+
+  /* Typography improvements */
+  --ls-line-height-base: 1.7;
+}
+
+/* Dark theme variables are loaded from theme files. */ 

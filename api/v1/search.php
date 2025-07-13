@@ -1,11 +1,14 @@
 <?php
+
+namespace App;
+
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
-require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../../config.php';
 
 $pdo = get_db_connection();
-$dataManager = new DataManager($pdo);
+$dataManager = new \App\DataManager($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
 
 function get_content_snippet($content, $term, $context_length = 100) {
@@ -72,7 +75,7 @@ if ($method === 'GET') {
         if (isset($_GET['q'])) {
             $term = sanitize_fts_term($_GET['q']);
             if (empty($term)) {
-                ApiResponse::error('Search term is required.', 400);
+                \App\ApiResponse::error('Search term is required.', 400);
             }
             $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM Notes_fts WHERE Notes_fts MATCH ?");
             $count_stmt->execute([$term]);
@@ -88,7 +91,7 @@ if ($method === 'GET') {
 
         } elseif (isset($_GET['backlinks_for_page_name'])) {
             $target_page_name = trim($_GET['backlinks_for_page_name']);
-            if (empty($target_page_name)) ApiResponse::error('Target page name is required.', 400);
+            if (empty($target_page_name)) \App\ApiResponse::error('Target page name is required.', 400);
 
             $count_stmt = $pdo->prepare("SELECT COUNT(DISTINCT N.id) FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id WHERE Prop.name = 'links_to_page' AND Prop.value = ?");
             $count_stmt->execute([$target_page_name]);
@@ -102,7 +105,7 @@ if ($method === 'GET') {
         } elseif (isset($_GET['tasks'])) {
             $status = strtoupper(trim($_GET['tasks']));
             if ($status !== 'ALL' && !in_array($status, TASK_STATES)) {
-                ApiResponse::error('Invalid task status. Use "all" or one of: ' . implode(', ', TASK_STATES), 400);
+                \App\ApiResponse::error('Invalid task status. Use "all" or one of: ' . implode(', ', TASK_STATES), 400);
             }
 
             if ($status === 'ALL') {
@@ -110,7 +113,18 @@ if ($method === 'GET') {
                 $count_stmt->execute();
                 $total = (int)$count_stmt->fetchColumn();
 
-                $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, Pg.name as page_name, Prop.value as status FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages Pg ON N.page_id = Pg.id WHERE Prop.name = 'status' GROUP BY N.id ORDER BY N.updated_at DESC LIMIT ? OFFSET ?");
+                $stmt = $pdo->prepare(<<<SQL
+SELECT N.id as note_id, N.content, N.page_id, Pg.name as page_name, Prop.value as status
+FROM Notes N
+JOIN Pages Pg ON N.page_id = Pg.id
+JOIN Properties Prop ON Prop.note_id = N.id AND Prop.name = 'status'
+  AND Prop.id = (
+    SELECT MAX(p2.id) FROM Properties p2 WHERE p2.note_id = N.id AND p2.name = 'status'
+  )
+ORDER BY N.updated_at DESC
+LIMIT ? OFFSET ?
+SQL
+                );
                 $stmt->execute([$per_page, $offset]);
                 $results = $stmt->fetchAll();
                 foreach ($results as &$result) $result['content_snippet'] = get_content_snippet($result['content'], '{status::' . $result['status'] . '}');
@@ -136,13 +150,13 @@ if ($method === 'GET') {
             $results = $stmt->fetchAll();
 
         } else {
-            ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, tasks, or favorites', 400);
+            \App\ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, tasks, or favorites', 400);
         }
 
         // Attach properties to all results, regardless of search type
         attach_properties_to_results($dataManager, $results, $includeParentProps);
 
-        ApiResponse::success([
+        \App\ApiResponse::success([
             'results' => $results,
             'pagination' => [
                 'total_items' => $total,
@@ -155,8 +169,8 @@ if ($method === 'GET') {
     } catch (PDOException $e) {
         // FTS5 might throw an error on invalid syntax
         error_log("Search Error: " . $e->getMessage());
-        ApiResponse::error('Search failed. Please check your search term or contact support.', 500, ['details' => $e->getMessage()]);
+        \App\ApiResponse::error('Search failed. Please check your search term or contact support.', 500, ['details' => $e->getMessage()]);
     }
 } else {
-    ApiResponse::error('Method Not Allowed', 405);
+    \App\ApiResponse::error('Method Not Allowed', 405);
 }

@@ -7,7 +7,7 @@
 import { saveNoteImmediately } from '../app/note-actions.js';
 import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
-import { attachmentsAPI, notesAPI } from '../api_client.js';
+import { attachmentsAPI, notesAPI, pagesAPI } from '../api_client.js';
 import { decrypt } from '../utils.js';
 import { getCurrentPagePassword } from '../app/state.js';
 import {
@@ -123,16 +123,9 @@ function renderNote(note, nestingLevel = 0) {
         noteItemEl.classList.add('encrypted-note');
     }
 
-    // Controls section (drag handle and bullet)
+    // Controls section (bullet)
     const controlsEl = document.createElement('div');
     controlsEl.className = 'note-controls';
-
-    // Drag handle
-    const dragHandleEl = document.createElement('span');
-    dragHandleEl.className = 'note-drag-handle';
-    dragHandleEl.innerHTML = '<i data-feather="menu"></i>';
-    dragHandleEl.style.display = 'none'; // Hide the grip handle
-    controlsEl.appendChild(dragHandleEl);
 
     // Bullet (common to all notes)
     const bulletEl = document.createElement('span');
@@ -149,17 +142,13 @@ function renderNote(note, nestingLevel = 0) {
         arrowEl.dataset.collapsed = note.collapsed ? 'true' : 'false';
 
         const bulletElFromControls = controlsEl.querySelector('.note-bullet');
-        const dragHandle = controlsEl.querySelector('.note-drag-handle');
-        if (dragHandle) {
-            controlsEl.insertBefore(arrowEl, dragHandle);
-        } else if (bulletElFromControls) {
+        if (bulletElFromControls) {
             controlsEl.insertBefore(arrowEl, bulletElFromControls);
         } else {
             controlsEl.appendChild(arrowEl);
         }
     }
     
-    controlsEl.appendChild(dragHandleEl);
     controlsEl.appendChild(bulletEl);
 
     const contentWrapperEl = document.createElement('div');
@@ -246,29 +235,29 @@ function renderNote(note, nestingLevel = 0) {
 
         const files = Array.from(e.dataTransfer.files);
         if (files.length > 0 && note.id && !String(note.id).startsWith('temp-')) {
+            const formData = new FormData();
             for (const file of files) {
-                const formData = new FormData();
                 formData.append('attachmentFile', file);
-                formData.append('note_id', note.id);
-                try {
-                    await attachmentsAPI.uploadAttachment(formData);
-                    const feedback = document.createElement('div');
-                    feedback.className = 'copy-feedback'; 
-                    feedback.textContent = `File "${file.name}" uploaded!`;
-                    document.body.appendChild(feedback);
-                    setTimeout(() => feedback.remove(), 3000);
-                    
-                    if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
-                         const pageData = await notesAPI.getPageData(window.currentPageId);
-                         window.notesForCurrentPage = pageData.notes; 
-                         window.ui.displayNotes(pageData.notes, window.currentPageId); 
-                    } else {
-                        console.warn('displayNotes function not available for page refresh after D&D upload.')
-                    }
-                } catch (error) {
-                    console.error('Error uploading file via drag & drop:', error);
-                    alert(`Failed to upload file "${file.name}": ${error.message}`);
+            }
+            formData.append('note_id', note.id);
+            try {
+                await attachmentsAPI.uploadAttachment(formData);
+                const feedback = document.createElement('div');
+                feedback.className = 'copy-feedback'; 
+                feedback.textContent = `Uploaded ${files.length} file${files.length > 1 ? 's' : ''}!`;
+                document.body.appendChild(feedback);
+                setTimeout(() => feedback.remove(), 3000);
+                
+                if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
+                     const pageData = await notesAPI.getPageData(window.currentPageId);
+                     window.notesForCurrentPage = pageData.notes; 
+                     window.ui.displayNotes(pageData.notes, window.currentPageId); 
+                } else {
+                    console.warn('displayNotes function not available for page refresh after D&D upload.')
                 }
+            } catch (error) {
+                console.error('Error uploading file(s) via drag & drop:', error);
+                alert(`Failed to upload file(s): ${error.message}`);
             }
         } else if (String(note.id).startsWith('temp-')) {
             alert('Please save the note (by adding some content) before adding attachments.');
@@ -326,6 +315,16 @@ function switchToEditMode(contentEl) {
     contentEl.innerHTML = '';
     contentEl.textContent = textToEdit;
     contentEl.focus();
+    
+    // Position cursor at the end of the text
+    if (textToEdit.length > 0) {
+        const range = document.createRange();
+        const selection = window.getSelection();
+        range.selectNodeContents(contentEl);
+        range.collapse(false); // collapse to end
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
 
     // Helper function for inserting link and updating state
     const insertSelectedPageLink = (selectedPageName) => {
@@ -686,9 +685,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container todo">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="TODO" />
-                    <span class="task-status-badge todo">TODO</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword todo">TODO</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('DOING ')) {
@@ -697,9 +697,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container doing">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="DOING" />
-                    <span class="task-status-badge doing">DOING</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword doing">DOING</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('SOMEDAY ')) {
@@ -708,9 +709,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container someday">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="SOMEDAY" />
-                    <span class="task-status-badge someday">SOMEDAY</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword someday">SOMEDAY</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('DONE ')) {
@@ -719,9 +721,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container done">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="DONE" checked />
-                    <span class="task-status-badge done">DONE</span>
                 </div>
-                <div class="task-content done-text">${taskContent}</div>
+                <div class="task-content done-text">
+                    <span class="task-keyword done">DONE</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('WAITING ')) {
@@ -730,9 +733,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container waiting">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="WAITING" />
-                    <span class="task-status-badge waiting">WAITING</span>
                 </div>
-                <div class="task-content">${taskContent}</div>
+                <div class="task-content">
+                    <span class="task-keyword waiting">WAITING</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('CANCELLED ')) {
@@ -741,9 +745,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container cancelled">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="CANCELLED" checked disabled />
-                    <span class="task-status-badge cancelled">CANCELLED</span>
                 </div>
-                <div class="task-content cancelled-text">${taskContent}</div>
+                <div class="task-content cancelled-text">
+                    <span class="task-keyword cancelled">CANCELLED</span> ${taskContent}
+                </div>
             </div>
         `;
     } else if (html.startsWith('NLR ')) {
@@ -752,9 +757,10 @@ function parseAndRenderContent(rawContent) {
             <div class="task-container nlr">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="NLR" checked disabled />
-                    <span class="task-status-badge nlr">NLR</span>
                 </div>
-                <div class="task-content nlr-text">${taskContent}</div>
+                <div class="task-content nlr-text">
+                    <span class="task-keyword nlr">NLR</span> ${taskContent}
+                </div>
             </div>
         `;
     } else {
@@ -794,7 +800,7 @@ function parseAndRenderContent(rawContent) {
         // Handle page links
         html = html.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
             const trimmedName = pageName.trim();
-            return `<span class="page-link-bracket">[[</span><a href="#" class="page-link" data-page-name="${trimmedName}">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
+            return `<span class="page-link-bracket">[[</span><a href="page.php?page=${encodeURIComponent(trimmedName)}" class="page-link">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
         });
 
         // Handle SQL Queries SQL{...} - This should happen before Markdown parsing of the query content itself.
@@ -805,8 +811,8 @@ function parseAndRenderContent(rawContent) {
             return `<div class="sql-query-placeholder" data-sql-query="${escapedSqlQuery}">Loading SQL Query...</div>`;
         });
 
-        html = html.replace(/!{{(.*?)}}/g, (match, blockRef) => {
-            const trimmedRef = blockRef.trim();
+        html = html.replace(/!\{\{(.*?)\}\}/g, (match, blockRef) => {
+            const trimmedRef = blockRef ? blockRef.trim() : '';
             if (/^\d+$/.test(trimmedRef)) {
                 return `<div class="transclusion-placeholder" data-block-ref="${trimmedRef}">Loading...</div>`;
             } else {
@@ -845,6 +851,8 @@ function parseAndRenderContent(rawContent) {
     return html;
 }
 
+window.parseAndRenderContent = parseAndRenderContent;
+
 /**
  * Renders attachments for a note
  * @param {HTMLElement} container - The container element to render attachments into
@@ -877,19 +885,7 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
             return;
         }
         
-        // If attachments are found, ensure the main container is visible (it was reset above)
-        // and the inner attachmentsContainer will be 'flex'
-
-        const attachmentsContainer = document.createElement('div');
-        // The class 'note-attachments' might already be on the 'container' element itself.
-        // If 'container' is just a generic div, then adding this class to a child is appropriate.
-        // Based on existing code, `container` IS the element with class `note-attachments`.
-        // So, we should append items directly to `container` or manage `attachmentsContainer` carefully.
-        // For now, let's assume `container` is the one to be styled and filled.
-        // Re-evaluating: The original code appends `attachmentsContainer` to `container`. This is fine.
-
-        container.appendChild(attachmentsContainer); // This was the original structure.
-
+        // Append note-attachment-item elements directly to container for vertical stacking
         noteAttachments.forEach(attachment => {
             const attachmentEl = document.createElement('div');
             attachmentEl.className = 'note-attachment-item';
@@ -897,25 +893,33 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
 
             let previewEl = '';
             const isImage = attachment.type && attachment.type.startsWith('image/');
+            const isExcalidraw = attachment.name.endsWith('.excalidraw') || attachment.name.endsWith('.json');
 
             if (isImage) {
                 previewEl = `<img src="${attachment.url}" alt="${attachment.name}" class="attachment-preview-image">`;
+            } else if (isExcalidraw) {
+                previewEl = `<i data-feather="pen-tool" class="attachment-preview-icon"></i>`;
             } else {
                 previewEl = `<i data-feather="file" class="attachment-preview-icon"></i>`;
             }
 
-            const linkEl = document.createElement('a');
-            linkEl.href = attachment.url;
-            linkEl.className = 'attachment-name';
-            if (!isImage) {
-                linkEl.target = '_blank'; 
+            let linkHtml = '';
+            if (isImage) {
+                linkHtml = `<a href="${attachment.url}" class="attachment-name delegated-attachment-image" data-attachment-url="${attachment.url}">${attachment.name}</a>`;
+            } else if (isExcalidraw) {
+                // Button to open in Excalidraw editor, passing note_id and attachment id
+                linkHtml = `<button class="attachment-edit-excalidraw-btn" data-note-id="${noteId}" data-attachment-id="${attachment.id}">
+                    <i data-feather="edit-3"></i> Edit in Excalidraw
+                </button>
+                <a href="${attachment.url}" class="attachment-name" target="_blank">${attachment.name}</a>`;
+            } else {
+                linkHtml = `<a href="${attachment.url}" class="attachment-name" target="_blank">${attachment.name}</a>`;
             }
-            linkEl.textContent = attachment.name;
 
             attachmentEl.innerHTML = `
                 <div class="attachment-preview">${previewEl}</div>
                 <div class="attachment-info">
-                    ${linkEl.outerHTML} 
+                    ${linkHtml}
                     <span class="attachment-meta">${attachment.type} - ${new Date(attachment.created_at).toLocaleDateString()}</span>
                 </div>
                 <button class="attachment-delete-btn" data-attachment-id="${attachment.id}" data-note-id="${noteId}">
@@ -923,28 +927,24 @@ async function renderAttachments(container, noteId, has_attachments_flag) {
                 </button>
             `;
 
-            attachmentsContainer.appendChild(attachmentEl);
+            container.appendChild(attachmentEl);
+        });
 
-            if (isImage) {
-                const imageLink = attachmentEl.querySelector('.attachment-name');
-                if (imageLink) {
-                    imageLink.dataset.attachmentUrl = attachment.url;
-                    imageLink.classList.add('delegated-attachment-image');
-                }
+        // Add delegated event listener for Edit in Excalidraw buttons
+        container.addEventListener('click', function(e) {
+            const btn = e.target.closest('.attachment-edit-excalidraw-btn');
+            if (btn) {
+                const noteId = btn.getAttribute('data-note-id');
+                const attachmentId = btn.getAttribute('data-attachment-id');
+                // Open excalidraw editor with note_id and attachment_id as query params
+                const url = `/extensions/excalidraw_editor/excalidraw.html?note_id=${encodeURIComponent(noteId)}&attachment_id=${encodeURIComponent(attachmentId)}`;
+                window.open(url, '_blank');
             }
         });
 
-        if (attachmentsContainer.children.length > 0) {
-            // The main `container` should be visible (already set by `container.style.display = '';`)
-            // The `attachmentsContainer` (inner list) can be flex if it has items.
-            attachmentsContainer.style.display = 'flex'; // This was on attachmentsContainer before
-            container.style.display = 'flex'; // Ensure the main container is also flex if it wasn't.
-                                               // Or, if `container` is already styled by CSS, this might be redundant
-                                               // or conflict. Let's assume `container`'s display is managed by its parent or CSS.
-                                               // The original code set `attachmentsContainer.style.display = 'flex'`.
+        if (container.children.length > 0) {
+            container.style.display = 'flex'; // Ensure the main container is flex (column by CSS)
         } else {
-            // This case should be caught by `if (!noteAttachments || noteAttachments.length === 0)` above.
-            // If somehow it's reached, hide the main container.
             container.style.display = 'none';
         }
 
@@ -1003,7 +1003,7 @@ function renderProperties(container, properties) {
             }
 
             if (name.toLowerCase() === 'favorite' && String(valueToRender).toLowerCase() === 'true') {
-                htmlToSet += `<span class="${itemClass} favorite"><span class="property-favorite">⭐</span></span>`;
+                htmlToSet += `<span class="${itemClass} favorite"><span class="property-favorite"><i data-feather="star"></span></span>`;
             } else if (name.startsWith('tag::') || name.toLowerCase() === 'tags' || name.toLowerCase() === 'tag') {
                 htmlToSet += `<span class="${itemClass} tag">
                     <span class="property-key">#</span>
@@ -1241,6 +1241,9 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
         <div class="menu-item" data-action="copy-transclusion" data-note-id="${noteId}">
             <i data-feather="link"></i> Copy transclusion link
         </div>
+        <div class="menu-item" data-action="copy-anchor-link" data-note-id="${noteId}">
+            <i data-feather="anchor"></i> Copy anchor link
+        </div>
         <div class="menu-item" data-action="delete" data-note-id="${noteId}">
             <i data-feather="trash-2"></i> Delete
         </div>
@@ -1250,23 +1253,24 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
         <div class="menu-item" data-action="open-zen" data-note-id="${noteId}">
             <i data-feather="edit-3"></i> Open in Zen Writer
         </div>
+        <div class="menu-item" data-action="open-excalidraw" data-note-id="${noteId}">
+            <i data-feather="pen-tool"></i> Open in Excalidraw
+        </div>
+        <div class="menu-item" data-action="open-math-notepad" data-note-id="${noteId}">
+            <i data-feather="hash"></i> Open in Math Notepad
+        </div>
     `;
     menu.style.position = 'fixed';
     menu.style.left = `${event.pageX}px`;
     menu.style.top = `${event.pageY}px`;
 
-    const handleMenuAction = async (actionEvent) => {
-        const selectedMenuItem = actionEvent.target.closest('.menu-item');
-        if (!selectedMenuItem) return;
-        
-        const action = selectedMenuItem.dataset.action;
-        const actionNoteId = selectedMenuItem.dataset.noteId; // Get noteId from the item
-        const actionPageId = selectedMenuItem.dataset.pageId;
-
-
+    const handleMenuAction = async (event) => {
+        const target = event.target.closest('.menu-item');
+        if (!target) return;
+        const action = target.dataset.action;
         switch (action) {
             case 'copy-transclusion':
-                const transclusionLink = `!{{${actionNoteId}}}`;
+                const transclusionLink = `!{{${target.dataset.noteId}}}`;
                 await navigator.clipboard.writeText(transclusionLink);
                 // Show feedback (consider a global feedback function)
                 const feedbackCopy = document.createElement('div');
@@ -1275,18 +1279,30 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                 document.body.appendChild(feedbackCopy);
                 setTimeout(() => feedbackCopy.remove(), 2000);
                 break;
+            case 'copy-anchor-link':
+                // Get current page name from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentPage = urlParams.get('page') || 'default';
+                const anchorLink = `${window.location.origin}${window.location.pathname}?page=${encodeURIComponent(currentPage)}#note-${target.dataset.noteId}`;
+                await navigator.clipboard.writeText(anchorLink);
+                const feedbackAnchor = document.createElement('div');
+                feedbackAnchor.className = 'copy-feedback';
+                feedbackAnchor.textContent = 'Anchor link copied!';
+                document.body.appendChild(feedbackAnchor);
+                setTimeout(() => feedbackAnchor.remove(), 2000);
+                break;
             case 'delete':
-                if (confirm(`Are you sure you want to delete note ${actionNoteId}?`)) {
+                if (confirm(`Are you sure you want to delete note ${target.dataset.noteId}?`)) {
                     try {
-                        await notesAPI.deleteNote(actionNoteId);
-                        document.querySelector(`.note-item[data-note-id="${actionNoteId}"]`)?.remove();
+                        await notesAPI.deleteNote(target.dataset.noteId);
+                        document.querySelector(`.note-item[data-note-id="${target.dataset.noteId}"]`)?.remove();
                         // Also remove from window.notesForCurrentPage
                         if (window.notesForCurrentPage) {
-                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(actionNoteId));
+                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
                         }
                     } catch (error) {
                         const deleteErrorMessage = error.message || 'Please try again.';
-                        console.error(`handleDelegatedBulletContextMenu (delete action): Error deleting note ${actionNoteId}. Error:`, error);
+                        console.error(`handleDelegatedBulletContextMenu (delete action): Error deleting note ${target.dataset.noteId}. Error:`, error);
                         alert(`Failed to delete note. ${deleteErrorMessage}`);
                     }
                 }
@@ -1300,7 +1316,7 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                     for (const file of files) {
                         const formData = new FormData();
                         formData.append('attachmentFile', file);
-                        formData.append('note_id', actionNoteId);
+                        formData.append('note_id', target.dataset.noteId);
                         try {
                             await attachmentsAPI.uploadAttachment(formData);
                             const feedbackUpload = document.createElement('div');
@@ -1308,24 +1324,41 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                             feedbackUpload.textContent = `File "${file.name}" uploaded successfully!`;
                             document.body.appendChild(feedbackUpload);
                             setTimeout(() => feedbackUpload.remove(), 3000);
-                            if (window.ui && typeof window.ui.displayNotes === 'function' && actionPageId) {
-                                const pageData = await notesAPI.getPageData(actionPageId); // Refresh page
-                                window.ui.displayNotes(pageData.notes, actionPageId);
+                            if (window.ui && typeof window.ui.displayNotes === 'function' && target.dataset.pageId) {
+                                const pageData = await notesAPI.getPageData(target.dataset.pageId); // Refresh page
+                                window.ui.displayNotes(pageData.notes, target.dataset.pageId);
                             } else {
-                                console.warn('handleDelegatedBulletContextMenu (upload action): displayNotes function or pageId not available to refresh after upload for noteId:', actionNoteId);
+                                console.warn('handleDelegatedBulletContextMenu (upload action): displayNotes function or pageId not available to refresh after upload for noteId:', target.dataset.noteId);
                             }
                         } catch (error) {
                             const uploadErrorMessage = error.message || 'Please try again.';
-                            console.error(`handleDelegatedBulletContextMenu (upload action): Error uploading file "${file.name}" for note ${actionNoteId}. Error:`, error);
+                            console.error(`handleDelegatedBulletContextMenu (upload action): Error uploading file "${file.name}" for note ${target.dataset.noteId}. Error:`, error);
                             alert(`Failed to upload file "${file.name}". ${uploadErrorMessage}`);
                         }
                     }
                 };
                 input.click();
                 break;
+            case 'open-zen':
+                const zenNoteId = target.dataset.noteId;
+                const zenUrl = `/extensions/zen/index.html?note_id=${zenNoteId}`;
+                window.open(zenUrl, '_blank');
+                if (typeof closeMenu === 'function') closeMenu();
+                return;
+            case 'open-excalidraw':
+                const excalidrawNoteId = target.dataset.noteId;
+                const excalidrawUrl = `/extensions/excalidraw_editor/excalidraw.html?note_id=${excalidrawNoteId}`;
+                window.open(excalidrawUrl, '_blank');
+                if (typeof closeMenu === 'function') closeMenu();
+                return;
+            case 'open-math-notepad':
+                const mathNoteId = target.dataset.noteId;
+                const mathUrl = `/extensions/math_notepad/index.html?note_id=${mathNoteId}`;
+                window.open(mathUrl, '_blank');
+                if (typeof closeMenu === 'function') closeMenu();
+                return;
         }
-        menu.remove(); 
-        document.removeEventListener('click', closeMenuOnClickOutside); 
+        menu.remove();
     };
 
     menu.addEventListener('click', handleMenuAction);
@@ -1353,8 +1386,8 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
 
 function handleDelegatedNoteContentClick(targetElement) {
     // Check if the click was on an interactive element within the content that should not trigger edit mode
-    if (targetElement.matches('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image') || 
-        targetElement.closest('.task-checkbox, .page-link, .property-inline, .task-status-badge, .sql-query-placeholder, .transclusion-placeholder, .content-image')) {
+    if (targetElement.matches('.task-checkbox, .page-link, .property-inline, .sql-query-placeholder, .transclusion-placeholder, .content-image') || 
+        targetElement.closest('.task-checkbox, .page-link, .property-inline, .sql-query-placeholder, .transclusion-placeholder, .content-image')) {
         return;
     }
     switchToEditMode(targetElement);
@@ -1381,15 +1414,20 @@ async function handleDelegatedAttachmentDelete(targetElement) {
         await attachmentsAPI.deleteAttachment(attachmentId, noteId);
         attachmentItem?.remove();
 
-        const attachmentsContainer = targetElement.closest('.note-attachments');
-        if (attachmentsContainer && attachmentsContainer.children.length === 0) {
-            attachmentsContainer.style.display = 'none';
+        // Find the attachments container
+        const noteItem = targetElement.closest('.note-item');
+        const attachmentsContainer = noteItem?.querySelector('.note-attachments');
+        let remaining = 0;
+        if (attachmentsContainer) {
+            remaining = attachmentsContainer.querySelectorAll('.note-attachment-item').length;
+            if (remaining === 0) {
+                attachmentsContainer.style.display = 'none';
+            }
         }
 
         if (window.notesForCurrentPage) {
             const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
             if (noteToUpdate) {
-                const remaining = attachmentsContainer ? attachmentsContainer.children.length : 0;
                 noteToUpdate.has_attachments = remaining > 0;
             }
         }
@@ -1483,13 +1521,14 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
         taskContainer.classList.remove(currentMarker.toLowerCase());
         taskContainer.classList.add(newMarker.toLowerCase());
         
-        const badge = taskContainer.querySelector('.task-status-badge');
-        badge.className = `task-status-badge ${newMarker.toLowerCase()}`;
-        badge.textContent = newMarker;
-
         const taskContentDiv = taskContainer.querySelector('.task-content');
         taskContentDiv.classList.toggle('done-text', newMarker === 'DONE');
-        
+        // Update the keyword span
+        const keywordSpan = taskContentDiv.querySelector('.task-keyword');
+        if (keywordSpan) {
+            keywordSpan.className = `task-keyword ${newMarker.toLowerCase()}`;
+            keywordSpan.textContent = newMarker;
+        }
         checkbox.dataset.markerType = newMarker;
     }
 
@@ -1507,8 +1546,9 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
  * @param {HTMLElement} placeholderEl - The placeholder element to be replaced.
  * @param {string} noteContent - The raw content of the note to be rendered inside the placeholder.
  * @param {string} noteId - The ID of the transcluded note, for creating a link.
+ * @param {Object} noteData - The full note data object containing page_id and other information.
  */
-export function renderTransclusion(placeholderEl, noteContent, noteId) {
+export async function renderTransclusion(placeholderEl, noteContent, noteId, noteData = null) {
     if (!placeholderEl) return;
 
     // Create a container for the transcluded content
@@ -1521,7 +1561,32 @@ export function renderTransclusion(placeholderEl, noteContent, noteId) {
     // Create a header with a link to the original note
     const headerEl = document.createElement('div');
     headerEl.className = 'transclusion-header';
-    headerEl.innerHTML = `<a href="#" class="transclusion-link" data-note-id="${noteId}" title="Go to original note"><i data-feather="corner-up-left"></i></a>`;
+    
+    // Create the link - if we have noteData with page_id, create a proper link
+    let linkHref = '#';
+    let linkText = `Note ${noteId}`;
+    
+    if (noteData && noteData.page_id) {
+        try {
+            // Fetch the page information to get the page name
+            const pageData = await pagesAPI.getPageById(noteData.page_id);
+            if (pageData && pageData.name) {
+                linkHref = `page.php?page=${encodeURIComponent(pageData.name)}#note-${noteId}`;
+                linkText = `📄 ${pageData.name}`;
+            } else {
+                // Fallback to page_id if page name not found
+                linkHref = `page.php?page_id=${noteData.page_id}#note-${noteId}`;
+                linkText = `📄 Note ${noteId}`;
+            }
+        } catch (error) {
+            console.error('Error fetching page data for transclusion link:', error);
+            // Fallback to page_id if API call fails
+            linkHref = `page.php?page_id=${noteData.page_id}#note-${noteId}`;
+            linkText = `📄 Note ${noteId}`;
+        }
+    }
+    
+    headerEl.innerHTML = `<a href="${linkHref}" class="transclusion-link" data-note-id="${noteId}" title="Go to original note">${linkText}</a>`;
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'transclusion-body';
@@ -1610,13 +1675,7 @@ function initializeDelegatedNoteEventListeners(notesContainerEl) {
             return;
         }
 
-        // Page link click
-        const pageLink = target.closest('a.page-link');
-        if (pageLink && pageLink.dataset.pageName) {
-            event.preventDefault();
-            window.loadPage(pageLink.dataset.pageName);
-            return;
-        }
+
     });
 
     notesContainerEl.addEventListener('contextmenu', (event) => {
