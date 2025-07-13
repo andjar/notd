@@ -99,21 +99,6 @@
   gap: 10px;
 }
 
-.splash-logo-svg {
-  width: 50px;
-  height: 50px;
-  margin-bottom: 5px;
-}
-
-#splash-orb-text {
-  color: var(--ls-splash-orb-text-color);
-  font-family: var(--ls-header-font-family);
-  font-size: 1.5em;
-  font-weight: 400;
-  text-align: center;
-  line-height: 1.3;
-}
-
 #splash-orb-perimeter-dots {
   position: absolute;
   top: 0;
@@ -133,6 +118,12 @@
   border-radius: 50%;
   opacity: 0;
   /* Animation will set transform and opacity */
+}
+
+.splash-logo-svg {
+  width: 90%;
+  height: 90%;
+  overflow: visible; /* Ensure content is not clipped */
 }
 
 /* Time and Date Container */

@@ -4,6 +4,18 @@
  * =======================================================
 */
 
+.app-logo {
+    height: 50px; /* Adjust as needed */
+    width: auto;
+    vertical-align: middle;
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.app-logo:hover {
+    opacity: 0.7;
+    transform: scale(0.95);
+}
+
 /* 1. The main container for the entire header area */
 .page-header-container {
     position: relative; /* Essential for positioning child elements */
