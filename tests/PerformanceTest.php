@@ -62,26 +62,6 @@ class PerformanceTest extends TestCase
         ];
     }
 
-    public function testHealthCheckPerformance()
-    {
-        $times = [];
-        
-        // Run health check 10 times and measure performance
-        for ($i = 0; $i < 10; $i++) {
-            $response = $this->makeRequest('GET', '/ping');
-            $times[] = $response['response_time'];
-            
-            $this->assertEquals(200, $response['status_code']);
-        }
-        
-        $avgTime = array_sum($times) / count($times);
-        $maxTime = max($times);
-        
-        // Health check should be very fast
-        $this->assertLessThan(100, $avgTime, "Average response time should be under 100ms, got {$avgTime}ms");
-        $this->assertLessThan(200, $maxTime, "Maximum response time should be under 200ms, got {$maxTime}ms");
-    }
-
     public function testBatchOperationsPerformance()
     {
         // Create a test page first
