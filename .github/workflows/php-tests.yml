@@ -70,6 +70,9 @@ jobs:
         UPLOADS_DIR: ./uploads/test
         APP_ENV: testing
 
+    - name: Start PHP built-in server
+      run: php -S localhost:80 -t . > /dev/null 2>&1 &
+
     - name: Run ${{ matrix.test-suite }} tests
       run: |
         cd tests
