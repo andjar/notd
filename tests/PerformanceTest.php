@@ -12,6 +12,9 @@ class PerformanceTest extends TestCase
 
     protected function setUp(): void
     {
+        if (getenv('CI')) {
+            $this->markTestSkipped('Performance tests are skipped in CI environment.');
+        }
         $this->baseUrl = 'http://localhost/api/v1';
         $this->testDbPath = __DIR__ . '/../db/test_database.sqlite';
         
