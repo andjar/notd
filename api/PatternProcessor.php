@@ -4,7 +4,7 @@ namespace App;
 
 // Unified Pattern Processing System
 require_once 'db_connect.php';
-require_once 'property_trigger_service.php'; // New trigger service
+require_once 'PropertyTriggerService.php'; // New trigger service
 
 /**
  * Pattern Processing Registry and Engine

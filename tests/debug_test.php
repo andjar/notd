@@ -34,10 +34,10 @@ foreach ($classes as $class) {
 // Check if files exist
 echo "4. Checking if API files exist...\n";
 $files = [
-    'api/data_manager.php',
-    'api/pattern_processor.php',
-    'api/property_trigger_service.php',
-    'api/v1/webhooks.php'
+    'api/DataManager.php',
+    'api/PatternProcessor.php',
+    'api/PropertyTriggerService.php',
+    'api/v1/WebhooksManager.php'
 ];
 
 foreach ($files as $file) {

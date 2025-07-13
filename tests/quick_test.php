@@ -16,12 +16,12 @@ if (file_exists($autoload_psr4)) {
     echo "autoload_psr4.php does NOT exist!\n";
 }
 
-// Check for api/data_manager.php with various case permutations
+// Check for PSR-4 filenames (capitalized)
 $paths = [
-    __DIR__ . '/../api/data_manager.php',
     __DIR__ . '/../api/DataManager.php',
-    __DIR__ . '/../API/data_manager.php',
-    __DIR__ . '/../API/DataManager.php',
+    __DIR__ . '/../api/PatternProcessor.php',
+    __DIR__ . '/../api/PropertyTriggerService.php',
+    __DIR__ . '/../api/v1/WebhooksManager.php',
 ];
 foreach ($paths as $p) {
     echo "$p: " . (file_exists($p) ? 'YES' : 'NO') . "\n";

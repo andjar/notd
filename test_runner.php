@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/tests/bootstrap.php';
 require_once __DIR__ . '/vendor/autoload.php'; // PHPUnit
-require_once __DIR__ . '/api/data_manager.php'; // Include DataManager class
+require_once __DIR__ . '/api/DataManager.php'; // Include DataManager class
 
 // Simple test classes without PHPUnit dependency
 class SimpleDataManagerTest {

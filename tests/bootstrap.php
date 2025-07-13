@@ -28,33 +28,33 @@ if (file_exists($autoloadPath)) {
     
     // Include classes that are actually used by tests
     // Order is important - include classes with no dependencies first
-    require_once __DIR__ . '/../api/v1/webhooks.php';
+    require_once __DIR__ . '/../api/v1/WebhooksManager.php';
     error_log("WebhooksManager file included");
     
-    require_once __DIR__ . '/../api/property_trigger_service.php';
+    require_once __DIR__ . '/../api/PropertyTriggerService.php';
     error_log("PropertyTriggerService file included");
     
-    require_once __DIR__ . '/../api/pattern_processor.php';
+    require_once __DIR__ . '/../api/PatternProcessor.php';
     error_log("PatternProcessor file included");
     
-    require_once __DIR__ . '/../api/data_manager.php';
+    require_once __DIR__ . '/../api/DataManager.php';
     error_log("DataManager file included");
     
     // Verify classes exist after manual loading
     error_log("Checking if classes exist after manual loading:");
-    error_log("WebhooksManager exists: " . (class_exists('App\WebhooksManager') ? 'YES' : 'NO'));
-    error_log("PropertyTriggerService exists: " . (class_exists('App\PropertyTriggerService') ? 'YES' : 'NO'));
-    error_log("PatternProcessor exists: " . (class_exists('App\PatternProcessor') ? 'YES' : 'NO'));
-    error_log("DataManager exists: " . (class_exists('App\DataManager') ? 'YES' : 'NO'));
+    error_log("WebhooksManager exists: " . (class_exists('App\\WebhooksManager') ? 'YES' : 'NO'));
+    error_log("PropertyTriggerService exists: " . (class_exists('App\\PropertyTriggerService') ? 'YES' : 'NO'));
+    error_log("PatternProcessor exists: " . (class_exists('App\\PatternProcessor') ? 'YES' : 'NO'));
+    error_log("DataManager exists: " . (class_exists('App\\DataManager') ? 'YES' : 'NO'));
     
     // If classes still don't exist, it's a more serious issue
-    if (!class_exists('App\DataManager')) {
+    if (!class_exists('App\\DataManager')) {
         error_log("CRITICAL: DataManager class not found even after manual includes!");
         error_log("Trying to debug by checking if the file exists...");
-        error_log("DataManager file exists: " . (file_exists(__DIR__ . '/../api/data_manager.php') ? 'YES' : 'NO'));
+        error_log("DataManager file exists: " . (file_exists(__DIR__ . '/../api/DataManager.php') ? 'YES' : 'NO'));
         
         // Try to get more info about what's wrong
-        if (file_exists(__DIR__ . '/../api/data_manager.php')) {
+        if (file_exists(__DIR__ . '/../api/DataManager.php')) {
             error_log("File exists but class not found - possible syntax error in file");
         }
     }

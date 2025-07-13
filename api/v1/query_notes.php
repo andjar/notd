@@ -9,7 +9,7 @@ namespace App;
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
-require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../DataManager.php';
 
 $pdo = get_db_connection();
 $input = json_decode(file_get_contents('php://input'), true);

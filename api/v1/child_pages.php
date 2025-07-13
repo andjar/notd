@@ -7,7 +7,7 @@ namespace App;
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../api/db_connect.php';
 require_once __DIR__ . '/../../api/response_utils.php';
-require_once __DIR__ . '/../../api/data_manager.php';
+require_once __DIR__ . '/../../api/DataManager.php';
 require_once __DIR__ . '/../../api/validator_utils.php';
 
 header('Content-Type: application/json');

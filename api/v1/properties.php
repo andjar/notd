@@ -7,7 +7,7 @@ require_once __DIR__ . '/../db_connect.php';
 // The 'Writer' logic is now handled by PatternProcessor and called from note/page update endpoints.
 // (property_parser.php was removed)
 require_once __DIR__ . '/../response_utils.php';
-require_once __DIR__ . '/../data_manager.php';
+require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../validator_utils.php';
 
 // Helper function to check for entity existence.

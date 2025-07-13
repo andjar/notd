@@ -5,10 +5,10 @@ echo "=== SYNTAX VALIDATION TEST ===\n";
 
 $files = [
     'config.php',
-    'api/data_manager.php',
-    'api/pattern_processor.php',
-    'api/property_trigger_service.php',
-    'api/v1/webhooks.php',
+    'api/DataManager.php',
+    'api/PatternProcessor.php',
+    'api/PropertyTriggerService.php',
+    'api/v1/WebhooksManager.php',
     'api/db_connect.php',
     'api/response_utils.php',
     'api/validator_utils.php',
