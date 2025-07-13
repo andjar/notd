@@ -1,0 +1,403 @@
+# .github/workflows/pages.yml
+name: Deploy Jekyll Landing Page
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+          cache-version: 0
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v4
+
+      - name: Create Jekyll site structure
+        run: |
+          # Create necessary directories
+          mkdir -p _sass
+          mkdir -p _layouts
+          mkdir -p assets/css
+          
+          # Create _config.yml
+          cat > _config.yml << 'EOF'
+          remote_theme: pages-themes/cayman@v0.2.0
+          plugins:
+            - jekyll-remote-theme
+            - jekyll-relative-links
+          
+          title: ${{ github.event.repository.name }}
+          description: ${{ github.event.repository.description }}
+          
+          # Repository information
+          repository: ${{ github.repository }}
+          github:
+            repository_nwo: ${{ github.repository }}
+            repository_name: ${{ github.event.repository.name }}
+            repository_url: ${{ github.event.repository.html_url }}
+            owner_name: ${{ github.repository_owner }}
+            owner_url: https://github.com/${{ github.repository_owner }}
+            zip_url: ${{ github.event.repository.html_url }}/archive/refs/heads/main.zip
+            tar_url: ${{ github.event.repository.html_url }}/archive/refs/heads/main.tar.gz
+            is_project_page: true
+            is_user_page: false
+          
+          # Custom variables
+          github_username: ${{ github.repository_owner }}
+          github_repo: ${{ github.event.repository.name }}
+          github_url: ${{ github.event.repository.html_url }}
+          
+          # Enable relative links
+          relative_links:
+            enabled: true
+            collections: true
+          
+          # Markdown settings
+          markdown: kramdown
+          highlighter: rouge
+          
+          # Sass settings
+          sass:
+            sass_dir: _sass
+            style: compressed
+          EOF
+          
+          # Create custom pastel color overrides
+          cat > _sass/custom-colors.scss << 'EOF'
+          // Elegant Pastel Color Palette
+          $primary-gradient-start: #f5eef8;
+          $primary-gradient-end: #e6e6fa;
+          $accent-color: #d8bfd8;
+          $text-primary: #333333;
+          $text-secondary: #555555;
+          $link-color: #9370db;
+          $link-hover: #8a2be2;
+          $background-light: #fafafa;
+          $border-color: #dcdcdc;
+          $code-background: #f5f5f5;
+          $button-bg: #e6e6fa;
+          $button-hover: #d8bfd8;
+          
+          // Override Cayman theme variables
+          .page-header {
+            background: linear-gradient(120deg, $primary-gradient-start, $primary-gradient-end);
+            background-image: linear-gradient(120deg, $primary-gradient-start, $primary-gradient-end);
+            border-bottom: 2px solid $border-color;
+          }
+          
+          .project-name {
+            color: $text-primary !important;
+            font-weight: 600;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+          }
+          
+          .project-tagline {
+            color: $text-secondary !important;
+            font-weight: 400;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.6);
+          }
+          
+          .btn {
+            background: linear-gradient(45deg, $button-bg, $button-hover);
+            border: 1px solid $border-color;
+            color: $text-primary;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            
+            &:hover {
+              background: linear-gradient(45deg, $button-hover, $button-bg);
+              transform: translateY(-2px);
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+          }
+          
+          .main-content {
+            h1, h2, h3, h4, h5, h6 {
+              color: $text-primary;
+              border-bottom: 2px solid $border-color;
+              padding-bottom: 0.5rem;
+              margin-bottom: 1rem;
+            }
+            
+            h1 {
+              background: linear-gradient(45deg, $primary-gradient-start, $accent-color);
+              background-clip: text;
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              font-weight: 700;
+            }
+            
+            p {
+              color: $text-secondary;
+              line-height: 1.7;
+            }
+            
+            a {
+              color: $link-color;
+              text-decoration: none;
+              border-bottom: 1px solid transparent;
+              transition: all 0.3s ease;
+              
+              &:hover {
+                color: $link-hover;
+                border-bottom-color: $link-hover;
+              }
+            }
+            
+            blockquote {
+              border-left: 4px solid $accent-color;
+              background: linear-gradient(90deg, rgba(247, 220, 111, 0.1), transparent);
+              padding: 1rem 1.5rem;
+              margin: 1.5rem 0;
+              border-radius: 0 8px 8px 0;
+            }
+            
+            code {
+              background: $code-background;
+              border: 1px solid $border-color;
+              border-radius: 4px;
+              padding: 2px 6px;
+              color: $text-primary;
+            }
+            
+            pre {
+              background: $code-background;
+              border: 1px solid $border-color;
+              border-radius: 8px;
+              padding: 1rem;
+              overflow-x: auto;
+              
+              code {
+                background: transparent;
+                border: none;
+                padding: 0;
+              }
+            }
+            
+            img {
+              border-radius: 8px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+              margin: 1rem 0;
+              max-width: 100%;
+              height: auto;
+            }
+            
+            table {
+              border-collapse: collapse;
+              border-radius: 8px;
+              overflow: hidden;
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+              
+              th {
+                background: linear-gradient(45deg, $primary-gradient-start, $primary-gradient-end);
+                color: $text-primary;
+                font-weight: 600;
+              }
+              
+              td, th {
+                border: 1px solid $border-color;
+                padding: 0.75rem;
+              }
+              
+              tr:nth-child(even) {
+                background: rgba(232, 244, 253, 0.3);
+              }
+            }
+          }
+          
+          // Custom badges and elements
+          .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: linear-gradient(45deg, $accent-color, lighten($accent-color, 10%));
+            color: $text-primary;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin: 0.25rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          }
+          
+          .screenshot-container {
+            text-align: center;
+            margin: 2rem 0;
+            
+            img {
+              max-width: 90%;
+              border-radius: 12px;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            }
+          }
+          EOF
+          
+          # Create custom layout
+          cat > _layouts/default.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="{{ site.lang | default: "en-US" }}">
+            <head>
+              <meta charset="UTF-8">
+              {% seo %}
+              <link rel="preconnect" href="https://fonts.gstatic.com">
+              <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" as="style" type="text/css" crossorigin>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <meta name="theme-color" content="#E8F4FD">
+              <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+              <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+              <link rel="stylesheet" href="{{ '/assets/css/custom.css?v=' | append: site.github.build_revision | relative_url }}">
+              {% include head-custom.html %}
+            </head>
+            <body>
+              <a id="skip-to-content" href="#content">Skip to the content.</a>
+          
+              <header class="page-header" role="banner">
+                <h1 class="project-name">{{ page.title | default: site.title | default: site.github.repository_name }}</h1>
+                <h2 class="project-tagline">{{ page.description | default: site.description | default: site.github.project_tagline }}</h2>
+                {% if site.github.is_project_page %}
+                  <a href="{{ site.github.repository_url }}" class="btn">View on GitHub</a>
+                {% endif %}
+                {% if site.show_downloads %}
+                  <a href="{{ site.github.zip_url }}" class="btn">Download .zip</a>
+                  <a href="{{ site.github.tar_url }}" class="btn">Download .tar.gz</a>
+                {% endif %}
+              </header>
+          
+              <main id="content" class="main-content" role="main">
+                {{ content }}
+          
+                <footer class="site-footer">
+                  {% if site.github.is_project_page %}
+                    <span class="site-footer-owner">
+                      <a href="{{ site.github.repository_url }}">{{ site.github.repository_name }}</a> 
+                      is maintained by <a href="{{ site.github.owner_url }}">{{ site.github.owner_name }}</a>.
+                    </span>
+                  {% endif %}
+                  <span class="site-footer-credits">
+                    This page was generated by <a href="https://pages.github.com">GitHub Pages</a>.
+                  </span>
+                </footer>
+              </main>
+            </body>
+          </html>
+          EOF
+          
+          # Create assets/css/custom.css
+          cat > assets/css/custom.css << 'EOF'
+          ---
+          ---
+          
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          @import "custom-colors";
+          
+          * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+          
+          body {
+            background: linear-gradient(135deg, #FDFEFE 0%, #F8F9FA 100%);
+            min-height: 100vh;
+          }
+          
+          .page-header {
+            padding: 3rem 1rem;
+          }
+          
+          .main-content {
+            max-width: 64rem;
+            margin: 0 auto;
+            padding: 2rem;
+          }
+          
+          // Add smooth scrolling
+          html {
+            scroll-behavior: smooth;
+          }
+          
+          // Custom animations
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          .main-content > * {
+            animation: fadeInUp 0.6s ease-out;
+          }
+          EOF
+
+      - name: Create index page from README
+        run: |
+          # Create index.md that includes the README
+          cat > index.md << 'EOF'
+          ---
+          layout: default
+          title: ${{ github.event.repository.name }}
+          description: ${{ github.event.repository.description }}
+          ---
+          
+          {% capture readme_content %}
+          {% include_relative README.md %}
+          {% endcapture %}
+          
+          {{ readme_content | markdownify }}
+          EOF
+          
+          # Create Gemfile
+          cat > Gemfile << 'EOF'
+          source "https://rubygems.org"
+          gem "github-pages", group: :jekyll_plugins
+          gem "jekyll-remote-theme"
+          gem "jekyll-relative-links"
+          gem "webrick", "~> 1.7"
+          EOF
+
+      - name: Build with Jekyll
+        run: |
+          bundle install
+          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+        env:
+          JEKYLL_ENV: production
+          PAGES_REPO_NWO: ${{ github.repository }}
+          JEKYLL_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
