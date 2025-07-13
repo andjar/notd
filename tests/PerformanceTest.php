@@ -30,7 +30,7 @@ class PerformanceTest extends TestCase
     protected function tearDown(): void
     {
         // Clean up test database
-        if (file_exists($this->testDbPath)) {
+        if (!empty($this->testDbPath) && file_exists($this->testDbPath)) {
             unlink($this->testDbPath);
         }
     }
