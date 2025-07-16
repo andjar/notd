@@ -500,17 +500,30 @@ function renderBacklinks($backlinks) {
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner" x-data="{
-                notes: [],
+                get notes() {
+                    const storeNotes = $store.app.notes || [];
+                    console.log('[AlpineTemplate] Getting notes from store:', storeNotes);
+                    return storeNotes;
+                },
+                get noteTree() {
+                    const tree = buildNoteTree(this.notes);
+                    console.log('[AlpineTemplate] Built note tree:', tree);
+                    return tree;
+                },
                 init() {
-                    this.notes = [...$store.app.notes];
-                    this.$watch('$store.app.notes', value => {
-                        this.notes = [...value];
-                        console.log('[AlpineTemplate] Mirrored notes updated:', this.notes);
+                    console.log('[AlpineTemplate] Initializing notes container');
+                    // Watch for store changes and trigger reactivity
+                    this.$watch('$store.app.notes', () => {
+                        console.log('[AlpineTemplate] Store notes changed, triggering refresh');
+                        this.$nextTick(() => {
+                            // Force re-evaluation of computed properties
+                            this.$el.dispatchEvent(new CustomEvent('notesUpdated'));
+                        });
                     });
                 }
             }">
-                <template x-for="note in buildNoteTree(notes)" :key="note.id">
-                    <div x-init="console.log('[AlpineTemplate] Rendering note:', note, 'All notes:', notes)" class="note-item"
+                <template x-for="note in noteTree" :key="note.id">
+                    <div x-init="console.log('[AlpineTemplate] Rendering note:', note, 'Tree length:', noteTree.length)" class="note-item"
                         x-data="noteComponent(note, 0)"
                         :data-note-id="note.id"
                         :style="`--nesting-level: ${nestingLevel}`"

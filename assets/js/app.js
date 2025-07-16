@@ -88,13 +88,8 @@ Alpine.store('app', {
     console.log('[AlpineStore] setNotes called. New notes:', newNotes);
     this.notes = newNotes;
     window.notesForCurrentPage = newNotes;
-    // Force Alpine to refresh the DOM after store update
-    if (window.Alpine && typeof Alpine.flushAndStopDeferringMutations === 'function') {
-      Alpine.flushAndStopDeferringMutations();
-    }
-    if (window.Alpine && Alpine.version && parseFloat(Alpine.version) >= 3.10 && typeof this.$nextTick === 'function') {
-      this.$nextTick(() => { if (this.$refresh) this.$refresh(); });
-    }
+    // Alpine.js 3.x will automatically detect the reactive change
+    console.log('[AlpineStore] Store notes updated, Alpine.js should detect the change');
   },
   
   addNote(note) {
