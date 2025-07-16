@@ -301,13 +301,12 @@ function renderBacklinks($backlinks) {
 <body>
     <div id="splash-screen" 
          x-data="splashScreen(window.APP_CONFIG.SPLASH_DISABLED)" 
-         x-show="false"
-         x-init="show = false"
+         x-show="show"
+         x-init="init()"
          @click="hideSplash()"
          x-transition:leave="transition ease-in duration-300" 
          x-transition:leave-start="opacity-100" 
-         x-transition:leave-end="opacity-0"
-         style="display: none !important;">
+         x-transition:leave-end="opacity-0">
         <div class="time-date-container">
             <div id="clock" class="clock" x-text="time"></div>
             <div id="date" class="date" x-text="date"></div>
@@ -502,14 +501,28 @@ function renderBacklinks($backlinks) {
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner" x-data="{
                 get noteTree() {
-                    const storeNotes = $store.app.notes || [];
-                    const tree = buildNoteTree(storeNotes);
-                    console.log('[AlpineTemplate] Built note tree from store:', tree, 'Store notes:', storeNotes);
-                    return tree;
+                    try {
+                        if (!$store.app || !$store.app.notes) {
+                            console.log('[AlpineTemplate] Store not ready, returning empty tree');
+                            return [];
+                        }
+                        const storeNotes = $store.app.notes;
+                        const tree = buildNoteTree(storeNotes);
+                        console.log('[AlpineTemplate] Built note tree:', tree.length, 'items from', storeNotes.length, 'notes');
+                        return tree;
+                    } catch (error) {
+                        console.error('[AlpineTemplate] Error building note tree:', error);
+                        return [];
+                    }
                 },
                 init() {
                     console.log('[AlpineTemplate] Initializing notes container');
-                    console.log('[AlpineTemplate] Initial store state:', $store.app);
+                    // Watch for store changes
+                    if ($store.app) {
+                        this.$watch('$store.app.notes', (newNotes) => {
+                            console.log('[AlpineTemplate] Store notes changed:', newNotes?.length || 0, 'notes');
+                        });
+                    }
                 }
             }">
                 <template x-for="note in noteTree" :key="note.id">
@@ -617,37 +630,6 @@ function renderBacklinks($backlinks) {
                     </div>
                 </template>
             </div>
-            
-            <!-- Debug: Test note creation -->
-            <div id="debug-panel" style="position: fixed; top: 10px; right: 10px; z-index: 9999; background: white; border: 2px solid #007cba; padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                <strong>Debug Controls:</strong><br>
-                <button id="debug-add-note" x-data @click="
-                    const note = {
-                        id: Date.now(),
-                        content: 'Debug note ' + Date.now(),
-                        order_index: $store.app.notes.length,
-                        parent_note_id: null,
-                        page_id: $store.app.currentPageId || 1
-                    };
-                    console.log('[DEBUG] Adding note:', note);
-                    $store.app.addNote(note);
-                    console.log('[DEBUG] Store notes after add:', $store.app.notes);
-                " 
-                        style="margin: 5px; padding: 5px 10px; background: #007cba; color: white; border: none; cursor: pointer;">
-                    Add Test Note
-                </button>
-                <button id="debug-clear-notes" x-data @click="
-                    console.log('[DEBUG] Clearing notes');
-                    $store.app.setNotes([]);
-                    console.log('[DEBUG] Store notes after clear:', $store.app.notes);
-                " 
-                        style="margin: 5px; padding: 5px 10px; background: #dc3545; color: white; border: none; cursor: pointer;">
-                    Clear Notes
-                </button>
-                <br>
-                <span x-data x-text="'Notes count: ' + $store.app.notes.length"></span>
-            </div>
-            
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
             </button>
