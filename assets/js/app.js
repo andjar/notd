@@ -199,6 +199,7 @@ import { initGlobalSearch, initPageSearchModal, initNoteSearchModal } from './ap
 // --- Global Function Exposure ---
 window.displayPageProperties = displayPagePropertiesFromEditor;
 window.parseAndRenderContent = parseAndRenderContent; // **ENHANCEMENT**: Expose markdown rendering function globally
+window.buildNoteTree = ui.buildNoteTree; // **FIX**: Expose buildNoteTree function globally for Alpine.js templates
 
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
