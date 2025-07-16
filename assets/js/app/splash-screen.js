@@ -29,10 +29,6 @@ export function splashScreen() {
         dotRadius: 105,
         
         init() {
-            // Disable splash screen for testing
-            this.show = false;
-            return;
-            
             // Check if this is a subsequent page load (not the initial app load)
             const isSubsequentLoad = sessionStorage.getItem('notd_initial_load_complete');
             

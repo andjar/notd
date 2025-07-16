@@ -297,8 +297,7 @@ function renderBacklinks($backlinks) {
 <body>
     <div id="splash-screen" 
          x-data="splashScreen()" 
-         x-show="false"
-         style="display: none !important;"
+         x-show="show"
          x-init="init()"
          @click="hideSplash()"
          x-transition:leave="transition ease-in duration-300" 
