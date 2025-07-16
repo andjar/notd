@@ -235,12 +235,20 @@ export async function handleAddRootNote() {
     });
 
     const optimisticDOMUpdater = () => {
-        const noteEl = ui.addNoteElement(optimisticNewNote);
-        const contentDiv = noteEl?.querySelector('.note-content');
-        if (contentDiv) {
-            contentDiv.dataset.rawContent = '';
-            ui.switchToEditMode(contentDiv);
-        }
+        // The ui.addNoteElement function will handle updating the legacy global state
+        ui.addNoteElement(optimisticNewNote);
+        
+        // Focus the new note content after a short delay to allow for DOM updates
+        setTimeout(() => {
+            const newNoteElement = getNoteElementById(clientTempId);
+            if (newNoteElement) {
+                const contentDiv = newNoteElement.querySelector('.note-content');
+                if (contentDiv) {
+                    contentDiv.dataset.rawContent = '';
+                    ui.switchToEditMode(contentDiv);
+                }
+            }
+        }, 50);
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Add Root Note");
 }
@@ -286,15 +294,18 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     });
 
     const optimisticDOMUpdater = () => {
-        // **OPTIMIZATION**: Create and insert new note element immediately without full re-render
-        const newNoteEl = createOptimisticNoteElement(optimisticNewNote, noteData.parent_note_id);
-        if (newNoteEl) {
-            // Insert after current note
-            noteItem.after(newNoteEl);
-            
-            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
-            setTimeout(() => {
-                const newContentDiv = newNoteEl.querySelector('.note-content');
+        // Update the legacy global state for backward compatibility
+        window.notesForCurrentPage.push(optimisticNewNote);
+        
+        // The Alpine.js store connection in the template will automatically
+        // re-render when $store.app.notes changes, so we don't need to manually
+        // create DOM elements here. The Alpine.js reactivity will handle it.
+        
+        // Focus the new note content after a short delay to allow for DOM updates
+        setTimeout(() => {
+            const newNoteElement = getNoteElementById(clientTempId);
+            if (newNoteElement) {
+                const newContentDiv = newNoteElement.querySelector('.note-content');
                 if (newContentDiv) {
                     // Switch to edit mode
                     ui.switchToEditMode(newContentDiv);
@@ -319,8 +330,8 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
                     // Focus the element
                     newContentDiv.focus();
                 }
-            }, 0); // Use setTimeout to ensure DOM is ready
-        }
+            }
+        }, 50);
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Sibling Note");
 }
@@ -572,28 +583,21 @@ async function handleTabKey(e, noteItem, noteData) {
             }
         });
         
-        // Use Alpine.js reactive updates for immediate visual feedback
-        const appStore = getAppStore();
-        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-        const noteTree = buildNoteTree(sortedNotes);
-        const notesContainer = document.getElementById('notes-container');
-        if (notesContainer && notesContainer.__x) {
-            const alpineData = notesContainer.__x.$data;
-            alpineData.notes = noteTree;
-            // Use $nextTick to ensure DOM updates are processed
-            notesContainer.__x.$nextTick(() => {
-                // Re-initialize drag and drop after DOM update
-                setTimeout(() => {
-                    initializeDragAndDrop();
-                    // Focus the note content
-                    const movedNoteElement = getNoteElementById(noteData.id);
-                    if (movedNoteElement) {
-                        const newContentDiv = movedNoteElement.querySelector('.note-content');
-                        if (newContentDiv) ui.switchToEditMode(newContentDiv);
-                    }
-                }, 0);
-            });
-        }
+        // Update the legacy global state for backward compatibility
+        window.notesForCurrentPage = [...appStore.notes];
+        
+        // The Alpine.js store connection in the template will automatically
+        // re-render when $store.app.notes changes, so we don't need to manually
+        // update the DOM here. The Alpine.js reactivity will handle it.
+        
+        // Focus the note content after a short delay to allow for DOM updates
+        setTimeout(() => {
+            const movedNoteElement = getNoteElementById(noteData.id);
+            if (movedNoteElement) {
+                const newContentDiv = movedNoteElement.querySelector('.note-content');
+                if (newContentDiv) ui.switchToEditMode(newContentDiv);
+            }
+        }, 50);
     };
     
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
@@ -718,10 +722,15 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
     const operations = [{ type: 'delete', payload: { id: noteIdToDelete } }];
     
     const optimisticDOMUpdater = () => {
+        // The ui.removeNoteElement function will handle updating the legacy global state
         ui.removeNoteElement(noteIdToDelete);
+        
+        // Focus the target note after a short delay to allow for DOM updates
         if (focusTargetEl) {
-            const contentToFocus = focusTargetEl.querySelector('.note-content');
-            if(contentToFocus) ui.switchToEditMode(contentToFocus);
+            setTimeout(() => {
+                const contentToFocus = focusTargetEl.querySelector('.note-content');
+                if(contentToFocus) ui.switchToEditMode(contentToFocus);
+            }, 50);
         }
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Delete Note (Backspace)");
@@ -881,24 +890,18 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
     }];
 
     const optimisticDOMUpdater = () => {
-        // Create and insert child note element
-        const newNoteEl = createOptimisticNoteElement(optimisticNewNote, noteData.id);
-        if (newNoteEl) {
-            // Find or create children container
-            let childrenContainer = noteItem.querySelector('.note-children');
-            if (!childrenContainer) {
-                childrenContainer = document.createElement('div');
-                childrenContainer.className = 'note-children';
-                noteItem.appendChild(childrenContainer);
-                noteItem.classList.add('has-children');
-            }
-            
-            // Insert the new child
-            childrenContainer.appendChild(newNoteEl);
-            
-            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
-            setTimeout(() => {
-                const newContentDiv = newNoteEl.querySelector('.note-content');
+        // Update the legacy global state for backward compatibility
+        window.notesForCurrentPage.push(optimisticNewNote);
+        
+        // The Alpine.js store connection in the template will automatically
+        // re-render when $store.app.notes changes, so we don't need to manually
+        // create DOM elements here. The Alpine.js reactivity will handle it.
+        
+        // Focus the new note content after a short delay to allow for DOM updates
+        setTimeout(() => {
+            const newNoteElement = getNoteElementById(clientTempId);
+            if (newNoteElement) {
+                const newContentDiv = newNoteElement.querySelector('.note-content');
                 if (newContentDiv) {
                     // Switch to edit mode
                     ui.switchToEditMode(newContentDiv);
@@ -923,8 +926,8 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
                     // Focus the element
                     newContentDiv.focus();
                 }
-            }, 0); // Use setTimeout to ensure DOM is ready
-        }
+            }
+        }, 50);
     };
     
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Child Note");

@@ -93,23 +93,16 @@ function renderNotesInContainer(noteTree, container) {
  */
 export function addNoteElement(noteData) {
     if (!noteData) return null;
+    
+    // Update the legacy global state for backward compatibility
     window.notesForCurrentPage.push(noteData);
-    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    const notesContainer = document.getElementById('notes-container');
-    if (notesContainer && notesContainer.__x) {
-        // Use Alpine.js reactive data instead of getUnobservedData()
-        const alpineData = notesContainer.__x.$data;
-        alpineData.notes = noteTree;
-        // Trigger Alpine.js reactivity by accessing $nextTick
-        notesContainer.__x.$nextTick(() => {
-            // Re-initialize drag and drop after DOM update
-            setTimeout(() => {
-                initializeDragAndDrop();
-            }, 0);
-        });
-    }
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    
+    // The Alpine.js store connection in the template will automatically
+    // re-render when $store.app.notes changes, so we don't need to manually
+    // update the DOM here. The Alpine.js store should already be updated
+    // by the calling code.
+    
+    // Return null since the DOM is now managed by Alpine.js reactivity
     return null;
 }
 
@@ -118,23 +111,13 @@ export function addNoteElement(noteData) {
  * @param {string} noteId - The ID of the note to remove.
  */
 export function removeNoteElement(noteId) {
+    // Update the legacy global state for backward compatibility
     window.notesForCurrentPage = window.notesForCurrentPage.filter(note => String(note.id) !== String(noteId));
-    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    const notesContainer = document.getElementById('notes-container');
-    if (notesContainer && notesContainer.__x) {
-        // Use Alpine.js reactive data instead of getUnobservedData()
-        const alpineData = notesContainer.__x.$data;
-        alpineData.notes = noteTree;
-        // Trigger Alpine.js reactivity by accessing $nextTick
-        notesContainer.__x.$nextTick(() => {
-            // Re-initialize drag and drop after DOM update
-            setTimeout(() => {
-                initializeDragAndDrop();
-            }, 0);
-        });
-    }
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    
+    // The Alpine.js store connection in the template will automatically
+    // re-render when $store.app.notes changes, so we don't need to manually
+    // update the DOM here. The Alpine.js store should already be updated
+    // by the calling code.
 }
 
 /**
