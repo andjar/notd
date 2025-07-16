@@ -5,7 +5,7 @@
 
 export function splashScreen() {
     return {
-        show: true,
+        show: false, // Start hidden by default
         time: '12:00',
         date: 'Monday, 1 January',
         bubbles: [],
@@ -29,6 +29,10 @@ export function splashScreen() {
         dotRadius: 105,
         
         init() {
+            // Disable splash screen for testing
+            this.show = false;
+            return;
+            
             // Check if this is a subsequent page load (not the initial app load)
             const isSubsequentLoad = sessionStorage.getItem('notd_initial_load_complete');
             
@@ -37,6 +41,9 @@ export function splashScreen() {
                 this.show = false;
                 return;
             }
+            
+            // Show splash screen for initial load
+            this.show = true;
             
             // Mark initial load as complete
             sessionStorage.setItem('notd_initial_load_complete', 'true');
@@ -47,12 +54,12 @@ export function splashScreen() {
             this.startTimeUpdates();
             this.startAnimation();
             
-            // Auto-hide after 2 seconds on initial load
+            // Auto-hide after 1 second on initial load (reduced from 2 seconds)
             setTimeout(() => {
                 this.show = false;
                 this.stopAnimation();
                 this.stopTimeUpdates();
-            }, 2000);
+            }, 1000);
         },
         
         // Method to manually show the splash screen

@@ -323,7 +323,7 @@ if (mobileToolbar) {
 
 
 // --- Application Startup ---
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('alpine:initialized', async () => {
     if (typeof ui === 'undefined' || !notesContainer) {
         console.error('UI module or critical DOM elements not loaded. Application cannot start.');
         document.body.innerHTML = '<h1>Application failed to start. Please check the console.</h1>';

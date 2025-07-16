@@ -34,7 +34,8 @@ export function displayNotes(notesData, pageId) {
         // Update Alpine.js with empty array and update state
         setNotesForCurrentPage([]);
         if (notesContainer && notesContainer.__x) {
-            notesContainer.__x.getUnobservedData().notes = [];
+            const alpineData = notesContainer.__x.$data;
+            alpineData.notes = [];
         }
         // Show empty state message
         notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
@@ -47,7 +48,8 @@ export function displayNotes(notesData, pageId) {
     
     // Update Alpine.js data for future use
     if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
+        const alpineData = notesContainer.__x.$data;
+        alpineData.notes = noteTree;
     }
     
     // Render notes using traditional DOM approach since Alpine.js template is not implemented yet
@@ -96,7 +98,16 @@ export function addNoteElement(noteData) {
     const noteTree = buildNoteTree(sortedNotes);
     const notesContainer = document.getElementById('notes-container');
     if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
+        // Use Alpine.js reactive data instead of getUnobservedData()
+        const alpineData = notesContainer.__x.$data;
+        alpineData.notes = noteTree;
+        // Trigger Alpine.js reactivity by accessing $nextTick
+        notesContainer.__x.$nextTick(() => {
+            // Re-initialize drag and drop after DOM update
+            setTimeout(() => {
+                initializeDragAndDrop();
+            }, 0);
+        });
     }
     // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
     return null;
@@ -112,7 +123,16 @@ export function removeNoteElement(noteId) {
     const noteTree = buildNoteTree(sortedNotes);
     const notesContainer = document.getElementById('notes-container');
     if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
+        // Use Alpine.js reactive data instead of getUnobservedData()
+        const alpineData = notesContainer.__x.$data;
+        alpineData.notes = noteTree;
+        // Trigger Alpine.js reactivity by accessing $nextTick
+        notesContainer.__x.$nextTick(() => {
+            // Re-initialize drag and drop after DOM update
+            setTimeout(() => {
+                initializeDragAndDrop();
+            }, 0);
+        });
     }
     // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
 }
@@ -211,15 +231,47 @@ export async function handleNoteDrop(evt) {
     try {
         await window.notesAPI.batchUpdateNotes(operations);
         
-        // Clear cache and reload page to get fresh data
-        pageCache.removePage(window.currentPageName);
-        await window.loadPage(window.currentPageName, false, false);
+        // Instead of reloading the page, update the optimistic UI
+        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const noteTree = buildNoteTree(sortedNotes);
+        const notesContainer = document.getElementById('notes-container');
+        if (notesContainer && notesContainer.__x) {
+            const alpineData = notesContainer.__x.$data;
+            alpineData.notes = noteTree;
+            // Use $nextTick to ensure DOM updates are processed
+            notesContainer.__x.$nextTick(() => {
+                // Re-initialize drag and drop after DOM update
+                setTimeout(() => {
+                    initializeDragAndDrop();
+                }, 0);
+            });
+        }
+        
+        console.log('Note drop changes saved successfully');
     } catch (error) {
         console.error("Failed to save note drop changes:", error);
         alert("Could not save new note positions. Reverting.");
         
-        pageCache.removePage(window.currentPageName);
-        await window.loadPage(window.currentPageName, false, false);
+        // Revert the optimistic changes
+        const revertedNoteToMove = window.notesForCurrentPage.find(n => n.id == noteId);
+        if(revertedNoteToMove) {
+            revertedNoteToMove.parent_note_id = evt.from.closest('.note-item')?.dataset.noteId || null;
+            revertedNoteToMove.order_index = evt.oldIndex;
+        }
+        
+        // Re-render with reverted data
+        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const noteTree = buildNoteTree(sortedNotes);
+        const notesContainer = document.getElementById('notes-container');
+        if (notesContainer && notesContainer.__x) {
+            const alpineData = notesContainer.__x.$data;
+            alpineData.notes = noteTree;
+            notesContainer.__x.$nextTick(() => {
+                setTimeout(() => {
+                    initializeDragAndDrop();
+                }, 0);
+            });
+        }
     }
 }
 

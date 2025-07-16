@@ -14,6 +14,7 @@ import { notesAPI } from '../api_client.js';
 import { debounce, handleAutocloseBrackets, insertTextAtCursor, encrypt } from '../utils.js';
 import { ui } from '../ui.js';
 import { pageCache } from './page-cache.js';
+import { buildNoteTree, initializeDragAndDrop } from '../ui/note-elements.js';
 
 const notesContainer = document.querySelector('#notes-container');
 
@@ -554,38 +555,44 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // **OPTIMIZATION**: Immediate visual feedback without full re-render
+    // **OPTIMIZATION**: Use Alpine.js reactive updates for immediate feedback
     const optimisticDOMUpdater = () => {
-        // Update the note's visual indentation immediately
-        const noteElement = getNoteElementById(noteData.id);
-        if (noteElement && targetOrderIndex !== null) { // **FIX**: Check if targetOrderIndex is defined
-            // Calculate new nesting level
-            const newNestingLevel = calculateNestingLevel(newParentId, appStore.notes);
-            
-            // Update CSS custom property for immediate visual feedback
-            noteElement.style.setProperty('--nesting-level', newNestingLevel);
-            
-            // Move the note element to its new position in the DOM
-            moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex);
-            
-            // Update the note's data in the store
-            const noteToMove = getNoteDataById(noteData.id);
-            if (noteToMove) {
-                noteToMove.parent_note_id = newParentId;
-                noteToMove.order_index = targetOrderIndex;
+        // Update the note's data in the store
+        const noteToMove = getNoteDataById(noteData.id);
+        if (noteToMove) {
+            noteToMove.parent_note_id = newParentId;
+            noteToMove.order_index = targetOrderIndex;
+        }
+        
+        // Update sibling order indices
+        operations.forEach(op => {
+            if (op.type === 'update') {
+                const note = getNoteDataById(op.payload.id);
+                if (note) note.order_index = op.payload.order_index;
             }
-            
-            // Update sibling order indices
-            operations.forEach(op => {
-                if (op.type === 'update') {
-                    const note = getNoteDataById(op.payload.id);
-                    if (note) note.order_index = op.payload.order_index;
-                }
+        });
+        
+        // Use Alpine.js reactive updates for immediate visual feedback
+        const appStore = getAppStore();
+        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const noteTree = buildNoteTree(sortedNotes);
+        const notesContainer = document.getElementById('notes-container');
+        if (notesContainer && notesContainer.__x) {
+            const alpineData = notesContainer.__x.$data;
+            alpineData.notes = noteTree;
+            // Use $nextTick to ensure DOM updates are processed
+            notesContainer.__x.$nextTick(() => {
+                // Re-initialize drag and drop after DOM update
+                setTimeout(() => {
+                    initializeDragAndDrop();
+                    // Focus the note content
+                    const movedNoteElement = getNoteElementById(noteData.id);
+                    if (movedNoteElement) {
+                        const newContentDiv = movedNoteElement.querySelector('.note-content');
+                        if (newContentDiv) ui.switchToEditMode(newContentDiv);
+                    }
+                }, 0);
             });
-            
-            // Refocus the note content
-            const newContentDiv = noteElement.querySelector('.note-content');
-            if (newContentDiv) ui.switchToEditMode(newContentDiv);
         }
     };
     
