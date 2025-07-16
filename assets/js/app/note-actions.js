@@ -81,16 +81,6 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
                     }
                 } else if (opResult.type === 'create' && opResult.client_temp_id) {
                     _finalizeNewNote(opResult.client_temp_id, opResult.note);
-                    // Focus the newly created note
-                    setTimeout(() => {
-                        const newNoteElement = getNoteElementById(opResult.note.id);
-                        if (newNoteElement) {
-                            const contentDiv = newNoteElement.querySelector('.note-content');
-                            if (contentDiv) {
-                                ui.switchToEditMode(contentDiv);
-                            }
-                        }
-                    }, 100); // Small delay to ensure DOM is updated
                 } else if (opResult.type === 'update' && opResult.note) {
                     const appStore = getAppStore();
                     appStore.updateNote(opResult.note);
@@ -245,10 +235,12 @@ export async function handleAddRootNote() {
     });
 
     const optimisticDOMUpdater = () => {
-        // Pure Alpine.js approach - no DOM manipulation needed
-        // The store update will automatically trigger template updates
-        // Focus will be handled by Alpine.js lifecycle hooks
-        console.log('Adding root note - Alpine.js template will handle DOM updates');
+        const noteEl = ui.addNoteElement(optimisticNewNote);
+        const contentDiv = noteEl?.querySelector('.note-content');
+        if (contentDiv) {
+            contentDiv.dataset.rawContent = '';
+            ui.switchToEditMode(contentDiv);
+        }
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Add Root Note");
 }
@@ -294,10 +286,41 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     });
 
     const optimisticDOMUpdater = () => {
-        // Pure Alpine.js approach - no DOM manipulation needed
-        // The store update will automatically trigger template updates
-        // Focus handling will be improved in the Alpine.js component
-        console.log('Adding sibling note - Alpine.js template will handle DOM updates');
+        // **OPTIMIZATION**: Create and insert new note element immediately without full re-render
+        const newNoteEl = createOptimisticNoteElement(optimisticNewNote, noteData.parent_note_id);
+        if (newNoteEl) {
+            // Insert after current note
+            noteItem.after(newNoteEl);
+            
+            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
+            setTimeout(() => {
+                const newContentDiv = newNoteEl.querySelector('.note-content');
+                if (newContentDiv) {
+                    // Switch to edit mode
+                    ui.switchToEditMode(newContentDiv);
+                    
+                    // Set cursor to beginning of the new note
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    
+                    // Clear any existing selection
+                    sel.removeAllRanges();
+                    
+                    // Position cursor at the start of the content
+                    range.setStart(newContentDiv, 0);
+                    range.collapse(true);
+                    
+                    // Apply the selection
+                    sel.addRange(range);
+                    
+                    // Ensure the new note is visible
+                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Focus the element
+                    newContentDiv.focus();
+                }
+            }, 0); // Use setTimeout to ensure DOM is ready
+        }
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Sibling Note");
 }
@@ -446,6 +469,7 @@ async function handleTabKey(e, noteItem, noteData) {
     await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
 
     const appStore = getAppStore();
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     let operations = [];
     let newParentId = null;
     let targetOrderIndex = null; // **FIX**: Declare targetOrderIndex in proper scope
@@ -531,44 +555,48 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // Store original state for potential rollback
-    const appStore = getAppStore();
-    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
-
-    try {
-        // Pure Alpine.js approach - update only the store, let Alpine.js handle DOM updates
-        const noteToMove = appStore.notes.find(n => String(n.id) === String(noteData.id));
+    // **OPTIMIZATION**: Use Alpine.js reactive updates for immediate feedback
+    const optimisticDOMUpdater = () => {
+        // Update the note's data in the store
+        const noteToMove = getNoteDataById(noteData.id);
         if (noteToMove) {
             noteToMove.parent_note_id = newParentId;
             noteToMove.order_index = targetOrderIndex;
         }
         
-        // Update sibling order indices in the store
+        // Update sibling order indices
         operations.forEach(op => {
             if (op.type === 'update') {
-                const note = appStore.notes.find(n => String(n.id) === String(op.payload.id));
+                const note = getNoteDataById(op.payload.id);
                 if (note) note.order_index = op.payload.order_index;
             }
         });
         
-        // Store updates will automatically trigger template updates - no manual DOM manipulation needed
-        console.log('Indentation changes updated in store - Alpine.js template will handle DOM updates');
-        
-        // Make the API call
-        await window.notesAPI.batchUpdateNotes(operations);
-        
-        console.log('Indentation changes saved successfully');
-        
-    } catch (error) {
-        console.error("Failed to save indentation changes:", error);
-        alert("Could not save note indentation. Reverting.");
-        
-        // Revert the Alpine.js store
-        appStore.setNotes(originalNotesState);
-        
-        // Store updates will automatically trigger template updates
-        console.log('Indentation changes reverted in store');
-    }
+        // Use Alpine.js reactive updates for immediate visual feedback
+        const appStore = getAppStore();
+        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const noteTree = buildNoteTree(sortedNotes);
+        const notesContainer = document.getElementById('notes-container');
+        if (notesContainer && notesContainer.__x) {
+            const alpineData = notesContainer.__x.$data;
+            alpineData.notes = noteTree;
+            // Use $nextTick to ensure DOM updates are processed
+            notesContainer.__x.$nextTick(() => {
+                // Re-initialize drag and drop after DOM update
+                setTimeout(() => {
+                    initializeDragAndDrop();
+                    // Focus the note content
+                    const movedNoteElement = getNoteElementById(noteData.id);
+                    if (movedNoteElement) {
+                        const newContentDiv = movedNoteElement.querySelector('.note-content');
+                        if (newContentDiv) ui.switchToEditMode(newContentDiv);
+                    }
+                }, 0);
+            });
+        }
+    };
+    
+    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
 }
 
 // **NEW**: Helper function to calculate nesting level
@@ -690,10 +718,11 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
     const operations = [{ type: 'delete', payload: { id: noteIdToDelete } }];
     
     const optimisticDOMUpdater = () => {
-        // Pure Alpine.js approach - no DOM manipulation needed
-        // The store update will automatically trigger template updates
-        // Focus handling will be managed by Alpine.js lifecycle hooks
-        console.log('Deleting note - Alpine.js template will handle DOM updates');
+        ui.removeNoteElement(noteIdToDelete);
+        if (focusTargetEl) {
+            const contentToFocus = focusTargetEl.querySelector('.note-content');
+            if(contentToFocus) ui.switchToEditMode(contentToFocus);
+        }
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Delete Note (Backspace)");
 }
@@ -852,10 +881,50 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
     }];
 
     const optimisticDOMUpdater = () => {
-        // Pure Alpine.js approach - no DOM manipulation needed
-        // The store update will automatically trigger template updates
-        // Focus handling will be managed by Alpine.js lifecycle hooks
-        console.log('Creating child note - Alpine.js template will handle DOM updates');
+        // Create and insert child note element
+        const newNoteEl = createOptimisticNoteElement(optimisticNewNote, noteData.id);
+        if (newNoteEl) {
+            // Find or create children container
+            let childrenContainer = noteItem.querySelector('.note-children');
+            if (!childrenContainer) {
+                childrenContainer = document.createElement('div');
+                childrenContainer.className = 'note-children';
+                noteItem.appendChild(childrenContainer);
+                noteItem.classList.add('has-children');
+            }
+            
+            // Insert the new child
+            childrenContainer.appendChild(newNoteEl);
+            
+            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
+            setTimeout(() => {
+                const newContentDiv = newNoteEl.querySelector('.note-content');
+                if (newContentDiv) {
+                    // Switch to edit mode
+                    ui.switchToEditMode(newContentDiv);
+                    
+                    // Set cursor to beginning of the new note
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    
+                    // Clear any existing selection
+                    sel.removeAllRanges();
+                    
+                    // Position cursor at the start of the content
+                    range.setStart(newContentDiv, 0);
+                    range.collapse(true);
+                    
+                    // Apply the selection
+                    sel.addRange(range);
+                    
+                    // Ensure the new note is visible
+                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    // Focus the element
+                    newContentDiv.focus();
+                }
+            }, 0); // Use setTimeout to ensure DOM is ready
+        }
     };
     
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Child Note");

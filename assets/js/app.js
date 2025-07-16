@@ -192,10 +192,6 @@ import { initGlobalSearch, initPageSearchModal, initNoteSearchModal } from './ap
 window.displayPageProperties = displayPagePropertiesFromEditor;
 window.parseAndRenderContent = parseAndRenderContent; // **ENHANCEMENT**: Expose markdown rendering function globally
 
-// Import and expose buildNoteTree for template access
-import { buildNoteTree } from './ui/note-elements.js';
-window.buildNoteTree = buildNoteTree;
-
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
 
