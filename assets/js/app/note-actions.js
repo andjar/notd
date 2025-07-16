@@ -555,43 +555,30 @@ async function handleTabKey(e, noteItem, noteData) {
     }
     
     // Store original state for potential rollback
-    const originalNotesState = JSON.parse(JSON.stringify(window.notesForCurrentPage));
+    const appStore = getAppStore();
+    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
 
     try {
-        // Optimistically update the UI immediately (same pattern as drag-and-drop)
-        const noteToMove = window.notesForCurrentPage.find(n => String(n.id) === String(noteData.id));
+        // Pure Alpine.js approach - update only the store, let Alpine.js handle DOM updates
+        const noteToMove = appStore.notes.find(n => String(n.id) === String(noteData.id));
         if (noteToMove) {
             noteToMove.parent_note_id = newParentId;
             noteToMove.order_index = targetOrderIndex;
         }
         
-        // Update sibling order indices
+        // Update sibling order indices in the store
         operations.forEach(op => {
             if (op.type === 'update') {
-                const note = window.notesForCurrentPage.find(n => String(n.id) === String(op.payload.id));
+                const note = appStore.notes.find(n => String(n.id) === String(op.payload.id));
                 if (note) note.order_index = op.payload.order_index;
             }
         });
         
-        // Also update the Alpine.js store to keep both patterns synchronized
-        const appStore = getAppStore();
-        const storeNoteToMove = appStore.notes.find(n => String(n.id) === String(noteData.id));
-        if (storeNoteToMove) {
-            storeNoteToMove.parent_note_id = newParentId;
-            storeNoteToMove.order_index = targetOrderIndex;
-        }
-        
-        operations.forEach(op => {
-            if (op.type === 'update') {
-                const storeNote = appStore.notes.find(n => String(n.id) === String(op.payload.id));
-                if (storeNote) storeNote.order_index = op.payload.order_index;
-            }
-        });
-        
-        // Update the UI immediately with the optimistic changes
-        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        // Update the Alpine.js data immediately using the store's reactive data
+        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
         const noteTree = buildNoteTree(sortedNotes);
         const notesContainer = document.getElementById('notes-container');
+        
         if (notesContainer && notesContainer.__x) {
             const alpineData = notesContainer.__x.$data;
             alpineData.notes = noteTree;
@@ -610,7 +597,10 @@ async function handleTabKey(e, noteItem, noteData) {
             });
         }
         
-        // Make the API call (same pattern as drag-and-drop)
+        // Sync the legacy window object (keep for backward compatibility)
+        window.notesForCurrentPage = [...appStore.notes];
+        
+        // Make the API call
         await window.notesAPI.batchUpdateNotes(operations);
         
         console.log('Indentation changes saved successfully');
@@ -619,17 +609,14 @@ async function handleTabKey(e, noteItem, noteData) {
         console.error("Failed to save indentation changes:", error);
         alert("Could not save note indentation. Reverting.");
         
-        // Revert the optimistic changes (same pattern as drag-and-drop)
-        window.notesForCurrentPage = originalNotesState;
-        
-        // Also revert the Alpine.js store
-        const appStore = getAppStore();
+        // Revert the Alpine.js store
         appStore.setNotes(originalNotesState);
         
         // Re-render with reverted data
-        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
         const noteTree = buildNoteTree(sortedNotes);
         const notesContainer = document.getElementById('notes-container');
+        
         if (notesContainer && notesContainer.__x) {
             const alpineData = notesContainer.__x.$data;
             alpineData.notes = noteTree;
@@ -639,6 +626,9 @@ async function handleTabKey(e, noteItem, noteData) {
                 }, 0);
             });
         }
+        
+        // Sync the legacy window object
+        window.notesForCurrentPage = [...appStore.notes];
     }
 }
 
