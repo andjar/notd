@@ -555,26 +555,40 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // **OPTIMIZATION**: Use Alpine.js store pattern for consistent optimistic updates
+    // **OPTIMIZATION**: Use same pattern as working drag-and-drop functionality
     const optimisticDOMUpdater = () => {
-        // Update the note's data in the Alpine.js store (proper reactive pattern)
-        const appStore = getAppStore();
-        const noteToMove = appStore.notes.find(n => String(n.id) === String(noteData.id));
+        // Update the note's data in the window.notesForCurrentPage array (same pattern as drag-and-drop)
+        const noteToMove = window.notesForCurrentPage.find(n => String(n.id) === String(noteData.id));
         if (noteToMove) {
             noteToMove.parent_note_id = newParentId;
             noteToMove.order_index = targetOrderIndex;
         }
         
-        // Update sibling order indices in the Alpine.js store
+        // Update sibling order indices in the window.notesForCurrentPage array
         operations.forEach(op => {
             if (op.type === 'update') {
-                const note = appStore.notes.find(n => String(n.id) === String(op.payload.id));
+                const note = window.notesForCurrentPage.find(n => String(n.id) === String(op.payload.id));
                 if (note) note.order_index = op.payload.order_index;
             }
         });
         
-        // Trigger Alpine.js reactivity by updating the notes tree
-        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        // Also update the Alpine.js store to keep both patterns synchronized
+        const appStore = getAppStore();
+        const storeNoteToMove = appStore.notes.find(n => String(n.id) === String(noteData.id));
+        if (storeNoteToMove) {
+            storeNoteToMove.parent_note_id = newParentId;
+            storeNoteToMove.order_index = targetOrderIndex;
+        }
+        
+        operations.forEach(op => {
+            if (op.type === 'update') {
+                const storeNote = appStore.notes.find(n => String(n.id) === String(op.payload.id));
+                if (storeNote) storeNote.order_index = op.payload.order_index;
+            }
+        });
+        
+        // Use the exact same pattern as handleNoteDrop function
+        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
         const noteTree = buildNoteTree(sortedNotes);
         const notesContainer = document.getElementById('notes-container');
         if (notesContainer && notesContainer.__x) {
