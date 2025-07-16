@@ -469,7 +469,6 @@ async function handleTabKey(e, noteItem, noteData) {
     await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
 
     const appStore = getAppStore();
-    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     let operations = [];
     let newParentId = null;
     let targetOrderIndex = null; // **FIX**: Declare targetOrderIndex in proper scope
@@ -555,16 +554,18 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // **OPTIMIZATION**: Use same pattern as working drag-and-drop functionality
-    const optimisticDOMUpdater = () => {
-        // Update the note's data in the window.notesForCurrentPage array (same pattern as drag-and-drop)
+    // Store original state for potential rollback
+    const originalNotesState = JSON.parse(JSON.stringify(window.notesForCurrentPage));
+
+    try {
+        // Optimistically update the UI immediately (same pattern as drag-and-drop)
         const noteToMove = window.notesForCurrentPage.find(n => String(n.id) === String(noteData.id));
         if (noteToMove) {
             noteToMove.parent_note_id = newParentId;
             noteToMove.order_index = targetOrderIndex;
         }
         
-        // Update sibling order indices in the window.notesForCurrentPage array
+        // Update sibling order indices
         operations.forEach(op => {
             if (op.type === 'update') {
                 const note = window.notesForCurrentPage.find(n => String(n.id) === String(op.payload.id));
@@ -587,7 +588,7 @@ async function handleTabKey(e, noteItem, noteData) {
             }
         });
         
-        // Use the exact same pattern as handleNoteDrop function
+        // Update the UI immediately with the optimistic changes
         const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
         const noteTree = buildNoteTree(sortedNotes);
         const notesContainer = document.getElementById('notes-container');
@@ -608,9 +609,37 @@ async function handleTabKey(e, noteItem, noteData) {
                 }, 0);
             });
         }
-    };
-    
-    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
+        
+        // Make the API call (same pattern as drag-and-drop)
+        await window.notesAPI.batchUpdateNotes(operations);
+        
+        console.log('Indentation changes saved successfully');
+        
+    } catch (error) {
+        console.error("Failed to save indentation changes:", error);
+        alert("Could not save note indentation. Reverting.");
+        
+        // Revert the optimistic changes (same pattern as drag-and-drop)
+        window.notesForCurrentPage = originalNotesState;
+        
+        // Also revert the Alpine.js store
+        const appStore = getAppStore();
+        appStore.setNotes(originalNotesState);
+        
+        // Re-render with reverted data
+        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+        const noteTree = buildNoteTree(sortedNotes);
+        const notesContainer = document.getElementById('notes-container');
+        if (notesContainer && notesContainer.__x) {
+            const alpineData = notesContainer.__x.$data;
+            alpineData.notes = noteTree;
+            notesContainer.__x.$nextTick(() => {
+                setTimeout(() => {
+                    initializeDragAndDrop();
+                }, 0);
+            });
+        }
+    }
 }
 
 // **NEW**: Helper function to calculate nesting level
