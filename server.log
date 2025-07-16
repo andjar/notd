@@ -1,10 +1,767 @@
-[Wed Jul 16 23:49:32 2025] PHP 8.3.6 Development Server (http://localhost:8080) started
-[Wed Jul 16 23:49:41 2025] [::1]:55542 Accepted
-[Wed Jul 16 23:49:41 2025] [::1]:55542 [500]: GET /page.php?page=test
-[Wed Jul 16 23:49:41 2025] [::1]:55542 Closing
-[Wed Jul 16 23:50:18 2025] [::1]:36434 Accepted
-[Wed Jul 16 23:50:18 2025] [::1]:36434 [500]: GET /page.php?page=test
-[Wed Jul 16 23:50:18 2025] [::1]:36434 Closing
-[Wed Jul 16 23:50:48 2025] [::1]:40486 Accepted
-[Wed Jul 16 23:50:48 2025] [::1]:40486 [302]: GET /index.php
-[Wed Jul 16 23:50:48 2025] [::1]:40486 Closing
+[Wed Jul 16 23:51:58 2025] PHP 8.3.6 Development Server (http://localhost:8080) started
+[Wed Jul 16 23:52:07 2025] [::1]:46550 Accepted
+[Wed Jul 16 23:52:07 2025] [::1]:46550 [302]: GET /
+[Wed Jul 16 23:52:07 2025] [::1]:46550 Closing
+[Wed Jul 16 23:52:30 2025] [::1]:53064 Accepted
+[Wed Jul 16 23:52:30 2025] [::1]:53080 Accepted
+[Wed Jul 16 23:52:30 2025] [::1]:53064 [302]: GET /?splash=false
+[Wed Jul 16 23:52:30 2025] [::1]:53064 Closing
+[Wed Jul 16 23:52:30 2025] [::1]:53080 [500]: GET /page.php?page=2025-07-16
+[Wed Jul 16 23:52:30 2025] [::1]:53080 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45504 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45516 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45504 [302]: GET /?splash=false
+[Wed Jul 16 23:53:02 2025] [::1]:45504 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45516 [200]: GET /page.php?page=2025-07-16
+[Wed Jul 16 23:53:02 2025] [::1]:45516 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45520 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45520 [200]: GET /assets/css/themes/default.css
+[Wed Jul 16 23:53:02 2025] [::1]:45520 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45524 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45524 [200]: GET /assets/css/components/header.css
+[Wed Jul 16 23:53:02 2025] [::1]:45524 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45528 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45528 [200]: GET /assets/css/style_modular.css
+[Wed Jul 16 23:53:02 2025] [::1]:45528 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45532 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45532 [200]: GET /assets/libs/feather.min.js
+[Wed Jul 16 23:53:02 2025] [::1]:45532 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45542 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45550 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45542 [200]: GET /assets/libs/marked.min.js
+[Wed Jul 16 23:53:02 2025] [::1]:45542 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45562 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45550 [200]: GET /assets/libs/Sortable.min.js
+[Wed Jul 16 23:53:02 2025] [::1]:45550 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45562 [200]: GET /assets/libs/sjcl.js
+[Wed Jul 16 23:53:02 2025] [::1]:45562 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45568 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45568 [200]: GET /assets/js/app.js
+[Wed Jul 16 23:53:02 2025] [::1]:45568 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45584 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45584 [200]: GET /assets/css/base/variables.css
+[Wed Jul 16 23:53:02 2025] [::1]:45584 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45590 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45590 [200]: GET /assets/css/base/reset.css
+[Wed Jul 16 23:53:02 2025] [::1]:45590 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45594 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45594 [200]: GET /assets/css/layout/grid.css
+[Wed Jul 16 23:53:02 2025] [::1]:45594 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45598 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45598 [200]: GET /assets/css/layout/sidebar.css
+[Wed Jul 16 23:53:02 2025] [::1]:45598 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45600 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45600 [200]: GET /assets/css/utilities/utilities.css
+[Wed Jul 16 23:53:02 2025] [::1]:45600 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45610 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45610 [200]: GET /assets/css/components/notes.css
+[Wed Jul 16 23:53:02 2025] [::1]:45610 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45612 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45612 [200]: GET /assets/css/components/tasks.css
+[Wed Jul 16 23:53:02 2025] [::1]:45612 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45620 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45620 [200]: GET /assets/css/components/splash.css
+[Wed Jul 16 23:53:02 2025] [::1]:45620 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45628 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45628 [200]: GET /assets/css/components/buttons.css
+[Wed Jul 16 23:53:02 2025] [::1]:45628 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45636 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45636 [200]: GET /assets/css/components/forms.css
+[Wed Jul 16 23:53:02 2025] [::1]:45636 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45638 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45638 [200]: GET /assets/css/components/pills.css
+[Wed Jul 16 23:53:02 2025] [::1]:45638 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45648 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45648 [200]: GET /assets/css/components/modals.css
+[Wed Jul 16 23:53:02 2025] [::1]:45648 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45660 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45660 [200]: GET /assets/css/components/encryption.css
+[Wed Jul 16 23:53:02 2025] [::1]:45660 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45672 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45672 [200]: GET /assets/css/components/transclusion.css
+[Wed Jul 16 23:53:02 2025] [::1]:45672 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45684 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45684 [200]: GET /assets/css/components/properties.css
+[Wed Jul 16 23:53:02 2025] [::1]:45684 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45686 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45690 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45686 [200]: GET /assets/css/components/links.css
+[Wed Jul 16 23:53:02 2025] [::1]:45686 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45690 [200]: GET /assets/css/components/note-styling.css
+[Wed Jul 16 23:53:02 2025] [::1]:45690 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45704 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45704 [200]: GET /assets/css/components/calendar.css
+[Wed Jul 16 23:53:02 2025] [::1]:45704 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45718 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45718 [200]: GET /assets/css/components/icons.css
+[Wed Jul 16 23:53:02 2025] [::1]:45718 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45724 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45724 [200]: GET /assets/css/components/attachments.css
+[Wed Jul 16 23:53:02 2025] [::1]:45724 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45726 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45726 [200]: GET /assets/css/components/mobile-toolbar.css
+[Wed Jul 16 23:53:02 2025] [::1]:45726 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45732 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45732 [200]: GET /assets/js/app/note-component.js
+[Wed Jul 16 23:53:02 2025] [::1]:45732 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45740 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45740 [200]: GET /assets/js/app/splash-screen.js
+[Wed Jul 16 23:53:02 2025] [::1]:45740 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45742 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45742 [200]: GET /assets/js/app/sidebar-component.js
+[Wed Jul 16 23:53:02 2025] [::1]:45742 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45744 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45744 [200]: GET /assets/js/app/calendar-component.js
+[Wed Jul 16 23:53:02 2025] [::1]:45744 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45750 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45750 [200]: GET /assets/js/app/sidebar.js
+[Wed Jul 16 23:53:02 2025] [::1]:45750 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45758 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45758 [200]: GET /assets/js/app/page-loader.js
+[Wed Jul 16 23:53:02 2025] [::1]:45758 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45764 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45764 [200]: GET /assets/js/ui.js
+[Wed Jul 16 23:53:02 2025] [::1]:45764 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45774 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45774 [200]: GET /assets/js/utils.js
+[Wed Jul 16 23:53:02 2025] [::1]:45774 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45784 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45784 [200]: GET /assets/js/ui/note-renderer.js
+[Wed Jul 16 23:53:02 2025] [::1]:45784 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45800 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45800 [200]: GET /assets/js/app/note-actions.js
+[Wed Jul 16 23:53:02 2025] [::1]:45800 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45816 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45816 [200]: GET /assets/js/app/template-handler.js
+[Wed Jul 16 23:53:02 2025] [::1]:45816 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45820 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45820 [200]: GET /assets/js/api_client.js
+[Wed Jul 16 23:53:02 2025] [::1]:45820 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45828 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45828 [200]: GET /assets/js/app/property-editor.js
+[Wed Jul 16 23:53:02 2025] [::1]:45828 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45844 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45844 [200]: GET /assets/js/app/app-init.js
+[Wed Jul 16 23:53:02 2025] [::1]:45844 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45858 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45858 [200]: GET /assets/js/app/search.js
+[Wed Jul 16 23:53:02 2025] [::1]:45858 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45866 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45866 [200]: GET /assets/js/app/calendar-cache.js
+[Wed Jul 16 23:53:02 2025] [::1]:45866 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45868 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45868 [200]: GET /assets/js/utils/content-parser.js
+[Wed Jul 16 23:53:02 2025] [::1]:45868 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45870 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45870 [200]: GET /assets/js/app/page-cache.js
+[Wed Jul 16 23:53:02 2025] [::1]:45870 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45874 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45874 [200]: GET /assets/js/app/recent-history.js
+[Wed Jul 16 23:53:02 2025] [::1]:45874 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45878 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45880 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45878 [200]: GET /assets/js/ui/note-elements.js
+[Wed Jul 16 23:53:02 2025] [::1]:45878 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45880 [200]: GET /assets/js/ui/dom-refs.js
+[Wed Jul 16 23:53:02 2025] [::1]:45880 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45884 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45890 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45884 [200]: GET /assets/js/app/state.js
+[Wed Jul 16 23:53:02 2025] [::1]:45884 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45890 [200]: GET /assets/js/ui/page-link-suggestions.js
+[Wed Jul 16 23:53:02 2025] [::1]:45890 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45902 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45902 [200]: GET /assets/js/app/order-index-service.js
+[Wed Jul 16 23:53:02 2025] [::1]:45902 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:45906 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:45906 [200]: GET /assets/js/app/event-handlers.js
+[Wed Jul 16 23:53:02 2025] [::1]:45906 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:42120 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:42120 [200]: GET /assets/js/app/backlinks-modal.js
+[Wed Jul 16 23:53:02 2025] [::1]:42120 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:42132 Accepted
+[Wed Jul 16 23:53:02 2025] [::1]:42144 Accepted
+[Wed Jul 16 23:53:02 2025] 2025-07-16 23:53:02 - Processing GET request - Context: {"type":"note"}
+[Wed Jul 16 23:53:02 2025] Template directory path: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:53:02 2025] Reading templates from: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:53:02 2025] Found templates: meeting_note, email, r_snippet, daily_journal, task_list, book_notes, quote, bookmark, project_plan
+[Wed Jul 16 23:53:02 2025] 2025-07-16 23:53:02 - Found templates - Context: {"count":9,"templates":["meeting_note","email","r_snippet","daily_journal","task_list","book_notes","quote","bookmark","project_plan"]}
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/meeting_note.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/email.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/r_snippet.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/daily_journal.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/task_list.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/book_notes.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/quote.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/bookmark.php
+[Wed Jul 16 23:53:02 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/project_plan.php
+[Wed Jul 16 23:53:02 2025] 2025-07-16 23:53:02 - Sending template data - Context: {"count":9}
+[Wed Jul 16 23:53:02 2025] 2025-07-16 23:53:02 - Final response structure - Context: {"response":[{"name":"meeting_note","content":"# Meeting Notes: {{title}}\n\n**Date:** 2025-07-16\n**Time:** 23:53:02\n**Location:** {{location}}\n**Tags:** {{tags}}\n\n## Attendees\n- {{attendee_1}}\n- {{attendee_2}}\n\n## Agenda\n1. {{agenda_item_1}}\n2. {{agenda_item_2}}\n3. {{agenda_item_3}}\n\n## Discussion \/ Notes\n- \n\n## Action Items\n- [ ] {{action_item_1_description}} (Assignee: {{assignee_1}}, Due: {{due_date_1}})\n- [ ] \n\n## Decisions\n-\n\n## Next Meeting\n**Date:** {{next_meeting_date}}\n**Time:** {{next_meeting_time}}\n**Agenda (Draft):** {{next_meeting_agenda_draft}}\n\n---\n*Generated: {{created_datetime}}*"},{"name":"email","content":"## Email: {{subject}}\n\n**To:** {{to_address}}\n**From:** {{from_address}}\n**Subject:** {{subject}}\n**Date:** 2025-07-16 23:53:02\n**Priority:** {{priority}}\n**Tags:** {{tags}}\n\n{{email_body}}\n\n*Saved: {{created_datetime}}*\n{tag::mail}"},{"name":"r_snippet","content":"# R Snippet: {{snippet_name}}\n\n**Description:** {{description}}\n**Language:** R\n**Version:** {{r_version}}\n**Tags:** {{tags}}\n**Date:** 2025-07-16\n\n```r\n{{r_code}}\n```\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"daily_journal","content":"# Daily Journal: {{journal_date}}\n\n**Overall Mood:** {{mood}} (e.g., Happy, Sad, Productive, Stressed, Calm)\n**Energy Level:** {{energy_level}} (1-5)\n**Tags:** {{tags}}\n\n---\n\n## Highlights of the Day\n- {{highlight_1}}\n- {{highlight_2}}\n\n## Challenges Faced\n- {{challenge_1}}\n  - *How I handled it:* {{challenge_1_handling}}\n- {{challenge_2}}\n  - *How I handled it:* {{challenge_2_handling}}\n\n## What I'm Grateful For\n1. {{grateful_1}}\n2. {{grateful_2}}\n3. {{grateful_3}}\n\n## Learnings & Insights\n- {{learning_1}}\n- {{learning_2}}\n\n## Goals for Tomorrow\n- [ ] {{goal_tomorrow_1}}\n- [ ] {{goal_tomorrow_2}}\n\n## Brain Dump \/ Free Space\n{{brain_dump}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"task_list","content":"# Task List: {{list_title}}\n\n**Date:** 2025-07-16\n**Project:** {{project_name}}\n**Tags:** {{tags}}\n\n---\n\n## Tasks\n\n- [ ] **{{task_1_title}}**\n  - Priority: {{task_1_priority}}\n  - Due: {{task_1_due_date}}\n  - Details: {{task_1_details}}\n  - Assignee: {{task_1_assignee}}\n\n- [ ] **{{task_2_title}}**\n  - Priority: {{task_2_priority}}\n  - Due: {{task_2_due_date}}\n  - Details: {{task_2_details}}\n  - Assignee: {{task_2_assignee}}\n\n- [ ]\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"book_notes","content":"# Book Notes: {{book_title}}\n\n**Author:** {{author}}\n**Genre:** {{genre}}\n**Year Published:** {{year_published}}\n**Date Started:** {{date_started}}\n**Date Finished:** {{date_finished}}\n**My Rating:** {{my_rating}}\/5\n**Tags:** {{tags}}\n\n---\n\n## Summary\n{{summary}}\n\n## Key Takeaways\n- {{takeaway_1}}\n- {{takeaway_2}}\n- {{takeaway_3}}\n\n## Favorite Quotes\n> {{quote_1_text}}\n> -- Page {{quote_1_page}}\n\n> {{quote_2_text}}\n> -- Page {{quote_2_page}}\n\n## Characters\n- **{{character_1_name}}**: {{character_1_description}}\n- **{{character_2_name}}**: {{character_2_description}}\n\n## Themes\n- {{theme_1}}\n- {{theme_2}}\n\n## Notes & Reflections\n{{notes_reflections}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"quote","content":"> {{quote_text}}\n>\n> -- {{quote_author}}, *{{quote_source}}*\n\n**Context:** {{context}}\n**Tags:** {{tags}}\n\n---\n*Noted: {{created_datetime}}*"},{"name":"bookmark","content":"# Bookmark: {{bookmark_title}}\n\n**URL:** {{url}}\n**Description:** {{description}}\n**Tags:** {{tags}}\n**Added:** 2025-07-16\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"project_plan","content":"# Project Plan: {{project_name}}\n\n**Project Lead:** {{project_lead}}\n**Team Members:** {{team_members}}\n**Start Date:** {{start_date}}\n**Target End Date:** {{end_date}}\n**Status:** {{status}} (e.g., Planning, In Progress, On Hold, Completed)\n**Tags:** {{tags}}\n\n---\n\n## 1. Project Goals & Objectives\n{{goals_objectives}}\n\n## 2. Scope\n**In Scope:**\n- {{in_scope_1}}\n- {{in_scope_2}}\n\n**Out of Scope:**\n- {{out_of_scope_1}}\n- {{out_of_scope_2}}\n\n## 3. Milestones & Timeline\n| Milestone             | Target Date      | Status      | Notes                       |\n|-----------------------|------------------|-------------|-----------------------------|\n| {{milestone_1_name}}  | {{milestone_1_date}} | {{milestone_1_status}} | {{milestone_1_notes}}       |\n| {{milestone_2_name}}  | {{milestone_2_date}} | {{milestone_2_status}} | {{milestone_2_notes}}       |\n|                       |                  |             |                             |\n\n## 4. Resources\n- **Budget:** {{budget}}\n- **Tools:** {{tools}}\n- **Documentation:** {{documentation_links}}\n\n## 5. Risks & Mitigation\n| Risk Description      | Likelihood (H\/M\/L) | Impact (H\/M\/L) | Mitigation Plan             |\n|-----------------------|--------------------|----------------|-----------------------------|\n| {{risk_1_description}}| {{risk_1_likelihood}} | {{risk_1_impact}}  | {{risk_1_mitigation}}       |\n| {{risk_2_description}}| {{risk_2_likelihood}} | {{risk_2_impact}}  | {{risk_2_mitigation}}       |\n|                       |                    |                |                             |\n\n## 6. Stakeholders\n- {{stakeholder_1_name}} ({{stakeholder_1_role}})\n- {{stakeholder_2_name}} ({{stakeholder_2_role}})\n\n## 7. Communication Plan\n{{communication_plan}}\n\n## 8. Notes & Open Questions\n{{notes_open_questions}}\n\n---\n*Created: {{created_datetime}}*\n"}]}
+[Wed Jul 16 23:53:02 2025] [::1]:42132 [200]: GET /api/v1/templates.php?type=note
+[Wed Jul 16 23:53:02 2025] [::1]:42132 Closing
+[Wed Jul 16 23:53:02 2025] [::1]:42144 [200]: GET /assets/images/notd.svg
+[Wed Jul 16 23:53:02 2025] [::1]:42144 Closing
+[Wed Jul 16 23:53:40 2025] [::1]:47062 Accepted
+[Wed Jul 16 23:53:40 2025] [::1]:47062 [200]: GET /page.php?page=test&splash=false
+[Wed Jul 16 23:53:40 2025] [::1]:47062 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60672 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60688 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60672 [200]: GET /page.php?page=test&splash=false
+[Wed Jul 16 23:55:17 2025] [::1]:60672 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60688 [200]: GET /assets/css/themes/default.css
+[Wed Jul 16 23:55:17 2025] [::1]:60688 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60702 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60702 [200]: GET /assets/css/components/header.css
+[Wed Jul 16 23:55:17 2025] [::1]:60702 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60706 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60706 [200]: GET /assets/css/style_modular.css
+[Wed Jul 16 23:55:17 2025] [::1]:60706 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60716 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60716 [200]: GET /assets/libs/feather.min.js
+[Wed Jul 16 23:55:17 2025] [::1]:60716 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60722 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60724 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60740 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60752 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60722 [200]: GET /assets/libs/marked.min.js
+[Wed Jul 16 23:55:17 2025] [::1]:60722 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60724 [200]: GET /assets/libs/Sortable.min.js
+[Wed Jul 16 23:55:17 2025] [::1]:60724 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60740 [200]: GET /assets/libs/sjcl.js
+[Wed Jul 16 23:55:17 2025] [::1]:60752 [200]: GET /assets/js/app.js
+[Wed Jul 16 23:55:17 2025] [::1]:60740 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60752 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60756 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60756 [200]: GET /assets/css/base/variables.css
+[Wed Jul 16 23:55:17 2025] [::1]:60756 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60760 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60760 [200]: GET /assets/css/base/reset.css
+[Wed Jul 16 23:55:17 2025] [::1]:60760 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60768 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60768 [200]: GET /assets/css/layout/grid.css
+[Wed Jul 16 23:55:17 2025] [::1]:60768 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60778 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60778 [200]: GET /assets/css/layout/sidebar.css
+[Wed Jul 16 23:55:17 2025] [::1]:60778 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60790 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60792 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60790 [200]: GET /assets/css/utilities/utilities.css
+[Wed Jul 16 23:55:17 2025] [::1]:60792 [200]: GET /assets/css/components/notes.css
+[Wed Jul 16 23:55:17 2025] [::1]:60790 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60792 Closing
+[Wed Jul 16 23:55:17 2025] [::1]:60804 Accepted
+[Wed Jul 16 23:55:17 2025] [::1]:60804 [200]: GET /assets/css/components/tasks.css
+[Wed Jul 16 23:55:17 2025] [::1]:60804 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60816 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60828 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60816 [200]: GET /assets/css/components/splash.css
+[Wed Jul 16 23:55:18 2025] [::1]:60816 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60828 [200]: GET /assets/css/components/buttons.css
+[Wed Jul 16 23:55:18 2025] [::1]:60828 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60832 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60832 [200]: GET /assets/css/components/forms.css
+[Wed Jul 16 23:55:18 2025] [::1]:60832 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60844 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60844 [200]: GET /assets/css/components/pills.css
+[Wed Jul 16 23:55:18 2025] [::1]:60844 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60858 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60874 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60886 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60858 [200]: GET /assets/css/components/modals.css
+[Wed Jul 16 23:55:18 2025] [::1]:60858 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60874 [200]: GET /assets/css/components/encryption.css
+[Wed Jul 16 23:55:18 2025] [::1]:60874 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60886 [200]: GET /assets/css/components/transclusion.css
+[Wed Jul 16 23:55:18 2025] [::1]:60886 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60896 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60896 [200]: GET /assets/css/components/properties.css
+[Wed Jul 16 23:55:18 2025] [::1]:60896 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60898 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60898 [200]: GET /assets/css/components/links.css
+[Wed Jul 16 23:55:18 2025] [::1]:60898 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60914 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60914 [200]: GET /assets/css/components/note-styling.css
+[Wed Jul 16 23:55:18 2025] [::1]:60914 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60930 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60930 [200]: GET /assets/css/components/calendar.css
+[Wed Jul 16 23:55:18 2025] [::1]:60930 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60942 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60942 [200]: GET /assets/css/components/icons.css
+[Wed Jul 16 23:55:18 2025] [::1]:60942 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60958 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60964 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60958 [200]: GET /assets/css/components/attachments.css
+[Wed Jul 16 23:55:18 2025] [::1]:60958 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60964 [200]: GET /assets/css/components/mobile-toolbar.css
+[Wed Jul 16 23:55:18 2025] [::1]:60964 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60976 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60976 [200]: GET /assets/js/app/note-component.js
+[Wed Jul 16 23:55:18 2025] [::1]:60976 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60988 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60988 [200]: GET /assets/js/app/splash-screen.js
+[Wed Jul 16 23:55:18 2025] [::1]:60988 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:60998 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:60998 [200]: GET /assets/js/app/sidebar-component.js
+[Wed Jul 16 23:55:18 2025] [::1]:60998 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32780 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32780 [200]: GET /assets/js/app/calendar-component.js
+[Wed Jul 16 23:55:18 2025] [::1]:32780 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32796 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32796 [200]: GET /assets/js/app/sidebar.js
+[Wed Jul 16 23:55:18 2025] [::1]:32796 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32810 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32810 [200]: GET /assets/js/app/page-loader.js
+[Wed Jul 16 23:55:18 2025] [::1]:32810 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32812 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32812 [200]: GET /assets/js/ui.js
+[Wed Jul 16 23:55:18 2025] [::1]:32812 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32818 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32818 [200]: GET /assets/js/utils.js
+[Wed Jul 16 23:55:18 2025] [::1]:32818 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32834 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32834 [200]: GET /assets/js/ui/note-renderer.js
+[Wed Jul 16 23:55:18 2025] [::1]:32834 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32848 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32862 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32848 [200]: GET /assets/js/app/note-actions.js
+[Wed Jul 16 23:55:18 2025] [::1]:32862 [200]: GET /assets/js/app/template-handler.js
+[Wed Jul 16 23:55:18 2025] [::1]:32848 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32862 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32872 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32884 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32872 [200]: GET /assets/js/api_client.js
+[Wed Jul 16 23:55:18 2025] [::1]:32872 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32898 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32884 [200]: GET /assets/js/app/property-editor.js
+[Wed Jul 16 23:55:18 2025] [::1]:32884 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32902 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32898 [200]: GET /assets/js/app/app-init.js
+[Wed Jul 16 23:55:18 2025] [::1]:32898 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32902 [200]: GET /assets/js/app/search.js
+[Wed Jul 16 23:55:18 2025] [::1]:32902 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32916 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32916 [200]: GET /assets/js/app/calendar-cache.js
+[Wed Jul 16 23:55:18 2025] [::1]:32916 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32932 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32932 [200]: GET /assets/js/utils/content-parser.js
+[Wed Jul 16 23:55:18 2025] [::1]:32932 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32944 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32944 [200]: GET /assets/js/app/page-cache.js
+[Wed Jul 16 23:55:18 2025] [::1]:32944 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32946 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32946 [200]: GET /assets/js/app/recent-history.js
+[Wed Jul 16 23:55:18 2025] [::1]:32946 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32954 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32954 [200]: GET /assets/js/ui/note-elements.js
+[Wed Jul 16 23:55:18 2025] [::1]:32954 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32962 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32962 [200]: GET /assets/js/ui/dom-refs.js
+[Wed Jul 16 23:55:18 2025] [::1]:32962 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32968 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32968 [200]: GET /assets/js/app/state.js
+[Wed Jul 16 23:55:18 2025] [::1]:32968 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32982 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32982 [200]: GET /assets/js/ui/page-link-suggestions.js
+[Wed Jul 16 23:55:18 2025] [::1]:32982 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32984 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32984 [200]: GET /assets/js/app/order-index-service.js
+[Wed Jul 16 23:55:18 2025] [::1]:32984 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:32998 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:32998 [200]: GET /assets/js/app/event-handlers.js
+[Wed Jul 16 23:55:18 2025] [::1]:32998 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:33014 Accepted
+[Wed Jul 16 23:55:18 2025] [::1]:33014 [200]: GET /assets/js/app/backlinks-modal.js
+[Wed Jul 16 23:55:18 2025] [::1]:33014 Closing
+[Wed Jul 16 23:55:18 2025] [::1]:33028 Accepted
+[Wed Jul 16 23:55:18 2025] 2025-07-16 23:55:18 - Processing GET request - Context: {"type":"note"}
+[Wed Jul 16 23:55:18 2025] Template directory path: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:55:18 2025] Reading templates from: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:55:18 2025] Found templates: meeting_note, email, r_snippet, daily_journal, task_list, book_notes, quote, bookmark, project_plan
+[Wed Jul 16 23:55:18 2025] 2025-07-16 23:55:18 - Found templates - Context: {"count":9,"templates":["meeting_note","email","r_snippet","daily_journal","task_list","book_notes","quote","bookmark","project_plan"]}
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/meeting_note.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/email.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/r_snippet.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/daily_journal.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/task_list.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/book_notes.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/quote.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/bookmark.php
+[Wed Jul 16 23:55:18 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/project_plan.php
+[Wed Jul 16 23:55:18 2025] 2025-07-16 23:55:18 - Sending template data - Context: {"count":9}
+[Wed Jul 16 23:55:18 2025] 2025-07-16 23:55:18 - Final response structure - Context: {"response":[{"name":"meeting_note","content":"# Meeting Notes: {{title}}\n\n**Date:** 2025-07-16\n**Time:** 23:55:18\n**Location:** {{location}}\n**Tags:** {{tags}}\n\n## Attendees\n- {{attendee_1}}\n- {{attendee_2}}\n\n## Agenda\n1. {{agenda_item_1}}\n2. {{agenda_item_2}}\n3. {{agenda_item_3}}\n\n## Discussion \/ Notes\n- \n\n## Action Items\n- [ ] {{action_item_1_description}} (Assignee: {{assignee_1}}, Due: {{due_date_1}})\n- [ ] \n\n## Decisions\n-\n\n## Next Meeting\n**Date:** {{next_meeting_date}}\n**Time:** {{next_meeting_time}}\n**Agenda (Draft):** {{next_meeting_agenda_draft}}\n\n---\n*Generated: {{created_datetime}}*"},{"name":"email","content":"## Email: {{subject}}\n\n**To:** {{to_address}}\n**From:** {{from_address}}\n**Subject:** {{subject}}\n**Date:** 2025-07-16 23:55:18\n**Priority:** {{priority}}\n**Tags:** {{tags}}\n\n{{email_body}}\n\n*Saved: {{created_datetime}}*\n{tag::mail}"},{"name":"r_snippet","content":"# R Snippet: {{snippet_name}}\n\n**Description:** {{description}}\n**Language:** R\n**Version:** {{r_version}}\n**Tags:** {{tags}}\n**Date:** 2025-07-16\n\n```r\n{{r_code}}\n```\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"daily_journal","content":"# Daily Journal: {{journal_date}}\n\n**Overall Mood:** {{mood}} (e.g., Happy, Sad, Productive, Stressed, Calm)\n**Energy Level:** {{energy_level}} (1-5)\n**Tags:** {{tags}}\n\n---\n\n## Highlights of the Day\n- {{highlight_1}}\n- {{highlight_2}}\n\n## Challenges Faced\n- {{challenge_1}}\n  - *How I handled it:* {{challenge_1_handling}}\n- {{challenge_2}}\n  - *How I handled it:* {{challenge_2_handling}}\n\n## What I'm Grateful For\n1. {{grateful_1}}\n2. {{grateful_2}}\n3. {{grateful_3}}\n\n## Learnings & Insights\n- {{learning_1}}\n- {{learning_2}}\n\n## Goals for Tomorrow\n- [ ] {{goal_tomorrow_1}}\n- [ ] {{goal_tomorrow_2}}\n\n## Brain Dump \/ Free Space\n{{brain_dump}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"task_list","content":"# Task List: {{list_title}}\n\n**Date:** 2025-07-16\n**Project:** {{project_name}}\n**Tags:** {{tags}}\n\n---\n\n## Tasks\n\n- [ ] **{{task_1_title}}**\n  - Priority: {{task_1_priority}}\n  - Due: {{task_1_due_date}}\n  - Details: {{task_1_details}}\n  - Assignee: {{task_1_assignee}}\n\n- [ ] **{{task_2_title}}**\n  - Priority: {{task_2_priority}}\n  - Due: {{task_2_due_date}}\n  - Details: {{task_2_details}}\n  - Assignee: {{task_2_assignee}}\n\n- [ ]\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"book_notes","content":"# Book Notes: {{book_title}}\n\n**Author:** {{author}}\n**Genre:** {{genre}}\n**Year Published:** {{year_published}}\n**Date Started:** {{date_started}}\n**Date Finished:** {{date_finished}}\n**My Rating:** {{my_rating}}\/5\n**Tags:** {{tags}}\n\n---\n\n## Summary\n{{summary}}\n\n## Key Takeaways\n- {{takeaway_1}}\n- {{takeaway_2}}\n- {{takeaway_3}}\n\n## Favorite Quotes\n> {{quote_1_text}}\n> -- Page {{quote_1_page}}\n\n> {{quote_2_text}}\n> -- Page {{quote_2_page}}\n\n## Characters\n- **{{character_1_name}}**: {{character_1_description}}\n- **{{character_2_name}}**: {{character_2_description}}\n\n## Themes\n- {{theme_1}}\n- {{theme_2}}\n\n## Notes & Reflections\n{{notes_reflections}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"quote","content":"> {{quote_text}}\n>\n> -- {{quote_author}}, *{{quote_source}}*\n\n**Context:** {{context}}\n**Tags:** {{tags}}\n\n---\n*Noted: {{created_datetime}}*"},{"name":"bookmark","content":"# Bookmark: {{bookmark_title}}\n\n**URL:** {{url}}\n**Description:** {{description}}\n**Tags:** {{tags}}\n**Added:** 2025-07-16\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"project_plan","content":"# Project Plan: {{project_name}}\n\n**Project Lead:** {{project_lead}}\n**Team Members:** {{team_members}}\n**Start Date:** {{start_date}}\n**Target End Date:** {{end_date}}\n**Status:** {{status}} (e.g., Planning, In Progress, On Hold, Completed)\n**Tags:** {{tags}}\n\n---\n\n## 1. Project Goals & Objectives\n{{goals_objectives}}\n\n## 2. Scope\n**In Scope:**\n- {{in_scope_1}}\n- {{in_scope_2}}\n\n**Out of Scope:**\n- {{out_of_scope_1}}\n- {{out_of_scope_2}}\n\n## 3. Milestones & Timeline\n| Milestone             | Target Date      | Status      | Notes                       |\n|-----------------------|------------------|-------------|-----------------------------|\n| {{milestone_1_name}}  | {{milestone_1_date}} | {{milestone_1_status}} | {{milestone_1_notes}}       |\n| {{milestone_2_name}}  | {{milestone_2_date}} | {{milestone_2_status}} | {{milestone_2_notes}}       |\n|                       |                  |             |                             |\n\n## 4. Resources\n- **Budget:** {{budget}}\n- **Tools:** {{tools}}\n- **Documentation:** {{documentation_links}}\n\n## 5. Risks & Mitigation\n| Risk Description      | Likelihood (H\/M\/L) | Impact (H\/M\/L) | Mitigation Plan             |\n|-----------------------|--------------------|----------------|-----------------------------|\n| {{risk_1_description}}| {{risk_1_likelihood}} | {{risk_1_impact}}  | {{risk_1_mitigation}}       |\n| {{risk_2_description}}| {{risk_2_likelihood}} | {{risk_2_impact}}  | {{risk_2_mitigation}}       |\n|                       |                    |                |                             |\n\n## 6. Stakeholders\n- {{stakeholder_1_name}} ({{stakeholder_1_role}})\n- {{stakeholder_2_name}} ({{stakeholder_2_role}})\n\n## 7. Communication Plan\n{{communication_plan}}\n\n## 8. Notes & Open Questions\n{{notes_open_questions}}\n\n---\n*Created: {{created_datetime}}*\n"}]}
+[Wed Jul 16 23:55:18 2025] [::1]:33028 [200]: GET /api/v1/templates.php?type=note
+[Wed Jul 16 23:55:18 2025] [::1]:33028 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53276 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53284 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53276 [200]: GET /page.php?page=test
+[Wed Jul 16 23:55:26 2025] [::1]:53276 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53284 [200]: GET /assets/css/themes/default.css
+[Wed Jul 16 23:55:26 2025] [::1]:53284 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53286 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53286 [200]: GET /assets/css/components/header.css
+[Wed Jul 16 23:55:26 2025] [::1]:53286 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53300 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53300 [200]: GET /assets/css/style_modular.css
+[Wed Jul 16 23:55:26 2025] [::1]:53300 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53306 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53314 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53320 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53326 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53306 [200]: GET /assets/libs/feather.min.js
+[Wed Jul 16 23:55:26 2025] [::1]:53306 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53342 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53314 [200]: GET /assets/libs/marked.min.js
+[Wed Jul 16 23:55:26 2025] [::1]:53320 [200]: GET /assets/libs/Sortable.min.js
+[Wed Jul 16 23:55:26 2025] [::1]:53314 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53320 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53326 [200]: GET /assets/libs/sjcl.js
+[Wed Jul 16 23:55:26 2025] [::1]:53326 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53342 [200]: GET /assets/js/app.js
+[Wed Jul 16 23:55:26 2025] [::1]:53342 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53348 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53348 [200]: GET /assets/css/base/variables.css
+[Wed Jul 16 23:55:26 2025] [::1]:53348 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53350 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53350 [200]: GET /assets/css/base/reset.css
+[Wed Jul 16 23:55:26 2025] [::1]:53350 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53358 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53358 [200]: GET /assets/css/layout/grid.css
+[Wed Jul 16 23:55:26 2025] [::1]:53358 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53370 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53370 [200]: GET /assets/css/layout/sidebar.css
+[Wed Jul 16 23:55:26 2025] [::1]:53370 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53378 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53378 [200]: GET /assets/css/utilities/utilities.css
+[Wed Jul 16 23:55:26 2025] [::1]:53378 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53384 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53384 [200]: GET /assets/css/components/notes.css
+[Wed Jul 16 23:55:26 2025] [::1]:53384 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53396 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53396 [200]: GET /assets/css/components/tasks.css
+[Wed Jul 16 23:55:26 2025] [::1]:53396 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53410 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53410 [200]: GET /assets/css/components/splash.css
+[Wed Jul 16 23:55:26 2025] [::1]:53410 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53420 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53420 [200]: GET /assets/css/components/buttons.css
+[Wed Jul 16 23:55:26 2025] [::1]:53420 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53430 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53430 [200]: GET /assets/css/components/forms.css
+[Wed Jul 16 23:55:26 2025] [::1]:53430 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53442 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53442 [200]: GET /assets/css/components/pills.css
+[Wed Jul 16 23:55:26 2025] [::1]:53442 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53454 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53454 [200]: GET /assets/css/components/modals.css
+[Wed Jul 16 23:55:26 2025] [::1]:53454 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53466 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53466 [200]: GET /assets/css/components/encryption.css
+[Wed Jul 16 23:55:26 2025] [::1]:53466 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53476 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53476 [200]: GET /assets/css/components/transclusion.css
+[Wed Jul 16 23:55:26 2025] [::1]:53476 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53484 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53484 [200]: GET /assets/css/components/properties.css
+[Wed Jul 16 23:55:26 2025] [::1]:53484 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53486 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53486 [200]: GET /assets/css/components/links.css
+[Wed Jul 16 23:55:26 2025] [::1]:53486 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53490 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53490 [200]: GET /assets/css/components/note-styling.css
+[Wed Jul 16 23:55:26 2025] [::1]:53490 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53502 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53502 [200]: GET /assets/css/components/calendar.css
+[Wed Jul 16 23:55:26 2025] [::1]:53502 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53516 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53516 [200]: GET /assets/css/components/icons.css
+[Wed Jul 16 23:55:26 2025] [::1]:53516 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53526 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53526 [200]: GET /assets/css/components/attachments.css
+[Wed Jul 16 23:55:26 2025] [::1]:53526 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53534 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53534 [200]: GET /assets/css/components/mobile-toolbar.css
+[Wed Jul 16 23:55:26 2025] [::1]:53534 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53536 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53536 [200]: GET /assets/js/app/note-component.js
+[Wed Jul 16 23:55:26 2025] [::1]:53536 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53542 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53542 [200]: GET /assets/js/app/splash-screen.js
+[Wed Jul 16 23:55:26 2025] [::1]:53542 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53544 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53558 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53544 [200]: GET /assets/js/app/sidebar-component.js
+[Wed Jul 16 23:55:26 2025] [::1]:53544 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53558 [200]: GET /assets/js/app/calendar-component.js
+[Wed Jul 16 23:55:26 2025] [::1]:53558 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53570 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53570 [200]: GET /assets/js/app/sidebar.js
+[Wed Jul 16 23:55:26 2025] [::1]:53570 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53578 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53578 [200]: GET /assets/js/app/page-loader.js
+[Wed Jul 16 23:55:26 2025] [::1]:53578 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53584 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53584 [200]: GET /assets/js/ui.js
+[Wed Jul 16 23:55:26 2025] [::1]:53584 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53592 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53608 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53592 [200]: GET /assets/js/utils.js
+[Wed Jul 16 23:55:26 2025] [::1]:53592 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53608 [200]: GET /assets/js/ui/note-renderer.js
+[Wed Jul 16 23:55:26 2025] [::1]:53608 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53620 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53624 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53620 [200]: GET /assets/js/app/note-actions.js
+[Wed Jul 16 23:55:26 2025] [::1]:53624 [200]: GET /assets/js/app/template-handler.js
+[Wed Jul 16 23:55:26 2025] [::1]:53620 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53624 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53640 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53640 [200]: GET /assets/js/api_client.js
+[Wed Jul 16 23:55:26 2025] [::1]:53640 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53642 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53642 [200]: GET /assets/js/app/property-editor.js
+[Wed Jul 16 23:55:26 2025] [::1]:53642 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53650 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53650 [200]: GET /assets/js/app/app-init.js
+[Wed Jul 16 23:55:26 2025] [::1]:53650 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53654 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53654 [200]: GET /assets/js/app/search.js
+[Wed Jul 16 23:55:26 2025] [::1]:53654 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53668 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53668 [200]: GET /assets/js/app/calendar-cache.js
+[Wed Jul 16 23:55:26 2025] [::1]:53668 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53674 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53674 [200]: GET /assets/js/utils/content-parser.js
+[Wed Jul 16 23:55:26 2025] [::1]:53674 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53686 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53686 [200]: GET /assets/js/app/page-cache.js
+[Wed Jul 16 23:55:26 2025] [::1]:53686 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53698 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53698 [200]: GET /assets/js/app/recent-history.js
+[Wed Jul 16 23:55:26 2025] [::1]:53698 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53704 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53704 [200]: GET /assets/js/ui/note-elements.js
+[Wed Jul 16 23:55:26 2025] [::1]:53704 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53708 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53708 [200]: GET /assets/js/ui/dom-refs.js
+[Wed Jul 16 23:55:26 2025] [::1]:53708 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53716 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53716 [200]: GET /assets/js/app/state.js
+[Wed Jul 16 23:55:26 2025] [::1]:53716 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53718 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53718 [200]: GET /assets/js/ui/page-link-suggestions.js
+[Wed Jul 16 23:55:26 2025] [::1]:53718 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53722 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53722 [200]: GET /assets/js/app/order-index-service.js
+[Wed Jul 16 23:55:26 2025] [::1]:53722 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53732 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53732 [200]: GET /assets/js/app/event-handlers.js
+[Wed Jul 16 23:55:26 2025] [::1]:53732 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53734 Accepted
+[Wed Jul 16 23:55:26 2025] [::1]:53734 [200]: GET /assets/js/app/backlinks-modal.js
+[Wed Jul 16 23:55:26 2025] [::1]:53734 Closing
+[Wed Jul 16 23:55:26 2025] [::1]:53744 Accepted
+[Wed Jul 16 23:55:26 2025] 2025-07-16 23:55:26 - Processing GET request - Context: {"type":"note"}
+[Wed Jul 16 23:55:26 2025] Template directory path: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:55:26 2025] Reading templates from: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:55:26 2025] Found templates: meeting_note, email, r_snippet, daily_journal, task_list, book_notes, quote, bookmark, project_plan
+[Wed Jul 16 23:55:26 2025] 2025-07-16 23:55:26 - Found templates - Context: {"count":9,"templates":["meeting_note","email","r_snippet","daily_journal","task_list","book_notes","quote","bookmark","project_plan"]}
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/meeting_note.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/email.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/r_snippet.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/daily_journal.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/task_list.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/book_notes.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/quote.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/bookmark.php
+[Wed Jul 16 23:55:26 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/project_plan.php
+[Wed Jul 16 23:55:26 2025] 2025-07-16 23:55:26 - Sending template data - Context: {"count":9}
+[Wed Jul 16 23:55:26 2025] 2025-07-16 23:55:26 - Final response structure - Context: {"response":[{"name":"meeting_note","content":"# Meeting Notes: {{title}}\n\n**Date:** 2025-07-16\n**Time:** 23:55:26\n**Location:** {{location}}\n**Tags:** {{tags}}\n\n## Attendees\n- {{attendee_1}}\n- {{attendee_2}}\n\n## Agenda\n1. {{agenda_item_1}}\n2. {{agenda_item_2}}\n3. {{agenda_item_3}}\n\n## Discussion \/ Notes\n- \n\n## Action Items\n- [ ] {{action_item_1_description}} (Assignee: {{assignee_1}}, Due: {{due_date_1}})\n- [ ] \n\n## Decisions\n-\n\n## Next Meeting\n**Date:** {{next_meeting_date}}\n**Time:** {{next_meeting_time}}\n**Agenda (Draft):** {{next_meeting_agenda_draft}}\n\n---\n*Generated: {{created_datetime}}*"},{"name":"email","content":"## Email: {{subject}}\n\n**To:** {{to_address}}\n**From:** {{from_address}}\n**Subject:** {{subject}}\n**Date:** 2025-07-16 23:55:26\n**Priority:** {{priority}}\n**Tags:** {{tags}}\n\n{{email_body}}\n\n*Saved: {{created_datetime}}*\n{tag::mail}"},{"name":"r_snippet","content":"# R Snippet: {{snippet_name}}\n\n**Description:** {{description}}\n**Language:** R\n**Version:** {{r_version}}\n**Tags:** {{tags}}\n**Date:** 2025-07-16\n\n```r\n{{r_code}}\n```\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"daily_journal","content":"# Daily Journal: {{journal_date}}\n\n**Overall Mood:** {{mood}} (e.g., Happy, Sad, Productive, Stressed, Calm)\n**Energy Level:** {{energy_level}} (1-5)\n**Tags:** {{tags}}\n\n---\n\n## Highlights of the Day\n- {{highlight_1}}\n- {{highlight_2}}\n\n## Challenges Faced\n- {{challenge_1}}\n  - *How I handled it:* {{challenge_1_handling}}\n- {{challenge_2}}\n  - *How I handled it:* {{challenge_2_handling}}\n\n## What I'm Grateful For\n1. {{grateful_1}}\n2. {{grateful_2}}\n3. {{grateful_3}}\n\n## Learnings & Insights\n- {{learning_1}}\n- {{learning_2}}\n\n## Goals for Tomorrow\n- [ ] {{goal_tomorrow_1}}\n- [ ] {{goal_tomorrow_2}}\n\n## Brain Dump \/ Free Space\n{{brain_dump}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"task_list","content":"# Task List: {{list_title}}\n\n**Date:** 2025-07-16\n**Project:** {{project_name}}\n**Tags:** {{tags}}\n\n---\n\n## Tasks\n\n- [ ] **{{task_1_title}}**\n  - Priority: {{task_1_priority}}\n  - Due: {{task_1_due_date}}\n  - Details: {{task_1_details}}\n  - Assignee: {{task_1_assignee}}\n\n- [ ] **{{task_2_title}}**\n  - Priority: {{task_2_priority}}\n  - Due: {{task_2_due_date}}\n  - Details: {{task_2_details}}\n  - Assignee: {{task_2_assignee}}\n\n- [ ]\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"book_notes","content":"# Book Notes: {{book_title}}\n\n**Author:** {{author}}\n**Genre:** {{genre}}\n**Year Published:** {{year_published}}\n**Date Started:** {{date_started}}\n**Date Finished:** {{date_finished}}\n**My Rating:** {{my_rating}}\/5\n**Tags:** {{tags}}\n\n---\n\n## Summary\n{{summary}}\n\n## Key Takeaways\n- {{takeaway_1}}\n- {{takeaway_2}}\n- {{takeaway_3}}\n\n## Favorite Quotes\n> {{quote_1_text}}\n> -- Page {{quote_1_page}}\n\n> {{quote_2_text}}\n> -- Page {{quote_2_page}}\n\n## Characters\n- **{{character_1_name}}**: {{character_1_description}}\n- **{{character_2_name}}**: {{character_2_description}}\n\n## Themes\n- {{theme_1}}\n- {{theme_2}}\n\n## Notes & Reflections\n{{notes_reflections}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"quote","content":"> {{quote_text}}\n>\n> -- {{quote_author}}, *{{quote_source}}*\n\n**Context:** {{context}}\n**Tags:** {{tags}}\n\n---\n*Noted: {{created_datetime}}*"},{"name":"bookmark","content":"# Bookmark: {{bookmark_title}}\n\n**URL:** {{url}}\n**Description:** {{description}}\n**Tags:** {{tags}}\n**Added:** 2025-07-16\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"project_plan","content":"# Project Plan: {{project_name}}\n\n**Project Lead:** {{project_lead}}\n**Team Members:** {{team_members}}\n**Start Date:** {{start_date}}\n**Target End Date:** {{end_date}}\n**Status:** {{status}} (e.g., Planning, In Progress, On Hold, Completed)\n**Tags:** {{tags}}\n\n---\n\n## 1. Project Goals & Objectives\n{{goals_objectives}}\n\n## 2. Scope\n**In Scope:**\n- {{in_scope_1}}\n- {{in_scope_2}}\n\n**Out of Scope:**\n- {{out_of_scope_1}}\n- {{out_of_scope_2}}\n\n## 3. Milestones & Timeline\n| Milestone             | Target Date      | Status      | Notes                       |\n|-----------------------|------------------|-------------|-----------------------------|\n| {{milestone_1_name}}  | {{milestone_1_date}} | {{milestone_1_status}} | {{milestone_1_notes}}       |\n| {{milestone_2_name}}  | {{milestone_2_date}} | {{milestone_2_status}} | {{milestone_2_notes}}       |\n|                       |                  |             |                             |\n\n## 4. Resources\n- **Budget:** {{budget}}\n- **Tools:** {{tools}}\n- **Documentation:** {{documentation_links}}\n\n## 5. Risks & Mitigation\n| Risk Description      | Likelihood (H\/M\/L) | Impact (H\/M\/L) | Mitigation Plan             |\n|-----------------------|--------------------|----------------|-----------------------------|\n| {{risk_1_description}}| {{risk_1_likelihood}} | {{risk_1_impact}}  | {{risk_1_mitigation}}       |\n| {{risk_2_description}}| {{risk_2_likelihood}} | {{risk_2_impact}}  | {{risk_2_mitigation}}       |\n|                       |                    |                |                             |\n\n## 6. Stakeholders\n- {{stakeholder_1_name}} ({{stakeholder_1_role}})\n- {{stakeholder_2_name}} ({{stakeholder_2_role}})\n\n## 7. Communication Plan\n{{communication_plan}}\n\n## 8. Notes & Open Questions\n{{notes_open_questions}}\n\n---\n*Created: {{created_datetime}}*\n"}]}
+[Wed Jul 16 23:55:26 2025] [::1]:53744 [200]: GET /api/v1/templates.php?type=note
+[Wed Jul 16 23:55:26 2025] [::1]:53744 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47606 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47612 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47606 [200]: GET /page.php?page=test&splash=false
+[Wed Jul 16 23:55:33 2025] [::1]:47606 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47612 [200]: GET /assets/css/themes/default.css
+[Wed Jul 16 23:55:33 2025] [::1]:47612 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47616 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47616 [200]: GET /assets/css/components/header.css
+[Wed Jul 16 23:55:33 2025] [::1]:47616 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47630 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47630 [200]: GET /assets/css/style_modular.css
+[Wed Jul 16 23:55:33 2025] [::1]:47630 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47634 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47634 [200]: GET /assets/libs/feather.min.js
+[Wed Jul 16 23:55:33 2025] [::1]:47634 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47646 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47646 [200]: GET /assets/libs/marked.min.js
+[Wed Jul 16 23:55:33 2025] [::1]:47646 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47652 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47654 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47668 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47652 [200]: GET /assets/libs/Sortable.min.js
+[Wed Jul 16 23:55:33 2025] [::1]:47654 [200]: GET /assets/libs/sjcl.js
+[Wed Jul 16 23:55:33 2025] [::1]:47652 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47654 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47668 [200]: GET /assets/js/app.js
+[Wed Jul 16 23:55:33 2025] [::1]:47668 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47678 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47678 [200]: GET /assets/css/base/variables.css
+[Wed Jul 16 23:55:33 2025] [::1]:47678 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47684 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47684 [200]: GET /assets/css/base/reset.css
+[Wed Jul 16 23:55:33 2025] [::1]:47684 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47696 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47696 [200]: GET /assets/css/layout/grid.css
+[Wed Jul 16 23:55:33 2025] [::1]:47696 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47698 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47698 [200]: GET /assets/css/layout/sidebar.css
+[Wed Jul 16 23:55:33 2025] [::1]:47698 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47700 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47700 [200]: GET /assets/css/utilities/utilities.css
+[Wed Jul 16 23:55:33 2025] [::1]:47714 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47700 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47714 [200]: GET /assets/css/components/notes.css
+[Wed Jul 16 23:55:33 2025] [::1]:47714 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47730 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47730 [200]: GET /assets/css/components/tasks.css
+[Wed Jul 16 23:55:33 2025] [::1]:47730 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47746 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47746 [200]: GET /assets/css/components/splash.css
+[Wed Jul 16 23:55:33 2025] [::1]:47746 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47752 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47752 [200]: GET /assets/css/components/buttons.css
+[Wed Jul 16 23:55:33 2025] [::1]:47752 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47756 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47756 [200]: GET /assets/css/components/forms.css
+[Wed Jul 16 23:55:33 2025] [::1]:47756 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47760 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47760 [200]: GET /assets/css/components/pills.css
+[Wed Jul 16 23:55:33 2025] [::1]:47760 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47766 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47766 [200]: GET /assets/css/components/modals.css
+[Wed Jul 16 23:55:33 2025] [::1]:47766 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47768 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47768 [200]: GET /assets/css/components/encryption.css
+[Wed Jul 16 23:55:33 2025] [::1]:47768 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47778 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47778 [200]: GET /assets/css/components/transclusion.css
+[Wed Jul 16 23:55:33 2025] [::1]:47778 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47794 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47794 [200]: GET /assets/css/components/properties.css
+[Wed Jul 16 23:55:33 2025] [::1]:47794 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47804 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47804 [200]: GET /assets/css/components/links.css
+[Wed Jul 16 23:55:33 2025] [::1]:47804 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47818 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47818 [200]: GET /assets/css/components/note-styling.css
+[Wed Jul 16 23:55:33 2025] [::1]:47818 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47822 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47822 [200]: GET /assets/css/components/calendar.css
+[Wed Jul 16 23:55:33 2025] [::1]:47822 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47834 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47834 [200]: GET /assets/css/components/icons.css
+[Wed Jul 16 23:55:33 2025] [::1]:47834 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47840 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47840 [200]: GET /assets/css/components/attachments.css
+[Wed Jul 16 23:55:33 2025] [::1]:47840 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47844 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47844 [200]: GET /assets/css/components/mobile-toolbar.css
+[Wed Jul 16 23:55:33 2025] [::1]:47844 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47848 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47848 [200]: GET /assets/js/app/note-component.js
+[Wed Jul 16 23:55:33 2025] [::1]:47848 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47860 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47860 [200]: GET /assets/js/app/splash-screen.js
+[Wed Jul 16 23:55:33 2025] [::1]:47860 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47862 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47862 [200]: GET /assets/js/app/sidebar-component.js
+[Wed Jul 16 23:55:33 2025] [::1]:47862 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47872 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47872 [200]: GET /assets/js/app/calendar-component.js
+[Wed Jul 16 23:55:33 2025] [::1]:47872 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47888 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47888 [200]: GET /assets/js/app/sidebar.js
+[Wed Jul 16 23:55:33 2025] [::1]:47888 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47894 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47894 [200]: GET /assets/js/app/page-loader.js
+[Wed Jul 16 23:55:33 2025] [::1]:47894 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47908 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47908 [200]: GET /assets/js/ui.js
+[Wed Jul 16 23:55:33 2025] [::1]:47908 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47924 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47924 [200]: GET /assets/js/utils.js
+[Wed Jul 16 23:55:33 2025] [::1]:47938 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47938 [200]: GET /assets/js/ui/note-renderer.js
+[Wed Jul 16 23:55:33 2025] [::1]:47924 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47938 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47942 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47942 [200]: GET /assets/js/app/note-actions.js
+[Wed Jul 16 23:55:33 2025] [::1]:47942 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47956 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47966 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47956 [200]: GET /assets/js/app/template-handler.js
+[Wed Jul 16 23:55:33 2025] [::1]:47956 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47966 [200]: GET /assets/js/api_client.js
+[Wed Jul 16 23:55:33 2025] [::1]:47966 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47968 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47968 [200]: GET /assets/js/app/property-editor.js
+[Wed Jul 16 23:55:33 2025] [::1]:47968 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47974 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47982 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47974 [200]: GET /assets/js/app/app-init.js
+[Wed Jul 16 23:55:33 2025] [::1]:47982 [200]: GET /assets/js/app/search.js
+[Wed Jul 16 23:55:33 2025] [::1]:47974 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47982 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47994 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47994 [200]: GET /assets/js/app/calendar-cache.js
+[Wed Jul 16 23:55:33 2025] [::1]:47994 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:47998 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:47998 [200]: GET /assets/js/utils/content-parser.js
+[Wed Jul 16 23:55:33 2025] [::1]:47998 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48008 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48008 [200]: GET /assets/js/app/page-cache.js
+[Wed Jul 16 23:55:33 2025] [::1]:48008 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48024 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48024 [200]: GET /assets/js/app/recent-history.js
+[Wed Jul 16 23:55:33 2025] [::1]:48024 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48028 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48030 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48028 [200]: GET /assets/js/ui/note-elements.js
+[Wed Jul 16 23:55:33 2025] [::1]:48028 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48030 [200]: GET /assets/js/ui/dom-refs.js
+[Wed Jul 16 23:55:33 2025] [::1]:48030 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48036 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48036 [200]: GET /assets/js/app/state.js
+[Wed Jul 16 23:55:33 2025] [::1]:48036 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48050 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48050 [200]: GET /assets/js/ui/page-link-suggestions.js
+[Wed Jul 16 23:55:33 2025] [::1]:48050 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48052 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48052 [200]: GET /assets/js/app/order-index-service.js
+[Wed Jul 16 23:55:33 2025] [::1]:48052 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48064 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48064 [200]: GET /assets/js/app/event-handlers.js
+[Wed Jul 16 23:55:33 2025] [::1]:48064 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48078 Accepted
+[Wed Jul 16 23:55:33 2025] [::1]:48078 [200]: GET /assets/js/app/backlinks-modal.js
+[Wed Jul 16 23:55:33 2025] [::1]:48078 Closing
+[Wed Jul 16 23:55:33 2025] [::1]:48090 Accepted
+[Wed Jul 16 23:55:33 2025] 2025-07-16 23:55:33 - Processing GET request - Context: {"type":"note"}
+[Wed Jul 16 23:55:33 2025] Template directory path: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:55:33 2025] Reading templates from: /home/runner/work/notd/notd/api/../assets/template/note
+[Wed Jul 16 23:55:33 2025] Found templates: meeting_note, email, r_snippet, daily_journal, task_list, book_notes, quote, bookmark, project_plan
+[Wed Jul 16 23:55:33 2025] 2025-07-16 23:55:33 - Found templates - Context: {"count":9,"templates":["meeting_note","email","r_snippet","daily_journal","task_list","book_notes","quote","bookmark","project_plan"]}
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/meeting_note.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/email.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/r_snippet.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/daily_journal.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/task_list.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/book_notes.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/quote.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/bookmark.php
+[Wed Jul 16 23:55:33 2025] Processing template: /home/runner/work/notd/notd/api/../assets/template/note/project_plan.php
+[Wed Jul 16 23:55:33 2025] 2025-07-16 23:55:33 - Sending template data - Context: {"count":9}
+[Wed Jul 16 23:55:33 2025] 2025-07-16 23:55:33 - Final response structure - Context: {"response":[{"name":"meeting_note","content":"# Meeting Notes: {{title}}\n\n**Date:** 2025-07-16\n**Time:** 23:55:33\n**Location:** {{location}}\n**Tags:** {{tags}}\n\n## Attendees\n- {{attendee_1}}\n- {{attendee_2}}\n\n## Agenda\n1. {{agenda_item_1}}\n2. {{agenda_item_2}}\n3. {{agenda_item_3}}\n\n## Discussion \/ Notes\n- \n\n## Action Items\n- [ ] {{action_item_1_description}} (Assignee: {{assignee_1}}, Due: {{due_date_1}})\n- [ ] \n\n## Decisions\n-\n\n## Next Meeting\n**Date:** {{next_meeting_date}}\n**Time:** {{next_meeting_time}}\n**Agenda (Draft):** {{next_meeting_agenda_draft}}\n\n---\n*Generated: {{created_datetime}}*"},{"name":"email","content":"## Email: {{subject}}\n\n**To:** {{to_address}}\n**From:** {{from_address}}\n**Subject:** {{subject}}\n**Date:** 2025-07-16 23:55:33\n**Priority:** {{priority}}\n**Tags:** {{tags}}\n\n{{email_body}}\n\n*Saved: {{created_datetime}}*\n{tag::mail}"},{"name":"r_snippet","content":"# R Snippet: {{snippet_name}}\n\n**Description:** {{description}}\n**Language:** R\n**Version:** {{r_version}}\n**Tags:** {{tags}}\n**Date:** 2025-07-16\n\n```r\n{{r_code}}\n```\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"daily_journal","content":"# Daily Journal: {{journal_date}}\n\n**Overall Mood:** {{mood}} (e.g., Happy, Sad, Productive, Stressed, Calm)\n**Energy Level:** {{energy_level}} (1-5)\n**Tags:** {{tags}}\n\n---\n\n## Highlights of the Day\n- {{highlight_1}}\n- {{highlight_2}}\n\n## Challenges Faced\n- {{challenge_1}}\n  - *How I handled it:* {{challenge_1_handling}}\n- {{challenge_2}}\n  - *How I handled it:* {{challenge_2_handling}}\n\n## What I'm Grateful For\n1. {{grateful_1}}\n2. {{grateful_2}}\n3. {{grateful_3}}\n\n## Learnings & Insights\n- {{learning_1}}\n- {{learning_2}}\n\n## Goals for Tomorrow\n- [ ] {{goal_tomorrow_1}}\n- [ ] {{goal_tomorrow_2}}\n\n## Brain Dump \/ Free Space\n{{brain_dump}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"task_list","content":"# Task List: {{list_title}}\n\n**Date:** 2025-07-16\n**Project:** {{project_name}}\n**Tags:** {{tags}}\n\n---\n\n## Tasks\n\n- [ ] **{{task_1_title}}**\n  - Priority: {{task_1_priority}}\n  - Due: {{task_1_due_date}}\n  - Details: {{task_1_details}}\n  - Assignee: {{task_1_assignee}}\n\n- [ ] **{{task_2_title}}**\n  - Priority: {{task_2_priority}}\n  - Due: {{task_2_due_date}}\n  - Details: {{task_2_details}}\n  - Assignee: {{task_2_assignee}}\n\n- [ ]\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"book_notes","content":"# Book Notes: {{book_title}}\n\n**Author:** {{author}}\n**Genre:** {{genre}}\n**Year Published:** {{year_published}}\n**Date Started:** {{date_started}}\n**Date Finished:** {{date_finished}}\n**My Rating:** {{my_rating}}\/5\n**Tags:** {{tags}}\n\n---\n\n## Summary\n{{summary}}\n\n## Key Takeaways\n- {{takeaway_1}}\n- {{takeaway_2}}\n- {{takeaway_3}}\n\n## Favorite Quotes\n> {{quote_1_text}}\n> -- Page {{quote_1_page}}\n\n> {{quote_2_text}}\n> -- Page {{quote_2_page}}\n\n## Characters\n- **{{character_1_name}}**: {{character_1_description}}\n- **{{character_2_name}}**: {{character_2_description}}\n\n## Themes\n- {{theme_1}}\n- {{theme_2}}\n\n## Notes & Reflections\n{{notes_reflections}}\n\n---\n*Created: {{created_datetime}}*\n"},{"name":"quote","content":"> {{quote_text}}\n>\n> -- {{quote_author}}, *{{quote_source}}*\n\n**Context:** {{context}}\n**Tags:** {{tags}}\n\n---\n*Noted: {{created_datetime}}*"},{"name":"bookmark","content":"# Bookmark: {{bookmark_title}}\n\n**URL:** {{url}}\n**Description:** {{description}}\n**Tags:** {{tags}}\n**Added:** 2025-07-16\n\n## Notes\n{{notes}}\n\n---\n*Created: {{created_datetime}}*"},{"name":"project_plan","content":"# Project Plan: {{project_name}}\n\n**Project Lead:** {{project_lead}}\n**Team Members:** {{team_members}}\n**Start Date:** {{start_date}}\n**Target End Date:** {{end_date}}\n**Status:** {{status}} (e.g., Planning, In Progress, On Hold, Completed)\n**Tags:** {{tags}}\n\n---\n\n## 1. Project Goals & Objectives\n{{goals_objectives}}\n\n## 2. Scope\n**In Scope:**\n- {{in_scope_1}}\n- {{in_scope_2}}\n\n**Out of Scope:**\n- {{out_of_scope_1}}\n- {{out_of_scope_2}}\n\n## 3. Milestones & Timeline\n| Milestone             | Target Date      | Status      | Notes                       |\n|-----------------------|------------------|-------------|-----------------------------|\n| {{milestone_1_name}}  | {{milestone_1_date}} | {{milestone_1_status}} | {{milestone_1_notes}}       |\n| {{milestone_2_name}}  | {{milestone_2_date}} | {{milestone_2_status}} | {{milestone_2_notes}}       |\n|                       |                  |             |                             |\n\n## 4. Resources\n- **Budget:** {{budget}}\n- **Tools:** {{tools}}\n- **Documentation:** {{documentation_links}}\n\n## 5. Risks & Mitigation\n| Risk Description      | Likelihood (H\/M\/L) | Impact (H\/M\/L) | Mitigation Plan             |\n|-----------------------|--------------------|----------------|-----------------------------|\n| {{risk_1_description}}| {{risk_1_likelihood}} | {{risk_1_impact}}  | {{risk_1_mitigation}}       |\n| {{risk_2_description}}| {{risk_2_likelihood}} | {{risk_2_impact}}  | {{risk_2_mitigation}}       |\n|                       |                    |                |                             |\n\n## 6. Stakeholders\n- {{stakeholder_1_name}} ({{stakeholder_1_role}})\n- {{stakeholder_2_name}} ({{stakeholder_2_role}})\n\n## 7. Communication Plan\n{{communication_plan}}\n\n## 8. Notes & Open Questions\n{{notes_open_questions}}\n\n---\n*Created: {{created_datetime}}*\n"}]}
+[Wed Jul 16 23:55:33 2025] [::1]:48090 [200]: GET /api/v1/templates.php?type=note
+[Wed Jul 16 23:55:33 2025] [::1]:48090 Closing

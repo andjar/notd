@@ -299,6 +299,7 @@ function renderBacklinks($backlinks) {
     </script>
 </head>
 <body>
+    <?php if (!$splashDisabled): ?>
     <div id="splash-screen" 
          x-data="splashScreen(window.APP_CONFIG.SPLASH_DISABLED)" 
          x-show="show"
@@ -375,6 +376,7 @@ function renderBacklinks($backlinks) {
             </div>
         </div>
     </div>
+    <?php endif; ?>
     
     <div class="app-container" x-data="sidebarComponent()" x-init="init()">
         <!-- Left Sidebar -->
