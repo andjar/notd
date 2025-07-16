@@ -3,8 +3,9 @@
  * @module splash-screen
  */
 
-export function splashScreen() {
+export function splashScreen(splashDisabled = false) {
     return {
+        splashDisabled: splashDisabled,
         show: false, // Start hidden by default
         time: '12:00',
         date: 'Monday, 1 January',
@@ -29,27 +30,28 @@ export function splashScreen() {
         dotRadius: 105,
         
         init() {
+            // If splash is disabled by URL flag, never show splash
+            if (this.splashDisabled) {
+                this.show = false;
+                sessionStorage.setItem('notd_initial_load_complete', 'true');
+                return;
+            }
             // Check if this is a subsequent page load (not the initial app load)
             const isSubsequentLoad = sessionStorage.getItem('notd_initial_load_complete');
-            
             if (isSubsequentLoad) {
                 // Skip splash screen on subsequent loads
                 this.show = false;
                 return;
             }
-            
             // Show splash screen for initial load
             this.show = true;
-            
             // Mark initial load as complete
             sessionStorage.setItem('notd_initial_load_complete', 'true');
-            
             this.initBubbles();
             this.initDots();
             this.updateTimeDate();
             this.startTimeUpdates();
             this.startAnimation();
-            
             // Auto-hide after 1 second on initial load (reduced from 2 seconds)
             setTimeout(() => {
                 this.show = false;

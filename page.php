@@ -116,6 +116,9 @@ if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName)) {
 $renderInternal = PROPERTY_WEIGHTS[3]['visible_in_view_mode'] ?? false;
 $showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
 
+// --- Splash Screen Disable Flag ---
+$splashDisabled = isset($_GET['splash']) && $_GET['splash'] === 'false';
+
 // --- Helper Functions for Rendering ---
 function renderPageTitle($pageName) {
     if (strpos($pageName, '/') === false) {
@@ -290,13 +293,14 @@ function renderBacklinks($backlinks) {
         // Pass server-side configuration to JavaScript
         window.APP_CONFIG = {
             RENDER_INTERNAL_PROPERTIES: <?php echo json_encode($renderInternal); ?>,
-            SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE: <?php echo json_encode($showInternalInEdit); ?>
+            SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE: <?php echo json_encode($showInternalInEdit); ?>,
+            SPLASH_DISABLED: <?php echo $splashDisabled ? 'true' : 'false'; ?>
         };
     </script>
 </head>
 <body>
     <div id="splash-screen" 
-         x-data="splashScreen()" 
+         x-data="splashScreen(window.APP_CONFIG.SPLASH_DISABLED)" 
          x-show="show"
          x-init="init()"
          @click="hideSplash()"
