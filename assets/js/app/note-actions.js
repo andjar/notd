@@ -555,25 +555,25 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // **OPTIMIZATION**: Use Alpine.js reactive updates for immediate feedback
+    // **OPTIMIZATION**: Use Alpine.js store pattern for consistent optimistic updates
     const optimisticDOMUpdater = () => {
-        // Update the note's data in the store
-        const noteToMove = getNoteDataById(noteData.id);
+        // Update the note's data in the Alpine.js store (proper reactive pattern)
+        const appStore = getAppStore();
+        const noteToMove = appStore.notes.find(n => String(n.id) === String(noteData.id));
         if (noteToMove) {
             noteToMove.parent_note_id = newParentId;
             noteToMove.order_index = targetOrderIndex;
         }
         
-        // Update sibling order indices
+        // Update sibling order indices in the Alpine.js store
         operations.forEach(op => {
             if (op.type === 'update') {
-                const note = getNoteDataById(op.payload.id);
+                const note = appStore.notes.find(n => String(n.id) === String(op.payload.id));
                 if (note) note.order_index = op.payload.order_index;
             }
         });
         
-        // Use Alpine.js reactive updates for immediate visual feedback
-        const appStore = getAppStore();
+        // Trigger Alpine.js reactivity by updating the notes tree
         const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
         const noteTree = buildNoteTree(sortedNotes);
         const notesContainer = document.getElementById('notes-container');
