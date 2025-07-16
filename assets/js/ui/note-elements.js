@@ -33,31 +33,17 @@ export function displayNotes(notesData, pageId) {
     if (safeNotesData.length === 0) {
         // Update Alpine.js store with empty array
         setNotesForCurrentPage([]);
-        if (notesContainer && notesContainer.__x) {
-            const alpineData = notesContainer.__x.$data;
-            alpineData.notes = [];
-        }
         // Show empty state message
         notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
         return;
     }
 
     const sortedNotes = [...safeNotesData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
     
-    // Update Alpine.js store first
+    // Update Alpine.js store - this will automatically trigger template updates
     setNotesForCurrentPage(sortedNotes);
     
-    // Update Alpine.js data for immediate UI updates
-    if (notesContainer && notesContainer.__x) {
-        const alpineData = notesContainer.__x.$data;
-        alpineData.notes = noteTree;
-    }
-    
-    // Render notes using traditional DOM approach since Alpine.js template is also active
-    renderNotesInContainer(noteTree, notesContainer);
-    
-    // Initialize drag and drop after rendering
+    // Initialize drag and drop after Alpine.js renders
     setTimeout(() => {
         initializeDragAndDrop();
     }, 0);
@@ -96,31 +82,13 @@ function renderNotesInContainer(noteTree, container) {
 export function addNoteElement(noteData) {
     if (!noteData) return null;
     
-    // Pure Alpine.js approach - update the store, let Alpine.js handle DOM updates
+    // Pure Alpine.js approach - update only the store, let Alpine.js handle DOM updates
     const appStore = window.Alpine.store('app');
     appStore.addNote(noteData);
     
-    const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    const notesContainer = document.getElementById('notes-container');
+    // No need to manually update DOM - Alpine.js template handles this automatically
+    // The template reads from the store via: get notes() { return $store.app.notes ? buildNoteTree($store.app.notes) : [] }
     
-    if (notesContainer && notesContainer.__x) {
-        // Use Alpine.js reactive data
-        const alpineData = notesContainer.__x.$data;
-        alpineData.notes = noteTree;
-        // Trigger Alpine.js reactivity by accessing $nextTick
-        notesContainer.__x.$nextTick(() => {
-            // Re-initialize drag and drop after DOM update
-            setTimeout(() => {
-                initializeDragAndDrop();
-            }, 0);
-        });
-    }
-    
-    // Sync the legacy window object (keep for backward compatibility)
-    window.notesForCurrentPage = [...appStore.notes];
-    
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
     return null;
 }
 
@@ -129,31 +97,12 @@ export function addNoteElement(noteData) {
  * @param {string} noteId - The ID of the note to remove.
  */
 export function removeNoteElement(noteId) {
-    // Pure Alpine.js approach - update the store, let Alpine.js handle DOM updates
+    // Pure Alpine.js approach - update only the store, let Alpine.js handle DOM updates
     const appStore = window.Alpine.store('app');
     appStore.removeNoteById(noteId);
     
-    const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    const notesContainer = document.getElementById('notes-container');
-    
-    if (notesContainer && notesContainer.__x) {
-        // Use Alpine.js reactive data
-        const alpineData = notesContainer.__x.$data;
-        alpineData.notes = noteTree;
-        // Trigger Alpine.js reactivity by accessing $nextTick
-        notesContainer.__x.$nextTick(() => {
-            // Re-initialize drag and drop after DOM update
-            setTimeout(() => {
-                initializeDragAndDrop();
-            }, 0);
-        });
-    }
-    
-    // Sync the legacy window object (keep for backward compatibility)
-    window.notesForCurrentPage = [...appStore.notes];
-    
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    // No need to manually update DOM - Alpine.js template handles this automatically
+    // The template reads from the store via: get notes() { return $store.app.notes ? buildNoteTree($store.app.notes) : [] }
 }
 
 /**
@@ -251,25 +200,7 @@ export async function handleNoteDrop(evt) {
     try {
         await window.notesAPI.batchUpdateNotes(operations);
         
-        // Instead of reloading the page, update the optimistic UI using Alpine.js store
-        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-        const noteTree = buildNoteTree(sortedNotes);
-        const notesContainer = document.getElementById('notes-container');
-        if (notesContainer && notesContainer.__x) {
-            const alpineData = notesContainer.__x.$data;
-            alpineData.notes = noteTree;
-            // Use $nextTick to ensure DOM updates are processed
-            notesContainer.__x.$nextTick(() => {
-                // Re-initialize drag and drop after DOM update
-                setTimeout(() => {
-                    initializeDragAndDrop();
-                }, 0);
-            });
-        }
-        
-        // Sync the legacy window object (keep for backward compatibility)
-        window.notesForCurrentPage = [...appStore.notes];
-        
+        // Pure Alpine.js approach - the store updates will automatically trigger template updates
         console.log('Note drop changes saved successfully');
     } catch (error) {
         console.error("Failed to save note drop changes:", error);
@@ -282,22 +213,15 @@ export async function handleNoteDrop(evt) {
             revertedNoteToMove.order_index = evt.oldIndex;
         }
         
-        // Re-render with reverted data
-        const sortedNotes = [...appStore.notes].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-        const noteTree = buildNoteTree(sortedNotes);
-        const notesContainer = document.getElementById('notes-container');
-        if (notesContainer && notesContainer.__x) {
-            const alpineData = notesContainer.__x.$data;
-            alpineData.notes = noteTree;
-            notesContainer.__x.$nextTick(() => {
-                setTimeout(() => {
-                    initializeDragAndDrop();
-                }, 0);
-            });
-        }
+        // Revert sibling updates
+        filteredSiblingUpdates.forEach(upd => {
+            const sib = appStore.notes.find(n => n.id == upd.id);
+            if(sib) {
+                sib.order_index = upd.originalOrderIndex; // We need to store original values
+            }
+        });
         
-        // Sync the legacy window object
-        window.notesForCurrentPage = [...appStore.notes];
+        // Store updates will automatically trigger template updates
     }
 }
 

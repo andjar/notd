@@ -495,7 +495,21 @@ function renderBacklinks($backlinks) {
                 <!-- Page content will be rendered here by JavaScript -->
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
-            <div id="notes-container" class="outliner" x-data="{ notes: [] }" x-init="initializeDragAndDrop()">
+            <div id="notes-container" class="outliner" x-data="{
+                get notes() { return $store.app.notes ? buildNoteTree($store.app.notes) : [] },
+                init() {
+                    // Watch for changes in notes and reinitialize drag and drop
+                    this.$watch('notes', () => {
+                        this.$nextTick(() => {
+                            setTimeout(() => {
+                                if (typeof initializeDragAndDrop === 'function') {
+                                    initializeDragAndDrop();
+                                }
+                            }, 0);
+                        });
+                    });
+                }
+            }">
                 <template x-for="note in notes" :key="note.id">
                     <div class="note-item"
                         x-data="noteComponent(note, 0)"

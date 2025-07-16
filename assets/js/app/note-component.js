@@ -20,6 +20,15 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
 
         init() {
             this.contentEl = this.$refs.contentDiv;
+            
+            // Watch for changes in the note content to trigger reactivity
+            this.$watch('note.content', (newContent) => {
+                if (this.contentEl && !this.isEditing) {
+                    // Update the rendered content when note changes
+                    this.contentEl.innerHTML = this.parseContent(newContent);
+                }
+            });
+            
             this.$watch('isEditing', (value) => {
                 if (value) {
                     this.switchToEditMode();
@@ -27,6 +36,14 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
                     this.switchToRenderedMode();
                 }
             });
+            
+            // Auto-focus new notes that are empty and have temporary IDs
+            if (this.note.content === '' && String(this.note.id).startsWith('temp-')) {
+                this.$nextTick(() => {
+                    this.editNote();
+                });
+            }
+            
             this.$nextTick(() => {
                 if (window.FeatherManager) {
                     window.FeatherManager.requestUpdate();
