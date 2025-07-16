@@ -52,12 +52,12 @@ export function splashScreen(splashDisabled = false) {
             this.updateTimeDate();
             this.startTimeUpdates();
             this.startAnimation();
-            // Auto-hide after 1 second on initial load (reduced from 2 seconds)
+            // Auto-hide after 0.5 seconds on initial load (reduced from 1 second)
             setTimeout(() => {
                 this.show = false;
                 this.stopAnimation();
                 this.stopTimeUpdates();
-            }, 1000);
+            }, 500);
         },
         
         // Method to manually show the splash screen
