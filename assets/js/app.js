@@ -87,24 +87,18 @@ Alpine.store('app', {
   setNotes(newNotes) {
     this.notes = newNotes;
     window.notesForCurrentPage = newNotes;
-    // Trigger a custom event to notify components about the change
-    window.dispatchEvent(new CustomEvent('notesChanged', { detail: newNotes }));
   },
   
   addNote(note) {
     this.notes.push(note);
     this.notes.sort((a, b) => a.order_index - b.order_index);
     window.notesForCurrentPage = this.notes;
-    // Trigger a custom event to notify components about the change
-    window.dispatchEvent(new CustomEvent('notesChanged', { detail: this.notes }));
   },
   
   removeNoteById(noteId) {
     const idx = this.notes.findIndex(n => String(n.id) === String(noteId));
     if (idx > -1) this.notes.splice(idx, 1);
     window.notesForCurrentPage = this.notes;
-    // Trigger a custom event to notify components about the change
-    window.dispatchEvent(new CustomEvent('notesChanged', { detail: this.notes }));
   },
   
   updateNote(updatedNote) {
@@ -115,8 +109,6 @@ Alpine.store('app', {
       this.notes.push(updatedNote);
     }
     window.notesForCurrentPage = this.notes;
-    // Trigger a custom event to notify components about the change
-    window.dispatchEvent(new CustomEvent('notesChanged', { detail: this.notes }));
   },
   
   setFocusedNoteId(newNoteId) {

@@ -496,16 +496,13 @@ function renderBacklinks($backlinks) {
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner" x-data="{
-                notes: [],
+                get notes() {
+                    // Make the template directly reactive to store changes
+                    const storeNotes = this.$store.app.notes || [];
+                    return buildNoteTree(storeNotes);
+                },
+                
                 init() {
-                    // Initialize notes from store
-                    this.updateNotes();
-                    
-                    // Listen for custom notes changed events
-                    window.addEventListener('notesChanged', (e) => {
-                        this.updateNotes();
-                    });
-                    
                     // Initialize drag and drop
                     this.$nextTick(() => {
                         if (typeof initializeDragAndDrop === 'function') {
@@ -523,12 +520,6 @@ function renderBacklinks($backlinks) {
                             }, 0);
                         });
                     });
-                },
-                
-                updateNotes() {
-                    const storeNotes = this.$store.app.notes || [];
-                    const newNotes = buildNoteTree(storeNotes);
-                    this.notes = newNotes;
                 }
             }">
                 <template x-for="note in notes" :key="note.id">
