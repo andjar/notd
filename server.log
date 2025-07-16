@@ -1,0 +1,2 @@
+nohup: ignoring input
+[Wed Jul 16 10:12:14 2025] Failed to listen on localhost:8000 (reason: Address already in use)
