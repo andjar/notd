@@ -27,16 +27,32 @@ export function displayNotes(notesData, pageId) {
     // Ensure notesData is an array (handle null/undefined)
     const safeNotesData = Array.isArray(notesData) ? notesData : [];
     
+    // Update Alpine.js store instead of direct DOM manipulation
+    const appStore = window.Alpine?.store('app');
+    if (appStore) {
+        appStore.setNotes(safeNotesData);
+        console.log('[DisplayNotes] Updated Alpine.js store with', safeNotesData.length, 'notes');
+    } else {
+        console.warn('[DisplayNotes] Alpine.js store not available');
+        // Fallback to legacy DOM manipulation if Alpine.js isn't available
+        legacyDisplayNotes(safeNotesData, pageId, notesContainer);
+    }
+    
+    // Update legacy state for backward compatibility
+    setNotesForCurrentPage(safeNotesData);
+}
+
+/**
+ * Legacy DOM manipulation fallback for when Alpine.js isn't available
+ * @param {Array} safeNotesData - Array of note objects
+ * @param {number} pageId - Current page ID
+ * @param {HTMLElement} notesContainer - Container element
+ */
+function legacyDisplayNotes(safeNotesData, pageId, notesContainer) {
     // Clear the container first (removes "Loading page..." message)
     notesContainer.innerHTML = '';
     
     if (safeNotesData.length === 0) {
-        // Update Alpine.js with empty array and update state
-        setNotesForCurrentPage([]);
-        if (notesContainer && notesContainer.__x) {
-            const alpineData = notesContainer.__x.$data;
-            alpineData.notes = [];
-        }
         // Show empty state message
         notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
         return;
@@ -44,15 +60,8 @@ export function displayNotes(notesData, pageId) {
 
     const sortedNotes = [...safeNotesData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
     const noteTree = buildNoteTree(sortedNotes);
-    setNotesForCurrentPage(sortedNotes);
     
-    // Update Alpine.js data for future use
-    if (notesContainer && notesContainer.__x) {
-        const alpineData = notesContainer.__x.$data;
-        alpineData.notes = noteTree;
-    }
-    
-    // Render notes using traditional DOM approach since Alpine.js template is not implemented yet
+    // Render notes using traditional DOM approach
     renderNotesInContainer(noteTree, notesContainer);
     
     // Initialize drag and drop after rendering

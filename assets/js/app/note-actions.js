@@ -125,7 +125,7 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         ui.updateSaveStatusIndicator('error');
         const appStore = getAppStore();
         appStore.setNotes(originalNotesState);
-        ui.displayNotes(appStore.notes, appStore.currentPageId);
+        // No need to call ui.displayNotes - Alpine.js store update handles the UI update
         success = false;
     } finally {
         batchInProgress = false;

@@ -149,7 +149,12 @@ Alpine.store('app', {
   }
 });
     Alpine.data('noteComponent', noteComponent);
-    Alpine.data('splashScreen', splashScreen);
+    
+    // Only register splash screen if not disabled
+    if (!window.APP_CONFIG || !window.APP_CONFIG.SPLASH_DISABLED) {
+        Alpine.data('splashScreen', splashScreen);
+    }
+    
     Alpine.data('sidebarComponent', sidebarComponent);
     Alpine.data('calendarComponent', calendarComponent);
 });
@@ -200,6 +205,7 @@ import { initGlobalSearch, initPageSearchModal, initNoteSearchModal } from './ap
 window.displayPageProperties = displayPagePropertiesFromEditor;
 window.parseAndRenderContent = parseAndRenderContent; // **ENHANCEMENT**: Expose markdown rendering function globally
 window.buildNoteTree = ui.buildNoteTree; // **FIX**: Expose buildNoteTree function globally for Alpine.js templates
+window.initializeDragAndDrop = ui.initializeDragAndDrop; // **FIX**: Expose initializeDragAndDrop function globally for Alpine.js templates
 
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;

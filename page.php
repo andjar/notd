@@ -500,28 +500,41 @@ function renderBacklinks($backlinks) {
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner" x-data="{
-                get noteTree() {
+                noteTree: [],
+                init() {
+                    console.log('[AlpineTemplate] Initializing notes container');
+                    // Initial update
+                    this.updateNoteTree();
+                    
+                    // Watch for store changes and update noteTree
+                    if ($store.app) {
+                        this.$watch('$store.app.notes', (newNotes) => {
+                            console.log('[AlpineTemplate] Store notes changed:', newNotes?.length || 0, 'notes');
+                            this.updateNoteTree();
+                        });
+                    }
+                },
+                updateNoteTree() {
                     try {
                         if (!$store.app || !$store.app.notes) {
-                            console.log('[AlpineTemplate] Store not ready, returning empty tree');
-                            return [];
+                            console.log('[AlpineTemplate] Store not ready, setting empty tree');
+                            this.noteTree = [];
+                            return;
                         }
                         const storeNotes = $store.app.notes;
                         const tree = buildNoteTree(storeNotes);
                         console.log('[AlpineTemplate] Built note tree:', tree.length, 'items from', storeNotes.length, 'notes');
-                        return tree;
+                        this.noteTree = tree;
+                        
+                        // Reinitialize drag and drop after DOM updates
+                        this.$nextTick(() => {
+                            if (typeof initializeDragAndDrop === 'function') {
+                                setTimeout(() => initializeDragAndDrop(), 0);
+                            }
+                        });
                     } catch (error) {
                         console.error('[AlpineTemplate] Error building note tree:', error);
-                        return [];
-                    }
-                },
-                init() {
-                    console.log('[AlpineTemplate] Initializing notes container');
-                    // Watch for store changes
-                    if ($store.app) {
-                        this.$watch('$store.app.notes', (newNotes) => {
-                            console.log('[AlpineTemplate] Store notes changed:', newNotes?.length || 0, 'notes');
-                        });
+                        this.noteTree = [];
                     }
                 }
             }">

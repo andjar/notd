@@ -1,2 +1,10 @@
-nohup: ignoring input
-[Wed Jul 16 10:12:14 2025] Failed to listen on localhost:8000 (reason: Address already in use)
+[Wed Jul 16 23:49:32 2025] PHP 8.3.6 Development Server (http://localhost:8080) started
+[Wed Jul 16 23:49:41 2025] [::1]:55542 Accepted
+[Wed Jul 16 23:49:41 2025] [::1]:55542 [500]: GET /page.php?page=test
+[Wed Jul 16 23:49:41 2025] [::1]:55542 Closing
+[Wed Jul 16 23:50:18 2025] [::1]:36434 Accepted
+[Wed Jul 16 23:50:18 2025] [::1]:36434 [500]: GET /page.php?page=test
+[Wed Jul 16 23:50:18 2025] [::1]:36434 Closing
+[Wed Jul 16 23:50:48 2025] [::1]:40486 Accepted
+[Wed Jul 16 23:50:48 2025] [::1]:40486 [302]: GET /index.php
+[Wed Jul 16 23:50:48 2025] [::1]:40486 Closing
