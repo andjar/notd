@@ -85,30 +85,43 @@ Alpine.store('app', {
   },
   
   setNotes(newNotes) {
+    console.log('[AlpineStore] setNotes called. New notes:', newNotes);
     this.notes = newNotes;
     window.notesForCurrentPage = newNotes;
+    // Force Alpine to refresh the DOM after store update
+    if (window.Alpine && typeof Alpine.flushAndStopDeferringMutations === 'function') {
+      Alpine.flushAndStopDeferringMutations();
+    }
+    if (window.Alpine && Alpine.version && parseFloat(Alpine.version) >= 3.10 && typeof this.$nextTick === 'function') {
+      this.$nextTick(() => { if (this.$refresh) this.$refresh(); });
+    }
   },
   
   addNote(note) {
-    this.notes.push(note);
-    this.notes.sort((a, b) => a.order_index - b.order_index);
-    window.notesForCurrentPage = this.notes;
+    console.log('[AlpineStore] addNote called. Note:', note);
+    this.setNotes([...this.notes, note].sort((a, b) => a.order_index - b.order_index));
   },
   
   removeNoteById(noteId) {
-    const idx = this.notes.findIndex(n => String(n.id) === String(noteId));
-    if (idx > -1) this.notes.splice(idx, 1);
-    window.notesForCurrentPage = this.notes;
+    console.log('[AlpineStore] removeNoteById called. NoteId:', noteId);
+    const newNotes = this.notes.filter(n => String(n.id) !== String(noteId));
+    this.setNotes(newNotes);
   },
   
   updateNote(updatedNote) {
+    console.log('[AlpineStore] updateNote called. UpdatedNote:', updatedNote);
     const idx = this.notes.findIndex(n => String(n.id) === String(updatedNote.id));
+    let newNotes;
     if (idx > -1) {
-      this.notes[idx] = { ...this.notes[idx], ...updatedNote };
+      newNotes = [
+        ...this.notes.slice(0, idx),
+        { ...this.notes[idx], ...updatedNote },
+        ...this.notes.slice(idx + 1)
+      ];
     } else {
-      this.notes.push(updatedNote);
+      newNotes = [...this.notes, updatedNote];
     }
-    window.notesForCurrentPage = this.notes;
+    this.setNotes(newNotes);
   },
   
   setFocusedNoteId(newNoteId) {

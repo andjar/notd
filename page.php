@@ -496,34 +496,17 @@ function renderBacklinks($backlinks) {
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
             <div id="notes-container" class="outliner" x-data="{
-                get notes() {
-                    // Make the template directly reactive to store changes
-                    const storeNotes = this.$store.app.notes || [];
-                    return buildNoteTree(storeNotes);
-                },
-                
+                notes: [],
                 init() {
-                    // Initialize drag and drop
-                    this.$nextTick(() => {
-                        if (typeof initializeDragAndDrop === 'function') {
-                            initializeDragAndDrop();
-                        }
-                    });
-                    
-                    // Watch for changes in notes and reinitialize drag and drop
-                    this.$watch('notes', () => {
-                        this.$nextTick(() => {
-                            setTimeout(() => {
-                                if (typeof initializeDragAndDrop === 'function') {
-                                    initializeDragAndDrop();
-                                }
-                            }, 0);
-                        });
+                    this.notes = [...$store.app.notes];
+                    this.$watch('$store.app.notes', value => {
+                        this.notes = [...value];
+                        console.log('[AlpineTemplate] Mirrored notes updated:', this.notes);
                     });
                 }
             }">
-                <template x-for="note in notes" :key="note.id">
-                    <div class="note-item"
+                <template x-for="note in buildNoteTree(notes)" :key="note.id">
+                    <div x-init="console.log('[AlpineTemplate] Rendering note:', note, 'All notes:', notes)" class="note-item"
                         x-data="noteComponent(note, 0)"
                         :data-note-id="note.id"
                         :style="`--nesting-level: ${nestingLevel}`"

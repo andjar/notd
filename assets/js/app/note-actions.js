@@ -31,6 +31,7 @@ export function getNoteElementById(noteId) {
 }
 
 function _finalizeNewNote(clientTempId, noteFromServer) {
+    console.log('[NoteActions] _finalizeNewNote called. clientTempId:', clientTempId, 'noteFromServer:', noteFromServer);
     if (!noteFromServer || !noteFromServer.id) {
         console.error("[_finalizeNewNote] Invalid note data from server for temp ID:", clientTempId, noteFromServer);
         return;
@@ -39,7 +40,13 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
     const appStore = getAppStore();
     const noteIndex = appStore.notes.findIndex(n => String(n.id) === String(clientTempId));
     if (noteIndex > -1) {
-        appStore.notes[noteIndex] = { ...appStore.notes[noteIndex], ...noteFromServer, id: permanentId };
+        const newNotes = [
+            ...appStore.notes.slice(0, noteIndex),
+            { ...appStore.notes[noteIndex], ...noteFromServer, id: permanentId },
+            ...appStore.notes.slice(noteIndex + 1)
+        ];
+        appStore.setNotes(newNotes);
+        console.log('[NoteActions] _finalizeNewNote updated notes:', newNotes);
     }
     const tempNoteEl = getNoteElementById(clientTempId);
     if (tempNoteEl) {
@@ -64,7 +71,11 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
     ui.updateSaveStatusIndicator('pending');
     let success = false;
     try {
-        if (typeof optimisticDOMUpdater === 'function') optimisticDOMUpdater();
+        if (typeof optimisticDOMUpdater === 'function') {
+            console.log('[NoteActions] Running optimisticDOMUpdater for', userActionName);
+            optimisticDOMUpdater();
+            console.log('[NoteActions] Notes after optimisticDOMUpdater:', getAppStore().notes);
+        }
         console.log("Batch operations to send:", operations);
         const batchResponse = await notesAPI.batchUpdateNotes(operations);
         let allSubOperationsSucceeded = true;
@@ -86,6 +97,7 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
                     appStore.updateNote(opResult.note);
                 }
             });
+            console.log('[NoteActions] Batch operations complete. Notes:', getAppStore().notes);
         } else {
             allSubOperationsSucceeded = false;
             console.error(`[${userActionName} BATCH] Invalid response structure from server:`, batchResponse);
