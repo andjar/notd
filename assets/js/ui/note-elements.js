@@ -198,63 +198,54 @@ export async function handleNoteDrop(evt) {
     ];
     
     // Optimistically update local state before calling API
-    const noteToMove = window.notesForCurrentPage.find(n => n.id == noteId);
+    const appStore = window.Alpine.store('app');
+    const noteToMove = appStore.notes.find(n => n.id == noteId);
     if(noteToMove) {
         noteToMove.parent_note_id = newParentId;
         noteToMove.order_index = targetOrderIndex;
     }
     
     filteredSiblingUpdates.forEach(upd => {
-        const sib = window.notesForCurrentPage.find(n => n.id == upd.id);
+        const sib = appStore.notes.find(n => n.id == upd.id);
         if(sib) {
             sib.order_index = upd.newOrderIndex;
         }
     });
+    
+    // Update the legacy global state for backward compatibility
+    window.notesForCurrentPage = [...appStore.notes];
 
     try {
         await window.notesAPI.batchUpdateNotes(operations);
         
-        // Instead of reloading the page, update the optimistic UI
-        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-        const noteTree = buildNoteTree(sortedNotes);
-        const notesContainer = document.getElementById('notes-container');
-        if (notesContainer && notesContainer.__x) {
-            const alpineData = notesContainer.__x.$data;
-            alpineData.notes = noteTree;
-            // Use $nextTick to ensure DOM updates are processed
-            notesContainer.__x.$nextTick(() => {
-                // Re-initialize drag and drop after DOM update
-                setTimeout(() => {
-                    initializeDragAndDrop();
-                }, 0);
-            });
-        }
+        // The Alpine.js store connection in the template will automatically
+        // re-render when $store.app.notes changes, so we don't need to manually
+        // update the DOM here. The Alpine.js reactivity will handle it.
         
         console.log('Note drop changes saved successfully');
     } catch (error) {
         console.error("Failed to save note drop changes:", error);
         alert("Could not save new note positions. Reverting.");
         
-        // Revert the optimistic changes
-        const revertedNoteToMove = window.notesForCurrentPage.find(n => n.id == noteId);
+        // Revert the optimistic changes in the Alpine.js store
+        const revertedNoteToMove = appStore.notes.find(n => n.id == noteId);
         if(revertedNoteToMove) {
             revertedNoteToMove.parent_note_id = evt.from.closest('.note-item')?.dataset.noteId || null;
             revertedNoteToMove.order_index = evt.oldIndex;
         }
         
-        // Re-render with reverted data
-        const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-        const noteTree = buildNoteTree(sortedNotes);
-        const notesContainer = document.getElementById('notes-container');
-        if (notesContainer && notesContainer.__x) {
-            const alpineData = notesContainer.__x.$data;
-            alpineData.notes = noteTree;
-            notesContainer.__x.$nextTick(() => {
-                setTimeout(() => {
-                    initializeDragAndDrop();
-                }, 0);
-            });
-        }
+        // Revert sibling updates
+        filteredSiblingUpdates.forEach(upd => {
+            const sib = appStore.notes.find(n => n.id == upd.id);
+            if(sib) {
+                // TODO: We need to store the original order indices to revert properly
+                // For now, just reload the page to recover
+                window.location.reload();
+            }
+        });
+        
+        // Update the legacy global state for backward compatibility
+        window.notesForCurrentPage = [...appStore.notes];
     }
 }
 
