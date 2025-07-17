@@ -213,6 +213,9 @@ export async function handleAddRootNote() {
     const lastRootNote = rootNotes.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).pop();
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, null, lastRootNote?.id || null, null);
     
+    // **FIX**: Filter out temporary IDs from sibling updates to prevent server errors
+    const validSiblingUpdates = siblingUpdates.filter(upd => !String(upd.id).startsWith('temp-'));
+    
     const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
     
@@ -226,9 +229,9 @@ export async function handleAddRootNote() {
     }
 
     const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
-    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
+    validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    siblingUpdates.forEach(upd => {
+    validSiblingUpdates.forEach(upd => {
         const note = getNoteDataById(upd.id);
         if(note) note.order_index = upd.newOrderIndex;
     });
@@ -263,6 +266,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
 
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, noteData.parent_note_id, String(noteData.id), nextSibling?.id || null);
     
+    // **FIX**: Filter out temporary IDs from sibling updates to prevent server errors
+    const validSiblingUpdates = siblingUpdates.filter(upd => !String(upd.id).startsWith('temp-'));
+    
     const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
 
@@ -276,10 +282,10 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     }
     
     const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
-    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
+    validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    // **OPTIMIZATION**: Update sibling order indices immediately
-    siblingUpdates.forEach(op => {
+    // **OPTIMIZATION**: Update sibling order indices immediately (only for valid notes)
+    validSiblingUpdates.forEach(op => {
         const note = getNoteDataById(op.id);
         if (note) note.order_index = op.newOrderIndex;
     });
