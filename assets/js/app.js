@@ -14,6 +14,7 @@ import { sidebarState } from './app/sidebar.js';
 
 // Wait for Alpine to be available
 document.addEventListener('alpine:init', () => {
+console.log('[Alpine] Alpine init event fired');
 
 // Alpine.js directive for feather icons
 Alpine.directive('feather', (el, { expression }, { evaluate, effect }) => {
@@ -151,22 +152,28 @@ Alpine.store('app', {
 
 // Notes Container Alpine.js Component
 function notesContainer() {
+  console.log('[NotesContainer] Function called');
   return {
     noteTree: [],
     init() {
       console.log('[AlpineTemplate] Initializing notes container');
+      console.log('[AlpineTemplate] Store available:', !!this.$store.app);
+      console.log('[AlpineTemplate] BuildNoteTree available:', typeof window.buildNoteTree);
+      
       // Initial update
       this.updateNoteTree();
       
       // Watch for store changes and update noteTree
+      // Using regular function instead of arrow function to avoid HTML escaping issues
       if (this.$store.app) {
-        this.$watch('$store.app.notes', (newNotes) => {
+        this.$watch('$store.app.notes', function(newNotes) {
           console.log('[AlpineTemplate] Store notes changed:', newNotes?.length || 0, 'notes');
           this.updateNoteTree();
-        });
+        }.bind(this));
       }
     },
     updateNoteTree() {
+      console.log('[AlpineTemplate] updateNoteTree called');
       try {
         if (!this.$store.app || !this.$store.app.notes) {
           console.log('[AlpineTemplate] Store not ready, setting empty tree');
@@ -174,14 +181,21 @@ function notesContainer() {
           return;
         }
         const storeNotes = this.$store.app.notes;
-        const tree = buildNoteTree(storeNotes);
-        console.log('[AlpineTemplate] Built note tree:', tree.length, 'items from', storeNotes.length, 'notes');
-        this.noteTree = tree;
+        console.log('[AlpineTemplate] Store notes:', storeNotes);
+        
+        if (typeof window.buildNoteTree === 'function') {
+          const tree = window.buildNoteTree(storeNotes);
+          console.log('[AlpineTemplate] Built note tree:', tree.length, 'items from', storeNotes.length, 'notes');
+          this.noteTree = tree;
+        } else {
+          console.error('[AlpineTemplate] buildNoteTree function not available');
+          this.noteTree = [];
+        }
         
         // Reinitialize drag and drop after DOM updates
-        this.$nextTick(() => {
+        this.$nextTick(function() {
           if (typeof initializeDragAndDrop === 'function') {
-            setTimeout(() => initializeDragAndDrop(), 0);
+            setTimeout(function() { initializeDragAndDrop(); }, 0);
           }
         });
       } catch (error) {
@@ -190,11 +204,12 @@ function notesContainer() {
       }
     },
     flattenNoteTree(notes, parentDepth = 0) {
+      console.log('[AlpineTemplate] flattenNoteTree called with:', notes.length, 'notes');
       // Flatten the note tree into a single array with depth information
       let flatNotes = [];
       
-      const flattenRecursive = (nodeArray, currentDepth) => {
-        nodeArray.forEach(note => {
+      const flattenRecursive = function(nodeArray, currentDepth) {
+        nodeArray.forEach(function(note) {
           // Add note with depth information
           const flatNote = { ...note, depth: currentDepth };
           flatNotes.push(flatNote);
@@ -207,6 +222,7 @@ function notesContainer() {
       };
       
       flattenRecursive(notes, parentDepth);
+      console.log('[AlpineTemplate] Flattened to:', flatNotes.length, 'items');
       return flatNotes;
     },
     
@@ -220,6 +236,7 @@ function notesContainer() {
 window.notesContainer = notesContainer;
 
     Alpine.data('noteComponent', noteComponent);
+    Alpine.data('notesContainer', notesContainer);
     
     // Only register splash screen component if not disabled
     if (!window.APP_CONFIG.SPLASH_DISABLED) {
