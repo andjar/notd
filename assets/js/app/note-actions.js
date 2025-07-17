@@ -48,6 +48,40 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
     }
 }
 
+/**
+ * Provides immediate visual feedback when a note becomes a parent
+ * Shows the collapse arrow briefly to indicate the note now has children
+ * @param {HTMLElement} noteElement - The note element that became a parent
+ */
+function provideBecomeParentFeedback(noteElement) {
+    if (!noteElement) return;
+    
+    const collapseArrow = noteElement.querySelector('.note-collapse-arrow');
+    if (collapseArrow) {
+        // Temporarily make the collapse arrow visible for immediate feedback
+        collapseArrow.style.opacity = '0.8';
+        collapseArrow.style.transform = 'scale(1.1)';
+        collapseArrow.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        
+        // Reset to normal state after a brief moment
+        setTimeout(() => {
+            collapseArrow.style.opacity = '';
+            collapseArrow.style.transform = '';
+            collapseArrow.style.transition = '';
+        }, 800);
+    }
+    
+    // Also briefly highlight the thread line
+    const threadLine = noteElement.querySelector('::after');
+    if (threadLine) {
+        // Add a temporary class for thread line animation
+        noteElement.classList.add('new-parent-feedback');
+        setTimeout(() => {
+            noteElement.classList.remove('new-parent-feedback');
+        }, 1000);
+    }
+}
+
 let batchInProgress = false;
 let batchQueue = [];
 
@@ -213,6 +247,9 @@ export async function handleAddRootNote() {
     const lastRootNote = rootNotes.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).pop();
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, null, lastRootNote?.id || null, null);
     
+    // **FIX**: Filter out temporary IDs from sibling updates to prevent server errors
+    const validSiblingUpdates = siblingUpdates.filter(upd => !String(upd.id).startsWith('temp-'));
+    
     const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
     
@@ -226,9 +263,9 @@ export async function handleAddRootNote() {
     }
 
     const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
-    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
+    validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    siblingUpdates.forEach(upd => {
+    validSiblingUpdates.forEach(upd => {
         const note = getNoteDataById(upd.id);
         if(note) note.order_index = upd.newOrderIndex;
     });
@@ -263,6 +300,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
 
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, noteData.parent_note_id, String(noteData.id), nextSibling?.id || null);
     
+    // **FIX**: Filter out temporary IDs from sibling updates to prevent server errors
+    const validSiblingUpdates = siblingUpdates.filter(upd => !String(upd.id).startsWith('temp-'));
+    
     const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
 
@@ -276,10 +316,10 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     }
     
     const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
-    siblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
+    validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
-    // **OPTIMIZATION**: Update sibling order indices immediately
-    siblingUpdates.forEach(op => {
+    // **OPTIMIZATION**: Update sibling order indices immediately (only for valid notes)
+    validSiblingUpdates.forEach(op => {
         const note = getNoteDataById(op.id);
         if (note) note.order_index = op.newOrderIndex;
     });
@@ -291,34 +331,32 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
             // Insert after current note
             noteItem.after(newNoteEl);
             
-            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
-            setTimeout(() => {
-                const newContentDiv = newNoteEl.querySelector('.note-content');
-                if (newContentDiv) {
-                    // Switch to edit mode
-                    ui.switchToEditMode(newContentDiv);
-                    
-                    // Set cursor to beginning of the new note
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    
-                    // Clear any existing selection
-                    sel.removeAllRanges();
-                    
-                    // Position cursor at the start of the content
-                    range.setStart(newContentDiv, 0);
-                    range.collapse(true);
-                    
-                    // Apply the selection
-                    sel.addRange(range);
-                    
-                    // Ensure the new note is visible
-                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    
-                    // Focus the element
-                    newContentDiv.focus();
-                }
-            }, 0); // Use setTimeout to ensure DOM is ready
+            // **ENHANCEMENT**: Ensure immediate focus and cursor positioning
+            const newContentDiv = newNoteEl.querySelector('.note-content');
+            if (newContentDiv) {
+                // Switch to edit mode immediately
+                ui.switchToEditMode(newContentDiv);
+                
+                // Set cursor to beginning of the new note immediately
+                const range = document.createRange();
+                const sel = window.getSelection();
+                
+                // Clear any existing selection
+                sel.removeAllRanges();
+                
+                // Position cursor at the start of the content
+                range.setStart(newContentDiv, 0);
+                range.collapse(true);
+                
+                // Apply the selection
+                sel.addRange(range);
+                
+                // Ensure the new note is visible
+                newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Focus the element
+                newContentDiv.focus();
+            }
         }
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Sibling Note");
@@ -554,11 +592,11 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // **OPTIMIZATION**: Immediate visual feedback without full re-render
+    // **OPTIMIZATION**: Immediate visual feedback without delays
     const optimisticDOMUpdater = () => {
         // Update the note's visual indentation immediately
         const noteElement = getNoteElementById(noteData.id);
-        if (noteElement && targetOrderIndex !== null) { // **FIX**: Check if targetOrderIndex is defined
+        if (noteElement && targetOrderIndex !== null) {
             // Calculate new nesting level
             const newNestingLevel = calculateNestingLevel(newParentId, appStore.notes);
             
@@ -575,7 +613,7 @@ async function handleTabKey(e, noteItem, noteData) {
                 noteToMove.order_index = targetOrderIndex;
             }
             
-            // Update sibling order indices
+            // Update sibling order indices immediately
             operations.forEach(op => {
                 if (op.type === 'update') {
                     const note = getNoteDataById(op.payload.id);
@@ -583,9 +621,19 @@ async function handleTabKey(e, noteItem, noteData) {
                 }
             });
             
-            // Refocus the note content
+            // **IMPROVEMENT**: Refocus immediately without delay
             const newContentDiv = noteElement.querySelector('.note-content');
-            if (newContentDiv) ui.switchToEditMode(newContentDiv);
+            if (newContentDiv) {
+                ui.switchToEditMode(newContentDiv);
+                // Focus with proper cursor positioning
+                newContentDiv.focus();
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(newContentDiv);
+                range.collapse(false); // Collapse to end
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
         }
     };
     
@@ -658,6 +706,9 @@ function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
             
             // Add has-children class to parent
             parentElement.classList.add('has-children');
+            
+            // **ENHANCEMENT**: Provide immediate visual feedback for new parent
+            provideBecomeParentFeedback(parentElement);
         }
         
         const existingChildren = Array.from(childrenContainer.children).filter(el => 
@@ -884,39 +935,40 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
                 childrenContainer.className = 'note-children';
                 noteItem.appendChild(childrenContainer);
                 noteItem.classList.add('has-children');
+                
+                // **ENHANCEMENT**: Provide immediate visual feedback for new parent
+                provideBecomeParentFeedback(noteItem);
             }
             
             // Insert the new child
             childrenContainer.appendChild(newNoteEl);
             
-            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
-            setTimeout(() => {
-                const newContentDiv = newNoteEl.querySelector('.note-content');
-                if (newContentDiv) {
-                    // Switch to edit mode
-                    ui.switchToEditMode(newContentDiv);
-                    
-                    // Set cursor to beginning of the new note
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    
-                    // Clear any existing selection
-                    sel.removeAllRanges();
-                    
-                    // Position cursor at the start of the content
-                    range.setStart(newContentDiv, 0);
-                    range.collapse(true);
-                    
-                    // Apply the selection
-                    sel.addRange(range);
-                    
-                    // Ensure the new note is visible
-                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    
-                    // Focus the element
-                    newContentDiv.focus();
-                }
-            }, 0); // Use setTimeout to ensure DOM is ready
+            // **ENHANCEMENT**: Ensure immediate focus and cursor positioning
+            const newContentDiv = newNoteEl.querySelector('.note-content');
+            if (newContentDiv) {
+                // Switch to edit mode immediately
+                ui.switchToEditMode(newContentDiv);
+                
+                // Set cursor to beginning of the new note immediately
+                const range = document.createRange();
+                const sel = window.getSelection();
+                
+                // Clear any existing selection
+                sel.removeAllRanges();
+                
+                // Position cursor at the start of the content
+                range.setStart(newContentDiv, 0);
+                range.collapse(true);
+                
+                // Apply the selection
+                sel.addRange(range);
+                
+                // Ensure the new note is visible
+                newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Focus the element
+                newContentDiv.focus();
+            }
         }
     };
     
@@ -942,3 +994,6 @@ export async function handleTaskCheckboxClick(e) {
     // The call remains in app.js, but the implementation is now in the UI layer.
     // This is a placeholder or can be removed if app.js calls the UI function directly.
 }
+
+// Export utility function for visual feedback
+export { provideBecomeParentFeedback };

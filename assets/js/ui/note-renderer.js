@@ -207,11 +207,12 @@ function renderNote(note, nestingLevel = 0) {
 
     contentWrapperEl.appendChild(contentEl);
 
-    const attachmentsEl = document.createElement('div');
-    attachmentsEl.className = 'note-attachments';
-    contentWrapperEl.appendChild(attachmentsEl);
-
-    if (note.id && (typeof note.id === 'number' || (typeof note.id === 'string' && !note.id.startsWith('temp-')))) {
+    // Only create attachments div if the note actually has attachments
+    if (note.id && (typeof note.id === 'number' || (typeof note.id === 'string' && !note.id.startsWith('temp-'))) && note.has_attachments) {
+        const attachmentsEl = document.createElement('div');
+        attachmentsEl.className = 'note-attachments';
+        contentWrapperEl.appendChild(attachmentsEl);
+        
         // Pass note.id and note.has_attachments flag
         renderAttachments(attachmentsEl, note.id, note.has_attachments);
     }
