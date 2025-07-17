@@ -353,4 +353,26 @@
   margin-top: 8px;
   margin-right: 16px;
   font-weight: var(--ls-font-weight-normal);
+}
+
+/* Visual feedback for notes that just became parents */
+.note-item.new-parent-feedback::after {
+  background-color: var(--ls-accent-9) !important;
+  opacity: 0.8 !important;
+  animation: new-parent-glow 1s ease-out;
+}
+
+@keyframes new-parent-glow {
+  0% {
+    opacity: 0.8;
+    background-color: var(--ls-accent-9);
+  }
+  50% {
+    opacity: 1;
+    background-color: var(--ls-accent-8);
+  }
+  100% {
+    opacity: 0.4;
+    background-color: var(--ls-secondary-border-color);
+  }
 } 

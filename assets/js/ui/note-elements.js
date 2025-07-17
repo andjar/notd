@@ -9,6 +9,7 @@ import { renderNote } from './note-renderer.js';
 import { calculateOrderIndex } from '../app/order-index-service.js';
 import { setNotesForCurrentPage } from '../app/state.js';
 import { pageCache } from '../app/page-cache.js';
+import { provideBecomeParentFeedback } from '../app/note-actions.js';
 
 window.renderNote = renderNote;
 
@@ -148,6 +149,9 @@ export function addNoteElement(noteData) {
                 childrenContainer.className = 'note-children';
                 parentElement.appendChild(childrenContainer);
                 parentElement.classList.add('has-children');
+                
+                // **ENHANCEMENT**: Provide immediate visual feedback for new parent
+                provideBecomeParentFeedback(parentElement);
             }
             childrenContainer.appendChild(noteElement);
         } else {

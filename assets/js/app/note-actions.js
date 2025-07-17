@@ -48,6 +48,40 @@ function _finalizeNewNote(clientTempId, noteFromServer) {
     }
 }
 
+/**
+ * Provides immediate visual feedback when a note becomes a parent
+ * Shows the collapse arrow briefly to indicate the note now has children
+ * @param {HTMLElement} noteElement - The note element that became a parent
+ */
+function provideBecomeParentFeedback(noteElement) {
+    if (!noteElement) return;
+    
+    const collapseArrow = noteElement.querySelector('.note-collapse-arrow');
+    if (collapseArrow) {
+        // Temporarily make the collapse arrow visible for immediate feedback
+        collapseArrow.style.opacity = '0.8';
+        collapseArrow.style.transform = 'scale(1.1)';
+        collapseArrow.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        
+        // Reset to normal state after a brief moment
+        setTimeout(() => {
+            collapseArrow.style.opacity = '';
+            collapseArrow.style.transform = '';
+            collapseArrow.style.transition = '';
+        }, 800);
+    }
+    
+    // Also briefly highlight the thread line
+    const threadLine = noteElement.querySelector('::after');
+    if (threadLine) {
+        // Add a temporary class for thread line animation
+        noteElement.classList.add('new-parent-feedback');
+        setTimeout(() => {
+            noteElement.classList.remove('new-parent-feedback');
+        }, 1000);
+    }
+}
+
 let batchInProgress = false;
 let batchQueue = [];
 
@@ -672,6 +706,9 @@ function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
             
             // Add has-children class to parent
             parentElement.classList.add('has-children');
+            
+            // **ENHANCEMENT**: Provide immediate visual feedback for new parent
+            provideBecomeParentFeedback(parentElement);
         }
         
         const existingChildren = Array.from(childrenContainer.children).filter(el => 
@@ -898,6 +935,9 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
                 childrenContainer.className = 'note-children';
                 noteItem.appendChild(childrenContainer);
                 noteItem.classList.add('has-children');
+                
+                // **ENHANCEMENT**: Provide immediate visual feedback for new parent
+                provideBecomeParentFeedback(noteItem);
             }
             
             // Insert the new child
@@ -954,3 +994,6 @@ export async function handleTaskCheckboxClick(e) {
     // The call remains in app.js, but the implementation is now in the UI layer.
     // This is a placeholder or can be removed if app.js calls the UI function directly.
 }
+
+// Export utility function for visual feedback
+export { provideBecomeParentFeedback };
