@@ -148,6 +148,7 @@ Alpine.store('app', {
     this.pageCache.clear();
   }
 });
+
     Alpine.data('noteComponent', noteComponent);
     
     // Only register splash screen component if not disabled
