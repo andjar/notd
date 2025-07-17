@@ -301,7 +301,7 @@ function renderBacklinks($backlinks) {
 <body>
     <?php if (!$splashDisabled): ?>
     <div id="splash-screen" 
-         x-data="splashScreen(window.APP_CONFIG.SPLASH_DISABLED)" 
+         x-data="splashScreen(<?php echo $splashDisabled ? 'true' : 'false'; ?>)" 
          x-show="show"
          x-init="init()"
          @click="hideSplash()"
@@ -541,12 +541,13 @@ function renderBacklinks($backlinks) {
                 }
             }">
                 <template x-for="note in noteTree" :key="note.id">
-                    <div x-init="console.log('[AlpineTemplate] Rendering note:', note, 'Tree length:', noteTree.length)" class="note-item"
-                        x-data="noteComponent(note, 0)"
-                        :data-note-id="note.id"
-                        :style="`--nesting-level: ${nestingLevel}`"
-                        :class="{ 'has-children': note.children && note.children.length > 0, 'collapsed': note.collapsed, 'encrypted-note': note.is_encrypted, 'decrypted-note': note.is_encrypted && note.content && !note.content.startsWith('{') }">
-
+                    <div x-init="console.log('[AlpineTemplate] Rendering note:', note, 'Tree length:', noteTree.length)" 
+                         x-data="noteComponent(note, 0)"
+                         class="note-item"
+                         :data-note-id="note.id"
+                         :style="`--nesting-level: ${nestingLevel}`"
+                         :class="{ 'has-children': note.children && note.children.length > 0, 'collapsed': note.collapsed, 'encrypted-note': note.is_encrypted, 'decrypted-note': note.is_encrypted && note.content && !note.content.startsWith('{') }">
+                        
                         <div class="note-header-row">
                             <div class="note-controls">
                                 <span class="note-collapse-arrow" x-show="note.children && note.children.length > 0" @click="toggleCollapse()" :data-collapsed="note.collapsed ? 'true' : 'false'">
@@ -570,14 +571,14 @@ function renderBacklinks($backlinks) {
                             </div>
                         </div>
 
-                        <div class="note-children" :class="{ 'collapsed': note.collapsed }">
+                        <div class="note-children" :class="{ 'collapsed': note.collapsed }" x-show="note.children && note.children.length > 0">
                             <template x-for="childNote in note.children" :key="childNote.id">
-                                <div class="note-item"
-                                    x-data="noteComponent(childNote, $parent.nestingLevel + 1)"
-                                    :data-note-id="childNote.id"
-                                    :style="`--nesting-level: ${$parent.nestingLevel + 1}`"
-                                    :class="{ 'has-children': childNote.children && childNote.children.length > 0, 'collapsed': childNote.collapsed, 'encrypted-note': childNote.is_encrypted, 'decrypted-note': childNote.is_encrypted && childNote.content && !childNote.content.startsWith('{') }">
-
+                                <div x-data="noteComponent(childNote, 1)"
+                                     class="note-item"
+                                     :data-note-id="childNote.id"
+                                     :style="`--nesting-level: ${nestingLevel}`"
+                                     :class="{ 'has-children': childNote.children && childNote.children.length > 0, 'collapsed': childNote.collapsed, 'encrypted-note': childNote.is_encrypted, 'decrypted-note': childNote.is_encrypted && childNote.content && !childNote.content.startsWith('{') }">
+                                    
                                     <div class="note-header-row">
                                         <div class="note-controls">
                                             <span class="note-collapse-arrow" x-show="childNote.children && childNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="childNote.collapsed ? 'true' : 'false'">
@@ -601,15 +602,14 @@ function renderBacklinks($backlinks) {
                                         </div>
                                     </div>
 
-                                    <div class="note-children" :class="{ 'collapsed': childNote.collapsed }">
-                                        <!-- Recursive rendering of grand-children -->
+                                    <div class="note-children" :class="{ 'collapsed': childNote.collapsed }" x-show="childNote.children && childNote.children.length > 0">
                                         <template x-for="grandChildNote in childNote.children" :key="grandChildNote.id">
-                                            <div class="note-item"
-                                                x-data="noteComponent(grandChildNote, $parent.$parent.nestingLevel + 2)"
-                                                :data-note-id="grandChildNote.id"
-                                                :style="`--nesting-level: ${$parent.$parent.nestingLevel + 2}`"
-                                                :class="{ 'has-children': grandChildNote.children && grandChildNote.children.length > 0, 'collapsed': grandChildNote.collapsed, 'encrypted-note': grandChildNote.is_encrypted, 'decrypted-note': grandChildNote.is_encrypted && grandChildNote.content && !grandChildNote.content.startsWith('{') }">
-
+                                            <div x-data="noteComponent(grandChildNote, 2)"
+                                                 class="note-item"
+                                                 :data-note-id="grandChildNote.id"
+                                                 :style="`--nesting-level: ${nestingLevel}`"
+                                                 :class="{ 'has-children': grandChildNote.children && grandChildNote.children.length > 0, 'collapsed': grandChildNote.collapsed, 'encrypted-note': grandChildNote.is_encrypted, 'decrypted-note': grandChildNote.is_encrypted && grandChildNote.content && !grandChildNote.content.startsWith('{') }">
+                                                
                                                 <div class="note-header-row">
                                                     <div class="note-controls">
                                                         <span class="note-collapse-arrow" x-show="grandChildNote.children && grandChildNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="grandChildNote.collapsed ? 'true' : 'false'">
@@ -633,8 +633,43 @@ function renderBacklinks($backlinks) {
                                                     </div>
                                                 </div>
 
-                                                <div class="note-children" :class="{ 'collapsed': grandChildNote.collapsed }">
-                                                    <!-- Further nested children would go here, following the same pattern -->
+                                                <div class="note-children" :class="{ 'collapsed': grandChildNote.collapsed }" x-show="grandChildNote.children && grandChildNote.children.length > 0">
+                                                    <template x-for="greatGrandChildNote in grandChildNote.children" :key="greatGrandChildNote.id">
+                                                        <div x-data="noteComponent(greatGrandChildNote, 3)"
+                                                             class="note-item"
+                                                             :data-note-id="greatGrandChildNote.id"
+                                                             :style="`--nesting-level: ${nestingLevel}`"
+                                                             :class="{ 'has-children': greatGrandChildNote.children && greatGrandChildNote.children.length > 0, 'collapsed': greatGrandChildNote.collapsed, 'encrypted-note': greatGrandChildNote.is_encrypted, 'decrypted-note': greatGrandChildNote.is_encrypted && greatGrandChildNote.content && !greatGrandChildNote.content.startsWith('{') }">
+                                                            
+                                                            <div class="note-header-row">
+                                                                <div class="note-controls">
+                                                                    <span class="note-collapse-arrow" x-show="greatGrandChildNote.children && greatGrandChildNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="greatGrandChildNote.collapsed ? 'true' : 'false'">
+                                                                        <i data-feather="chevron-right"></i>
+                                                                    </span>
+                                                                    <span class="note-bullet" :data-note-id="greatGrandChildNote.id"></span>
+                                                                </div>
+                                                                <div class="note-content-wrapper">
+                                                                    <div class="note-content rendered-mode"
+                                                                        x-ref="contentDiv"
+                                                                        :data-note-id="greatGrandChildNote.id"
+                                                                        :data-raw-content="greatGrandChildNote.content"
+                                                                        x-html="parseContent(greatGrandChildNote.content)"
+                                                                        @click="editNote()"
+                                                                        @blur="isEditing = false"
+                                                                        @input="handleInput($event)"
+                                                                        @paste="handlePaste($event)"
+                                                                        @keydown="handleNoteKeyDown($event)">
+                                                                    </div>
+                                                                    <div class="note-attachments"></div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="note-children" :class="{ 'collapsed': greatGrandChildNote.collapsed }" x-show="greatGrandChildNote.children && greatGrandChildNote.children.length > 0">
+                                                                <!-- Note: This template supports up to 4 levels of nesting -->
+                                                                <!-- For deeper nesting, we would need a recursive component -->
+                                                            </div>
+                                                        </div>
+                                                    </template>
                                                 </div>
                                             </div>
                                         </template>

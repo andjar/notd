@@ -150,8 +150,10 @@ Alpine.store('app', {
 });
     Alpine.data('noteComponent', noteComponent);
     
-    // Always register splash screen component - it will handle the disabled state internally
-    Alpine.data('splashScreen', splashScreen);
+    // Only register splash screen component if not disabled
+    if (!window.APP_CONFIG.SPLASH_DISABLED) {
+        Alpine.data('splashScreen', splashScreen);
+    }
     
     Alpine.data('sidebarComponent', sidebarComponent);
     Alpine.data('calendarComponent', calendarComponent);
