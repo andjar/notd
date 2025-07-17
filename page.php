@@ -270,8 +270,8 @@ function renderBacklinks($backlinks) {
     <!-- Fonts and Core Styles -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/libs/font-ubuntu.css">
+    <link rel="stylesheet" href="assets/libs/font-awesome.min.css">
     
     <!-- Theme and App Styles -->
     <?php include 'assets/css/theme_loader.php'; ?>
@@ -283,7 +283,7 @@ function renderBacklinks($backlinks) {
     <script src="assets/libs/Sortable.min.js"></script>
     <script src="assets/libs/sjcl.js"></script>
     <script type="module" src="assets/js/app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="assets/libs/alpine.min.js" defer></script>
     
     <script>
          window.APP_CONFIG = window.APP_CONFIG || {};
