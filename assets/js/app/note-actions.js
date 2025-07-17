@@ -72,14 +72,11 @@ function provideBecomeParentFeedback(noteElement) {
     }
     
     // Also briefly highlight the thread line
-    const threadLine = noteElement.querySelector('::after');
-    if (threadLine) {
-        // Add a temporary class for thread line animation
-        noteElement.classList.add('new-parent-feedback');
-        setTimeout(() => {
-            noteElement.classList.remove('new-parent-feedback');
-        }, 1000);
-    }
+    // Add a temporary class for thread line animation
+    noteElement.classList.add('new-parent-feedback');
+    setTimeout(() => {
+        noteElement.classList.remove('new-parent-feedback');
+    }, 1000);
 }
 
 let batchInProgress = false;
