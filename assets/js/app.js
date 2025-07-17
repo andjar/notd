@@ -149,6 +149,76 @@ Alpine.store('app', {
   }
 });
 
+// Notes Container Alpine.js Component
+function notesContainer() {
+  return {
+    noteTree: [],
+    init() {
+      console.log('[AlpineTemplate] Initializing notes container');
+      // Initial update
+      this.updateNoteTree();
+      
+      // Watch for store changes and update noteTree
+      if (this.$store.app) {
+        this.$watch('$store.app.notes', (newNotes) => {
+          console.log('[AlpineTemplate] Store notes changed:', newNotes?.length || 0, 'notes');
+          this.updateNoteTree();
+        });
+      }
+    },
+    updateNoteTree() {
+      try {
+        if (!this.$store.app || !this.$store.app.notes) {
+          console.log('[AlpineTemplate] Store not ready, setting empty tree');
+          this.noteTree = [];
+          return;
+        }
+        const storeNotes = this.$store.app.notes;
+        const tree = buildNoteTree(storeNotes);
+        console.log('[AlpineTemplate] Built note tree:', tree.length, 'items from', storeNotes.length, 'notes');
+        this.noteTree = tree;
+        
+        // Reinitialize drag and drop after DOM updates
+        this.$nextTick(() => {
+          if (typeof initializeDragAndDrop === 'function') {
+            setTimeout(() => initializeDragAndDrop(), 0);
+          }
+        });
+      } catch (error) {
+        console.error('[AlpineTemplate] Error building note tree:', error);
+        this.noteTree = [];
+      }
+    },
+    flattenNoteTree(notes, parentDepth = 0) {
+      // Flatten the note tree into a single array with depth information
+      let flatNotes = [];
+      
+      const flattenRecursive = (nodeArray, currentDepth) => {
+        nodeArray.forEach(note => {
+          // Add note with depth information
+          const flatNote = { ...note, depth: currentDepth };
+          flatNotes.push(flatNote);
+          
+          // Recursively add children only if note is not collapsed
+          if (note.children && note.children.length > 0 && !note.collapsed) {
+            flattenRecursive(note.children, currentDepth + 1);
+          }
+        });
+      };
+      
+      flattenRecursive(notes, parentDepth);
+      return flatNotes;
+    },
+    
+    get flattenedNotes() {
+      return this.flattenNoteTree(this.noteTree);
+    }
+  };
+}
+
+// Make notesContainer globally available
+window.notesContainer = notesContainer;
+
     Alpine.data('noteComponent', noteComponent);
     
     // Only register splash screen component if not disabled
