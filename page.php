@@ -282,8 +282,8 @@ function renderBacklinks($backlinks) {
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
     <script src="assets/libs/sjcl.js"></script>
-    <script type="module" src="assets/js/app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script type="module" src="assets/js/app.js"></script>
     
     <script>
          window.APP_CONFIG = window.APP_CONFIG || {};

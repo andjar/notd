@@ -323,29 +323,47 @@ if (mobileToolbar) {
 
 
 // --- Application Startup ---
-document.addEventListener('DOMContentLoaded', async () => {
-    if (typeof ui === 'undefined' || !notesContainer) {
-        console.error('UI module or critical DOM elements not loaded. Application cannot start.');
-        document.body.innerHTML = '<h1>Application failed to start. Please check the console.</h1>';
-        return;
-    }
-    
-    try {
-        await initializeApp();
-        initPropertyEditor(); // Initialize listeners for the property modal
-        ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
-        initializeTemplateHandling(); // Initialize template functionality
+// Wait for both DOM and Alpine.js to be ready
+let domReady = false;
+let alpineReady = false;
 
-        // Initialize search modals
-        initGlobalSearch(); // Already existed, ensure it's called if not already
-        initPageSearchModal(); // Already existed, ensure it's called if not already
-        initNoteSearchModal(); // Initialize our new note search modal
-
-        // feather.replace(); // Initialize feather icons after DOM is ready
+function tryInitializeApp() {
+    if (domReady && alpineReady) {
+        if (typeof ui === 'undefined' || !notesContainer) {
+            console.error('UI module or critical DOM elements not loaded. Application cannot start.');
+            document.body.innerHTML = '<h1>Application failed to start. Please check the console.</h1>';
+            return;
+        }
         
-        // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.
-    } catch (error) {
-        console.error('Failed to initialize application:', error);
-        document.body.innerHTML = `<h1>Application Initialization Failed</h1><p>${error.message}</p><p>Check the console for more details.</p>`;
+        (async () => {
+            try {
+                await initializeApp();
+                initPropertyEditor(); // Initialize listeners for the property modal
+                ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
+                initializeTemplateHandling(); // Initialize template functionality
+
+                // Initialize search modals
+                initGlobalSearch(); // Already existed, ensure it's called if not already
+                initPageSearchModal(); // Already existed, ensure it's called if not already
+                initNoteSearchModal(); // Initialize our new note search modal
+
+                // feather.replace(); // Initialize feather icons after DOM is ready
+                
+                // Calendar is now initialized in `app-init.js` to ensure it's ready before page load.
+            } catch (error) {
+                console.error('Failed to initialize application:', error);
+                document.body.innerHTML = `<h1>Application Initialization Failed</h1><p>${error.message}</p><p>Check the console for more details.</p>`;
+            }
+        })();
     }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    domReady = true;
+    tryInitializeApp();
+});
+
+document.addEventListener('alpine:init', () => {
+    alpineReady = true;
+    tryInitializeApp();
 });
