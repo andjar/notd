@@ -91,15 +91,77 @@ function renderNotesInContainer(noteTree, container) {
  */
 export function addNoteElement(noteData) {
     if (!noteData) return null;
+    
+    // Update the data structures
     window.notesForCurrentPage.push(noteData);
     const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
     const noteTree = buildNoteTree(sortedNotes);
+    
     const notesContainer = document.getElementById('notes-container');
+    if (!notesContainer) return null;
+    
+    // Update Alpine.js data if available
     if (notesContainer && notesContainer.__x) {
         notesContainer.__x.getUnobservedData().notes = noteTree;
     }
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
-    return null;
+    
+    // **FIX**: Create actual DOM element for immediate visual feedback
+    const noteElement = renderNote(noteData, 0);
+    if (!noteElement) return null;
+    
+    // Clear "no notes" message if it exists
+    const noNotesMessage = notesContainer.querySelector('.no-notes-message');
+    if (noNotesMessage) {
+        noNotesMessage.remove();
+    }
+    
+    // Insert the note in the correct position based on order_index
+    if (!noteData.parent_note_id) {
+        // Root note - find correct position among root notes
+        const rootNotes = Array.from(notesContainer.children).filter(el => 
+            el.classList.contains('note-item') && !el.closest('.note-children')
+        );
+        
+        let insertPosition = 0;
+        for (let i = 0; i < rootNotes.length; i++) {
+            const existingNoteId = rootNotes[i].dataset.noteId;
+            const existingNote = window.notesForCurrentPage.find(n => String(n.id) === String(existingNoteId));
+            if (existingNote && (existingNote.order_index || 0) > (noteData.order_index || 0)) {
+                insertPosition = i;
+                break;
+            }
+            insertPosition = i + 1;
+        }
+        
+        if (insertPosition >= rootNotes.length) {
+            notesContainer.appendChild(noteElement);
+        } else {
+            notesContainer.insertBefore(noteElement, rootNotes[insertPosition]);
+        }
+    } else {
+        // Child note - find parent and insert
+        const parentElement = notesContainer.querySelector(`.note-item[data-note-id="${noteData.parent_note_id}"]`);
+        if (parentElement) {
+            let childrenContainer = parentElement.querySelector('.note-children');
+            if (!childrenContainer) {
+                childrenContainer = document.createElement('div');
+                childrenContainer.className = 'note-children';
+                parentElement.appendChild(childrenContainer);
+                parentElement.classList.add('has-children');
+            }
+            childrenContainer.appendChild(noteElement);
+        } else {
+            // Fallback: add as root note
+            notesContainer.appendChild(noteElement);
+        }
+    }
+    
+    // Initialize drag and drop for the new element
+    setTimeout(() => {
+        initializeDragAndDrop();
+    }, 0);
+    
+    return noteElement;
 }
 
 /**
@@ -107,14 +169,39 @@ export function addNoteElement(noteData) {
  * @param {string} noteId - The ID of the note to remove.
  */
 export function removeNoteElement(noteId) {
+    // Update data structures
     window.notesForCurrentPage = window.notesForCurrentPage.filter(note => String(note.id) !== String(noteId));
     const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
     const noteTree = buildNoteTree(sortedNotes);
+    
     const notesContainer = document.getElementById('notes-container');
-    if (notesContainer && notesContainer.__x) {
+    if (!notesContainer) return;
+    
+    // Update Alpine.js data if available
+    if (notesContainer.__x) {
         notesContainer.__x.getUnobservedData().notes = noteTree;
     }
-    // Drag-and-drop and feather icons are handled by Alpine lifecycle hooks
+    
+    // **FIX**: Actually remove the DOM element for immediate visual feedback
+    const noteElement = notesContainer.querySelector(`.note-item[data-note-id="${noteId}"]`);
+    if (noteElement) {
+        // Handle parent cleanup if this was the last child
+        const parent = noteElement.closest('.note-children');
+        noteElement.remove();
+        
+        if (parent && parent.children.length === 0) {
+            const parentNoteItem = parent.closest('.note-item');
+            if (parentNoteItem) {
+                parentNoteItem.classList.remove('has-children');
+                parent.remove();
+            }
+        }
+        
+        // Show "no notes" message if no notes remain
+        if (window.notesForCurrentPage.length === 0) {
+            notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
+        }
+    }
 }
 
 /**
@@ -194,7 +281,15 @@ export async function handleNoteDrop(evt) {
         ...filteredSiblingUpdates.map(upd => ({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }))
     ];
     
-    // Optimistically update local state before calling API
+    // **FIX**: Store original state for potential rollback
+    const originalNotesState = JSON.parse(JSON.stringify(window.notesForCurrentPage));
+    const originalDOMState = {
+        noteElement: evt.item,
+        originalParent: evt.from,
+        originalIndex: evt.oldIndex
+    };
+    
+    // Optimistically update local state immediately
     const noteToMove = window.notesForCurrentPage.find(n => n.id == noteId);
     if(noteToMove) {
         noteToMove.parent_note_id = newParentId;
@@ -207,19 +302,110 @@ export async function handleNoteDrop(evt) {
             sib.order_index = upd.newOrderIndex;
         }
     });
+    
+    // **FIX**: Update visual hierarchy immediately without page reload
+    updateNoteVisualHierarchy(evt.item, newParentId);
 
     try {
-        await window.notesAPI.batchUpdateNotes(operations);
+        const batchResponse = await window.notesAPI.batchUpdateNotes(operations);
         
-        // Clear cache and reload page to get fresh data
+        // Validate response
+        let allOperationsSucceeded = true;
+        if (batchResponse && Array.isArray(batchResponse.results)) {
+            batchResponse.results.forEach(opResult => {
+                if (opResult.status === 'error') {
+                    allOperationsSucceeded = false;
+                    console.error('[Drag Drop] Server reported error:', opResult);
+                }
+            });
+        } else {
+            allOperationsSucceeded = false;
+            console.error('[Drag Drop] Invalid response structure:', batchResponse);
+        }
+        
+        if (!allOperationsSucceeded) {
+            throw new Error('One or more drag-drop operations failed on the server');
+        }
+        
+        // **IMPROVEMENT**: Cache invalidation without full reload
         pageCache.removePage(window.currentPageName);
-        await window.loadPage(window.currentPageName, false, false);
+        
+        console.log('[Drag Drop] Successfully updated note positions');
+        
     } catch (error) {
         console.error("Failed to save note drop changes:", error);
-        alert("Could not save new note positions. Reverting.");
         
-        pageCache.removePage(window.currentPageName);
-        await window.loadPage(window.currentPageName, false, false);
+        // **FIX**: Rollback optimistic changes on error
+        window.notesForCurrentPage = originalNotesState;
+        
+        // Rollback DOM changes
+        if (originalDOMState.originalParent && originalDOMState.noteElement) {
+            const children = Array.from(originalDOMState.originalParent.children);
+            if (originalDOMState.originalIndex >= children.length) {
+                originalDOMState.originalParent.appendChild(originalDOMState.noteElement);
+            } else {
+                originalDOMState.originalParent.insertBefore(
+                    originalDOMState.noteElement, 
+                    children[originalDOMState.originalIndex]
+                );
+            }
+            
+            // Restore original visual hierarchy
+            updateNoteVisualHierarchy(originalDOMState.noteElement, 
+                originalNotesState.find(n => n.id == noteId)?.parent_note_id || null
+            );
+        }
+        
+        alert("Could not save new note positions. Changes have been reverted.");
+    }
+}
+
+/**
+ * **NEW**: Updates the visual hierarchy of a note without full page reload
+ * @param {HTMLElement} noteElement - The note element to update
+ * @param {string|null} newParentId - The new parent ID
+ */
+function updateNoteVisualHierarchy(noteElement, newParentId) {
+    if (!noteElement) return;
+    
+    // Calculate new nesting level
+    let nestingLevel = 0;
+    if (newParentId) {
+        // Count parent hierarchy
+        const allNotes = window.notesForCurrentPage;
+        let currentParentId = newParentId;
+        while (currentParentId) {
+            nestingLevel++;
+            const parentNote = allNotes.find(n => String(n.id) === String(currentParentId));
+            if (!parentNote) break;
+            currentParentId = parentNote.parent_note_id;
+        }
+    }
+    
+    // Update CSS custom property for visual indentation
+    noteElement.style.setProperty('--nesting-level', nestingLevel);
+    
+    // Update all descendant notes' nesting levels as well
+    updateDescendantNestingLevels(noteElement, nestingLevel);
+}
+
+/**
+ * **NEW**: Recursively updates nesting levels for descendant notes
+ * @param {HTMLElement} noteElement - The parent note element
+ * @param {number} parentNestingLevel - The parent's nesting level
+ */
+function updateDescendantNestingLevels(noteElement, parentNestingLevel) {
+    const childrenContainer = noteElement.querySelector('.note-children');
+    if (!childrenContainer) return;
+    
+    const childNotes = Array.from(childrenContainer.children).filter(el => 
+        el.classList.contains('note-item')
+    );
+    
+    for (const childNote of childNotes) {
+        const childNestingLevel = parentNestingLevel + 1;
+        childNote.style.setProperty('--nesting-level', childNestingLevel);
+        updateDescendantNestingLevels(childNote, childNestingLevel);
     }
 }
 

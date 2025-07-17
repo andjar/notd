@@ -291,34 +291,32 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
             // Insert after current note
             noteItem.after(newNoteEl);
             
-            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
-            setTimeout(() => {
-                const newContentDiv = newNoteEl.querySelector('.note-content');
-                if (newContentDiv) {
-                    // Switch to edit mode
-                    ui.switchToEditMode(newContentDiv);
-                    
-                    // Set cursor to beginning of the new note
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    
-                    // Clear any existing selection
-                    sel.removeAllRanges();
-                    
-                    // Position cursor at the start of the content
-                    range.setStart(newContentDiv, 0);
-                    range.collapse(true);
-                    
-                    // Apply the selection
-                    sel.addRange(range);
-                    
-                    // Ensure the new note is visible
-                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    
-                    // Focus the element
-                    newContentDiv.focus();
-                }
-            }, 0); // Use setTimeout to ensure DOM is ready
+            // **ENHANCEMENT**: Ensure immediate focus and cursor positioning
+            const newContentDiv = newNoteEl.querySelector('.note-content');
+            if (newContentDiv) {
+                // Switch to edit mode immediately
+                ui.switchToEditMode(newContentDiv);
+                
+                // Set cursor to beginning of the new note immediately
+                const range = document.createRange();
+                const sel = window.getSelection();
+                
+                // Clear any existing selection
+                sel.removeAllRanges();
+                
+                // Position cursor at the start of the content
+                range.setStart(newContentDiv, 0);
+                range.collapse(true);
+                
+                // Apply the selection
+                sel.addRange(range);
+                
+                // Ensure the new note is visible
+                newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Focus the element
+                newContentDiv.focus();
+            }
         }
     };
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, "Create Sibling Note");
@@ -554,11 +552,11 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // **OPTIMIZATION**: Immediate visual feedback without full re-render
+    // **OPTIMIZATION**: Immediate visual feedback without delays
     const optimisticDOMUpdater = () => {
         // Update the note's visual indentation immediately
         const noteElement = getNoteElementById(noteData.id);
-        if (noteElement && targetOrderIndex !== null) { // **FIX**: Check if targetOrderIndex is defined
+        if (noteElement && targetOrderIndex !== null) {
             // Calculate new nesting level
             const newNestingLevel = calculateNestingLevel(newParentId, appStore.notes);
             
@@ -575,7 +573,7 @@ async function handleTabKey(e, noteItem, noteData) {
                 noteToMove.order_index = targetOrderIndex;
             }
             
-            // Update sibling order indices
+            // Update sibling order indices immediately
             operations.forEach(op => {
                 if (op.type === 'update') {
                     const note = getNoteDataById(op.payload.id);
@@ -583,9 +581,19 @@ async function handleTabKey(e, noteItem, noteData) {
                 }
             });
             
-            // Refocus the note content
+            // **IMPROVEMENT**: Refocus immediately without delay
             const newContentDiv = noteElement.querySelector('.note-content');
-            if (newContentDiv) ui.switchToEditMode(newContentDiv);
+            if (newContentDiv) {
+                ui.switchToEditMode(newContentDiv);
+                // Focus with proper cursor positioning
+                newContentDiv.focus();
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(newContentDiv);
+                range.collapse(false); // Collapse to end
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
         }
     };
     
@@ -889,34 +897,32 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
             // Insert the new child
             childrenContainer.appendChild(newNoteEl);
             
-            // **ENHANCEMENT**: Ensure proper focus and cursor positioning
-            setTimeout(() => {
-                const newContentDiv = newNoteEl.querySelector('.note-content');
-                if (newContentDiv) {
-                    // Switch to edit mode
-                    ui.switchToEditMode(newContentDiv);
-                    
-                    // Set cursor to beginning of the new note
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    
-                    // Clear any existing selection
-                    sel.removeAllRanges();
-                    
-                    // Position cursor at the start of the content
-                    range.setStart(newContentDiv, 0);
-                    range.collapse(true);
-                    
-                    // Apply the selection
-                    sel.addRange(range);
-                    
-                    // Ensure the new note is visible
-                    newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    
-                    // Focus the element
-                    newContentDiv.focus();
-                }
-            }, 0); // Use setTimeout to ensure DOM is ready
+            // **ENHANCEMENT**: Ensure immediate focus and cursor positioning
+            const newContentDiv = newNoteEl.querySelector('.note-content');
+            if (newContentDiv) {
+                // Switch to edit mode immediately
+                ui.switchToEditMode(newContentDiv);
+                
+                // Set cursor to beginning of the new note immediately
+                const range = document.createRange();
+                const sel = window.getSelection();
+                
+                // Clear any existing selection
+                sel.removeAllRanges();
+                
+                // Position cursor at the start of the content
+                range.setStart(newContentDiv, 0);
+                range.collapse(true);
+                
+                // Apply the selection
+                sel.addRange(range);
+                
+                // Ensure the new note is visible
+                newContentDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                // Focus the element
+                newContentDiv.focus();
+            }
         }
     };
     
