@@ -1,6 +1,6 @@
 baseURL = "/"
 languageCode = "en-us"
-title = "notd - an outliner"
+title = "notd"
 theme = "kube"
 
 canonifyURLs = true
@@ -19,7 +19,7 @@ relativeURLs = false
 
 # Parameters
 [params]
-    author = "Your Name"
+    author = "Anders Hagen Jarmund"
     description = "Documentation for Your PHP/JS Outliner"
     
     # SEO
