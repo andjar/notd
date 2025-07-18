@@ -181,9 +181,16 @@
             } else if (excalidrawData.type === 'excalidraw') {
                 // Full excalidraw format
                 elements = excalidrawData.elements || [];
+                
+                // Safely handle appState with proper validation
+                const baseAppState = excalidrawData.appState || {};
+                const collaborators = Array.isArray(excalidrawData.appState?.collaborators) 
+                    ? excalidrawData.appState.collaborators 
+                    : [];
+                
                 appState = {
-                    ...excalidrawData.appState,
-                    collaborators: excalidrawData.appState?.collaborators || [],
+                    ...baseAppState,
+                    collaborators: collaborators,
                     viewBackgroundColor: excalidrawData.appState?.viewBackgroundColor || '#ffffff'
                 };
             } else {
