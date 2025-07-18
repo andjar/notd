@@ -154,7 +154,7 @@
             }
 
             // Fetch the attachment content
-            const response = await fetch(attachment.url);
+            const response = await fetch(`../../uploads/${attachment.path}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch attachment: ${response.status}`);
             }
@@ -174,11 +174,18 @@
             if (Array.isArray(excalidrawData)) {
                 // Old format - just elements array
                 elements = excalidrawData;
-                appState = {};
+                appState = {
+                    collaborators: [],
+                    viewBackgroundColor: '#ffffff'
+                };
             } else if (excalidrawData.type === 'excalidraw') {
                 // Full excalidraw format
                 elements = excalidrawData.elements || [];
-                appState = excalidrawData.appState || {};
+                appState = {
+                    ...excalidrawData.appState,
+                    collaborators: excalidrawData.appState?.collaborators || [],
+                    viewBackgroundColor: excalidrawData.appState?.viewBackgroundColor || '#ffffff'
+                };
             } else {
                 throw new Error('Unrecognized excalidraw file format');
             }
