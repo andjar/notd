@@ -17,9 +17,7 @@ if (empty($pageName)) {
 
 // --- Database Connection for Server-Side Rendering ---
 try {
-    $pdo = new PDO('sqlite:' . DB_PATH);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->exec('PRAGMA foreign_keys = ON;');
+    $pdo = get_db_connection();
 } catch (PDOException $e) {
     error_log("Database connection failed: " . $e->getMessage());
     $pdo = null;
@@ -81,13 +79,8 @@ if ($pdo) {
 
 // --- Journal Page Creation ---
 // Only create journal pages for date-based pages that don't exist
-if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName)) {
+if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName) && $pdo) {
     try {
-        // Connect to SQLite database
-        $pdo = new PDO('sqlite:' . DB_PATH);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $pdo->exec('PRAGMA foreign_keys = ON;');
-
         // Check if page exists
         $stmt = $pdo->prepare("SELECT id FROM Pages WHERE name = ?");
         $stmt->execute([$pageName]);
