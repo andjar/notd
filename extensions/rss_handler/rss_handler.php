@@ -1,7 +1,7 @@
 <?php
 
 // --- Configuration & Setup ---
-define('DEFAULT_CONFIG_PATH', 'rss_config.json');
+define('DEFAULT_CONFIG_PATH', 'config.json');
 define('DEFAULT_API_URL', 'http://localhost:8080/api'); // Replace with your notes app API
 
 // --- Logging ---

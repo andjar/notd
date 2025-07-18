@@ -1,9 +1,0 @@
-{
-  "api_url": "/api/v1",
-  "default_page_name_for_rss": "Inbox/rss",
-  "feeds": [
-    "https://www.nrk.no/toppsaker.rss",
-    { "url": "https://example.com/feed.xml", "page_name": "<today>/rss" },
-    { "url": "https://another.com/feed", "page_name": "News" }
-  ]
-}
