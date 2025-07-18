@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>API Overview on notd</title><link>/docs/overview/</link><description>Recent content in API Overview on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/docs/overview/index.xml" rel="self" type="application/rss+xml"/><item><title>Core Concepts</title><link>/docs/overview/core-concepts/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/core-concepts/</guid><description>&lt;h3 id="pages">Pages&lt;/h3>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>API Overview on notd</title><link>/notd/docs/overview/</link><description>Recent content in API Overview on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/notd/docs/overview/index.xml" rel="self" type="application/rss+xml"/><item><title>Core Concepts</title><link>/notd/docs/overview/core-concepts/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/core-concepts/</guid><description>&lt;h3 id="pages">Pages&lt;/h3>
 &lt;p>Pages are top-level containers for notes. Each page has a unique name and can contain multiple notes.&lt;/p>
 &lt;h3 id="notes">Notes&lt;/h3>
 &lt;p>Notes are the core content blocks that belong to pages. Notes can be nested under other notes, creating a hierarchical structure.&lt;/p>
@@ -10,7 +10,7 @@
 &lt;li>&lt;code>{key::::value}&lt;/code> - System log property (weight 4)&lt;/li>
 &lt;/ul>
 &lt;h3 id="task-states">Task States&lt;/h3>
-&lt;p>The API supports task status tracking with these states:&lt;/p></description></item><item><title>Quick Start Examples</title><link>/docs/overview/quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/quick-start/</guid><description>&lt;h3 id="1-create-a-page-and-add-notes">1. Create a Page and Add Notes&lt;/h3>
+&lt;p>The API supports task status tracking with these states:&lt;/p></description></item><item><title>Quick Start Examples</title><link>/notd/docs/overview/quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/quick-start/</guid><description>&lt;h3 id="1-create-a-page-and-add-notes">1. Create a Page and Add Notes&lt;/h3>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
@@ -137,43 +137,10 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#0a3069"> }&amp;#39;&lt;/span>
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
-&lt;/div></description></item><item><title>Advanced Features</title><link>/docs/overview/advanced-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/advanced-features/</guid><description>&lt;h3 id="property-system">Property System&lt;/h3>
-&lt;p>Properties are automatically parsed from content using these patterns:&lt;/p>
-&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
-&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
-&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
-&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
-&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
-&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>{key::value} # Public property (weight 2)
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{key:::value} # Internal property (weight 3)
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{key::::value} # System log property (weight 4)
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
-&lt;/div>
-&lt;/div>&lt;h3 id="content-patterns">Content Patterns&lt;/h3>
-&lt;p>The API recognizes several content patterns:&lt;/p>
-&lt;h4 id="page-links">Page Links&lt;/h4>
-&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
-&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
-&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
-&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>[[Page Name]] # Creates a link to another page
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
-&lt;/div>
-&lt;/div>&lt;h4 id="task-status">Task Status&lt;/h4>
-&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
-&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
-&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
-&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
-&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>TODO Research topic # Creates a TODO task
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>DONE Complete task # Creates a DONE task
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
-&lt;/div>
-&lt;/div>&lt;h4 id="sql-queries">SQL Queries&lt;/h4>
+&lt;/div></description></item><item><title>Advanced Features</title><link>/notd/docs/overview/advanced-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/advanced-features/</guid><description>&lt;p>notd includes several advanced features that leverage both the backend API and frontend capabilities to create powerful workflows and automation.&lt;/p>
+&lt;h2 id="frontend-driven-features">Frontend-Driven Features&lt;/h2>
+&lt;h3 id="dynamic-sql-queries">Dynamic SQL Queries&lt;/h3>
+&lt;p>The frontend can execute SQL queries embedded directly in notes, providing powerful data analysis and reporting capabilities:&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
@@ -182,7 +149,9 @@
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>SQL{SELECT id FROM Notes WHERE content LIKE &amp;#39;%important%&amp;#39;}
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
-&lt;/div>&lt;p>The frontend can be configured to execute SQL queries embedded in notes. This is a powerful feature that allows for dynamic content generation.&lt;/p></description></item><item><title>Best Practices</title><link>/docs/overview/best-practices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/best-practices/</guid><description>&lt;h3 id="1-use-batch-operations">1. Use Batch Operations&lt;/h3>
+&lt;/div>&lt;p>This creates dynamic content that updates automatically when underlying data changes.&lt;/p>
+&lt;h4 id="query-examples">Query Examples&lt;/h4>
+&lt;p>&lt;strong>Project Dashboard:&lt;/strong>&lt;/p></description></item><item><title>Best Practices</title><link>/notd/docs/overview/best-practices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/best-practices/</guid><description>&lt;h3 id="1-use-batch-operations">1. Use Batch Operations&lt;/h3>
 &lt;p>For multiple note operations, use batch operations instead of individual requests:&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
@@ -223,7 +192,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;h3 id="2-include-parent-properties">2. Include Parent Properties&lt;/h3>
-&lt;p>When fetching notes, consider including parent properties for context:&lt;/p></description></item><item><title>Troubleshooting</title><link>/docs/overview/troubleshooting/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/troubleshooting/</guid><description>&lt;h3 id="common-issues">Common Issues&lt;/h3>
+&lt;p>When fetching notes, consider including parent properties for context:&lt;/p></description></item><item><title>Troubleshooting</title><link>/notd/docs/overview/troubleshooting/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/troubleshooting/</guid><description>&lt;h3 id="common-issues">Common Issues&lt;/h3>
 &lt;ol>
 &lt;li>
 &lt;p>&lt;strong>Database Locked Errors&lt;/strong>&lt;/p>
@@ -255,7 +224,7 @@
 &lt;/li>
 &lt;/ol>
 &lt;h3 id="debug-mode">Debug Mode&lt;/h3>
-&lt;p>Enable debug logging by checking the server logs for detailed error information.&lt;/p></description></item><item><title>Changelog</title><link>/docs/overview/changelog/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/changelog/</guid><description>&lt;h3 id="version-100">Version 1.0.0&lt;/h3>
+&lt;p>Enable debug logging by checking the server logs for detailed error information.&lt;/p></description></item><item><title>Changelog</title><link>/notd/docs/overview/changelog/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/changelog/</guid><description>&lt;h3 id="version-100">Version 1.0.0&lt;/h3>
 &lt;ul>
 &lt;li>Initial API release&lt;/li>
 &lt;li>Full CRUD operations for pages and notes&lt;/li>

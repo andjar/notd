@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Frontend Guide on notd</title><link>/notd/docs/frontend-guide/</link><description>Recent content in Frontend Guide on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/notd/docs/frontend-guide/index.xml" rel="self" type="application/rss+xml"/><item><title>Frontend Quick Start</title><link>/notd/docs/frontend-guide/frontend-quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/frontend-quick-start/</guid><description>&lt;p>Get up and running with notd&amp;rsquo;s powerful frontend features in minutes. This guide covers the essential features you need to know to be productive immediately.&lt;/p>
+&lt;h2 id="first-steps">First Steps&lt;/h2>
+&lt;h3 id="1-understanding-the-interface">1. Understanding the Interface&lt;/h3>
+&lt;p>When you first open notd, you&amp;rsquo;ll see:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Sidebar&lt;/strong> (left) - Navigation, search, and quick access&lt;/li>
+&lt;li>&lt;strong>Main area&lt;/strong> (center) - Your notes and content&lt;/li>
+&lt;li>&lt;strong>Today&amp;rsquo;s date&lt;/strong> - notd starts with today&amp;rsquo;s journal page&lt;/li>
+&lt;/ul>
+&lt;h3 id="2-create-your-first-note">2. Create Your First Note&lt;/h3>
+&lt;p>Click in the main area and start typing:&lt;/p></description></item><item><title>Core Features</title><link>/notd/docs/frontend-guide/core-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/core-features/</guid><description>&lt;h2 id="rich-text-editing-with-markdown">Rich Text Editing with Markdown&lt;/h2>
+&lt;p>notd uses Markdown for formatting notes with live preview capabilities. The editor supports:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Headers&lt;/strong> using &lt;code># ## ###&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Lists&lt;/strong> with &lt;code>-&lt;/code> or &lt;code>1.&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Links&lt;/strong> using &lt;code>[text](url)&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Code blocks&lt;/strong> with triple backticks&lt;/li>
+&lt;li>&lt;strong>Emphasis&lt;/strong> with &lt;code>*italic*&lt;/code> and &lt;code>**bold**&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;h3 id="page-links">Page Links&lt;/h3>
+&lt;p>Create internal links to other pages using double square brackets:&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span>[[Page Name]]
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>This creates a clickable link to the specified page. If the page doesn&amp;rsquo;t exist, it will be created when clicked.&lt;/p></description></item><item><title>Journal &amp; Tasks</title><link>/notd/docs/frontend-guide/journal-tasks/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/journal-tasks/</guid><description>&lt;h2 id="journal-based-workflow">Journal-Based Workflow&lt;/h2>
+&lt;p>notd is built around a journal-based system inspired by tools like LogSeq. This approach uses date-based pages as the foundation for daily note-taking and organization.&lt;/p>
+&lt;h3 id="daily-journal-pages">Daily Journal Pages&lt;/h3>
+&lt;p>By default, notd redirects to today&amp;rsquo;s date page (e.g., &lt;code>2024-07-18&lt;/code>). These journal pages:&lt;/p>
+&lt;ul>
+&lt;li>Are automatically created when first accessed&lt;/li>
+&lt;li>Provide a consistent starting point for daily work&lt;/li>
+&lt;li>Can contain any type of content: notes, tasks, links, etc.&lt;/li>
+&lt;li>Form a chronological record of your thoughts and activities&lt;/li>
+&lt;/ul>
+&lt;h3 id="date-navigation">Date Navigation&lt;/h3>
+&lt;p>Navigate between dates using:&lt;/p></description></item><item><title>Backlinks &amp; Favorites</title><link>/notd/docs/frontend-guide/backlinks-favorites/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/backlinks-favorites/</guid><description>&lt;h2 id="backlinks-system">Backlinks System&lt;/h2>
+&lt;p>Backlinks show you which pages reference the current page, helping you discover connections and relationships in your knowledge base.&lt;/p>
+&lt;h3 id="how-backlinks-work">How Backlinks Work&lt;/h3>
+&lt;p>When you create a page link using &lt;code>[[Page Name]]&lt;/code>, notd automatically:&lt;/p>
+&lt;ul>
+&lt;li>Creates a clickable link to that page&lt;/li>
+&lt;li>Adds the current page to the target page&amp;rsquo;s backlinks&lt;/li>
+&lt;li>Tracks these relationships in the Properties table&lt;/li>
+&lt;/ul>
+&lt;h3 id="viewing-backlinks">Viewing Backlinks&lt;/h3>
+&lt;p>Backlinks appear in several places:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Sidebar&lt;/strong> - Shows recent backlinks to the current page&lt;/li>
+&lt;li>&lt;strong>Backlinks Modal&lt;/strong> - Full list accessible via the backlinks button&lt;/li>
+&lt;li>&lt;strong>Context&lt;/strong> - Shows which note on the source page contains the link&lt;/li>
+&lt;/ul>
+&lt;h3 id="backlinks-examples">Backlinks Examples&lt;/h3>
+&lt;p>If your &amp;ldquo;Project Alpha&amp;rdquo; page contains:&lt;/p></description></item><item><title>Search &amp; Navigation</title><link>/notd/docs/frontend-guide/search-navigation/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/search-navigation/</guid><description>&lt;p>notd provides powerful search capabilities that help you find information quickly across all your notes, pages, and attachments. The search system integrates with all frontend features including encryption, properties, and backlinks.&lt;/p>
+&lt;h2 id="global-search">Global Search&lt;/h2>
+&lt;h3 id="search-interface">Search Interface&lt;/h3>
+&lt;p>The global search is accessible from the sidebar and provides:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Real-time results&lt;/strong> - Search as you type with debounced queries&lt;/li>
+&lt;li>&lt;strong>Content highlighting&lt;/strong> - Search terms are highlighted in results&lt;/li>
+&lt;li>&lt;strong>Context snippets&lt;/strong> - Preview content around matching terms&lt;/li>
+&lt;li>&lt;strong>Property filtering&lt;/strong> - Filter by page and note properties&lt;/li>
+&lt;li>&lt;strong>Mixed results&lt;/strong> - Pages and notes shown together with clear distinction&lt;/li>
+&lt;/ul>
+&lt;h3 id="search-syntax">Search Syntax&lt;/h3>
+&lt;h4 id="basic-search">Basic Search&lt;/h4>
+&lt;pre tabindex="0">&lt;code>project management
+&lt;/code>&lt;/pre>&lt;p>Finds content containing both &amp;ldquo;project&amp;rdquo; and &amp;ldquo;management&amp;rdquo;.&lt;/p></description></item><item><title>User Interface</title><link>/notd/docs/frontend-guide/user-interface/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/user-interface/</guid><description>&lt;p>notd features a modern, responsive user interface built with Alpine.js and designed for efficient note-taking and knowledge management. This guide covers the interface components, interactions, and customization options.&lt;/p>
+&lt;h2 id="interface-overview">Interface Overview&lt;/h2>
+&lt;h3 id="main-layout">Main Layout&lt;/h3>
+&lt;p>The notd interface consists of several key areas:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Sidebar&lt;/strong> - Navigation, search, recent pages, favorites, and calendar&lt;/li>
+&lt;li>&lt;strong>Main Content Area&lt;/strong> - Note editing and viewing&lt;/li>
+&lt;li>&lt;strong>Toolbar&lt;/strong> - Action buttons and extension access&lt;/li>
+&lt;li>&lt;strong>Status Bar&lt;/strong> - Page information and connection status&lt;/li>
+&lt;/ul>
+&lt;h3 id="responsive-design">Responsive Design&lt;/h3>
+&lt;p>notd adapts to different screen sizes:&lt;/p></description></item><item><title>Best Practices</title><link>/notd/docs/frontend-guide/best-practices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/best-practices/</guid><description>&lt;p>This guide covers best practices for using notd effectively, drawn from real-world usage patterns and team collaboration experiences.&lt;/p>
+&lt;h2 id="content-organization">Content Organization&lt;/h2>
+&lt;h3 id="naming-conventions">Naming Conventions&lt;/h3>
+&lt;p>&lt;strong>Use consistent, descriptive page names:&lt;/strong>&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">9
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span># Good Examples
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Meeting Notes - Project Alpha - 2024-07-18
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Project Alpha/Requirements
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Team/John Smith/Performance Review 2024
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># Avoid
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>mtg notes
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>proj requirements 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>john stuff
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>&lt;strong>Establish team conventions:&lt;/strong>&lt;/p></description></item><item><title>Troubleshooting</title><link>/notd/docs/frontend-guide/troubleshooting/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/troubleshooting/</guid><description>&lt;p>Common issues and solutions for notd frontend features.&lt;/p>
+&lt;h2 id="search-issues">Search Issues&lt;/h2>
+&lt;h3 id="search-not-finding-content">Search Not Finding Content&lt;/h3>
+&lt;p>&lt;strong>Problem:&lt;/strong> Global search returns no results for content you know exists.&lt;/p>
+&lt;p>&lt;strong>Solutions:&lt;/strong>&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>Check encryption status&lt;/strong> - Encrypted content requires the page password&lt;/li>
+&lt;li>&lt;strong>Verify content is saved&lt;/strong> - Ensure changes were saved before searching&lt;/li>
+&lt;li>&lt;strong>Check property syntax&lt;/strong> - Properties must use correct syntax: &lt;code>{key::value}&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Search different terms&lt;/strong> - Try broader or alternative keywords&lt;/li>
+&lt;/ol>
+&lt;p>&lt;strong>Example Fix:&lt;/strong>&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span># If searching for: &amp;#34;project planning&amp;#34;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># Try instead: &amp;#34;project&amp;#34; or &amp;#34;planning&amp;#34; separately
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># Or check if content uses different terms like &amp;#34;project preparation&amp;#34;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="search-results-missing-context">Search Results Missing Context&lt;/h3>
+&lt;p>&lt;strong>Problem:&lt;/strong> Search results don&amp;rsquo;t show enough context around matching terms.&lt;/p></description></item></channel></rss>

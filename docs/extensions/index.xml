@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Extensions on notd</title><link>/notd/docs/extensions/</link><description>Recent content in Extensions on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/notd/docs/extensions/index.xml" rel="self" type="application/rss+xml"/><item><title>Kanban Board</title><link>/notd/docs/extensions/kanban-board/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/extensions/kanban-board/</guid><description>&lt;p>The Kanban Board extension provides visual task management with customizable boards, filters, and drag-and-drop functionality. It&amp;rsquo;s perfect for organizing tasks across different projects, priorities, or workflows.&lt;/p>
+&lt;h2 id="features">Features&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>Visual Task Management&lt;/strong> - Drag-and-drop interface for moving tasks between states&lt;/li>
+&lt;li>&lt;strong>Multiple Boards&lt;/strong> - Configure different boards for different contexts (work, personal, projects)&lt;/li>
+&lt;li>&lt;strong>Smart Filters&lt;/strong> - Show only tasks matching specific criteria&lt;/li>
+&lt;li>&lt;strong>Real-time Updates&lt;/strong> - Changes sync immediately with your notes&lt;/li>
+&lt;li>&lt;strong>Property Integration&lt;/strong> - Works seamlessly with notd&amp;rsquo;s property system&lt;/li>
+&lt;/ul>
+&lt;h2 id="board-configuration">Board Configuration&lt;/h2>
+&lt;p>The Kanban extension is configured through &lt;code>/extensions/kanban_board/config.json&lt;/code>:&lt;/p></description></item><item><title>Excalidraw Editor</title><link>/notd/docs/extensions/excalidraw-editor/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/extensions/excalidraw-editor/</guid><description>&lt;p>The Excalidraw Editor extension integrates the powerful &lt;a href="https://excalidraw.com/">Excalidraw&lt;/a> visual whiteboard directly into notd, enabling you to create hand-drawn diagrams, sketches, and visual notes that are automatically saved as note attachments.&lt;/p>
+&lt;h2 id="features">Features&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>Visual Drawing&lt;/strong> - Full-featured drawing canvas with shapes, text, and freehand drawing&lt;/li>
+&lt;li>&lt;strong>Seamless Integration&lt;/strong> - Launch directly from note context menus&lt;/li>
+&lt;li>&lt;strong>Automatic Saving&lt;/strong> - Drawings are saved as PNG attachments to specific notes&lt;/li>
+&lt;li>&lt;strong>Offline Support&lt;/strong> - Works completely offline with phpdesktop&lt;/li>
+&lt;li>&lt;strong>Modern Interface&lt;/strong> - React-based Excalidraw component with Alpine.js controls&lt;/li>
+&lt;/ul>
+&lt;h2 id="getting-started">Getting Started&lt;/h2>
+&lt;h3 id="opening-the-editor">Opening the Editor&lt;/h3>
+&lt;ol>
+&lt;li>&lt;strong>From Note Context Menu&lt;/strong> - Right-click any note and select &amp;ldquo;Open in Excalidraw&amp;rdquo;&lt;/li>
+&lt;li>&lt;strong>Direct Access&lt;/strong> - Navigate to the extension through the extensions menu&lt;/li>
+&lt;li>&lt;strong>URL Parameters&lt;/strong> - Access with specific note ID: &lt;code>excalidraw.html?note_id=123&lt;/code>&lt;/li>
+&lt;/ol>
+&lt;h3 id="creating-drawings">Creating Drawings&lt;/h3>
+&lt;p>The Excalidraw editor provides:&lt;/p></description></item><item><title>Additional Extensions</title><link>/notd/docs/extensions/additional-extensions/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/extensions/additional-extensions/</guid><description>&lt;p>notd includes several additional extensions that enhance your workflow with specialized tools and integrations. Each extension is designed to work seamlessly with the core system while providing focused functionality.&lt;/p>
+&lt;h2 id="attachment-dashboard-">Attachment Dashboard 📎&lt;/h2>
+&lt;p>The Attachment Dashboard provides centralized file management for organizing and accessing all your note attachments.&lt;/p>
+&lt;h3 id="features">Features&lt;/h3>
+&lt;ul>
+&lt;li>&lt;strong>Centralized View&lt;/strong> - See all attachments across your entire knowledge base&lt;/li>
+&lt;li>&lt;strong>File Type Filtering&lt;/strong> - Filter by images, documents, spreadsheets, etc.&lt;/li>
+&lt;li>&lt;strong>Search Capabilities&lt;/strong> - Find attachments by filename or associated note content&lt;/li>
+&lt;li>&lt;strong>Quick Preview&lt;/strong> - Preview supported file types without leaving the dashboard&lt;/li>
+&lt;li>&lt;strong>Bulk Operations&lt;/strong> - Manage multiple files at once&lt;/li>
+&lt;/ul>
+&lt;h3 id="usage-examples">Usage Examples&lt;/h3>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span># Project Assets {category::project}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>## Design Files
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Logo variations uploaded to dashboard
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Brand guidelines document attached
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Color palette reference images
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>## Documentation 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Technical specifications PDF
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> User manual drafts
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Meeting recordings
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{attachments::managed}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{project::alpha}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>Access the dashboard to:&lt;/p></description></item></channel></rss>

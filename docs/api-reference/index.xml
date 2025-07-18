@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>API Reference on notd</title><link>/docs/api-reference/</link><description>Recent content in API Reference on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/docs/api-reference/index.xml" rel="self" type="application/rss+xml"/><item><title>Ping</title><link>/docs/api-reference/ping/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/ping/</guid><description>&lt;p>A simple utility endpoint to check if the API is running.&lt;/p>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>API Reference on notd</title><link>/notd/docs/api-reference/</link><description>Recent content in API Reference on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/notd/docs/api-reference/index.xml" rel="self" type="application/rss+xml"/><item><title>Ping</title><link>/notd/docs/api-reference/ping/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/ping/</guid><description>&lt;p>A simple utility endpoint to check if the API is running.&lt;/p>
 &lt;h3 id="get-apiv1pingphp">&lt;code>GET /api/v1/ping.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Checks API health.&lt;/li>
@@ -18,7 +18,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Extensions</title><link>/docs/api-reference/extensions/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/extensions/</guid><description>&lt;p>Retrieves details about currently active extensions.&lt;/p>
+&lt;/ul></description></item><item><title>Extensions</title><link>/notd/docs/api-reference/extensions/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/extensions/</guid><description>&lt;p>Retrieves details about currently active extensions.&lt;/p>
 &lt;h3 id="get-apiv1extensionsphp">&lt;code>GET /api/v1/extensions.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Lists active extensions defined in the configuration.&lt;/li>
@@ -60,7 +60,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Attachments</title><link>/docs/api-reference/attachments/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/attachments/</guid><description>&lt;p>Manages file attachments for notes.&lt;/p>
+&lt;/ul></description></item><item><title>Attachments</title><link>/notd/docs/api-reference/attachments/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/attachments/</guid><description>&lt;p>Manages file attachments for notes.&lt;/p>
 &lt;h3 id="post-apiv1attachmentsphp-upload">&lt;code>POST /api/v1/attachments.php&lt;/code> (Upload)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Uploads a new attachment for a note.&lt;/li>
@@ -183,7 +183,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Notes</title><link>/docs/api-reference/notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/notes/</guid><description>&lt;p>Manages notes and their content. All property modifications are now done by updating the note&amp;rsquo;s &lt;code>content&lt;/code> field.&lt;/p>
+&lt;/ul></description></item><item><title>Notes</title><link>/notd/docs/api-reference/notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/notes/</guid><description>&lt;p>Manages notes and their content. All property modifications are now done by updating the note&amp;rsquo;s &lt;code>content&lt;/code> field.&lt;/p>
 &lt;h3 id="post-apiv1notesphp-batch-operations">&lt;code>POST /api/v1/notes.php&lt;/code> (Batch Operations)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Create, update, and delete multiple notes in a single atomic request. This is the &lt;strong>primary method&lt;/strong> for all write operations on notes.&lt;/li>
@@ -543,7 +543,7 @@
 &lt;/div>
 &lt;/div>&lt;/li>
 &lt;li>If &lt;code>GET /api/v1/notes.php?page_id=10&lt;/code> or &lt;code>GET /api/v1/notes.php?page_id=10&amp;amp;include_internal=false&lt;/code> is called, the &lt;code>properties&lt;/code> for note &lt;code>42&lt;/code> would only include &lt;code>public&lt;/code>.&lt;/li>
-&lt;/ul></description></item><item><title>Pages</title><link>/docs/api-reference/pages/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/pages/</guid><description>&lt;p>Manages pages, which now also have a &lt;code>content&lt;/code> field to drive their properties.&lt;/p>
+&lt;/ul></description></item><item><title>Pages</title><link>/notd/docs/api-reference/pages/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/pages/</guid><description>&lt;p>Manages pages, which now also have a &lt;code>content&lt;/code> field to drive their properties.&lt;/p>
 &lt;h3 id="post-apiv1pagesphp-create">&lt;code>POST /api/v1/pages.php&lt;/code> (Create)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Creates a new page.&lt;/li>
@@ -899,7 +899,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Append to Page</title><link>/docs/api-reference/append-to-page/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/append-to-page/</guid><description>&lt;p>A utility endpoint to quickly add notes to a page, creating the page if it doesn&amp;rsquo;t exist.&lt;/p>
+&lt;/ul></description></item><item><title>Append to Page</title><link>/notd/docs/api-reference/append-to-page/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/append-to-page/</guid><description>&lt;p>A utility endpoint to quickly add notes to a page, creating the page if it doesn&amp;rsquo;t exist.&lt;/p>
 &lt;h3 id="post-apiv1append_to_pagephp">&lt;code>POST /api/v1/append_to_page.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Appends one or more notes to a page, creating the page if necessary. Supports creating nested notes in one call.&lt;/li>
@@ -1009,7 +1009,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Properties</title><link>/docs/api-reference/properties/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/properties/</guid><description>&lt;p>This endpoint is now &lt;strong>read-only&lt;/strong>. It provides a way to query the &lt;code>Properties&lt;/code> table index directly, which can be useful for advanced filtering or finding all entities with a specific property value, without needing to perform a full-text search.&lt;/p>
+&lt;/ul></description></item><item><title>Properties</title><link>/notd/docs/api-reference/properties/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/properties/</guid><description>&lt;p>This endpoint is now &lt;strong>read-only&lt;/strong>. It provides a way to query the &lt;code>Properties&lt;/code> table index directly, which can be useful for advanced filtering or finding all entities with a specific property value, without needing to perform a full-text search.&lt;/p>
 &lt;h3 id="get-apiv1propertiesphp">&lt;code>GET /api/v1/properties.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Retrieves all indexed properties for a specific entity.&lt;/li>
@@ -1046,7 +1046,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Search</title><link>/docs/api-reference/search/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/search/</guid><description>&lt;p>Provides powerful search capabilities. It can search by term, find backlinks, list tasks, or list favorited pages.&lt;/p>
+&lt;/ul></description></item><item><title>Search</title><link>/notd/docs/api-reference/search/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/search/</guid><description>&lt;p>Provides powerful search capabilities. It can search by term, find backlinks, list tasks, or list favorited pages.&lt;/p>
 &lt;p>&lt;strong>General Parameters for search types returning notes (e.g., &lt;code>q&lt;/code>, &lt;code>backlinks_for_page_name&lt;/code>, &lt;code>tasks&lt;/code>):&lt;/strong>&lt;/p>
 &lt;ul>
 &lt;li>&lt;code>include_parent_properties&lt;/code> (optional, boolean): Defaults to &lt;code>false&lt;/code>. If set to &lt;code>true&lt;/code>, each note item in the &lt;code>results&lt;/code> array will include a &lt;code>parent_properties&lt;/code> field. This field contains an object with aggregated properties from all direct and indirect parent notes. The structure mirrors the main &lt;code>properties&lt;/code> field. For search types that do not return notes (e.g., &lt;code>favorites&lt;/code>), this parameter has no effect.&lt;/li>
@@ -1099,7 +1099,7 @@
 &lt;/div>&lt;/li>
 &lt;li>If &lt;code>include_parent_properties&lt;/code> is &lt;code>false&lt;/code> (default), the &lt;code>parent_properties&lt;/code> field will be an empty object (&lt;code>{}&lt;/code>) or &lt;code>null&lt;/code>.&lt;/li>
 &lt;/ul>
-&lt;p>The Search endpoint also supports other modes:&lt;/p></description></item><item><title>Query Notes</title><link>/docs/api-reference/query-notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/query-notes/</guid><description>&lt;p>Executes safe, predefined SQL queries against the indexed &lt;code>Properties&lt;/code> table to find notes. This becomes even more powerful for historical queries.&lt;/p>
+&lt;p>The Search endpoint also supports other modes:&lt;/p></description></item><item><title>Query Notes</title><link>/notd/docs/api-reference/query-notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/query-notes/</guid><description>&lt;p>Executes safe, predefined SQL queries against the indexed &lt;code>Properties&lt;/code> table to find notes. This becomes even more powerful for historical queries.&lt;/p>
 &lt;h3 id="post-apiv1query_notesphp">&lt;code>POST /api/v1/query_notes.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Fetches notes that match a specific, secure SQL query pattern.&lt;/li>
@@ -1153,7 +1153,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Templates</title><link>/docs/api-reference/templates/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/templates/</guid><description>&lt;p>Manages reusable templates for creating notes and pages.&lt;/p>
+&lt;/ul></description></item><item><title>Templates</title><link>/notd/docs/api-reference/templates/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/templates/</guid><description>&lt;p>Manages reusable templates for creating notes and pages.&lt;/p>
 &lt;h3 id="post-apiv1templatesphp-create">&lt;code>POST /api/v1/templates.php&lt;/code> (Create)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Creates a new template.&lt;/li>
@@ -1227,7 +1227,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Webhooks</title><link>/docs/api-reference/webhooks/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/webhooks/</guid><description>&lt;p>Manages webhook subscriptions for event notifications.&lt;/p>
+&lt;/ul></description></item><item><title>Webhooks</title><link>/notd/docs/api-reference/webhooks/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/webhooks/</guid><description>&lt;p>Manages webhook subscriptions for event notifications.&lt;/p>
 &lt;h3 id="post-apiv1webhooksphp-create">&lt;code>POST /api/v1/webhooks.php&lt;/code> (Create)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Registers a new webhook.&lt;/li>

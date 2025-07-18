@@ -1,4 +1,43 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Kube theme for Hugo on notd</title><link>/</link><description>Recent content in Kube theme for Hugo on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/index.xml" rel="self" type="application/rss+xml"/><item><title>Ping</title><link>/docs/api-reference/ping/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/ping/</guid><description>&lt;p>A simple utility endpoint to check if the API is running.&lt;/p>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Kube theme for Hugo on notd</title><link>/notd/</link><description>Recent content in Kube theme for Hugo on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/notd/index.xml" rel="self" type="application/rss+xml"/><item><title>Frontend Quick Start</title><link>/notd/docs/frontend-guide/frontend-quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/frontend-quick-start/</guid><description>&lt;p>Get up and running with notd&amp;rsquo;s powerful frontend features in minutes. This guide covers the essential features you need to know to be productive immediately.&lt;/p>
+&lt;h2 id="first-steps">First Steps&lt;/h2>
+&lt;h3 id="1-understanding-the-interface">1. Understanding the Interface&lt;/h3>
+&lt;p>When you first open notd, you&amp;rsquo;ll see:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Sidebar&lt;/strong> (left) - Navigation, search, and quick access&lt;/li>
+&lt;li>&lt;strong>Main area&lt;/strong> (center) - Your notes and content&lt;/li>
+&lt;li>&lt;strong>Today&amp;rsquo;s date&lt;/strong> - notd starts with today&amp;rsquo;s journal page&lt;/li>
+&lt;/ul>
+&lt;h3 id="2-create-your-first-note">2. Create Your First Note&lt;/h3>
+&lt;p>Click in the main area and start typing:&lt;/p></description></item><item><title>Core Features</title><link>/notd/docs/frontend-guide/core-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/core-features/</guid><description>&lt;h2 id="rich-text-editing-with-markdown">Rich Text Editing with Markdown&lt;/h2>
+&lt;p>notd uses Markdown for formatting notes with live preview capabilities. The editor supports:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Headers&lt;/strong> using &lt;code># ## ###&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Lists&lt;/strong> with &lt;code>-&lt;/code> or &lt;code>1.&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Links&lt;/strong> using &lt;code>[text](url)&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Code blocks&lt;/strong> with triple backticks&lt;/li>
+&lt;li>&lt;strong>Emphasis&lt;/strong> with &lt;code>*italic*&lt;/code> and &lt;code>**bold**&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;h3 id="page-links">Page Links&lt;/h3>
+&lt;p>Create internal links to other pages using double square brackets:&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span>[[Page Name]]
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>This creates a clickable link to the specified page. If the page doesn&amp;rsquo;t exist, it will be created when clicked.&lt;/p></description></item><item><title>Kanban Board</title><link>/notd/docs/extensions/kanban-board/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/extensions/kanban-board/</guid><description>&lt;p>The Kanban Board extension provides visual task management with customizable boards, filters, and drag-and-drop functionality. It&amp;rsquo;s perfect for organizing tasks across different projects, priorities, or workflows.&lt;/p>
+&lt;h2 id="features">Features&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>Visual Task Management&lt;/strong> - Drag-and-drop interface for moving tasks between states&lt;/li>
+&lt;li>&lt;strong>Multiple Boards&lt;/strong> - Configure different boards for different contexts (work, personal, projects)&lt;/li>
+&lt;li>&lt;strong>Smart Filters&lt;/strong> - Show only tasks matching specific criteria&lt;/li>
+&lt;li>&lt;strong>Real-time Updates&lt;/strong> - Changes sync immediately with your notes&lt;/li>
+&lt;li>&lt;strong>Property Integration&lt;/strong> - Works seamlessly with notd&amp;rsquo;s property system&lt;/li>
+&lt;/ul>
+&lt;h2 id="board-configuration">Board Configuration&lt;/h2>
+&lt;p>The Kanban extension is configured through &lt;code>/extensions/kanban_board/config.json&lt;/code>:&lt;/p></description></item><item><title>Ping</title><link>/notd/docs/api-reference/ping/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/ping/</guid><description>&lt;p>A simple utility endpoint to check if the API is running.&lt;/p>
 &lt;h3 id="get-apiv1pingphp">&lt;code>GET /api/v1/ping.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Checks API health.&lt;/li>
@@ -18,7 +57,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Core Concepts</title><link>/docs/overview/core-concepts/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/core-concepts/</guid><description>&lt;h3 id="pages">Pages&lt;/h3>
+&lt;/ul></description></item><item><title>Core Concepts</title><link>/notd/docs/overview/core-concepts/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/core-concepts/</guid><description>&lt;h3 id="pages">Pages&lt;/h3>
 &lt;p>Pages are top-level containers for notes. Each page has a unique name and can contain multiple notes.&lt;/p>
 &lt;h3 id="notes">Notes&lt;/h3>
 &lt;p>Notes are the core content blocks that belong to pages. Notes can be nested under other notes, creating a hierarchical structure.&lt;/p>
@@ -30,7 +69,24 @@
 &lt;li>&lt;code>{key::::value}&lt;/code> - System log property (weight 4)&lt;/li>
 &lt;/ul>
 &lt;h3 id="task-states">Task States&lt;/h3>
-&lt;p>The API supports task status tracking with these states:&lt;/p></description></item><item><title>Extensions</title><link>/docs/api-reference/extensions/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/extensions/</guid><description>&lt;p>Retrieves details about currently active extensions.&lt;/p>
+&lt;p>The API supports task status tracking with these states:&lt;/p></description></item><item><title>Excalidraw Editor</title><link>/notd/docs/extensions/excalidraw-editor/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/extensions/excalidraw-editor/</guid><description>&lt;p>The Excalidraw Editor extension integrates the powerful &lt;a href="https://excalidraw.com/">Excalidraw&lt;/a> visual whiteboard directly into notd, enabling you to create hand-drawn diagrams, sketches, and visual notes that are automatically saved as note attachments.&lt;/p>
+&lt;h2 id="features">Features&lt;/h2>
+&lt;ul>
+&lt;li>&lt;strong>Visual Drawing&lt;/strong> - Full-featured drawing canvas with shapes, text, and freehand drawing&lt;/li>
+&lt;li>&lt;strong>Seamless Integration&lt;/strong> - Launch directly from note context menus&lt;/li>
+&lt;li>&lt;strong>Automatic Saving&lt;/strong> - Drawings are saved as PNG attachments to specific notes&lt;/li>
+&lt;li>&lt;strong>Offline Support&lt;/strong> - Works completely offline with phpdesktop&lt;/li>
+&lt;li>&lt;strong>Modern Interface&lt;/strong> - React-based Excalidraw component with Alpine.js controls&lt;/li>
+&lt;/ul>
+&lt;h2 id="getting-started">Getting Started&lt;/h2>
+&lt;h3 id="opening-the-editor">Opening the Editor&lt;/h3>
+&lt;ol>
+&lt;li>&lt;strong>From Note Context Menu&lt;/strong> - Right-click any note and select &amp;ldquo;Open in Excalidraw&amp;rdquo;&lt;/li>
+&lt;li>&lt;strong>Direct Access&lt;/strong> - Navigate to the extension through the extensions menu&lt;/li>
+&lt;li>&lt;strong>URL Parameters&lt;/strong> - Access with specific note ID: &lt;code>excalidraw.html?note_id=123&lt;/code>&lt;/li>
+&lt;/ol>
+&lt;h3 id="creating-drawings">Creating Drawings&lt;/h3>
+&lt;p>The Excalidraw editor provides:&lt;/p></description></item><item><title>Extensions</title><link>/notd/docs/api-reference/extensions/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/extensions/</guid><description>&lt;p>Retrieves details about currently active extensions.&lt;/p>
 &lt;h3 id="get-apiv1extensionsphp">&lt;code>GET /api/v1/extensions.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Lists active extensions defined in the configuration.&lt;/li>
@@ -72,7 +128,64 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Attachments</title><link>/docs/api-reference/attachments/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/attachments/</guid><description>&lt;p>Manages file attachments for notes.&lt;/p>
+&lt;/ul></description></item><item><title>Journal &amp; Tasks</title><link>/notd/docs/frontend-guide/journal-tasks/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/journal-tasks/</guid><description>&lt;h2 id="journal-based-workflow">Journal-Based Workflow&lt;/h2>
+&lt;p>notd is built around a journal-based system inspired by tools like LogSeq. This approach uses date-based pages as the foundation for daily note-taking and organization.&lt;/p>
+&lt;h3 id="daily-journal-pages">Daily Journal Pages&lt;/h3>
+&lt;p>By default, notd redirects to today&amp;rsquo;s date page (e.g., &lt;code>2024-07-18&lt;/code>). These journal pages:&lt;/p>
+&lt;ul>
+&lt;li>Are automatically created when first accessed&lt;/li>
+&lt;li>Provide a consistent starting point for daily work&lt;/li>
+&lt;li>Can contain any type of content: notes, tasks, links, etc.&lt;/li>
+&lt;li>Form a chronological record of your thoughts and activities&lt;/li>
+&lt;/ul>
+&lt;h3 id="date-navigation">Date Navigation&lt;/h3>
+&lt;p>Navigate between dates using:&lt;/p></description></item><item><title>Additional Extensions</title><link>/notd/docs/extensions/additional-extensions/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/extensions/additional-extensions/</guid><description>&lt;p>notd includes several additional extensions that enhance your workflow with specialized tools and integrations. Each extension is designed to work seamlessly with the core system while providing focused functionality.&lt;/p>
+&lt;h2 id="attachment-dashboard-">Attachment Dashboard 📎&lt;/h2>
+&lt;p>The Attachment Dashboard provides centralized file management for organizing and accessing all your note attachments.&lt;/p>
+&lt;h3 id="features">Features&lt;/h3>
+&lt;ul>
+&lt;li>&lt;strong>Centralized View&lt;/strong> - See all attachments across your entire knowledge base&lt;/li>
+&lt;li>&lt;strong>File Type Filtering&lt;/strong> - Filter by images, documents, spreadsheets, etc.&lt;/li>
+&lt;li>&lt;strong>Search Capabilities&lt;/strong> - Find attachments by filename or associated note content&lt;/li>
+&lt;li>&lt;strong>Quick Preview&lt;/strong> - Preview supported file types without leaving the dashboard&lt;/li>
+&lt;li>&lt;strong>Bulk Operations&lt;/strong> - Manage multiple files at once&lt;/li>
+&lt;/ul>
+&lt;h3 id="usage-examples">Usage Examples&lt;/h3>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span># Project Assets {category::project}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>## Design Files
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Logo variations uploaded to dashboard
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Brand guidelines document attached
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Color palette reference images
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>## Documentation 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Technical specifications PDF
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> User manual drafts
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#cf222e">-&lt;/span> Meeting recordings
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{attachments::managed}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{project::alpha}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>Access the dashboard to:&lt;/p></description></item><item><title>Attachments</title><link>/notd/docs/api-reference/attachments/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/attachments/</guid><description>&lt;p>Manages file attachments for notes.&lt;/p>
 &lt;h3 id="post-apiv1attachmentsphp-upload">&lt;code>POST /api/v1/attachments.php&lt;/code> (Upload)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Uploads a new attachment for a note.&lt;/li>
@@ -195,7 +308,24 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Quick Start Examples</title><link>/docs/overview/quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/quick-start/</guid><description>&lt;h3 id="1-create-a-page-and-add-notes">1. Create a Page and Add Notes&lt;/h3>
+&lt;/ul></description></item><item><title>Backlinks &amp; Favorites</title><link>/notd/docs/frontend-guide/backlinks-favorites/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/backlinks-favorites/</guid><description>&lt;h2 id="backlinks-system">Backlinks System&lt;/h2>
+&lt;p>Backlinks show you which pages reference the current page, helping you discover connections and relationships in your knowledge base.&lt;/p>
+&lt;h3 id="how-backlinks-work">How Backlinks Work&lt;/h3>
+&lt;p>When you create a page link using &lt;code>[[Page Name]]&lt;/code>, notd automatically:&lt;/p>
+&lt;ul>
+&lt;li>Creates a clickable link to that page&lt;/li>
+&lt;li>Adds the current page to the target page&amp;rsquo;s backlinks&lt;/li>
+&lt;li>Tracks these relationships in the Properties table&lt;/li>
+&lt;/ul>
+&lt;h3 id="viewing-backlinks">Viewing Backlinks&lt;/h3>
+&lt;p>Backlinks appear in several places:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Sidebar&lt;/strong> - Shows recent backlinks to the current page&lt;/li>
+&lt;li>&lt;strong>Backlinks Modal&lt;/strong> - Full list accessible via the backlinks button&lt;/li>
+&lt;li>&lt;strong>Context&lt;/strong> - Shows which note on the source page contains the link&lt;/li>
+&lt;/ul>
+&lt;h3 id="backlinks-examples">Backlinks Examples&lt;/h3>
+&lt;p>If your &amp;ldquo;Project Alpha&amp;rdquo; page contains:&lt;/p></description></item><item><title>Quick Start Examples</title><link>/notd/docs/overview/quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/quick-start/</guid><description>&lt;h3 id="1-create-a-page-and-add-notes">1. Create a Page and Add Notes&lt;/h3>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
@@ -322,43 +452,10 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#0a3069"> }&amp;#39;&lt;/span>
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
-&lt;/div></description></item><item><title>Advanced Features</title><link>/docs/overview/advanced-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/advanced-features/</guid><description>&lt;h3 id="property-system">Property System&lt;/h3>
-&lt;p>Properties are automatically parsed from content using these patterns:&lt;/p>
-&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
-&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
-&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
-&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
-&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
-&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>{key::value} # Public property (weight 2)
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{key:::value} # Internal property (weight 3)
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>{key::::value} # System log property (weight 4)
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
-&lt;/div>
-&lt;/div>&lt;h3 id="content-patterns">Content Patterns&lt;/h3>
-&lt;p>The API recognizes several content patterns:&lt;/p>
-&lt;h4 id="page-links">Page Links&lt;/h4>
-&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
-&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
-&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
-&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>[[Page Name]] # Creates a link to another page
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
-&lt;/div>
-&lt;/div>&lt;h4 id="task-status">Task Status&lt;/h4>
-&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
-&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
-&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
-&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
-&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
-&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>TODO Research topic # Creates a TODO task
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>DONE Complete task # Creates a DONE task
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
-&lt;/div>
-&lt;/div>&lt;h4 id="sql-queries">SQL Queries&lt;/h4>
+&lt;/div></description></item><item><title>Advanced Features</title><link>/notd/docs/overview/advanced-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/advanced-features/</guid><description>&lt;p>notd includes several advanced features that leverage both the backend API and frontend capabilities to create powerful workflows and automation.&lt;/p>
+&lt;h2 id="frontend-driven-features">Frontend-Driven Features&lt;/h2>
+&lt;h3 id="dynamic-sql-queries">Dynamic SQL Queries&lt;/h3>
+&lt;p>The frontend can execute SQL queries embedded directly in notes, providing powerful data analysis and reporting capabilities:&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
@@ -367,7 +464,9 @@
 &lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-text" data-lang="text">&lt;span style="display:flex;">&lt;span>SQL{SELECT id FROM Notes WHERE content LIKE &amp;#39;%important%&amp;#39;}
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
-&lt;/div>&lt;p>The frontend can be configured to execute SQL queries embedded in notes. This is a powerful feature that allows for dynamic content generation.&lt;/p></description></item><item><title>Notes</title><link>/docs/api-reference/notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/notes/</guid><description>&lt;p>Manages notes and their content. All property modifications are now done by updating the note&amp;rsquo;s &lt;code>content&lt;/code> field.&lt;/p>
+&lt;/div>&lt;p>This creates dynamic content that updates automatically when underlying data changes.&lt;/p>
+&lt;h4 id="query-examples">Query Examples&lt;/h4>
+&lt;p>&lt;strong>Project Dashboard:&lt;/strong>&lt;/p></description></item><item><title>Notes</title><link>/notd/docs/api-reference/notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/notes/</guid><description>&lt;p>Manages notes and their content. All property modifications are now done by updating the note&amp;rsquo;s &lt;code>content&lt;/code> field.&lt;/p>
 &lt;h3 id="post-apiv1notesphp-batch-operations">&lt;code>POST /api/v1/notes.php&lt;/code> (Batch Operations)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Create, update, and delete multiple notes in a single atomic request. This is the &lt;strong>primary method&lt;/strong> for all write operations on notes.&lt;/li>
@@ -727,7 +826,21 @@
 &lt;/div>
 &lt;/div>&lt;/li>
 &lt;li>If &lt;code>GET /api/v1/notes.php?page_id=10&lt;/code> or &lt;code>GET /api/v1/notes.php?page_id=10&amp;amp;include_internal=false&lt;/code> is called, the &lt;code>properties&lt;/code> for note &lt;code>42&lt;/code> would only include &lt;code>public&lt;/code>.&lt;/li>
-&lt;/ul></description></item><item><title>Best Practices</title><link>/docs/overview/best-practices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/best-practices/</guid><description>&lt;h3 id="1-use-batch-operations">1. Use Batch Operations&lt;/h3>
+&lt;/ul></description></item><item><title>Search &amp; Navigation</title><link>/notd/docs/frontend-guide/search-navigation/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/search-navigation/</guid><description>&lt;p>notd provides powerful search capabilities that help you find information quickly across all your notes, pages, and attachments. The search system integrates with all frontend features including encryption, properties, and backlinks.&lt;/p>
+&lt;h2 id="global-search">Global Search&lt;/h2>
+&lt;h3 id="search-interface">Search Interface&lt;/h3>
+&lt;p>The global search is accessible from the sidebar and provides:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Real-time results&lt;/strong> - Search as you type with debounced queries&lt;/li>
+&lt;li>&lt;strong>Content highlighting&lt;/strong> - Search terms are highlighted in results&lt;/li>
+&lt;li>&lt;strong>Context snippets&lt;/strong> - Preview content around matching terms&lt;/li>
+&lt;li>&lt;strong>Property filtering&lt;/strong> - Filter by page and note properties&lt;/li>
+&lt;li>&lt;strong>Mixed results&lt;/strong> - Pages and notes shown together with clear distinction&lt;/li>
+&lt;/ul>
+&lt;h3 id="search-syntax">Search Syntax&lt;/h3>
+&lt;h4 id="basic-search">Basic Search&lt;/h4>
+&lt;pre tabindex="0">&lt;code>project management
+&lt;/code>&lt;/pre>&lt;p>Finds content containing both &amp;ldquo;project&amp;rdquo; and &amp;ldquo;management&amp;rdquo;.&lt;/p></description></item><item><title>Best Practices</title><link>/notd/docs/overview/best-practices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/best-practices/</guid><description>&lt;h3 id="1-use-batch-operations">1. Use Batch Operations&lt;/h3>
 &lt;p>For multiple note operations, use batch operations instead of individual requests:&lt;/p>
 &lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
 &lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
@@ -768,7 +881,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;h3 id="2-include-parent-properties">2. Include Parent Properties&lt;/h3>
-&lt;p>When fetching notes, consider including parent properties for context:&lt;/p></description></item><item><title>Pages</title><link>/docs/api-reference/pages/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/pages/</guid><description>&lt;p>Manages pages, which now also have a &lt;code>content&lt;/code> field to drive their properties.&lt;/p>
+&lt;p>When fetching notes, consider including parent properties for context:&lt;/p></description></item><item><title>Pages</title><link>/notd/docs/api-reference/pages/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/pages/</guid><description>&lt;p>Manages pages, which now also have a &lt;code>content&lt;/code> field to drive their properties.&lt;/p>
 &lt;h3 id="post-apiv1pagesphp-create">&lt;code>POST /api/v1/pages.php&lt;/code> (Create)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Creates a new page.&lt;/li>
@@ -1124,7 +1237,18 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Append to Page</title><link>/docs/api-reference/append-to-page/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/append-to-page/</guid><description>&lt;p>A utility endpoint to quickly add notes to a page, creating the page if it doesn&amp;rsquo;t exist.&lt;/p>
+&lt;/ul></description></item><item><title>User Interface</title><link>/notd/docs/frontend-guide/user-interface/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/user-interface/</guid><description>&lt;p>notd features a modern, responsive user interface built with Alpine.js and designed for efficient note-taking and knowledge management. This guide covers the interface components, interactions, and customization options.&lt;/p>
+&lt;h2 id="interface-overview">Interface Overview&lt;/h2>
+&lt;h3 id="main-layout">Main Layout&lt;/h3>
+&lt;p>The notd interface consists of several key areas:&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Sidebar&lt;/strong> - Navigation, search, recent pages, favorites, and calendar&lt;/li>
+&lt;li>&lt;strong>Main Content Area&lt;/strong> - Note editing and viewing&lt;/li>
+&lt;li>&lt;strong>Toolbar&lt;/strong> - Action buttons and extension access&lt;/li>
+&lt;li>&lt;strong>Status Bar&lt;/strong> - Page information and connection status&lt;/li>
+&lt;/ul>
+&lt;h3 id="responsive-design">Responsive Design&lt;/h3>
+&lt;p>notd adapts to different screen sizes:&lt;/p></description></item><item><title>Append to Page</title><link>/notd/docs/api-reference/append-to-page/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/append-to-page/</guid><description>&lt;p>A utility endpoint to quickly add notes to a page, creating the page if it doesn&amp;rsquo;t exist.&lt;/p>
 &lt;h3 id="post-apiv1append_to_pagephp">&lt;code>POST /api/v1/append_to_page.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Appends one or more notes to a page, creating the page if necessary. Supports creating nested notes in one call.&lt;/li>
@@ -1234,7 +1358,35 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Troubleshooting</title><link>/docs/overview/troubleshooting/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/troubleshooting/</guid><description>&lt;h3 id="common-issues">Common Issues&lt;/h3>
+&lt;/ul></description></item><item><title>Best Practices</title><link>/notd/docs/frontend-guide/best-practices/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/best-practices/</guid><description>&lt;p>This guide covers best practices for using notd effectively, drawn from real-world usage patterns and team collaboration experiences.&lt;/p>
+&lt;h2 id="content-organization">Content Organization&lt;/h2>
+&lt;h3 id="naming-conventions">Naming Conventions&lt;/h3>
+&lt;p>&lt;strong>Use consistent, descriptive page names:&lt;/strong>&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">9
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span># Good Examples
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Meeting Notes - Project Alpha - 2024-07-18
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Project Alpha/Requirements
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Team/John Smith/Performance Review 2024
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># Avoid
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>mtg notes
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>proj requirements 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>john stuff
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>&lt;strong>Establish team conventions:&lt;/strong>&lt;/p></description></item><item><title>Troubleshooting</title><link>/notd/docs/overview/troubleshooting/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/troubleshooting/</guid><description>&lt;h3 id="common-issues">Common Issues&lt;/h3>
 &lt;ol>
 &lt;li>
 &lt;p>&lt;strong>Database Locked Errors&lt;/strong>&lt;/p>
@@ -1266,7 +1418,7 @@
 &lt;/li>
 &lt;/ol>
 &lt;h3 id="debug-mode">Debug Mode&lt;/h3>
-&lt;p>Enable debug logging by checking the server logs for detailed error information.&lt;/p></description></item><item><title>Changelog</title><link>/docs/overview/changelog/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/overview/changelog/</guid><description>&lt;h3 id="version-100">Version 1.0.0&lt;/h3>
+&lt;p>Enable debug logging by checking the server logs for detailed error information.&lt;/p></description></item><item><title>Changelog</title><link>/notd/docs/overview/changelog/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/overview/changelog/</guid><description>&lt;h3 id="version-100">Version 1.0.0&lt;/h3>
 &lt;ul>
 &lt;li>Initial API release&lt;/li>
 &lt;li>Full CRUD operations for pages and notes&lt;/li>
@@ -1276,7 +1428,7 @@
 &lt;li>Template system&lt;/li>
 &lt;li>Webhook notifications&lt;/li>
 &lt;li>Batch operations for efficiency&lt;/li>
-&lt;/ul></description></item><item><title>Properties</title><link>/docs/api-reference/properties/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/properties/</guid><description>&lt;p>This endpoint is now &lt;strong>read-only&lt;/strong>. It provides a way to query the &lt;code>Properties&lt;/code> table index directly, which can be useful for advanced filtering or finding all entities with a specific property value, without needing to perform a full-text search.&lt;/p>
+&lt;/ul></description></item><item><title>Properties</title><link>/notd/docs/api-reference/properties/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/properties/</guid><description>&lt;p>This endpoint is now &lt;strong>read-only&lt;/strong>. It provides a way to query the &lt;code>Properties&lt;/code> table index directly, which can be useful for advanced filtering or finding all entities with a specific property value, without needing to perform a full-text search.&lt;/p>
 &lt;h3 id="get-apiv1propertiesphp">&lt;code>GET /api/v1/properties.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Retrieves all indexed properties for a specific entity.&lt;/li>
@@ -1313,7 +1465,32 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Search</title><link>/docs/api-reference/search/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/search/</guid><description>&lt;p>Provides powerful search capabilities. It can search by term, find backlinks, list tasks, or list favorited pages.&lt;/p>
+&lt;/ul></description></item><item><title>Troubleshooting</title><link>/notd/docs/frontend-guide/troubleshooting/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/troubleshooting/</guid><description>&lt;p>Common issues and solutions for notd frontend features.&lt;/p>
+&lt;h2 id="search-issues">Search Issues&lt;/h2>
+&lt;h3 id="search-not-finding-content">Search Not Finding Content&lt;/h3>
+&lt;p>&lt;strong>Problem:&lt;/strong> Global search returns no results for content you know exists.&lt;/p>
+&lt;p>&lt;strong>Solutions:&lt;/strong>&lt;/p>
+&lt;ol>
+&lt;li>&lt;strong>Check encryption status&lt;/strong> - Encrypted content requires the page password&lt;/li>
+&lt;li>&lt;strong>Verify content is saved&lt;/strong> - Ensure changes were saved before searching&lt;/li>
+&lt;li>&lt;strong>Check property syntax&lt;/strong> - Properties must use correct syntax: &lt;code>{key::value}&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Search different terms&lt;/strong> - Try broader or alternative keywords&lt;/li>
+&lt;/ol>
+&lt;p>&lt;strong>Example Fix:&lt;/strong>&lt;/p>
+&lt;div class="highlight">&lt;div style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">3
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="background-color:#fff;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-markdown" data-lang="markdown">&lt;span style="display:flex;">&lt;span># If searching for: &amp;#34;project planning&amp;#34;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># Try instead: &amp;#34;project&amp;#34; or &amp;#34;planning&amp;#34; separately
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span># Or check if content uses different terms like &amp;#34;project preparation&amp;#34;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="search-results-missing-context">Search Results Missing Context&lt;/h3>
+&lt;p>&lt;strong>Problem:&lt;/strong> Search results don&amp;rsquo;t show enough context around matching terms.&lt;/p></description></item><item><title>Search</title><link>/notd/docs/api-reference/search/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/search/</guid><description>&lt;p>Provides powerful search capabilities. It can search by term, find backlinks, list tasks, or list favorited pages.&lt;/p>
 &lt;p>&lt;strong>General Parameters for search types returning notes (e.g., &lt;code>q&lt;/code>, &lt;code>backlinks_for_page_name&lt;/code>, &lt;code>tasks&lt;/code>):&lt;/strong>&lt;/p>
 &lt;ul>
 &lt;li>&lt;code>include_parent_properties&lt;/code> (optional, boolean): Defaults to &lt;code>false&lt;/code>. If set to &lt;code>true&lt;/code>, each note item in the &lt;code>results&lt;/code> array will include a &lt;code>parent_properties&lt;/code> field. This field contains an object with aggregated properties from all direct and indirect parent notes. The structure mirrors the main &lt;code>properties&lt;/code> field. For search types that do not return notes (e.g., &lt;code>favorites&lt;/code>), this parameter has no effect.&lt;/li>
@@ -1366,7 +1543,7 @@
 &lt;/div>&lt;/li>
 &lt;li>If &lt;code>include_parent_properties&lt;/code> is &lt;code>false&lt;/code> (default), the &lt;code>parent_properties&lt;/code> field will be an empty object (&lt;code>{}&lt;/code>) or &lt;code>null&lt;/code>.&lt;/li>
 &lt;/ul>
-&lt;p>The Search endpoint also supports other modes:&lt;/p></description></item><item><title>Query Notes</title><link>/docs/api-reference/query-notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/query-notes/</guid><description>&lt;p>Executes safe, predefined SQL queries against the indexed &lt;code>Properties&lt;/code> table to find notes. This becomes even more powerful for historical queries.&lt;/p>
+&lt;p>The Search endpoint also supports other modes:&lt;/p></description></item><item><title>Query Notes</title><link>/notd/docs/api-reference/query-notes/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/query-notes/</guid><description>&lt;p>Executes safe, predefined SQL queries against the indexed &lt;code>Properties&lt;/code> table to find notes. This becomes even more powerful for historical queries.&lt;/p>
 &lt;h3 id="post-apiv1query_notesphp">&lt;code>POST /api/v1/query_notes.php&lt;/code>&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Fetches notes that match a specific, secure SQL query pattern.&lt;/li>
@@ -1420,7 +1597,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Templates</title><link>/docs/api-reference/templates/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/templates/</guid><description>&lt;p>Manages reusable templates for creating notes and pages.&lt;/p>
+&lt;/ul></description></item><item><title>Templates</title><link>/notd/docs/api-reference/templates/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/templates/</guid><description>&lt;p>Manages reusable templates for creating notes and pages.&lt;/p>
 &lt;h3 id="post-apiv1templatesphp-create">&lt;code>POST /api/v1/templates.php&lt;/code> (Create)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Creates a new template.&lt;/li>
@@ -1494,7 +1671,7 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Webhooks</title><link>/docs/api-reference/webhooks/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/docs/api-reference/webhooks/</guid><description>&lt;p>Manages webhook subscriptions for event notifications.&lt;/p>
+&lt;/ul></description></item><item><title>Webhooks</title><link>/notd/docs/api-reference/webhooks/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/api-reference/webhooks/</guid><description>&lt;p>Manages webhook subscriptions for event notifications.&lt;/p>
 &lt;h3 id="post-apiv1webhooksphp-create">&lt;code>POST /api/v1/webhooks.php&lt;/code> (Create)&lt;/h3>
 &lt;ul>
 &lt;li>&lt;strong>Description&lt;/strong>: Registers a new webhook.&lt;/li>
@@ -1664,4 +1841,4 @@
 &lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
 &lt;/div>
 &lt;/div>&lt;/li>
-&lt;/ul></description></item><item><title>Company</title><link>/company/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/company/</guid><description/></item></channel></rss>
+&lt;/ul></description></item><item><title>Company</title><link>/notd/company/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/company/</guid><description/></item></channel></rss>
