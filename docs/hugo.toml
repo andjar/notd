@@ -13,9 +13,19 @@ relativeURLs = false
     weight = 10
 
 [[menu.main]]
+    name = "Frontend Guide"
+    url = "/docs/frontend-guide/"
+    weight = 15
+
+[[menu.main]]
     name = "API Reference"
     url = "/docs/api-reference/"
     weight = 20
+
+[[menu.main]]
+    name = "Extensions"
+    url = "/docs/extensions/"
+    weight = 25
 
 [[menu.main]]
     name = "OpenAPI"
