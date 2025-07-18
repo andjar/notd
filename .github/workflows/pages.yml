@@ -6,15 +6,10 @@ on:
     paths:
       - 'docs/**'
       - '.github/workflows/pages.yml'
-  pull_request:
-    branches: [ main, master ]
-    paths:
-      - 'docs/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     permissions:
       contents: write
       pages: write
