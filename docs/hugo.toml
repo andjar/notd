@@ -1,0 +1,46 @@
+baseURL = "/"
+languageCode = "en-us"
+title = "notd - an outliner"
+theme = "kube"
+
+canonifyURLs = true
+relativeURLs = false
+
+# Menu configuration
+[[menu.main]]
+    name = "Documentation"
+    url = "/docs/"
+    weight = 10
+
+[[menu.main]]
+    name = "FAQ"
+    url = "/faq/"
+    weight = 30
+
+# Parameters
+[params]
+    author = "Your Name"
+    description = "Documentation for Your PHP/JS Outliner"
+    
+    # SEO
+    [params.seo]
+        [params.seo.webmaster_verifications]
+            google = "" # Add your Google verification code
+            bing = ""   # Add your Bing verification code
+    
+    # Control what gets indexed
+    noindex_kinds = [
+        "taxonomy",
+        "taxonomyTerm"
+    ]
+
+# Markup settings for better documentation
+[markup]
+    [markup.goldmark]
+        [markup.goldmark.renderer]
+            unsafe = true
+    [markup.highlight]
+        style = "github"
+        lineNos = true
+        codeFences = true
+        tabWidth = 4

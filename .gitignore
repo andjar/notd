@@ -11,3 +11,15 @@ uploads/*
 # Logs
 logs/*
 !logs/.gitkeep
+
+# Hugo generated files
+docs/public/
+docs/resources/
+docs/.hugo_build.lock
+
+# Hugo cache
+docs/.hugo_cache/
+
+# Temporary files
+docs/.DS_Store
+docs/Thumbs.db
