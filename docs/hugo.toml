@@ -8,14 +8,24 @@ relativeURLs = false
 
 # Menu configuration
 [[menu.main]]
-    name = "Documentation"
-    url = "/docs/"
+    name = "Overview"
+    url = "/docs/overview/"
     weight = 10
+
+[[menu.main]]
+    name = "API Reference"
+    url = "/docs/api-reference/"
+    weight = 20
+
+[[menu.main]]
+    name = "OpenAPI"
+    url = "/docs/openapi/"
+    weight = 30
 
 [[menu.main]]
     name = "FAQ"
     url = "/faq/"
-    weight = 30
+    weight = 40
 
 # Parameters
 [params]
