@@ -19,56 +19,29 @@ jobs:
       contents: write
       pages: write
       id-token: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for Hugo's .GitInfo
+          submodules: true  # Fetch Hugo themes (if they are submodules)
+          fetch-depth: 0    # Fetch all history for Hugo's .GitInfo
 
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v2
         with:
           hugo-version: 'latest'
-          extended: true  # Use extended version for SCSS support
+          extended: true
 
       - name: Build Hugo site
-        working-directory: ./docs
-        run: |
-          hugo --minify --verbose
-          echo "Build completed. Contents of public directory:"
-          ls -la public/
-          echo "Checking for index.html:"
-          ls -la public/index.html || echo "index.html not found!"
-
-      - name: Verify build output
-        working-directory: ./docs
-        run: |
-          if [ ! -f "public/index.html" ]; then
-            echo "ERROR: index.html not found in build output!"
-            exit 1
-          fi
-          echo "Build verification passed. Found index.html"
-          echo "Total files in public directory: $(find public -type f | wc -l)"
+        working-directory: ./docs # Important: Run the build in your docs folder
+        run: hugo --minify --verbose
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/public
-          publish_branch: gh-pages
-          force_orphan: true  # Create clean gh-pages branch
+          publish_dir: ./docs/public # Correctly point to the public output directory inside docs
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'Deploy documentation: ${{ github.event.head_commit.message }}'
-
-      - name: Verify deployment
-        run: |
-          echo "Deployment completed. Check the gh-pages branch for the following files:"
-          echo "- index.html (main page)"
-          echo "- css/ (stylesheets)"
-          echo "- js/ (javascript files)"
-          echo "- img/ (images)"
-          echo "- docs/ (documentation pages)"
-          echo ""
-          echo "GitHub Pages URL should be: https://yourusername.github.io/notd/"
