@@ -38,6 +38,7 @@ if (!defined('APP_BASE_URL')) {
 // --- Application Features ---
 define('ACTIVE_THEME', 'default'); // Defines the active theme CSS file.
 define('WEBHOOKS_ENABLED', true); // Master switch to enable or disable all webhook dispatches.
+define('ADVANCED_QUERY_MODE', false); // When true, disables security restrictions on the query API endpoint.
 define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
 define('TASK_STATES', ['TODO', 'DOING', 'DONE', 'SOMEDAY', 'WAITING', 'CANCELLED']); // Allowed task states for the task status parser.
 

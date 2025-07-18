@@ -20,41 +20,45 @@ if (!isset($input['sql_query'])) {
 
 // --- SQL Validation ---
 $sqlQuery = trim($input['sql_query']);
-$allowedPatterns = [
-    '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+/i',
-    '/^SELECT\s+(DISTINCT\s+)?N\.id\s+FROM\s+Notes\s+N\s+JOIN\s+Properties\s+P\s+ON\s+N\.id\s*=\s*P\.note_id\s+WHERE\s+/i',
-    '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+id\s+IN\s*\(\s*SELECT\s+note_id\s+FROM\s+Properties\s+WHERE\s+/i'
-];
 
-$patternMatched = false;
-foreach ($allowedPatterns as $pattern) {
-    if (preg_match($pattern, $sqlQuery)) {
-        $patternMatched = true;
-        break;
+// Bypass validation if advanced mode is enabled
+if (!defined('ADVANCED_QUERY_MODE') || ADVANCED_QUERY_MODE !== true) {
+    $allowedPatterns = [
+        '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+/i',
+        '/^SELECT\s+(DISTINCT\s+)?N\.id\s+FROM\s+Notes\s+N\s+JOIN\s+Properties\s+P\s+ON\s+N\.id\s*=\s*P\.note_id\s+WHERE\s+/i',
+        '/^SELECT\s+id\s+FROM\s+Notes\s+WHERE\s+id\s+IN\s*\(\s*SELECT\s+note_id\s+FROM\s+Properties\s+WHERE\s+/i'
+    ];
+
+    $patternMatched = false;
+    foreach ($allowedPatterns as $pattern) {
+        if (preg_match($pattern, $sqlQuery)) {
+            $patternMatched = true;
+            break;
+        }
     }
-}
 
-if (!$patternMatched) {
-    \App\ApiResponse::error('Query must be one of the allowed patterns.', 400);
-}
-
-if (strpos($sqlQuery, ';') !== false) {
-    \App\ApiResponse::error('Query must not contain semicolons.', 400);
-}
-
-$forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'EXEC', 'CREATE', 'ATTACH', 'DETACH'];
-foreach ($forbiddenKeywords as $keyword) {
-    if (preg_match('/\b' . $keyword . '\b/i', $sqlQuery)) {
-        \App\ApiResponse::error('Query contains forbidden SQL keywords.', 400);
+    if (!$patternMatched) {
+        \App\ApiResponse::error('Query must be one of the allowed patterns.', 400);
     }
-}
 
-// Check for allowed columns to prevent data leakage from other columns.
-// This is a simple text-based check and not a full AST parser, but provides a good layer of security.
-$allowedColumnsRegex = '/\b(N|P|Notes|Properties)\.(id|content|page_id|parent_note_id|created_at|updated_at|order_index|collapsed|active|note_id|name|value|weight)\b/i';
-$strippedQuery = preg_replace($allowedColumnsRegex, '', $sqlQuery);
-if (preg_match('/(N|P|Notes|Properties)\.\w+/', $strippedQuery)) {
-     \App\ApiResponse::error('Query references unauthorized columns.', 400);
+    if (strpos($sqlQuery, ';') !== false) {
+        \App\ApiResponse::error('Query must not contain semicolons.', 400);
+    }
+
+    $forbiddenKeywords = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'TRUNCATE', 'ALTER', 'EXEC', 'CREATE', 'ATTACH', 'DETACH'];
+    foreach ($forbiddenKeywords as $keyword) {
+        if (preg_match('/\b' . $keyword . '\b/i', $sqlQuery)) {
+            \App\ApiResponse::error('Query contains forbidden SQL keywords.', 400);
+        }
+    }
+
+    // Check for allowed columns to prevent data leakage from other columns.
+    // This is a simple text-based check and not a full AST parser, but provides a good layer of security.
+    $allowedColumnsRegex = '/\b(N|P|Notes|Properties)\.(id|content|page_id|parent_note_id|created_at|updated_at|order_index|collapsed|active|note_id|name|value|weight)\b/i';
+    $strippedQuery = preg_replace($allowedColumnsRegex, '', $sqlQuery);
+    if (preg_match('/(N|P|Notes|Properties)\.\w+/', $strippedQuery)) {
+         \App\ApiResponse::error('Query references unauthorized columns.', 400);
+    }
 }
 
 
