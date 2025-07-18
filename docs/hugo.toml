@@ -1,0 +1,56 @@
+baseURL = "/"
+languageCode = "en-us"
+title = "notd"
+theme = "kube"
+
+canonifyURLs = true
+relativeURLs = false
+
+# Menu configuration
+[[menu.main]]
+    name = "Overview"
+    url = "/docs/overview/"
+    weight = 10
+
+[[menu.main]]
+    name = "API Reference"
+    url = "/docs/api-reference/"
+    weight = 20
+
+[[menu.main]]
+    name = "OpenAPI"
+    url = "/docs/openapi/"
+    weight = 30
+
+[[menu.main]]
+    name = "FAQ"
+    url = "/faq/"
+    weight = 40
+
+# Parameters
+[params]
+    author = "Anders Hagen Jarmund"
+    description = "Documentation for Your PHP/JS Outliner"
+    
+    # SEO
+    [params.seo]
+        [params.seo.webmaster_verifications]
+            google = "" # Add your Google verification code
+            bing = ""   # Add your Bing verification code
+    
+    # Control what gets indexed
+    noindex_kinds = [
+        "taxonomy",
+        "taxonomyTerm"
+    ]
+
+# Markup settings for better documentation
+[markup]
+    [markup.goldmark]
+        [markup.goldmark.renderer]
+            unsafe = true
+    [markup.highlight]
+        style = "github"
+        lineNos = true
+        codeFences = true
+        tabWidth = 4
