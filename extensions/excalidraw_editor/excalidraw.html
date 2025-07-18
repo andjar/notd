@@ -55,10 +55,10 @@
   <script type="importmap">
     {
       "imports": {
-        "react": "https://esm.sh/react@19.0.0",
-        "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
-        "react-dom": "https://esm.sh/react-dom@19.0.0",
-        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client"
+        "react": "https://esm.sh/react@18",
+        "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
+        "react-dom": "https://esm.sh/react-dom@18",
+        "react-dom/client": "https://esm.sh/react-dom@18/client"
       }
     }
   </script>
@@ -86,23 +86,28 @@
     const successMessage = document.getElementById('success-message');
 
     let currentNoteId = null;
+    let currentAttachmentId = null;
     let excalidrawAPI = null;
     let isSaving = false;
 
     // Helper to update UI state
     function updateUI() {
-        noteIdDisplay.textContent = currentNoteId ? `Note ID: ${currentNoteId}` : 'Note ID: Not Provided!';
+        const displayText = currentNoteId ? `Note ID: ${currentNoteId}` : 'Note ID: Not Provided!';
+        const attachmentText = currentAttachmentId ? ` | Editing: ${currentAttachmentId}` : '';
+        noteIdDisplay.textContent = displayText + attachmentText;
         saveBtn.disabled = isSaving || !currentNoteId || !excalidrawAPI;
         errorMessage.style.display = errorMessage.textContent ? '' : 'none';
         successMessage.style.display = successMessage.textContent ? '' : 'none';
     }
 
-    // Retrieve note_id from URL
+    // Retrieve note_id and attachment_id from URL
     try {
         const urlParams = new URLSearchParams(window.location.search);
         currentNoteId = urlParams.get('note_id');
+        currentAttachmentId = urlParams.get('attachment_id');
     } catch (e) {
         currentNoteId = null;
+        currentAttachmentId = null;
     }
 
     // Initialize Excalidraw and store its API
@@ -113,6 +118,10 @@
                 excalidrawAPI: (api) => {
                     excalidrawAPI = api;
                     updateUI();
+                    // Load existing attachment data if attachment_id is provided
+                    if (currentAttachmentId && currentNoteId) {
+                        loadExistingAttachment();
+                    }
                 }
             }
         );
@@ -120,6 +129,80 @@
         root.render(React.createElement(App));
     } else {
         excalidrawContainer.innerHTML = 'Error: Excalidraw could not be initialized.';
+    }
+
+    // Function to load existing attachment data
+    async function loadExistingAttachment() {
+        try {
+            // Get all attachments for this note
+            const attachments = await attachmentsAPI.getNoteAttachments(currentNoteId);
+            
+            // Find the specific attachment
+            const attachment = attachments.find(att => att.id == currentAttachmentId);
+            
+            if (!attachment) {
+                errorMessage.textContent = 'Attachment not found';
+                updateUI();
+                return;
+            }
+
+            // Only load if it's an excalidraw file (.excalidraw or .json)
+            if (!attachment.name.endsWith('.excalidraw') && !attachment.name.endsWith('.json')) {
+                errorMessage.textContent = 'Selected attachment is not an Excalidraw file';
+                updateUI();
+                return;
+            }
+
+            // Fetch the attachment content
+            const response = await fetch(`../../uploads/${attachment.path}`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch attachment: ${response.status}`);
+            }
+            
+            const text = await response.text();
+            let excalidrawData;
+            
+            try {
+                excalidrawData = JSON.parse(text);
+            } catch (e) {
+                throw new Error('Invalid JSON in attachment file');
+            }
+
+            // Handle different formats - the attachment could be just elements array or full excalidraw format
+            let elements, appState;
+            
+            if (Array.isArray(excalidrawData)) {
+                // Old format - just elements array
+                elements = excalidrawData;
+                appState = {
+                    collaborators: [],
+                    viewBackgroundColor: '#ffffff'
+                };
+            } else if (excalidrawData.type === 'excalidraw') {
+                // Full excalidraw format
+                elements = excalidrawData.elements || [];
+                appState = {
+                    ...excalidrawData.appState,
+                    collaborators: excalidrawData.appState?.collaborators || [],
+                    viewBackgroundColor: excalidrawData.appState?.viewBackgroundColor || '#ffffff'
+                };
+            } else {
+                throw new Error('Unrecognized excalidraw file format');
+            }
+
+            // Load the data into Excalidraw
+            if (excalidrawAPI) {
+                excalidrawAPI.updateScene({
+                    elements: elements,
+                    appState: appState
+                });
+                successMessage.textContent = `Loaded ${attachment.name} successfully`;
+                updateUI();
+            }
+        } catch (error) {
+            errorMessage.textContent = `Error loading attachment: ${error.message}`;
+            updateUI();
+        }
     }
 
     // Save button click handler
