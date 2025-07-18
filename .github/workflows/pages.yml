@@ -30,7 +30,7 @@ jobs:
 
       - name: Build Hugo site
         working-directory: ./docs # Important: Run the build in your docs folder
-        run: hugo --minify --verbose
+        run: hugo --minify
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
