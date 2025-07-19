@@ -145,4 +145,35 @@
 }
 
 /* .sql-query-results is a .note-children div, so it should inherit default note-children styling. */
-/* No specific styles for .sql-query-results unless overrides are needed. */ 
+/* No specific styles for .sql-query-results unless overrides are needed. */
+
+/* Transclusion Depth Warning - Clear and Informative */
+.transclusion-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--ls-space-2);
+  padding: var(--ls-space-3);
+  background-color: var(--ls-warning-background-color, #fff3cd);
+  border: 1px solid var(--ls-warning-border-color, #ffeaa7);
+  border-radius: var(--ls-border-radius-medium);
+  color: var(--ls-warning-text-color, #856404);
+  font-size: var(--ls-font-size-sm);
+  font-weight: var(--ls-font-weight-medium);
+  margin: var(--ls-space-2) 0;
+}
+
+.transclusion-warning i {
+  color: var(--ls-warning-icon-color, #f39c12);
+  flex-shrink: 0;
+}
+
+/* Dark theme adjustments for transclusion warning */
+[data-theme="dark"] .transclusion-warning {
+  background-color: var(--ls-warning-background-color-dark, #2d1b0e);
+  border-color: var(--ls-warning-border-color-dark, #4a2c0a);
+  color: var(--ls-warning-text-color-dark, #f4d03f);
+}
+
+[data-theme="dark"] .transclusion-warning i {
+  color: var(--ls-warning-icon-color-dark, #f39c12);
+} 

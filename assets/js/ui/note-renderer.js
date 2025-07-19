@@ -1598,20 +1598,32 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
 /**
  * Renders the content of a fetched transclusion into its placeholder.
  * @param {HTMLElement} placeholderEl - The placeholder element to be replaced.
- * @param {string} noteContent - The raw content of the note to be rendered inside the placeholder.
+ * @param {Object} noteData - The note data object (possibly with children) to render.
  * @param {string} noteId - The ID of the transcluded note, for creating a link.
- * @param {Object} noteData - The full note data object containing page_id and other information.
+ * @param {number} [depth=0] - Current transclusion depth (0 = root level)
  */
-export async function renderTransclusion(placeholderEl, noteContent, noteId, noteData = null) {
-    if (!placeholderEl) return;
+export async function renderTransclusion(placeholderEl, noteData, noteId, depth = 0) {
+    if (!placeholderEl || !noteData) return;
+    
+    // Limit transclusion depth to 3 levels
+    const MAX_TRANSCLUSION_DEPTH = 3;
+    if (depth >= MAX_TRANSCLUSION_DEPTH) {
+        placeholderEl.innerHTML = `
+            <div class="transclusion-warning">
+                <i data-feather="alert-triangle"></i>
+                <span>Transclusion depth limit reached (max ${MAX_TRANSCLUSION_DEPTH} levels)</span>
+            </div>
+        `;
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+        return;
+    }
 
     // Create a container for the transcluded content
     const contentEl = document.createElement('div');
     contentEl.className = 'transcluded-content';
     
-    // Parse the fetched note content into HTML
-    const renderedHTML = parseAndRenderContent(noteContent);
-
     // Create a header with a link to the original note
     const headerEl = document.createElement('div');
     headerEl.className = 'transclusion-header';
@@ -1620,7 +1632,7 @@ export async function renderTransclusion(placeholderEl, noteContent, noteId, not
     let linkHref = '#';
     let linkText = `Note ${noteId}`;
     
-    if (noteData && noteData.page_id) {
+    if (noteData.page_id) {
         try {
             // Fetch the page information to get the page name
             const pageData = await pagesAPI.getPageById(noteData.page_id);
@@ -1644,7 +1656,18 @@ export async function renderTransclusion(placeholderEl, noteContent, noteId, not
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'transclusion-body';
-    bodyEl.innerHTML = renderedHTML;
+    
+    // Render the note tree starting with the root note
+    const noteTreeContainer = document.createElement('div');
+    noteTreeContainer.className = 'transclusion-note-tree';
+    
+    // Use the existing renderNote function to render the complete note tree
+    const renderedNoteElement = renderNote(noteData, 0);
+    if (renderedNoteElement) {
+        noteTreeContainer.appendChild(renderedNoteElement);
+    }
+    
+    bodyEl.appendChild(noteTreeContainer);
 
     contentEl.appendChild(headerEl);
     contentEl.appendChild(bodyEl);
@@ -1652,9 +1675,36 @@ export async function renderTransclusion(placeholderEl, noteContent, noteId, not
     // Replace the placeholder with the new content element
     placeholderEl.replaceWith(contentEl);
 
-    // Re-run Feather icons for the new link icon
+    // Re-run Feather icons for the new content
     if (typeof feather !== 'undefined') {
         feather.replace({ width: '1em', height: '1em' });
+    }
+    
+    // Process any nested transclusions within the transcluded content
+    // This includes transclusions in the main note content and in children notes
+    const allPlaceholders = contentEl.querySelectorAll('.transclusion-placeholder');
+    if (allPlaceholders.length > 0) {
+        // Process all transclusion placeholders found in the rendered content
+        for (const placeholder of allPlaceholders) {
+            const blockId = placeholder.dataset.blockRef;
+            if (blockId) {
+                try {
+                    // Use getNoteWithChildren which has backend recursion protection
+                    const nestedNoteWithChildren = await notesAPI.getNoteWithChildren(blockId);
+                    if (nestedNoteWithChildren) {
+                        // Recursively render the nested transclusion with incremented depth
+                        await renderTransclusion(placeholder, nestedNoteWithChildren, blockId, depth + 1);
+                    } else {
+                        placeholder.textContent = 'Block not found.';
+                        placeholder.classList.add('error');
+                    }
+                } catch (error) {
+                    console.error('Error processing nested transclusion:', error);
+                    placeholder.textContent = 'Error loading nested transclusion.';
+                    placeholder.classList.add('error');
+                }
+            }
+        }
     }
 }
 

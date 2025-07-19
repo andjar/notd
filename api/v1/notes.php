@@ -320,11 +320,20 @@ if ($method === 'GET') {
     // This prevents the TypeError in the DataManager.
     $includeInternal = (bool)filter_input(INPUT_GET, 'include_internal', FILTER_VALIDATE_BOOLEAN);
     $includeParentProperties = (bool)filter_input(INPUT_GET, 'include_parent_properties', FILTER_VALIDATE_BOOLEAN);
+    $includeChildren = (bool)filter_input(INPUT_GET, 'include_children', FILTER_VALIDATE_BOOLEAN);
     
     try {
         if (isset($_GET['id'])) {
             $noteId = (int)$_GET['id'];
-            $note = $dataManager->getNoteById($noteId, $includeInternal, $includeParentProperties);
+            
+            if ($includeChildren) {
+                // Use the new method to fetch note with children
+                $note = $dataManager->getNoteWithChildren($noteId, $includeInternal, $includeParentProperties);
+            } else {
+                // Use the existing method for backward compatibility
+                $note = $dataManager->getNoteById($noteId, $includeInternal, $includeParentProperties);
+            }
+            
             if ($note) {
                 \App\ApiResponse::success($note);
             } else {

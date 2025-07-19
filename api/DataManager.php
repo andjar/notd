@@ -217,6 +217,79 @@ class DataManager {
         return $note ?: null;
     }
 
+    /**
+     * Retrieves a note with all its children recursively, including properties.
+     * Implements recursion protection to prevent infinite loops.
+     * 
+     * @param int $noteId The ID of the root note to fetch
+     * @param bool $includeInternal Whether to include internal properties
+     * @param bool $includeParentProperties Whether to include parent properties
+     * @param int $maxDepth Maximum recursion depth (default 10)
+     * @param array $visitedIds Internal tracking to prevent circular references
+     * @param int $currentDepth Current recursion depth
+     * @return array|null The note with nested children, or null if not found
+     */
+    public function getNoteWithChildren(
+        int $noteId, 
+        bool $includeInternal = false, 
+        bool $includeParentProperties = false,
+        int $maxDepth = 10,
+        array $visitedIds = [],
+        int $currentDepth = 0
+    ): ?array {
+        // Recursion protection: check depth limit
+        if ($currentDepth >= $maxDepth) {
+            error_log("getNoteWithChildren: Maximum depth ($maxDepth) reached for note $noteId");
+            return null;
+        }
+
+        // Recursion protection: check for circular references
+        if (in_array($noteId, $visitedIds)) {
+            error_log("getNoteWithChildren: Circular reference detected for note $noteId");
+            return null;
+        }
+
+        // Add current note to visited list
+        $visitedIds[] = $noteId;
+
+        // Get the root note
+        $note = $this->getNoteById($noteId, $includeInternal, $includeParentProperties);
+        if (!$note) {
+            return null;
+        }
+
+        // Get all child notes for this note
+        $childrenStmt = $this->pdo->prepare("
+            SELECT id FROM Notes 
+            WHERE parent_note_id = :parent_id AND active = 1 
+            ORDER BY order_index ASC
+        ");
+        $childrenStmt->execute([':parent_id' => $noteId]);
+        $childIds = $childrenStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // Recursively fetch children (only if we haven't reached the depth limit for children)
+        $children = [];
+        if ($currentDepth < $maxDepth) {
+            foreach ($childIds as $childId) {
+                $child = $this->getNoteWithChildren(
+                    $childId, 
+                    $includeInternal, 
+                    $includeParentProperties,
+                    $maxDepth,
+                    $visitedIds,
+                    $currentDepth + 1
+                );
+                if ($child) {
+                    $children[] = $child;
+                }
+            }
+        }
+
+        // Add children to the note
+        $note['children'] = $children;
+
+        return $note;
+    }
 
     /**
      * Retrieves all notes for a page, with properties embedded.
