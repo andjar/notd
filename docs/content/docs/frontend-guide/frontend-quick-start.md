@@ -9,12 +9,16 @@ Get up and running with notd's powerful frontend features in minutes. This guide
 
 ### 1. Understanding the Interface
 
+![notd main layout](images/frontpage.png)
+
 When you first open notd, you'll see:
 - **Sidebar** (left) - Navigation, search, and quick access
 - **Main area** (center) - Your notes and content
 - **Today's date** - notd starts with today's journal page
 
 ### 2. Create Your First Note
+
+![notd main layout](images/my_first_note.png)
 
 Click in the main area and start typing:
 
@@ -26,6 +30,8 @@ Welcome to notd! This is my first note.
 TODO Learn notd features {priority::high}
 DOING Explore the interface
 ```
+
+NOTE: Each task must be a separate note.
 
 ### 3. Try Essential Features
 
@@ -67,6 +73,8 @@ Related pages:
 - Find unexpected relationships in your notes
 - Navigate between related concepts quickly
 
+Backlinks are visible in the right sidebar and their context can be shown with `ctrl + b`
+
 ### Task Management
 
 **Use different task states:**
@@ -78,19 +86,9 @@ WAITING Client feedback on proposal {contact::john}
 SOMEDAY Add advanced features {category::enhancement}
 ```
 
-**Organize with properties:**
-```markdown
-TODO Review code changes {
-  priority::medium
-  category::review
-  assigned::dev-team
-  sprint::current
-}
-```
-
 ### Search and Discovery
 
-**Use global search (Ctrl+K):**
+**Use global search (`Ctrl+K` or `shift + space`):**
 - Type anything to find it across all your notes
 - Search by content: "project planning"
 - Search by properties: "priority::high"
@@ -110,21 +108,19 @@ TODO Review code changes {
 {assigned::team-member}   # Assign responsibility
 {project::alpha}          # Group by project
 {status::in-progress}     # Track status
-{due::2024-07-25}        # Set deadlines
+{due::2024-07-25}         # Set deadlines
 ```
 
 **Create property-based queries:**
 ```markdown
 SQL{
-  SELECT name FROM Pages 
-  WHERE id IN (
-    SELECT page_id FROM Properties 
-    WHERE name='type' AND value='project'
-  )
+  SELECT N.id FROM Notes N
+  JOIN Properties P ON N.id = P.note_id
+  WHERE P.name = 'status' AND P.value = 'TODO'
 }
 ```
 
-## Power User Features
+## Power User Features [DOCUMENTATION NOT UPDATED YET]
 
 ### SQL Queries in Notes
 
@@ -171,37 +167,17 @@ Create reusable content blocks:
 {type::transclusion-source}
 ```
 
-Then embed it anywhere:
+To transclude the note (and its children) elsewhere, right click on the bullet an choose "Copy transclusion link". Transclusions are inserted as
+
 ```markdown
-# Project Meeting Notes
-
-## Attendees
-{{transclude:Team Contact Information}}
-
-## Agenda
-- Sprint planning
-- Technical blockers
-- Next milestones
+!{{note_id}}
 ```
 
 ### Encryption for Sensitive Content
 
-Protect sensitive information:
+Protect sensitive information. Click the gear icon besides the page title, and select Encrypt. The notes will be encrypted client-side and are NOT recoverable if you lose the key.
 
-```markdown
-# Personal Notes {encrypted::true}
-
-## Public Information
-This is visible to everyone.
-
-## Private Information  
-ENC{This content is encrypted and requires a password to view}
-
-## Meeting with Client
-ENC{Discussed sensitive project details and budget information}
-```
-
-## Daily Workflow Examples
+## Daily Workflow Examples [DOCUMENTATION NOT UPDATED YET]
 
 ### Morning Planning
 ```markdown

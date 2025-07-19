@@ -23,12 +23,12 @@ Create internal links to other pages using double square brackets:
 
 This creates a clickable link to the specified page. If the page doesn't exist, it will be created when clicked.
 
-## SQL Queries in Notes
+## SQL Queries in Notes [DOCUMENTATION NOT UPDATED YET]
 
 Execute dynamic SQL queries directly within your notes using the `SQL{}` syntax:
 
 ```markdown
-SQL{SELECT name FROM Pages WHERE name LIKE '%project%' ORDER BY updated_at DESC}
+SQL{SELECT N.id FROM Notes N WHERE content LIKE '%project%' ORDER BY updated_at DESC}
 ```
 
 This powerful feature allows you to:
@@ -58,7 +58,7 @@ SQL{SELECT N.content, P.name as page_name
 Embed content from other notes or pages using transclusion:
 
 ```markdown
-{{transclude:Note Title}}
+!{{note_id}}
 ```
 
 This feature allows you to:
@@ -67,25 +67,9 @@ This feature allows you to:
 - Build dynamic content that updates automatically
 - Reference shared information
 
-### Transclusion Examples
-
-**Embed a note by title:**
-```markdown
-{{transclude:Meeting Template}}
-```
-
-**Reference shared data:**
-```markdown
-{{transclude:Company Information}}
-```
-
 ## Client-Side Encryption
 
-Protect sensitive content with AES-256 encryption using the `ENC{}` syntax:
-
-```markdown
-ENC{sensitive information here}
-```
+Protect sensitive content by opening page properties and clicking "Encrypt". Note that encryption happens client-side, and content will NOT be recoverable if you lose the key.
 
 ### How Encryption Works
 
@@ -97,9 +81,8 @@ ENC{sensitive information here}
 ### Setting Up Encryption
 
 To use encryption:
-1. Set the `encrypted` property on a page: `{encrypted::true}`
+1. Open page properties and click "Encrypt"
 2. You'll be prompted for a password when viewing the page
-3. All content marked with `ENC{}` will be encrypted/decrypted automatically
 
 ### Encryption Best Practices
 
@@ -124,7 +107,6 @@ Add metadata to notes and pages using the property syntax:
 - `{priority::high}` - Set priority level
 - `{category::work}` - Categorize content
 - `{favorite::true}` - Add to favorites
-- `{encrypted::true}` - Enable encryption for the page
 
 ### Property Weights
 

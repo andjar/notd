@@ -29,6 +29,8 @@ notd includes a comprehensive task management system with multiple states and vi
 
 ### Task States
 
+![Example tasks]/images/tasks.png
+
 Use these keywords at the beginning of a note to create tasks:
 
 - `TODO` - Task to be done
@@ -61,6 +63,10 @@ DOING Write user guide {assigned::john} {estimate::4h}
 DONE Fix login bug {priority::urgent} {completed::2024-07-18}
 ```
 
+<div class="message focus" data-component="message"> <span class="close small"></span>
+    NOTE: When you toggle a TODO element, the backend database will add a `status` propery with the corresponding status. These will be appended so that you can log the progress of your task.
+</div>
+
 ### Visual Task Indicators
 
 Tasks are rendered with:
@@ -72,6 +78,8 @@ Tasks are rendered with:
 ## Task Workflow Integration
 
 ### Daily Planning
+
+![](images/task_page.png)
 
 Use journal pages for daily task planning:
 
@@ -114,13 +122,12 @@ SOMEDAY API documentation
 Use properties for advanced task management:
 
 ```markdown
-TODO Implement user authentication {
-  priority::high
-  estimate::8h
-  assigned::dev-team
-  sprint::2
-  epic::user-management
-}
+TODO Implement user authentication
+  {priority::high}
+  {estimate::8h}
+  {assigned::dev-team}
+  {sprint::2}
+  {epic::user-management}
 ```
 
 ## Recurring Tasks and Templates
@@ -158,6 +165,12 @@ TODO Review priorities
 - Tomorrow's priorities
 ```
 
+## Kanban board
+
+The kanban board extension gives you a quick overview of all tasks, and let you update their status. You can add custom property filters to only show certain tasks (e.g., by urgency or project).
+
+![](images/kanban.png)
+
 ## Task Search and Filtering
 
 ### Finding Tasks
@@ -167,7 +180,7 @@ Use search to find tasks across all pages:
 - Filter by properties: "priority::high"
 - Find tasks by category: "category::work"
 
-### SQL Queries for Task Management
+### SQL Queries for Task Management [NOT YET SUPPORTED]
 
 Create dynamic task lists with SQL:
 

@@ -9,6 +9,8 @@ notd features a modern, responsive user interface built with Alpine.js and desig
 
 ### Main Layout
 
+![notd main layout](images/frontpage.png)
+
 The notd interface consists of several key areas:
 
 - **Sidebar** - Navigation, search, recent pages, favorites, and calendar
@@ -38,8 +40,6 @@ notd adapts to different screen sizes:
 
 ### Favorites
 - **Starred Pages** - Pages marked with `{favorite::true}`
-- **Category Grouping** - Organize favorites by category
-- **Drag-and-Drop** - Reorder favorites (where supported)
 
 ### Calendar Widget
 - **Visual Navigation** - Click dates to navigate to journal pages
@@ -50,9 +50,8 @@ notd adapts to different screen sizes:
 ## Content Editor
 
 ### Markdown Editor
-- **Live Preview** - See formatting as you type
 - **Syntax Highlighting** - Code blocks and markdown syntax highlighted
-- **Auto-completion** - Page links and properties auto-complete
+- **Auto-completion** - Page links auto-complete
 - **Keyboard Shortcuts** - Standard markdown shortcuts supported
 
 ### Note Actions
@@ -75,44 +74,32 @@ Page-level actions in the toolbar:
 
 ### Page Links
 - **Auto-completion** - Type `[[` to see page suggestions
-- **Visual Indicators** - Existing vs. new pages styled differently
-- **Hover Preview** - Preview page content on hover (where supported)
-- **Context Actions** - Right-click for link options
 
 ### Task Elements
 - **Visual States** - Color-coded task status indicators
 - **Checkboxes** - Click to toggle task completion
-- **Progress Tracking** - Visual progress for task lists
-- **Drag Reordering** - Reorder tasks within notes
 
 ### Property Editor
 - **Inline Editing** - Edit properties directly in content
-- **Property Suggestions** - Auto-complete common property names
-- **Value Validation** - Validate property values where applicable
-- **Bulk Operations** - Edit multiple properties at once
 
 ## Keyboard Shortcuts
 
 ### Global Shortcuts
 - `Ctrl/Cmd + K` - Focus global search
-- `Ctrl/Cmd + N` - Create new note
-- `Ctrl/Cmd + S` - Save current changes
-- `Ctrl/Cmd + /` - Toggle sidebar
+- `Ctrl/Cmd + B` - Show backlinks
+- `Ctrl/Cmd + space` - Search for page names
+- `Shift + space` - Search for note contents
 - `Escape` - Close modals and panels
 
 ### Editor Shortcuts
-- `Ctrl/Cmd + B` - Bold text
-- `Ctrl/Cmd + I` - Italic text
-- `Ctrl/Cmd + L` - Create page link
+- `:t` - Replaced by `{tag::}`
+- `:k` - Replaced by `{keyword::}`
+- `:d` - Replaced by `{date::<today>}`
+- `:r` - Replaced by `{timestamp::<current time>}`
 - `Tab` - Indent note (create sub-note)
 - `Shift + Tab` - Outdent note
-- `Ctrl/Cmd + Enter` - Create new note at same level
-
-### Navigation Shortcuts
-- `Ctrl/Cmd + 1-9` - Jump to recent pages
-- `Ctrl/Cmd + G` - Go to today's journal page
-- `Ctrl/Cmd + Shift + F` - Advanced search
-- `Alt + Arrow Keys` - Navigate note hierarchy
+- `Enter` - Create new note at same level 
+- `Ctrl/Cmd + Enter` - Create new note as child
 
 ## Themes and Customization
 
@@ -137,65 +124,19 @@ notd supports multiple color schemes:
 
 ## Mobile Interface
 
-### Touch Interactions
-- **Tap to Edit** - Single tap to edit notes
-- **Long Press** - Context menu access
-- **Swipe Navigation** - Swipe between pages and sections
-- **Pinch to Zoom** - Zoom content for readability
-
 ### Mobile-Specific Features
-- **Hamburger Menu** - Access sidebar on mobile
 - **Bottom Toolbar** - Quick actions at thumb reach
-- **Voice Input** - Dictation support where available
-- **Offline Sync** - Seamless offline/online transitions
 
 ## Extension UI Integration
 
 ### Extension Buttons
-- **Toolbar Integration** - Extensions add buttons to main toolbar
 - **Context Menus** - Extension actions in right-click menus
-- **Sidebar Widgets** - Some extensions add sidebar components
-- **Modal Windows** - Extensions can open in overlay windows
 
 ### Visual Consistency
 - **Icon System** - Feather icons for consistent visual language
 - **Color Coordination** - Extensions follow main theme colors
 - **Typography** - Consistent fonts and sizing across extensions
 - **Interaction Patterns** - Standard interaction behaviors
-
-## Accessibility Features
-
-### Keyboard Navigation
-- **Tab Order** - Logical tab progression through interface
-- **Focus Indicators** - Clear visual focus indicators
-- **Skip Links** - Jump to main content areas
-- **Shortcut Keys** - Comprehensive keyboard shortcuts
-
-### Screen Reader Support
-- **Semantic HTML** - Proper heading and landmark structure
-- **ARIA Labels** - Descriptive labels for interactive elements
-- **Alt Text** - Alternative text for images and icons
-- **Status Announcements** - Important changes announced to screen readers
-
-### Visual Accessibility
-- **High Contrast** - Sufficient color contrast ratios
-- **Large Text** - Support for increased text size
-- **Reduced Motion** - Option to disable animations
-- **Color Independence** - Information not dependent on color alone
-
-## Performance Optimization
-
-### Loading States
-- **Progressive Loading** - Content loads incrementally
-- **Skeleton Screens** - Loading placeholders for better UX
-- **Lazy Loading** - Images and attachments load on demand
-- **Caching** - Intelligent caching for faster navigation
-
-### Responsiveness
-- **Debounced Input** - Search and editing optimized for performance
-- **Virtual Scrolling** - Handle large lists efficiently
-- **Background Sync** - Save changes without blocking interface
-- **Error Recovery** - Graceful handling of network issues
 
 ## Customization Tips
 

@@ -103,7 +103,7 @@ Create breadcrumb-style navigation:
 [[Home]] → [[Projects]] → [[Project Alpha]] → [[Current Sprint]]
 ```
 
-## Advanced Search Features
+## Advanced Search Features [DOCUMENTATION NOT UPDATED YET]
 
 ### SQL-Based Search
 
@@ -169,7 +169,7 @@ SQL{
 }
 ```
 
-## Search Workflows
+## Search Workflows [DOCUMENTATION NOT UPDATED YET]
 
 ### Daily Search Patterns
 
@@ -269,6 +269,8 @@ SQL{
 
 Common navigation shortcuts:
 - `Ctrl/Cmd + K` - Focus global search
+- `Ctrl/Cmd + space` - Search after page name
+- `Shift + space` - Search for page content
 - `Ctrl/Cmd + Click` - Open page link in new tab  
 - `Escape` - Close search results
 - `Arrow Keys` - Navigate search results

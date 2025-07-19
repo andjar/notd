@@ -38,7 +38,7 @@ Backlinks help you:
 - **Identify important pages** - Pages with many backlinks are often central topics
 - **Track references** - See where you've mentioned specific concepts
 
-### Backlinks in Search
+### Backlinks in Search [DOCUMENTATION NOT UPDATED YET]
 
 Use SQL queries to explore backlink patterns:
 
