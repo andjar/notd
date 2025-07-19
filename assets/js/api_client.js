@@ -161,7 +161,15 @@ const notesAPI = {
         const body = { action: 'batch', operations };
         return apiRequest('notes.php', 'POST', body);
     },
-    // The individual create, update, delete wrappers were removed as they were causing confusion.
+    // Individual wrapper functions for convenience
+    deleteNote: (noteId) => {
+        const operations = [{
+            type: 'delete',
+            payload: { id: noteId }
+        }];
+        return notesAPI.batchUpdateNotes(operations);
+    },
+    // The individual create, update wrappers were removed as they were causing confusion.
     // All note modifications should go through note-actions.js which correctly uses the batch endpoint.
 };
 

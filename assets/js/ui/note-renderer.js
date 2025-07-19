@@ -670,6 +670,52 @@ function switchToRenderedMode(contentEl) {
 }
 
 /**
+ * Processes task content for links and properties
+ * @param {string} taskContent - Raw task content without the task marker
+ * @returns {string} HTML string with parsed links and properties
+ */
+function parseTaskContent(taskContent) {
+    let parsedContent = taskContent;
+    
+    // Handle inline properties first
+    parsedContent = parsedContent.replace(/\{([^:]+):(:{1,2})([^}]+)\}/g, (match, key, additionalColons, value) => {
+        const trimmedKey = key.trim();
+        const trimmedValue = value.trim();
+        const isInternal = additionalColons === '::'; // True if original was {key:::value}
+
+        if (isInternal && (!window.APP_CONFIG || window.APP_CONFIG.RENDER_INTERNAL_PROPERTIES === false)) {
+            return ''; // Omit internal property if RENDER_INTERNAL_PROPERTIES is false
+        }
+
+        let propertyClass = 'property-inline';
+        let separator = isInternal ? ':::' : '::';
+        
+        if (isInternal) {
+            propertyClass += ' property-internal';
+        } else {
+            propertyClass += ' property-normal'; // Explicitly class normal properties
+        }
+
+        if (trimmedKey.toLowerCase() === 'tag') {
+            // Tags are typically not marked internal this way, but if they were:
+            return `<span class="${propertyClass} property-tag"><span class="property-key">#</span><span class="property-value">${trimmedValue}</span></span>`;
+        } else if (trimmedKey.toLowerCase() === 'alias') {
+             return `<span class="${propertyClass} alias-property"><span class="property-key">Alias</span><span class="property-separator">${separator}</span><span class="property-value">${trimmedValue}</span></span>`;
+        } else {
+            return `<span class="${propertyClass}"><span class="property-key">${trimmedKey}</span><span class="property-separator">${separator}</span><span class="property-value">${trimmedValue}</span></span>`;
+        }
+    });
+
+    // Handle page links
+    parsedContent = parsedContent.replace(/\[\[(.*?)\]\]/g, (match, pageName) => {
+        const trimmedName = pageName.trim();
+        return `<span class="page-link-bracket">[[</span><a href="page.php?page=${encodeURIComponent(trimmedName)}" class="page-link">${trimmedName}</a><span class="page-link-bracket">]]</span>`;
+    });
+    
+    return parsedContent;
+}
+
+/**
  * Parses and renders note content with special formatting
  * @param {string} rawContent - Raw note content
  * @returns {string} HTML string for display
@@ -682,85 +728,92 @@ function parseAndRenderContent(rawContent) {
     // Handle task markers with checkboxes - don't show the TODO/DONE prefix in content
     if (html.startsWith('TODO ')) {
         const taskContent = html.substring(5);
+        const parsedTaskContent = parseTaskContent(taskContent);
         html = `
             <div class="task-container todo">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="TODO" />
                 </div>
                 <div class="task-content">
-                    <span class="task-keyword todo">TODO</span> ${taskContent}
+                    <span class="task-keyword todo">TODO</span> ${parsedTaskContent}
                 </div>
             </div>
         `;
     } else if (html.startsWith('DOING ')) {
         const taskContent = html.substring(6);
+        const parsedTaskContent = parseTaskContent(taskContent);
         html = `
             <div class="task-container doing">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="DOING" />
                 </div>
                 <div class="task-content">
-                    <span class="task-keyword doing">DOING</span> ${taskContent}
+                    <span class="task-keyword doing">DOING</span> ${parsedTaskContent}
                 </div>
             </div>
         `;
     } else if (html.startsWith('SOMEDAY ')) {
         const taskContent = html.substring(8);
+        const parsedTaskContent = parseTaskContent(taskContent);
         html = `
             <div class="task-container someday">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="SOMEDAY" />
                 </div>
                 <div class="task-content">
-                    <span class="task-keyword someday">SOMEDAY</span> ${taskContent}
+                    <span class="task-keyword someday">SOMEDAY</span> ${parsedTaskContent}
                 </div>
             </div>
         `;
     } else if (html.startsWith('DONE ')) {
         const taskContent = html.substring(5);
+        const parsedTaskContent = parseTaskContent(taskContent);
         html = `
             <div class="task-container done">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="DONE" checked />
                 </div>
                 <div class="task-content done-text">
-                    <span class="task-keyword done">DONE</span> ${taskContent}
+                    <span class="task-keyword done">DONE</span> ${parsedTaskContent}
                 </div>
             </div>
         `;
     } else if (html.startsWith('WAITING ')) {
         const taskContent = html.substring(8);
+        const parsedTaskContent = parseTaskContent(taskContent);
         html = `
             <div class="task-container waiting">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="WAITING" />
                 </div>
                 <div class="task-content">
-                    <span class="task-keyword waiting">WAITING</span> ${taskContent}
+                    <span class="task-keyword waiting">WAITING</span> ${parsedTaskContent}
                 </div>
             </div>
         `;
     } else if (html.startsWith('CANCELLED ')) {
         const taskContent = html.substring(10);
+        const parsedTaskContent = parseTaskContent(taskContent);
         html = `
             <div class="task-container cancelled">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="CANCELLED" checked disabled />
                 </div>
                 <div class="task-content cancelled-text">
-                    <span class="task-keyword cancelled">CANCELLED</span> ${taskContent}
+                    <span class="task-keyword cancelled">CANCELLED</span> ${parsedTaskContent}
                 </div>
             </div>
         `;
     } else if (html.startsWith('NLR ')) {
         const taskContent = html.substring(4);
+        const parsedTaskContent = parseTaskContent(taskContent);
         html = `
             <div class="task-container nlr">
                 <div class="task-checkbox-container">
                     <input type="checkbox" class="task-checkbox" data-marker-type="NLR" checked disabled />
                 </div>
                 <div class="task-content nlr-text">
-                    <span class="task-keyword nlr">NLR</span> ${taskContent}
+                    <span class="task-keyword nlr">NLR</span> ${parsedTaskContent}
                 </div>
             </div>
         `;
