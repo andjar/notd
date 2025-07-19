@@ -40,9 +40,10 @@ export async function handleTransclusions() {
         const blockId = placeholder.dataset.blockRef;
         if (!blockId) continue;
         try {
-            const note = await notesAPI.getNote(blockId);
-            if (note && note.content) {
-                await ui.renderTransclusion(placeholder, note.content, blockId, note);
+            // Fetch the note with all its children
+            const noteWithChildren = await notesAPI.getNoteWithChildren(blockId);
+            if (noteWithChildren) {
+                await ui.renderTransclusion(placeholder, noteWithChildren, blockId);
             } else {
                 placeholder.textContent = 'Block not found.';
                 placeholder.classList.add('error');

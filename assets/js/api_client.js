@@ -157,6 +157,7 @@ const pagesAPI = {
 const notesAPI = {
     getPageData: (pageId) => apiRequest(`notes.php?page_id=${pageId}`),
     getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
+    getNoteWithChildren: (noteId) => apiRequest(`notes.php?id=${noteId}&include_children=true`),
     batchUpdateNotes: (operations) => {
         const body = { action: 'batch', operations };
         return apiRequest('notes.php', 'POST', body);
