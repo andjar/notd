@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>notd: a simple outliner on notd</title><link>/notd/</link><description>Recent content in notd: a simple outliner on notd</description><generator>Hugo</generator><language>en-us</language><atom:link href="/notd/index.xml" rel="self" type="application/rss+xml"/><item><title>Frontend Quick Start</title><link>/notd/docs/frontend-guide/frontend-quick-start/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/frontend-quick-start/</guid><description>&lt;p>Get up and running with notd&amp;rsquo;s powerful frontend features in minutes. This guide covers the essential features you need to know to be productive immediately.&lt;/p>
 &lt;h2 id="first-steps">First Steps&lt;/h2>
 &lt;h3 id="1-understanding-the-interface">1. Understanding the Interface&lt;/h3>
+&lt;p>&lt;img src="images/frontpage.png" alt="notd main layout">&lt;/p>
 &lt;p>When you first open notd, you&amp;rsquo;ll see:&lt;/p>
 &lt;ul>
 &lt;li>&lt;strong>Sidebar&lt;/strong> (left) - Navigation, search, and quick access&lt;/li>
@@ -8,7 +9,7 @@
 &lt;li>&lt;strong>Today&amp;rsquo;s date&lt;/strong> - notd starts with today&amp;rsquo;s journal page&lt;/li>
 &lt;/ul>
 &lt;h3 id="2-create-your-first-note">2. Create Your First Note&lt;/h3>
-&lt;p>Click in the main area and start typing:&lt;/p></description></item><item><title>Core Features</title><link>/notd/docs/frontend-guide/core-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/core-features/</guid><description>&lt;h2 id="rich-text-editing-with-markdown">Rich Text Editing with Markdown&lt;/h2>
+&lt;p>&lt;img src="images/my_first_note.png" alt="notd main layout">&lt;/p></description></item><item><title>Core Features</title><link>/notd/docs/frontend-guide/core-features/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/core-features/</guid><description>&lt;h2 id="rich-text-editing-with-markdown">Rich Text Editing with Markdown&lt;/h2>
 &lt;p>notd uses Markdown for formatting notes with live preview capabilities. The editor supports:&lt;/p>
 &lt;ul>
 &lt;li>&lt;strong>Headers&lt;/strong> using &lt;code># ## ###&lt;/code>&lt;/li>
@@ -1240,6 +1241,7 @@
 &lt;/ul></description></item><item><title>User Interface</title><link>/notd/docs/frontend-guide/user-interface/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>/notd/docs/frontend-guide/user-interface/</guid><description>&lt;p>notd features a modern, responsive user interface built with Alpine.js and designed for efficient note-taking and knowledge management. This guide covers the interface components, interactions, and customization options.&lt;/p>
 &lt;h2 id="interface-overview">Interface Overview&lt;/h2>
 &lt;h3 id="main-layout">Main Layout&lt;/h3>
+&lt;p>&lt;img src="images/frontpage.png" alt="notd main layout">&lt;/p>
 &lt;p>The notd interface consists of several key areas:&lt;/p>
 &lt;ul>
 &lt;li>&lt;strong>Sidebar&lt;/strong> - Navigation, search, recent pages, favorites, and calendar&lt;/li>
