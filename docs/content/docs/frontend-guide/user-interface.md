@@ -9,7 +9,7 @@ notd features a modern, responsive user interface built with Alpine.js and desig
 
 ### Main Layout
 
-![notd main layout](images/frontpage.png)
+![notd main layout](/images/frontpage.png)
 
 The notd interface consists of several key areas:
 

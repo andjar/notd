@@ -29,7 +29,7 @@ notd includes a comprehensive task management system with multiple states and vi
 
 ### Task States
 
-![Example tasks]/images/tasks.png
+![Example tasks](/images/tasks.png)
 
 Use these keywords at the beginning of a note to create tasks:
 
@@ -79,7 +79,7 @@ Tasks are rendered with:
 
 ### Daily Planning
 
-![](images/task_page.png)
+![](/images/task_page.png)
 
 Use journal pages for daily task planning:
 
@@ -169,7 +169,7 @@ TODO Review priorities
 
 The kanban board extension gives you a quick overview of all tasks, and let you update their status. You can add custom property filters to only show certain tasks (e.g., by urgency or project).
 
-![](images/kanban.png)
+![](/images/kanban.png)
 
 ## Task Search and Filtering
 

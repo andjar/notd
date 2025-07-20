@@ -9,7 +9,7 @@ Get up and running with notd's powerful frontend features in minutes. This guide
 
 ### 1. Understanding the Interface
 
-![notd main layout](images/frontpage.png)
+![notd main layout](/images/frontpage.png)
 
 When you first open notd, you'll see:
 - **Sidebar** (left) - Navigation, search, and quick access
@@ -18,7 +18,7 @@ When you first open notd, you'll see:
 
 ### 2. Create Your First Note
 
-![notd main layout](images/my_first_note.png)
+![notd main layout](/images/my_first_note.png)
 
 Click in the main area and start typing:
 

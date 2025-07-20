@@ -5,6 +5,8 @@ weight: 10
 
 ## Rich Text Editing with Markdown
 
+![](/images/markdown.png)
+
 notd uses Markdown for formatting notes with live preview capabilities. The editor supports:
 
 - **Headers** using `# ## ###`
