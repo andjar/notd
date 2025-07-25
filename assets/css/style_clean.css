@@ -1308,6 +1308,27 @@ textarea:focus {
   position: relative;
 }
 
+/* New Parent Feedback Animation */
+.note-item.new-parent-feedback::after {
+  background-color: var(--ls-accent-9) !important;
+  animation: newParentPulse 1s ease-out;
+}
+
+@keyframes newParentPulse {
+  0% {
+    background-color: var(--ls-accent-6);
+    opacity: 0.8;
+  }
+  50% {
+    background-color: var(--ls-accent-9);
+    opacity: 1;
+  }
+  100% {
+    background-color: var(--ls-accent-9);
+    opacity: 1;
+  }
+}
+
 .note-children .note-item::before {
   display: none;
 }

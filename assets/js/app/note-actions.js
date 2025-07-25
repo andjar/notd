@@ -494,49 +494,45 @@ function parseBasicMarkdown(text) {
 async function handleTabKey(e, noteItem, noteData) {
     e.preventDefault();
     
-    // **FIX**: Prevent operations on notes with temporary IDs
-    if (String(noteData.id).startsWith('temp-')) {
-        console.warn('[Indent Note] Cannot indent note with temporary ID. Please wait for the note to be saved first.');
+    // **IMPROVEMENT**: Allow indentation if note exists in the current session,
+    // even if it hasn't been saved to server yet
+    
+    const appStore = getAppStore();
+    
+    // Check if this note is actually in our local notes array
+    const noteExists = appStore.notes.find(n => String(n.id) === String(noteData.id));
+    if (!noteExists) {
+        console.warn('[Indent/Outdent] Note not found in current notes, cannot perform operation');
         return;
     }
     
-    await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
+    // Save immediately if the note doesn't have a temporary ID
+    if (!String(noteData.id).startsWith('temp-')) {
+        await saveNoteImmediately(noteItem);
+    }
 
-    const appStore = getAppStore();
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     let operations = [];
     let newParentId = null;
-    let targetOrderIndex = null; // **FIX**: Declare targetOrderIndex in proper scope
+    let targetOrderIndex = null;
 
     if (e.shiftKey) { // Outdent
         if (!noteData.parent_note_id) return;
         const oldParentNote = getNoteDataById(noteData.parent_note_id);
         if (!oldParentNote) return;
         
-        // **FIX**: Check if the old parent note has a temporary ID
-        if (String(oldParentNote.id).startsWith('temp-')) {
-            console.warn('[Outdent Note] Cannot outdent from a note with temporary ID. Please wait for the parent note to be saved first.');
-            return;
-        }
+        // **IMPROVEMENT**: Check parent note availability for outdenting
         
         newParentId = oldParentNote.parent_note_id;
 
-        // **FIX**: Check if the new parent (grandparent) has a temporary ID
-        if (newParentId && String(newParentId).startsWith('temp-')) {
-            console.warn('[Outdent Note] Cannot outdent to a note with temporary ID. Please wait for the grandparent note to be saved first.');
-            return;
-        }
+        // **IMPROVEMENT**: Check grandparent availability for outdenting
 
         const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, String(oldParentNote.id), null);
         targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
         
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
+        // **IMPROVEMENT**: Update all sibling order indices, including those with temporary IDs for optimistic updates
         siblingUpdates.forEach(upd => {
-            // **FIX**: Check if sibling has a temporary ID
-            if (String(upd.id).startsWith('temp-')) {
-                console.warn('[Outdent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
-                return;
-            }
             operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } });
         });
 
@@ -547,11 +543,7 @@ async function handleTabKey(e, noteItem, noteData) {
         
         const newParentNote = siblings[currentNoteIndexInSiblings - 1];
         
-        // **FIX**: Check if the new parent note has a temporary ID
-        if (String(newParentNote.id).startsWith('temp-')) {
-            console.warn('[Indent Note] Cannot indent under a note with temporary ID. Please wait for the parent note to be saved first.');
-            return;
-        }
+        // **IMPROVEMENT**: Check parent note availability for indenting
         
         newParentId = String(newParentNote.id);
         
@@ -579,15 +571,27 @@ async function handleTabKey(e, noteItem, noteData) {
         targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
+        // **IMPROVEMENT**: Update all sibling order indices, including those with temporary IDs for optimistic updates
         siblingUpdates.forEach(upd => {
-            // **FIX**: Check if sibling has a temporary ID
-            if (String(upd.id).startsWith('temp-')) {
-                console.warn('[Indent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
-                return;
-            }
             operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } });
         });
     }
+    
+    // **IMPROVEMENT**: Filter out operations that reference temporary IDs for server
+    // but still perform all local operations for immediate visual feedback
+    const serverOperations = operations.filter(op => {
+        if (op.type === 'update') {
+            // Don't send updates for notes with temporary IDs to the server
+            if (String(op.payload.id).startsWith('temp-')) {
+                return false;
+            }
+            // Don't send updates that reference temporary parent IDs
+            if (op.payload.parent_note_id && String(op.payload.parent_note_id).startsWith('temp-')) {
+                return false;
+            }
+        }
+        return true;
+    });
     
     // **OPTIMIZATION**: Immediate visual feedback without delays
     const optimisticDOMUpdater = () => {
@@ -634,7 +638,7 @@ async function handleTabKey(e, noteItem, noteData) {
         }
     };
     
-    await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
+    await executeBatchOperations(originalNotesState, serverOperations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
 }
 
 // **NEW**: Helper function to calculate nesting level
