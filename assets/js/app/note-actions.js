@@ -12,6 +12,7 @@ function getAppStore() {
 import { calculateOrderIndex } from './order-index-service.js';
 import { notesAPI } from '../api_client.js';
 import { debounce, handleAutocloseBrackets, insertTextAtCursor, encrypt } from '../utils.js';
+import { generateUuidV7, looksLikeTempId } from '../utils/uuid-utils.js';
 import { ui } from '../ui.js';
 import { pageCache } from './page-cache.js';
 
@@ -109,12 +110,11 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
                     if (opResult.id) {
                         console.error(`[${userActionName} BATCH] Failed operation ID:`, opResult.id);
                     }
-                } else if (opResult.type === 'create' && opResult.client_temp_id) {
-                    _finalizeNewNote(opResult.client_temp_id, opResult.note);
                 } else if (opResult.type === 'update' && opResult.note) {
                     const appStore = getAppStore();
                     appStore.updateNote(opResult.note);
                 }
+                // Note: No need for client_temp_id handling since we use real UUIDs now
             });
         } else {
             allSubOperationsSucceeded = false;
@@ -188,7 +188,7 @@ export async function handleNoteAction(action, noteId) {
 
 // --- Note Saving Logic ---
 async function _saveNoteToServer(noteId, rawContent) {
-    if (String(noteId).startsWith('temp-')) return null;
+    if (looksLikeTempId(String(noteId))) return null;
     if (!getNoteDataById(noteId)) return null;
     
     const appStore = getAppStore();
@@ -214,7 +214,7 @@ async function _saveNoteToServer(noteId, rawContent) {
 
 export async function saveNoteImmediately(noteEl) {
     const noteId = noteEl.dataset.noteId;
-    if (String(noteId).startsWith('temp-')) return null;
+    if (looksLikeTempId(String(noteId))) return null;
     const contentDiv = noteEl.querySelector('.note-content');
     if (!contentDiv) return null;
     
@@ -225,7 +225,7 @@ export async function saveNoteImmediately(noteEl) {
 
 export const debouncedSaveNote = debounce(async (noteEl) => {
     const noteId = noteEl.dataset.noteId;
-    if (String(noteId).startsWith('temp-')) return;
+    if (looksLikeTempId(String(noteId))) return;
     if (!getNoteDataById(noteId)) return;
     const contentDiv = noteEl.querySelector('.note-content');
     if (!contentDiv) return;
@@ -238,16 +238,16 @@ export const debouncedSaveNote = debounce(async (noteEl) => {
 export async function handleAddRootNote() {
     const appStore = getAppStore();
     if (!appStore.currentPageId) return;
-    const clientTempId = `temp-R-${Date.now()}`;
+    const noteId = generateUuidV7(); // Generate UUID directly instead of temporary ID
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     const rootNotes = appStore.notes.filter(n => !n.parent_note_id);
     const lastRootNote = rootNotes.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).pop();
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, null, lastRootNote?.id || null, null);
     
-    // **FIX**: Filter out temporary IDs from sibling updates to prevent server errors
-    const validSiblingUpdates = siblingUpdates.filter(upd => !String(upd.id).startsWith('temp-'));
+    // Filter out temporary IDs from sibling updates to prevent server errors (still needed during transition)
+    const validSiblingUpdates = siblingUpdates.filter(upd => !looksLikeTempId(String(upd.id)));
     
-    const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
+    const optimisticNewNote = { id: noteId, page_id: appStore.currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
     
     const password = appStore.pagePassword;
@@ -259,7 +259,7 @@ export async function handleAddRootNote() {
         isEncrypted = true;
     }
 
-    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: null, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const operations = [{ type: 'create', payload: { id: noteId, page_id: appStore.currentPageId, content: contentForServer, parent_note_id: null, order_index: targetOrderIndex } }];
     validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     validSiblingUpdates.forEach(upd => {

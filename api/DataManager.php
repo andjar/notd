@@ -49,7 +49,7 @@ class DataManager {
     /**
      * Retrieves properties for a single note.
      */
-    public function getNoteProperties(int $noteId, bool $includeInternal = false): array {
+    public function getNoteProperties($noteId, bool $includeInternal = false): array {
         $sql = "SELECT name, value, weight, created_at FROM Properties WHERE note_id = :noteId AND active = 1";
         if (!$includeInternal) {
             $sql .= " AND weight < 3";
@@ -159,7 +159,7 @@ class DataManager {
     /**
      * Retrieves a single note by its ID, including its formatted properties.
      */
-    public function getNoteById(int $noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
+    public function getNoteById($noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE id = :id AND active = 1");
         $stmt->execute([':id' => $noteId]);
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -294,7 +294,7 @@ class DataManager {
     /**
      * Retrieves all notes for a page, with properties embedded.
      */
-    public function getNotesByPageId(int $pageId, bool $includeInternal = false): array {
+    public function getNotesByPageId($pageId, bool $includeInternal = false): array {
         // First check if the active column exists
         $checkColumnStmt = $this->pdo->query("PRAGMA table_info(Notes)");
         $columns = $checkColumnStmt->fetchAll(PDO::FETCH_COLUMN, 1);
@@ -327,9 +327,8 @@ class DataManager {
             $attachmentSql .= " GROUP BY note_id";
             
             $attachmentStmt = $this->pdo->prepare($attachmentSql);
-            // Bind each note ID as an integer
-            $params = array_map('intval', $noteIds);
-            $attachmentStmt->execute($params);
+            // Bind each note ID - no need to cast to int anymore since they're UUIDs
+            $attachmentStmt->execute($noteIds);
             $notesWithAttachments = $attachmentStmt->fetchAll(PDO::FETCH_COLUMN);
             $notesWithAttachmentsMap = array_flip($notesWithAttachments);
         }
