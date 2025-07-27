@@ -13,6 +13,9 @@ require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../PatternProcessor.php';
 require_once __DIR__ . '/../response_utils.php';
+require_once __DIR__ . '/../uuid_utils.php';
+
+use App\UuidUtils;
 
 if (!function_exists('_indexPropertiesFromContent')) {
     function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
@@ -63,14 +66,15 @@ try {
                 if (!$page) {
                     // Page does not exist, so create it.
                     $pdo->beginTransaction();
-                    $stmt = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (:name, :content)");
-                    $stmt->execute([':name' => $pageName, ':content' => null]);
+                    $pageId = UuidUtils::generateUuidV7();
+                    $stmt = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (:id, :name, :content)");
+                    $stmt->execute([':id' => $pageId, ':name' => $pageName, ':content' => null]);
                     $pdo->commit();
                     $page = $dataManager->getPageByName($pageName); // Re-fetch the newly created page
                 }
                 \App\ApiResponse::success($page, 200);
             } elseif (isset($_GET['id'])) {
-                $page = $dataManager->getPageById((int)$_GET['id']);
+                $page = $dataManager->getPageById($_GET['id']); // Handle both UUIDs and integers
                 if ($page) {
                     \App\ApiResponse::success($page);
                 } else {
@@ -104,9 +108,9 @@ try {
             }
 
             $pdo->beginTransaction();
-            $stmt = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (:name, :content)");
-            $stmt->execute([':name' => $name, ':content' => $content]);
-            $pageId = $pdo->lastInsertId();
+            $pageId = UuidUtils::generateUuidV7();
+            $stmt = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (:id, :name, :content)");
+            $stmt->execute([':id' => $pageId, ':name' => $name, ':content' => $content]);
             
             if ($content) {
                 _indexPropertiesFromContent($pdo, 'page', $pageId, $content);

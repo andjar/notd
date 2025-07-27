@@ -18,25 +18,6 @@ export function debounce(func, delay) { // Added export keyword
 }
 
 /**
- * Generates a temporary ID for optimistic UI updates
- * Format: temp-{timestamp}-{random}
- * @returns {string} Temporary ID
- */
-function generateTempId() {
-    return 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-}
-
-/**
- * Generates a UUID v4
- * @returns {string} UUID v4
- */
-function uuidv4() {
-    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-    );
-}
-
-/**
  * Escapes HTML special characters in a string
  * @param {string} str - String to escape
  * @returns {string} Escaped string
@@ -151,8 +132,6 @@ function parseContentForDisplay(content) {
 // but ensure ES6 exports are primary for consistency in this project.
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        generateTempId,
-        uuidv4,
         escapeHTML,
         getTodaysJournalPageName,
         parseMarkdown,

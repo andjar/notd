@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UUID v7 JavaScript Test</title>
+</head>
+<body>
+    <h1>UUID v7 JavaScript Test</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        import { generateUuidV7, isValidUuidV7, extractTimestamp, looksLikeUuid } from './assets/js/utils/uuid-utils.js';
+        
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            output.innerHTML += message + '<br>';
+            console.log(message);
+        }
+        
+        log('=== UUID v7 JavaScript Test ===');
+        log('');
+        
+        // Test 1: Generate multiple UUIDs and verify format
+        log('1. Testing UUID generation and validation:');
+        let allValid = true;
+        
+        for (let i = 0; i < 5; i++) {
+            const uuid = generateUuidV7();
+            const isValid = isValidUuidV7(uuid);
+            const timestamp = extractTimestamp(uuid);
+            
+            log(`   UUID: ${uuid}`);
+            log(`   Valid: ${isValid ? 'YES' : 'NO'}`);
+            log(`   Timestamp: ${timestamp} (${new Date(timestamp).toISOString()})`);
+            log('   ---');
+            
+            if (!isValid) {
+                log('❌ Generated UUID is not valid!');
+                allValid = false;
+            }
+            
+            // Small delay to ensure different timestamps
+            await new Promise(resolve => setTimeout(resolve, 1));
+        }
+        
+        // Test 2: Test invalid UUIDs
+        log('');
+        log('2. Testing invalid UUID detection:');
+        const invalidUuids = [
+            '123e4567-e89b-12d3-a456-426614174000', // Wrong version
+            '123e4567-e89b-62d3-a456-426614174000', // Wrong version
+            'not-a-uuid',
+            '',
+            '123e4567-e89b-7123-x456-426614174000', // Invalid character
+        ];
+        
+        for (const invalid of invalidUuids) {
+            const isValid = isValidUuidV7(invalid);
+            log(`   '${invalid}' -> ${isValid ? 'VALID (ERROR!)' : 'INVALID (correct)'}`);
+            
+            if (isValid) {
+                log('❌ Invalid UUID was marked as valid!');
+                allValid = false;
+            }
+        }
+        
+        // Test 3: Test ordering
+        log('');
+        log('3. Testing timestamp ordering:');
+        const uuid1 = generateUuidV7();
+        await new Promise(resolve => setTimeout(resolve, 5)); // 5ms delay
+        const uuid2 = generateUuidV7();
+        
+        const ts1 = extractTimestamp(uuid1);
+        const ts2 = extractTimestamp(uuid2);
+        
+        log(`   UUID1: ${uuid1} (ts: ${ts1})`);
+        log(`   UUID2: ${uuid2} (ts: ${ts2})`);
+        log(`   Ordered correctly: ${ts2 > ts1 ? 'YES' : 'NO'}`);
+        
+        if (ts2 <= ts1) {
+            log('❌ UUIDs are not properly time-ordered!');
+            allValid = false;
+        }
+        
+        // Test 4: Test utility functions
+        log('');
+        log('4. Testing utility functions:');
+        const testUuid = generateUuidV7();
+        log(`   looksLikeUuid('${testUuid}'): ${looksLikeUuid(testUuid) ? 'YES' : 'NO'}`);
+        log(`   looksLikeUuid('123'): ${looksLikeUuid('123') ? 'YES' : 'NO'}`);
+        log(`   looksLikeUuid(123): ${looksLikeUuid(123) ? 'YES' : 'NO'}`);
+        
+        log('');
+        if (allValid) {
+            log('✅ All UUID tests passed!');
+        } else {
+            log('❌ Some tests failed!');
+        }
+        log('=== End UUID Test ===');
+    </script>
+</body>
+</html>

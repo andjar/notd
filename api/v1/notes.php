@@ -7,7 +7,10 @@ require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../PatternProcessor.php';
 require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../response_utils.php';
+require_once __DIR__ . '/../uuid_utils.php';
 require_once __DIR__ . '/batch_operations.php';
+
+use App\UuidUtils;
 
 // Add debug logging
 error_log("Notes API Request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
@@ -94,24 +97,36 @@ if (!function_exists('_indexPropertiesFromContent')) {
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
     function _createNoteInBatch($pdo, $dataManager, $payload, &$tempIdMap) {
-        if (!isset($payload['page_id']) || !is_numeric($payload['page_id'])) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing or invalid page_id for create operation', 'client_temp_id' => $payload['client_temp_id'] ?? null];
+        if (!isset($payload['page_id'])) {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing page_id for create operation', 'client_temp_id' => $payload['client_temp_id'] ?? null];
         }
 
-        $pageId = (int)$payload['page_id'];
+        // Handle both UUID and integer page IDs (for backward compatibility during migration)
+        $pageId = $payload['page_id'];
+        if (!UuidUtils::looksLikeUuid($pageId) && !is_numeric($pageId)) {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid page_id format', 'client_temp_id' => $payload['client_temp_id'] ?? null];
+        }
+
         $content = $payload['content'] ?? '';
         $parentNoteId = null;
         if (array_key_exists('parent_note_id', $payload)) {
-            $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : (int)$payload['parent_note_id'];
+            $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : $payload['parent_note_id'];
+            // Validate parent note ID format if provided
+            if ($parentNoteId !== null && !UuidUtils::looksLikeUuid($parentNoteId) && !is_numeric($parentNoteId)) {
+                return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid parent_note_id format', 'client_temp_id' => $payload['client_temp_id'] ?? null];
+            }
         }
         $orderIndex = $payload['order_index'] ?? null;
         $collapsed = $payload['collapsed'] ?? 0;
         $clientTempId = $payload['client_temp_id'] ?? null;
 
         try {
-            // 1. Create the note record
-            $sqlFields = ['page_id', 'content', 'parent_note_id', 'collapsed'];
-            $sqlParams = [':page_id' => $pageId, ':content' => $content, ':parent_note_id' => $parentNoteId, ':collapsed' => (int)$collapsed];
+            // Generate UUIDv7 for the new note
+            $noteId = UuidUtils::generateUuidV7();
+            
+            // 1. Create the note record with UUID
+            $sqlFields = ['id', 'page_id', 'content', 'parent_note_id', 'collapsed'];
+            $sqlParams = [':id' => $noteId, ':page_id' => $pageId, ':content' => $content, ':parent_note_id' => $parentNoteId, ':collapsed' => (int)$collapsed];
 
             if ($orderIndex !== null && is_numeric($orderIndex)) {
                 $sqlFields[] = 'order_index';
@@ -122,11 +137,6 @@ if (!function_exists('_createNoteInBatch')) {
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute($sqlParams);
-            $noteId = $pdo->lastInsertId();
-
-            if (!$noteId) {
-                 return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note record in database.', 'client_temp_id' => $clientTempId];
-            }
 
             // 2. Index properties from its content
             if (trim($content) !== '') {
@@ -157,13 +167,12 @@ if (!function_exists('_updateNoteInBatch')) {
         $noteId = $payload['id'] ?? null;
         if ($noteId === null) return ['type' => 'update', 'status' => 'error', 'message' => 'Missing id for update operation'];
 
-        // Resolve temporary IDs
+        // Resolve temporary IDs (still needed during transition)
         if (is_string($noteId) && isset($tempIdMap[$noteId])) {
             $noteId = $tempIdMap[$noteId];
-        } elseif (!is_numeric($noteId)) {
-             return ['type' => 'update', 'status' => 'error', 'message' => "Invalid or unresolved ID for update: {$payload['id']}", 'id' => $payload['id']];
+        } elseif (!UuidUtils::looksLikeUuid($noteId) && !is_numeric($noteId)) {
+             return ['type' => 'update', 'status' => 'error', 'message' => "Invalid ID format for update: {$payload['id']}", 'id' => $payload['id']];
         }
-        $noteId = (int)$noteId;
 
         try {
             $checkStmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
@@ -187,21 +196,19 @@ if (!function_exists('_updateNoteInBatch')) {
                     $newParentNoteId = $tempIdMap[$newParentNoteId];
                 }
                 $setClauses[] = "parent_note_id = ?";
-                $executeParams[] = $newParentNoteId === null ? null : (int)$newParentNoteId;
+                $executeParams[] = $newParentNoteId;
             }
 
-
-
             // Fetch current order_index and page_id for the note
-$metaStmt = $pdo->prepare("SELECT order_index, page_id FROM Notes WHERE id = ?");
-$metaStmt->execute([$noteId]);
-$meta = $metaStmt->fetch(PDO::FETCH_ASSOC);
-$oldIndex = (int)$meta['order_index'];
-$pageId = (int)$meta['page_id'];
+            $metaStmt = $pdo->prepare("SELECT order_index, page_id FROM Notes WHERE id = ?");
+            $metaStmt->execute([$noteId]);
+            $meta = $metaStmt->fetch(PDO::FETCH_ASSOC);
+            $oldIndex = (int)$meta['order_index'];
+            $pageId = $meta['page_id'];
 
             if (isset($payload['order_index'])) { $setClauses[] = "order_index = ?"; $executeParams[] = (int)$payload['order_index']; }
             if (isset($payload['collapsed'])) { $setClauses[] = "collapsed = ?"; $executeParams[] = (int)$payload['collapsed']; }
-            if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = (int)$payload['page_id']; }
+            if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = $payload['page_id']; }
 
             if (empty($setClauses) && !$contentWasUpdated) { // Check content update flag as well
                 return ['type' => 'update', 'status' => 'warning', 'message' => 'No updatable fields provided for note.', 'id' => $noteId];
@@ -237,13 +244,12 @@ if (!function_exists('_deleteNoteInBatch')) {
         $noteId = $payload['id'] ?? null;
         if ($noteId === null) return ['type' => 'delete', 'status' => 'error', 'message' => 'Missing id for delete operation'];
 
-        // Resolve temporary IDs
+        // Resolve temporary IDs (still needed during transition)
         if (is_string($noteId) && isset($tempIdMap[$noteId])) {
             $noteId = $tempIdMap[$noteId];
-        } elseif (!is_numeric($noteId)) {
-            return ['type' => 'delete', 'status' => 'error', 'message' => "Invalid or unresolved ID for delete: {$payload['id']}", 'id' => $payload['id']];
+        } elseif (!UuidUtils::looksLikeUuid($noteId) && !is_numeric($noteId)) {
+            return ['type' => 'delete', 'status' => 'error', 'message' => "Invalid ID format for delete: {$payload['id']}", 'id' => $payload['id']];
         }
-        $noteId = (int)$noteId;
 
         try {
             // CASCADE DELETE is on, so deleting a note will delete its properties.
