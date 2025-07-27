@@ -1,29 +1,27 @@
 <?php
 /**
- * Database Migration Script: Convert Integer IDs to UUIDv7
- * 
- * This script migrates the database from integer auto-increment IDs to UUIDv7 for:
- * - Pages table
- * - Notes table
- * - All foreign key references
- * 
- * IMPORTANT: This script creates a backup before making changes.
+ * Test Migration Script: Convert Integer IDs to UUIDv7 on test database
  */
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/api/db_connect.php';
+// Set test database path directly
+$testDbPath = __DIR__ . '/db/test_uuid_database.sqlite';
+
+if (!file_exists($testDbPath)) {
+    echo "❌ Test database not found at: $testDbPath\n";
+    exit(1);
+}
+
 require_once __DIR__ . '/api/uuid_utils.php';
 
 use App\UuidUtils;
 
-echo "=== Database Migration: Integer IDs to UUIDv7 ===\n\n";
-
-echo "Using database path: " . DB_PATH . "\n";
+echo "=== Test Database Migration: Integer IDs to UUIDv7 ===\n\n";
+echo "Using test database: $testDbPath\n";
 
 // Create backup
-$backupPath = DB_PATH . '.backup.' . date('Y-m-d_H-i-s');
+$backupPath = $testDbPath . '.backup.' . date('Y-m-d_H-i-s');
 echo "1. Creating backup at: $backupPath\n";
-if (!copy(DB_PATH, $backupPath)) {
+if (!copy($testDbPath, $backupPath)) {
     echo "❌ Failed to create backup!\n";
     exit(1);
 }
@@ -31,7 +29,8 @@ echo "✅ Backup created successfully\n\n";
 
 // Connect to database
 try {
-    $pdo = get_db_connection();
+    $pdo = new PDO('sqlite:' . $testDbPath);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->exec('PRAGMA foreign_keys = OFF'); // Disable foreign keys during migration
 } catch (Exception $e) {
     echo "❌ Failed to connect to database: " . $e->getMessage() . "\n";
@@ -106,21 +105,6 @@ try {
         )
     ");
     
-    // New Attachments table
-    $pdo->exec("
-        CREATE TABLE Attachments_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            note_id TEXT,
-            name TEXT NOT NULL,
-            path TEXT NOT NULL UNIQUE,
-            type TEXT,
-            size INTEGER,
-            active INTEGER NOT NULL DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (note_id) REFERENCES Notes_new(id) ON DELETE SET NULL
-        )
-    ");
-    
     // New Properties table
     $pdo->exec("
         CREATE TABLE Properties_new (
@@ -171,21 +155,6 @@ try {
         LEFT JOIN note_id_map pnm ON n.parent_note_id = pnm.old_id
     ");
     
-    echo "   Migrating attachments data...\n";
-    $pdo->exec("
-        INSERT INTO Attachments_new (note_id, name, path, type, size, active, created_at)
-        SELECT 
-            CASE WHEN a.note_id IS NULL THEN NULL ELSE nm.new_id END,
-            a.name, 
-            a.path, 
-            a.type, 
-            a.size, 
-            a.active, 
-            a.created_at
-        FROM Attachments a
-        LEFT JOIN note_id_map nm ON a.note_id = nm.old_id
-    ");
-    
     echo "   Migrating properties data...\n";
     $pdo->exec("
         INSERT INTO Properties_new (note_id, page_id, name, value, weight, active, created_at, updated_at)
@@ -206,13 +175,11 @@ try {
     // Step 6: Drop old tables and rename new ones
     echo "   Replacing old tables with new ones...\n";
     $pdo->exec("DROP TABLE Properties");
-    $pdo->exec("DROP TABLE Attachments");
     $pdo->exec("DROP TABLE Notes");
     $pdo->exec("DROP TABLE Pages");
     
     $pdo->exec("ALTER TABLE Pages_new RENAME TO Pages");
     $pdo->exec("ALTER TABLE Notes_new RENAME TO Notes");
-    $pdo->exec("ALTER TABLE Attachments_new RENAME TO Attachments");
     $pdo->exec("ALTER TABLE Properties_new RENAME TO Properties");
     
     // Step 7: Recreate indexes
@@ -220,7 +187,6 @@ try {
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_pages_name ON Pages(LOWER(name))");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_notes_page_id ON Notes(page_id)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_notes_parent_note_id ON Notes(parent_note_id)");
-    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON Attachments(note_id)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_properties_note_id_name ON Properties(note_id, name)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_properties_page_id_name ON Properties(page_id, name)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_properties_name_value ON Properties(name, value)");
@@ -244,29 +210,31 @@ try {
         END
     ");
     
-    // Step 9: Handle FTS table (recreate it)
+    // Step 9: Handle FTS table (recreate it with proper structure for UUIDs)
     echo "   Recreating FTS table...\n";
     $pdo->exec("DROP TABLE IF EXISTS Notes_fts");
-    $pdo->exec("CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts4(content)");
     
-    // Populate FTS table with new data
-    $pdo->exec("INSERT INTO Notes_fts(rowid, content) SELECT id, content FROM Notes WHERE content IS NOT NULL");
+    // Create FTS table without content-less FTS since we need to handle UUID rowids
+    $pdo->exec("CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts4(note_id, content)");
     
-    // Recreate FTS triggers
+    // Populate FTS table with new data - use integer rowid but store note_id separately
+    $pdo->exec("INSERT INTO Notes_fts(note_id, content) SELECT id, content FROM Notes WHERE content IS NOT NULL");
+    
+    // Recreate FTS triggers with proper UUID handling
     $pdo->exec("
         CREATE TRIGGER IF NOT EXISTS Notes_after_insert AFTER INSERT ON Notes BEGIN
-          INSERT INTO Notes_fts(rowid, content) VALUES (new.id, new.content);
+          INSERT INTO Notes_fts(note_id, content) VALUES (new.id, new.content);
         END
     ");
     $pdo->exec("
         CREATE TRIGGER IF NOT EXISTS Notes_after_delete AFTER DELETE ON Notes BEGIN
-          DELETE FROM Notes_fts WHERE docid=old.id;
+          DELETE FROM Notes_fts WHERE note_id = old.id;
         END
     ");
     $pdo->exec("
         CREATE TRIGGER IF NOT EXISTS Notes_after_update AFTER UPDATE ON Notes BEGIN
-          DELETE FROM Notes_fts WHERE docid=old.id;
-          INSERT INTO Notes_fts(rowid, content) VALUES (new.id, new.content);
+          DELETE FROM Notes_fts WHERE note_id = old.id;
+          INSERT INTO Notes_fts(note_id, content) VALUES (new.id, new.content);
         END
     ");
     
@@ -278,12 +246,10 @@ try {
     $pageCount = $pdo->query("SELECT COUNT(*) FROM Pages")->fetchColumn();
     $noteCount = $pdo->query("SELECT COUNT(*) FROM Notes")->fetchColumn();
     $propCount = $pdo->query("SELECT COUNT(*) FROM Properties")->fetchColumn();
-    $attachCount = $pdo->query("SELECT COUNT(*) FROM Attachments")->fetchColumn();
     
     echo "   Pages: $pageCount\n";
     echo "   Notes: $noteCount\n";
     echo "   Properties: $propCount\n";
-    echo "   Attachments: $attachCount\n";
     
     // Test that UUIDs are valid
     $samplePage = $pdo->query("SELECT id FROM Pages LIMIT 1")->fetchColumn();
@@ -291,6 +257,8 @@ try {
     
     if (UuidUtils::isValidUuidV7($samplePage) && UuidUtils::isValidUuidV7($sampleNote)) {
         echo "✅ Sample UUIDs are valid\n";
+        echo "   Page ID: $samplePage\n";
+        echo "   Note ID: $sampleNote\n";
     } else {
         echo "❌ Sample UUIDs are invalid!\n";
         throw new Exception("Generated UUIDs are not valid");

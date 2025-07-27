@@ -34,7 +34,7 @@ class DataManager {
     /**
      * Retrieves properties for a single page.
      */
-    public function getPageProperties(int $pageId, bool $includeInternal = false): array {
+    public function getPageProperties($pageId, bool $includeInternal = false): array {
         $sql = "SELECT name, value, weight, created_at FROM Properties WHERE page_id = :pageId AND active = 1";
         if (!$includeInternal) {
             // Assuming weight 3+ is internal, consistent with config.php
@@ -221,7 +221,7 @@ class DataManager {
      * Retrieves a note with all its children recursively, including properties.
      * Implements recursion protection to prevent infinite loops.
      * 
-     * @param int $noteId The ID of the root note to fetch
+     * @param mixed $noteId The ID of the root note to fetch
      * @param bool $includeInternal Whether to include internal properties
      * @param bool $includeParentProperties Whether to include parent properties
      * @param int $maxDepth Maximum recursion depth (default 10)
@@ -230,7 +230,7 @@ class DataManager {
      * @return array|null The note with nested children, or null if not found
      */
     public function getNoteWithChildren(
-        int $noteId, 
+        $noteId, 
         bool $includeInternal = false, 
         bool $includeParentProperties = false,
         int $maxDepth = 10,
@@ -344,7 +344,7 @@ class DataManager {
     /**
      * Retrieves a single page by its ID, with properties.
      */
-    public function getPageById(int $pageId): ?array {
+    public function getPageById($pageId): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = :id AND active = 1");
         $stmt->execute([':id' => $pageId]);
         $page = $stmt->fetch(PDO::FETCH_ASSOC);

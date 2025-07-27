@@ -282,14 +282,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     if (e.shiftKey) return;
     e.preventDefault();
 
-    // **FIX**: Prevent operations on notes with temporary IDs
-    if (String(noteData.id).startsWith('temp-')) {
-        console.warn('[Create Sibling Note] Cannot create sibling note when current note has temporary ID. Please wait for the note to be saved first.');
-        return;
-    }
-
+    // No need to check for temporary IDs since we use real UUIDs now
     const appStore = getAppStore();
-    const clientTempId = `temp-E-${Date.now()}`;
+    const noteId = generateUuidV7(); // Generate UUID directly
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     const siblings = appStore.notes.filter(n => String(n.parent_note_id ?? '') === String(noteData.parent_note_id ?? '')).sort((a, b) => a.order_index - b.order_index);
     const currentNoteIndexInSiblings = siblings.findIndex(n => String(n.id) === String(noteData.id));
@@ -297,10 +292,10 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
 
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, noteData.parent_note_id, String(noteData.id), nextSibling?.id || null);
     
-    // **FIX**: Filter out temporary IDs from sibling updates to prevent server errors
-    const validSiblingUpdates = siblingUpdates.filter(upd => !String(upd.id).startsWith('temp-'));
+    // Filter out temporary IDs from sibling updates (still needed during transition period)
+    const validSiblingUpdates = siblingUpdates.filter(upd => !looksLikeTempId(String(upd.id)));
     
-    const optimisticNewNote = { id: clientTempId, page_id: appStore.currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
+    const optimisticNewNote = { id: noteId, page_id: appStore.currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
 
     const password = appStore.pagePassword;
@@ -312,7 +307,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
         isEncrypted = true;
     }
     
-    const operations = [{ type: 'create', payload: { page_id: appStore.currentPageId, content: contentForServer, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, client_temp_id: clientTempId } }];
+    const operations = [{ type: 'create', payload: { id: noteId, page_id: appStore.currentPageId, content: contentForServer, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex } }];
     validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     // **OPTIMIZATION**: Update sibling order indices immediately (only for valid notes)
@@ -494,12 +489,7 @@ function parseBasicMarkdown(text) {
 async function handleTabKey(e, noteItem, noteData) {
     e.preventDefault();
     
-    // **FIX**: Prevent operations on notes with temporary IDs
-    if (String(noteData.id).startsWith('temp-')) {
-        console.warn('[Indent Note] Cannot indent note with temporary ID. Please wait for the note to be saved first.');
-        return;
-    }
-    
+    // No need to check for temporary IDs since we use real UUIDs now
     await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
 
     const appStore = getAppStore();
@@ -513,27 +503,16 @@ async function handleTabKey(e, noteItem, noteData) {
         const oldParentNote = getNoteDataById(noteData.parent_note_id);
         if (!oldParentNote) return;
         
-        // **FIX**: Check if the old parent note has a temporary ID
-        if (String(oldParentNote.id).startsWith('temp-')) {
-            console.warn('[Outdent Note] Cannot outdent from a note with temporary ID. Please wait for the parent note to be saved first.');
-            return;
-        }
-        
+        // No need to check for temporary parent IDs since we use real UUIDs now
         newParentId = oldParentNote.parent_note_id;
-
-        // **FIX**: Check if the new parent (grandparent) has a temporary ID
-        if (newParentId && String(newParentId).startsWith('temp-')) {
-            console.warn('[Outdent Note] Cannot outdent to a note with temporary ID. Please wait for the grandparent note to be saved first.');
-            return;
-        }
 
         const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, String(oldParentNote.id), null);
         targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
         
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
-            // **FIX**: Check if sibling has a temporary ID
-            if (String(upd.id).startsWith('temp-')) {
+            // Filter out temporary IDs (still needed during transition)
+            if (looksLikeTempId(String(upd.id))) {
                 console.warn('[Outdent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
                 return;
             }
@@ -547,12 +526,7 @@ async function handleTabKey(e, noteItem, noteData) {
         
         const newParentNote = siblings[currentNoteIndexInSiblings - 1];
         
-        // **FIX**: Check if the new parent note has a temporary ID
-        if (String(newParentNote.id).startsWith('temp-')) {
-            console.warn('[Indent Note] Cannot indent under a note with temporary ID. Please wait for the parent note to be saved first.');
-            return;
-        }
-        
+        // No need to check for temporary parent IDs since we use real UUIDs now
         newParentId = String(newParentNote.id);
         
         // **FIX**: Calculate the correct position for the indented note
@@ -580,8 +554,8 @@ async function handleTabKey(e, noteItem, noteData) {
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
-            // **FIX**: Check if sibling has a temporary ID
-            if (String(upd.id).startsWith('temp-')) {
+            // Filter out temporary IDs (still needed during transition)
+            if (looksLikeTempId(String(upd.id))) {
                 console.warn('[Indent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
                 return;
             }
@@ -738,12 +712,7 @@ function updateSubtreeNestingLevels(noteElement, nestingLevel) {
 }
 
 async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
-    // **FIX**: Prevent operations on notes with temporary IDs
-    if (String(noteData.id).startsWith('temp-')) {
-        console.warn('[Delete Note] Cannot delete note with temporary ID. Please wait for the note to be saved first.');
-        return;
-    }
-    
+    // No need to check for temporary IDs since we use real UUIDs now
     const appStore = getAppStore();
     if ((contentDiv.dataset.rawContent || contentDiv.textContent).trim() !== '') return;
     const children = appStore.notes.filter(n => String(n.parent_note_id) === String(noteData.id));
@@ -879,13 +848,9 @@ export async function handleNoteKeyDown(e) {
 
 // **NEW**: Treehouse-inspired function to create child note
 async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
-    if (String(noteData.id).startsWith('temp-')) {
-        console.warn('[Create Child Note] Cannot create child note when parent has temporary ID.');
-        return;
-    }
-
+    // No need to check for temporary IDs since we use real UUIDs now
     const appStore = getAppStore();
-    const clientTempId = `temp-C-${Date.now()}`;
+    const noteId = generateUuidV7(); // Generate UUID directly
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     
     // Calculate order index for the new child
@@ -893,7 +858,7 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
     const targetOrderIndex = existingChildren.length > 0 ? existingChildren[existingChildren.length - 1].order_index + 1 : 0;
     
     const optimisticNewNote = { 
-        id: clientTempId, 
+        id: noteId, 
         page_id: appStore.currentPageId, 
         content: '', 
         parent_note_id: noteData.id, 
@@ -913,11 +878,11 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
     const operations = [{ 
         type: 'create', 
         payload: { 
+            id: noteId,
             page_id: appStore.currentPageId, 
             content: contentForServer, 
             parent_note_id: noteData.id, 
-            order_index: targetOrderIndex, 
-            client_temp_id: clientTempId 
+            order_index: targetOrderIndex
         } 
     }];
 

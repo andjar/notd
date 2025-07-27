@@ -167,13 +167,12 @@ if (!function_exists('_updateNoteInBatch')) {
         $noteId = $payload['id'] ?? null;
         if ($noteId === null) return ['type' => 'update', 'status' => 'error', 'message' => 'Missing id for update operation'];
 
-        // Resolve temporary IDs
+        // Resolve temporary IDs (still needed during transition)
         if (is_string($noteId) && isset($tempIdMap[$noteId])) {
             $noteId = $tempIdMap[$noteId];
-        } elseif (!is_numeric($noteId)) {
-             return ['type' => 'update', 'status' => 'error', 'message' => "Invalid or unresolved ID for update: {$payload['id']}", 'id' => $payload['id']];
+        } elseif (!UuidUtils::looksLikeUuid($noteId) && !is_numeric($noteId)) {
+             return ['type' => 'update', 'status' => 'error', 'message' => "Invalid ID format for update: {$payload['id']}", 'id' => $payload['id']];
         }
-        $noteId = (int)$noteId;
 
         try {
             $checkStmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
@@ -197,21 +196,19 @@ if (!function_exists('_updateNoteInBatch')) {
                     $newParentNoteId = $tempIdMap[$newParentNoteId];
                 }
                 $setClauses[] = "parent_note_id = ?";
-                $executeParams[] = $newParentNoteId === null ? null : (int)$newParentNoteId;
+                $executeParams[] = $newParentNoteId;
             }
 
-
-
             // Fetch current order_index and page_id for the note
-$metaStmt = $pdo->prepare("SELECT order_index, page_id FROM Notes WHERE id = ?");
-$metaStmt->execute([$noteId]);
-$meta = $metaStmt->fetch(PDO::FETCH_ASSOC);
-$oldIndex = (int)$meta['order_index'];
-$pageId = (int)$meta['page_id'];
+            $metaStmt = $pdo->prepare("SELECT order_index, page_id FROM Notes WHERE id = ?");
+            $metaStmt->execute([$noteId]);
+            $meta = $metaStmt->fetch(PDO::FETCH_ASSOC);
+            $oldIndex = (int)$meta['order_index'];
+            $pageId = $meta['page_id'];
 
             if (isset($payload['order_index'])) { $setClauses[] = "order_index = ?"; $executeParams[] = (int)$payload['order_index']; }
             if (isset($payload['collapsed'])) { $setClauses[] = "collapsed = ?"; $executeParams[] = (int)$payload['collapsed']; }
-            if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = (int)$payload['page_id']; }
+            if (isset($payload['page_id'])) { $setClauses[] = "page_id = ?"; $executeParams[] = $payload['page_id']; }
 
             if (empty($setClauses) && !$contentWasUpdated) { // Check content update flag as well
                 return ['type' => 'update', 'status' => 'warning', 'message' => 'No updatable fields provided for note.', 'id' => $noteId];
@@ -247,13 +244,12 @@ if (!function_exists('_deleteNoteInBatch')) {
         $noteId = $payload['id'] ?? null;
         if ($noteId === null) return ['type' => 'delete', 'status' => 'error', 'message' => 'Missing id for delete operation'];
 
-        // Resolve temporary IDs
+        // Resolve temporary IDs (still needed during transition)
         if (is_string($noteId) && isset($tempIdMap[$noteId])) {
             $noteId = $tempIdMap[$noteId];
-        } elseif (!is_numeric($noteId)) {
-            return ['type' => 'delete', 'status' => 'error', 'message' => "Invalid or unresolved ID for delete: {$payload['id']}", 'id' => $payload['id']];
+        } elseif (!UuidUtils::looksLikeUuid($noteId) && !is_numeric($noteId)) {
+            return ['type' => 'delete', 'status' => 'error', 'message' => "Invalid ID format for delete: {$payload['id']}", 'id' => $payload['id']];
         }
-        $noteId = (int)$noteId;
 
         try {
             // CASCADE DELETE is on, so deleting a note will delete its properties.
