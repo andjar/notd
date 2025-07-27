@@ -9,6 +9,7 @@ import { splashScreen } from './app/splash-screen.js';
 import sidebarComponent from './app/sidebar-component.js';
 import calendarComponent from './app/calendar-component.js';
 import { sidebarState } from './app/sidebar.js';
+import { looksLikeTempId } from './utils/uuid-utils.js';
 
 
 
@@ -248,7 +249,7 @@ if (notesContainer) {
         const noteItem = noteWrapper.closest('.note-item');
         const noteId = noteItem?.dataset.noteId;
 
-        if (!noteId || noteId.startsWith('temp-')) {
+        if (!noteId || looksLikeTempId(noteId)) {
             alert('Please save the note before adding attachments.');
             return;
         }
