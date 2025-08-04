@@ -239,13 +239,11 @@ class DataManager {
     ): ?array {
         // Recursion protection: check depth limit
         if ($currentDepth >= $maxDepth) {
-            error_log("getNoteWithChildren: Maximum depth ($maxDepth) reached for note $noteId");
             return null;
         }
 
         // Recursion protection: check for circular references
         if (in_array($noteId, $visitedIds)) {
-            error_log("getNoteWithChildren: Circular reference detected for note $noteId");
             return null;
         }
 

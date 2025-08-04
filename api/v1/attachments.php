@@ -4,17 +4,7 @@ namespace App;
 
 use PDO;
 
-error_log("=== ATTACHMENTS.PHP START ===");
-if (isset($_SERVER['REQUEST_METHOD'])) {
-    error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
-} else {
-    error_log("REQUEST_METHOD: Not set (possibly included outside of a direct web request context)");
-}
-// Only log POST and FILES if it's a POST request, otherwise they might not be relevant or set
-if (($_SERVER['REQUEST_METHOD'] ?? null) === 'POST') {
-    error_log("POST data: " . print_r($_POST, true));
-    error_log("FILES data: " . print_r($_FILES, true));
-}
+// Debug logging disabled to prevent HTML output
 
 ob_start(); // Start output buffering
 
@@ -51,19 +41,16 @@ class AttachmentManager {
         $dir = UPLOADS_DIR . '/' . $year . '/' . $month;
         if (!file_exists($dir)) {
             if (!mkdir($dir, 0755, true)) {
-                error_log("Failed to create directory: " . $dir);
                 throw new \RuntimeException('Failed to create upload directory: ' . $dir);
             }
         }
         if (!is_writable($dir)) {
-            error_log("Directory not writable: " . $dir);
             throw new \RuntimeException('Upload directory is not writable: ' . $dir);
         }
         return $dir;
     }
 
     private function validateFile($file) {
-        error_log("Starting file validation for: " . $file['name']);
         
         if (!isset($file['error']) || is_array($file['error'])) {
             throw new \RuntimeException('Invalid file parameter');
@@ -122,7 +109,6 @@ class AttachmentManager {
             ];
             
             $mime_type = $mime_map[$extension] ?? 'application/octet-stream';
-            error_log("MIME type detected via extension fallback: " . $mime_type);
         }
         // Allow .excalidraw files as application/json
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -134,7 +120,6 @@ class AttachmentManager {
             throw new \RuntimeException('File type not allowed: ' . $mime_type);
         }
 
-        error_log("File validation completed successfully: name={$file['name']}, mime_type={$mime_type}");
         return $mime_type;
     }
 
@@ -179,7 +164,6 @@ public function handleRequest() {
 }
 
     private function handlePostRequest() {
-        error_log("=== POST METHOD PROCESSING ===");
         
         $validationRulesPOST = ['note_id' => 'required|isPositiveInteger'];
         $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
@@ -247,15 +231,13 @@ public function handleRequest() {
 
             $mime_type = $this->validateFile($file);
 
-            error_log("About to move_uploaded_file: name={$file['name']}, tmp_name={$file['tmp_name']}");
             if (!file_exists($file['tmp_name'])) {
-                error_log('Temp file does not exist: ' . $file['tmp_name'] . ' for ' . $file['name']);
+                // Temp file does not exist
             }
 
             if (!move_uploaded_file($file['tmp_name'], $target_path)) {
                 // Fallback: try copy if move_uploaded_file fails but file exists
                 if (file_exists($file['tmp_name'])) {
-                    error_log('move_uploaded_file failed, trying copy() for ' . $file['name']);
                     if (!copy($file['tmp_name'], $target_path)) {
                         $this->pdo->rollBack();
                         throw new \RuntimeException('Failed to move or copy uploaded file.');
@@ -293,7 +275,6 @@ public function handleRequest() {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            error_log('Error processing attachment: ' . $e->getMessage());
             return null;
         }
     }

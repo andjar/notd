@@ -2,6 +2,11 @@
 
 namespace App;
 
+// DEBUG: Add error display for this endpoint
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // api/v1/pages.php
 
 /**
@@ -9,6 +14,7 @@ namespace App;
  * This file acts as a router, delegating all logic to the DataManager.
  */
 
+require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../PatternProcessor.php';
@@ -53,25 +59,38 @@ if ($method === 'POST' && isset($input['_method'])) {
     $method = strtoupper($input['_method']);
 }
 
+echo "DEBUG: Method = $method\n";
+echo "DEBUG: GET params = " . json_encode($_GET) . "\n";
+
 $pdo = get_db_connection();
+echo "DEBUG: Database connected\n";
+
 $dataManager = new \App\DataManager($pdo);
+echo "DEBUG: DataManager created\n";
 // $propertyParser = new PropertyParser($pdo); // Removed global instantiation
 
 try {
+    echo "DEBUG: Entering try block\n";
     switch ($method) {
         case 'GET':
+            echo "DEBUG: Processing GET request\n";
             if (isset($_GET['name'])) {
+                echo "DEBUG: Found 'name' parameter\n";
                 $pageName = $_GET['name'];
+                echo "DEBUG: Page name = $pageName\n";
                 $page = $dataManager->getPageByName($pageName);
+                echo "DEBUG: getPageByName result = " . ($page ? 'found' : 'not found') . "\n";
                 if (!$page) {
                     // Page does not exist, so create it.
                     $pdo->beginTransaction();
-                    $pageId = UuidUtils::generateUuidV7();
+                    $pageId = \App\UuidUtils::generateUuidV7();
                     $stmt = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (:id, :name, :content)");
                     $stmt->execute([':id' => $pageId, ':name' => $pageName, ':content' => null]);
                     $pdo->commit();
                     $page = $dataManager->getPageByName($pageName); // Re-fetch the newly created page
                 }
+                echo "DEBUG: About to call ApiResponse::success\n";
+                echo "DEBUG: Page data = " . json_encode($page) . "\n";
                 \App\ApiResponse::success($page, 200);
             } elseif (isset($_GET['id'])) {
                 $page = $dataManager->getPageById($_GET['id']); // Handle both UUIDs and integers
@@ -108,7 +127,7 @@ try {
             }
 
             $pdo->beginTransaction();
-            $pageId = UuidUtils::generateUuidV7();
+            $pageId = \App\UuidUtils::generateUuidV7();
             $stmt = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (:id, :name, :content)");
             $stmt->execute([':id' => $pageId, ':name' => $name, ':content' => $content]);
             

@@ -1,12 +1,12 @@
 <?php
 if (!function_exists('log_db_error')) {
     function log_db_error($message, $context = []) {
-        error_log(date('Y-m-d H:i:s') . " [DB] " . $message . " " . json_encode($context));
+        // Disabled to prevent HTML output
     }
 }
 
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db/setup_db.php';
+require_once __DIR__ . '/../db/setup_db_fixed.php';
 require_once __DIR__ . '/db_helpers.php'; // Moved helpers to separate file
 
 function get_db_connection() {
@@ -41,7 +41,7 @@ function get_db_connection() {
                 try {
                     if ($pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='Pages'")->fetch() === false) {
                         log_db_error("Running database setup...");
-                        run_database_setup($pdo);
+                        run_database_setup_fixed($pdo);
                         
                         $welcome_notes_path = __DIR__ . '/../assets/template/page/welcome_notes.json';
                         if (file_exists($welcome_notes_path)) {

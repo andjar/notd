@@ -39,7 +39,6 @@ class PropertyTriggerService {
                 // If the target page doesn't exist, remove the alias
                 $stmt = $this->pdo->prepare("UPDATE Properties SET value = NULL WHERE page_id = ? AND name = 'alias'");
                 $stmt->execute([$entityId]);
-                error_log("Alias target page '{$propertyValue}' not found. Alias removed.");
             }
         }
     }
@@ -121,7 +120,7 @@ class PropertyTriggerService {
                 $this->webhooksManager->dispatchEvent($webhook, 'property_change', $payload);
             }
         } catch (Exception $e) {
-            error_log("Error during webhook dispatch: " . $e->getMessage());
+            // Silently handle webhook errors
         }
     }
 
@@ -163,7 +162,7 @@ class PropertyTriggerService {
                 $this->webhooksManager->dispatchEvent($webhook, $eventType, $payload);
             }
         } catch (Exception $e) {
-            error_log("Error during entity event webhook dispatch: " . $e->getMessage());
+            // Silently handle webhook errors
         }
     }
 

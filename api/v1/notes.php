@@ -12,9 +12,7 @@ require_once __DIR__ . '/batch_operations.php';
 
 use App\UuidUtils;
 
-// Add debug logging
-error_log("Notes API Request: " . $_SERVER['REQUEST_METHOD'] . " " . $_SERVER['REQUEST_URI']);
-error_log("Input data: " . json_encode($input ?? []));
+// Debug logging disabled to prevent HTML output
 
 // Create a fresh database connection for this request to avoid locking issues
 $pdo = get_db_connection();
@@ -86,8 +84,7 @@ if (!function_exists('_indexPropertiesFromContent')) {
                 $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
                 $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
             } catch (PDOException $e) {
-                // Log error but don't let it break the entire process if just this update fails
-                error_log("Could not update Notes.internal flag for note {$entityId}. Error: " . $e->getMessage());
+                // Silently handle internal flag update errors
             }
         }
     }
@@ -96,15 +93,15 @@ if (!function_exists('_indexPropertiesFromContent')) {
 
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
-    function _createNoteInBatch($pdo, $dataManager, $payload, &$tempIdMap) {
+    function _createNoteInBatch($pdo, $dataManager, $payload) {
         if (!isset($payload['page_id'])) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing page_id for create operation', 'client_temp_id' => $payload['client_temp_id'] ?? null];
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing page_id for create operation'];
         }
 
-        // Handle both UUID and integer page IDs (for backward compatibility during migration)
+        // Validate UUID format for page ID
         $pageId = $payload['page_id'];
-        if (!UuidUtils::looksLikeUuid($pageId) && !is_numeric($pageId)) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid page_id format', 'client_temp_id' => $payload['client_temp_id'] ?? null];
+        if (!UuidUtils::looksLikeUuid($pageId)) {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid page_id format'];
         }
 
         $content = $payload['content'] ?? '';
@@ -112,17 +109,16 @@ if (!function_exists('_createNoteInBatch')) {
         if (array_key_exists('parent_note_id', $payload)) {
             $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : $payload['parent_note_id'];
             // Validate parent note ID format if provided
-            if ($parentNoteId !== null && !UuidUtils::looksLikeUuid($parentNoteId) && !is_numeric($parentNoteId)) {
-                return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid parent_note_id format', 'client_temp_id' => $payload['client_temp_id'] ?? null];
+            if ($parentNoteId !== null && !UuidUtils::looksLikeUuid($parentNoteId)) {
+                return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid parent_note_id format'];
             }
         }
         $orderIndex = $payload['order_index'] ?? null;
         $collapsed = $payload['collapsed'] ?? 0;
-        $clientTempId = $payload['client_temp_id'] ?? null;
 
         try {
             // Generate UUIDv7 for the new note
-            $noteId = UuidUtils::generateUuidV7();
+            $noteId = \App\UuidUtils::generateUuidV7();
             
             // 1. Create the note record with UUID
             $sqlFields = ['id', 'page_id', 'content', 'parent_note_id', 'collapsed'];
@@ -145,32 +141,22 @@ if (!function_exists('_createNoteInBatch')) {
 
             // 3. Fetch the newly created note using DataManager for a consistent response
             $newNote = $dataManager->getNoteById($noteId); 
-
-            if ($clientTempId !== null) {
-                $tempIdMap[$clientTempId] = $noteId;
-            }
             
-            $result = ['type' => 'create', 'status' => 'success', 'note' => $newNote];
-            if ($clientTempId !== null) {
-                $result['client_temp_id'] = $clientTempId;
-            }
-            return $result;
+            return ['type' => 'create', 'status' => 'success', 'note' => $newNote];
 
         } catch (Exception $e) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note: ' . $e->getMessage(), 'client_temp_id' => $clientTempId];
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note: ' . $e->getMessage()];
         }
     }
 }
 
 if (!function_exists('_updateNoteInBatch')) {
-    function _updateNoteInBatch($pdo, $dataManager, $payload, $tempIdMap) {
+    function _updateNoteInBatch($pdo, $dataManager, $payload) {
         $noteId = $payload['id'] ?? null;
         if ($noteId === null) return ['type' => 'update', 'status' => 'error', 'message' => 'Missing id for update operation'];
 
-        // Resolve temporary IDs (still needed during transition)
-        if (is_string($noteId) && isset($tempIdMap[$noteId])) {
-            $noteId = $tempIdMap[$noteId];
-        } elseif (!UuidUtils::looksLikeUuid($noteId) && !is_numeric($noteId)) {
+        // Validate UUID format
+        if (!UuidUtils::looksLikeUuid($noteId)) {
              return ['type' => 'update', 'status' => 'error', 'message' => "Invalid ID format for update: {$payload['id']}", 'id' => $payload['id']];
         }
 
@@ -192,9 +178,6 @@ if (!function_exists('_updateNoteInBatch')) {
             }
             if (array_key_exists('parent_note_id', $payload)) {
                 $newParentNoteId = $payload['parent_note_id'];
-                if (is_string($newParentNoteId) && isset($tempIdMap[$newParentNoteId])) {
-                    $newParentNoteId = $tempIdMap[$newParentNoteId];
-                }
                 $setClauses[] = "parent_note_id = ?";
                 $executeParams[] = $newParentNoteId;
             }
@@ -240,14 +223,12 @@ if (!function_exists('_updateNoteInBatch')) {
 }
 
 if (!function_exists('_deleteNoteInBatch')) {
-    function _deleteNoteInBatch($pdo, $payload, $tempIdMap) {
+    function _deleteNoteInBatch($pdo, $payload) {
         $noteId = $payload['id'] ?? null;
         if ($noteId === null) return ['type' => 'delete', 'status' => 'error', 'message' => 'Missing id for delete operation'];
 
-        // Resolve temporary IDs (still needed during transition)
-        if (is_string($noteId) && isset($tempIdMap[$noteId])) {
-            $noteId = $tempIdMap[$noteId];
-        } elseif (!UuidUtils::looksLikeUuid($noteId) && !is_numeric($noteId)) {
+        // Validate UUID format
+        if (!UuidUtils::looksLikeUuid($noteId)) {
             return ['type' => 'delete', 'status' => 'error', 'message' => "Invalid ID format for delete: {$payload['id']}", 'id' => $payload['id']];
         }
 
@@ -280,8 +261,6 @@ if (!function_exists('_handleBatchOperations')) {
         }
 
         $results = [];
-        $tempIdMap = [];
-        
         try {
             // Process operations in a safe order: Delete -> Create -> Update
             $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
@@ -289,32 +268,25 @@ if (!function_exists('_handleBatchOperations')) {
             $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
 
             foreach ($deleteOps as $op) {
-                $result = _deleteNoteInBatch($pdo, $op['payload'] ?? [], $tempIdMap);
+                $result = _deleteNoteInBatch($pdo, $op['payload'] ?? []);
                 $results[] = $result;
-                if ($result['status'] === 'error') {
-                    error_log("Batch delete operation failed: " . json_encode($result));
-                }
+                // Silently handle batch operation errors
             }
             
             foreach ($createOps as $op) {
-                $result = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+                $result = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? []);
                 $results[] = $result;
-                if ($result['status'] === 'error') {
-                    error_log("Batch create operation failed: " . json_encode($result));
-                }
+                // Silently handle batch operation errors
             }
             
             foreach ($updateOps as $op) {
-                $result = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $tempIdMap);
+                $result = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? []);
                 $results[] = $result;
-                if ($result['status'] === 'error') {
-                    error_log("Batch update operation failed: " . json_encode($result));
-                }
+                // Silently handle batch operation errors
             }
             
             return $results;
         } catch (Exception $e) {
-            error_log("Batch operations failed with exception: " . $e->getMessage());
             throw $e;
         }
     }
@@ -330,7 +302,7 @@ if ($method === 'GET') {
     
     try {
         if (isset($_GET['id'])) {
-            $noteId = (int)$_GET['id'];
+            $noteId = $_GET['id'];
             
             if ($includeChildren) {
                 // Use the new method to fetch note with children
@@ -346,14 +318,13 @@ if ($method === 'GET') {
                 \App\ApiResponse::error('Note not found', 404);
             }
         } elseif (isset($_GET['page_id'])) {
-            $pageId = (int)$_GET['page_id'];
+            $pageId = $_GET['page_id'];
             $notes = $dataManager->getNotesByPageId($pageId, $includeInternal);
             \App\ApiResponse::success($notes);
         } else {
              \App\ApiResponse::error('Missing required parameter: id or page_id', 400);
         }
     } catch (Exception $e) {
-        error_log("API Error in notes.php (GET): " . $e->getMessage());
         \App\ApiResponse::error('An error occurred while fetching data: ' . $e->getMessage(), 500);
     }
 } elseif ($method === 'POST') {
@@ -373,13 +344,11 @@ if ($method === 'GET') {
             } catch (Exception $e) {
                 $errorMessage = $e->getMessage();
                 if (strpos($errorMessage, 'database is locked') !== false && $attempt < $maxRetries) {
-                    error_log("Database locked, retrying batch operation (attempt $attempt/$maxRetries)");
                     usleep($retryDelay * 1000); // Convert to microseconds
                     $retryDelay *= 2; // Exponential backoff
                     continue;
                 }
                 // If it's not a locking issue or we've exhausted retries, throw the error
-                error_log("Batch operation failed after $attempt attempts: " . $errorMessage);
                 close_db_connection($pdo);
                 \App\ApiResponse::error('Batch operation failed: ' . $errorMessage, 500);
                 return;

@@ -12,7 +12,7 @@ function getAppStore() {
 import { calculateOrderIndex } from './order-index-service.js';
 import { notesAPI } from '../api_client.js';
 import { debounce, handleAutocloseBrackets, insertTextAtCursor, encrypt } from '../utils.js';
-import { generateUuidV7, looksLikeTempId } from '../utils/uuid-utils.js';
+import { generateUuidV7 } from '../utils/uuid-utils.js';
 import { ui } from '../ui.js';
 import { pageCache } from './page-cache.js';
 
@@ -188,7 +188,6 @@ export async function handleNoteAction(action, noteId) {
 
 // --- Note Saving Logic ---
 async function _saveNoteToServer(noteId, rawContent) {
-    if (looksLikeTempId(String(noteId))) return null;
     if (!getNoteDataById(noteId)) return null;
     
     const appStore = getAppStore();
@@ -214,7 +213,6 @@ async function _saveNoteToServer(noteId, rawContent) {
 
 export async function saveNoteImmediately(noteEl) {
     const noteId = noteEl.dataset.noteId;
-    if (looksLikeTempId(String(noteId))) return null;
     const contentDiv = noteEl.querySelector('.note-content');
     if (!contentDiv) return null;
     
@@ -225,7 +223,6 @@ export async function saveNoteImmediately(noteEl) {
 
 export const debouncedSaveNote = debounce(async (noteEl) => {
     const noteId = noteEl.dataset.noteId;
-    if (looksLikeTempId(String(noteId))) return;
     if (!getNoteDataById(noteId)) return;
     const contentDiv = noteEl.querySelector('.note-content');
     if (!contentDiv) return;
@@ -244,8 +241,7 @@ export async function handleAddRootNote() {
     const lastRootNote = rootNotes.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)).pop();
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, null, lastRootNote?.id || null, null);
     
-    // Filter out temporary IDs from sibling updates to prevent server errors (still needed during transition)
-    const validSiblingUpdates = siblingUpdates.filter(upd => !looksLikeTempId(String(upd.id)));
+    const validSiblingUpdates = siblingUpdates;
     
     const optimisticNewNote = { id: noteId, page_id: appStore.currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
@@ -292,8 +288,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
 
     const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, noteData.parent_note_id, String(noteData.id), nextSibling?.id || null);
     
-    // Filter out temporary IDs from sibling updates (still needed during transition period)
-    const validSiblingUpdates = siblingUpdates.filter(upd => !looksLikeTempId(String(upd.id)));
+    const validSiblingUpdates = siblingUpdates;
     
     const optimisticNewNote = { id: noteId, page_id: appStore.currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
@@ -511,11 +506,6 @@ async function handleTabKey(e, noteItem, noteData) {
         
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
-            // Filter out temporary IDs (still needed during transition)
-            if (looksLikeTempId(String(upd.id))) {
-                console.warn('[Outdent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
-                return;
-            }
             operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } });
         });
 
@@ -554,11 +544,6 @@ async function handleTabKey(e, noteItem, noteData) {
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
-            // Filter out temporary IDs (still needed during transition)
-            if (looksLikeTempId(String(upd.id))) {
-                console.warn('[Indent Note] Cannot update order of sibling with temporary ID. Skipping this update.');
-                return;
-            }
             operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } });
         });
     }

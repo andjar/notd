@@ -2,12 +2,14 @@
 // api/db_helpers.php
 // Helper functions for creating notes and pages with property indexing
 
+require_once __DIR__ . '/uuid_utils.php';
+
 if (!function_exists('_create_note_and_index_properties')) {
-    function _create_note_and_index_properties(PDO $pdo, int $page_id, string $content, int $order_index) {
-        $stmt_insert_note = $pdo->prepare("INSERT INTO Notes (page_id, content, order_index) VALUES (?, ?, ?)");
-        $stmt_insert_note->execute([$page_id, $content, $order_index]);
-        $noteId = $pdo->lastInsertId();
-        if (!$noteId) throw new Exception("Failed to create note record for welcome note.");
+    function _create_note_and_index_properties(PDO $pdo, string $page_id, string $content, int $order_index) {
+        $noteId = \App\UuidUtils::generateUuidV7();
+        $stmt_insert_note = $pdo->prepare("INSERT INTO Notes (id, page_id, content, order_index) VALUES (?, ?, ?, ?)");
+        $stmt_insert_note->execute([$noteId, $page_id, $content, $order_index]);
+        
         if (!empty(trim($content))) {
             // Only process properties if PatternProcessor is available
             if (class_exists('App\PatternProcessor')) {
@@ -24,10 +26,10 @@ if (!function_exists('_create_note_and_index_properties')) {
 
 if (!function_exists('_create_page_and_index_properties')) {
     function _create_page_and_index_properties(PDO $pdo, string $name, ?string $content = null) {
-        $stmt_create_page = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (?, ?)");
-        $stmt_create_page->execute([$name, $content]);
-        $pageId = $pdo->lastInsertId();
-        if (!$pageId) throw new Exception("Failed to create page record for '$name'.");
+        $pageId = \App\UuidUtils::generateUuidV7();
+        $stmt_create_page = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (?, ?, ?)");
+        $stmt_create_page->execute([$pageId, $name, $content]);
+        
         if ($content && !empty(trim($content))) {
             // Only process properties if PatternProcessor is available
             if (class_exists('App\PatternProcessor')) {

@@ -10,7 +10,7 @@ import { handleTransclusions } from '../app/page-loader.js';
 import { attachmentsAPI, notesAPI, pagesAPI } from '../api_client.js';
 import { decrypt } from '../utils.js';
 import { getCurrentPagePassword } from '../app/state.js';
-import { looksLikeTempId } from '../utils/uuid-utils.js';
+
 import {
     showSuggestions,
     hideSuggestions,
@@ -209,7 +209,7 @@ function renderNote(note, nestingLevel = 0) {
     contentWrapperEl.appendChild(contentEl);
 
     // Only create attachments div if the note actually has attachments
-    if (note.id && !looksLikeTempId(String(note.id)) && note.has_attachments) {
+            if (note.id && note.has_attachments) {
         const attachmentsEl = document.createElement('div');
         attachmentsEl.className = 'note-attachments';
         contentWrapperEl.appendChild(attachmentsEl);
@@ -236,7 +236,7 @@ function renderNote(note, nestingLevel = 0) {
         contentWrapperEl.classList.remove('dragover');
 
         const files = Array.from(e.dataTransfer.files);
-        if (files.length > 0 && note.id && !looksLikeTempId(String(note.id))) {
+        if (files.length > 0 && note.id) {
             const formData = new FormData();
             for (const file of files) {
                 formData.append('attachmentFile', file);
@@ -261,7 +261,7 @@ function renderNote(note, nestingLevel = 0) {
                 console.error('Error uploading file(s) via drag & drop:', error);
                 alert(`Failed to upload file(s): ${error.message}`);
             }
-        } else if (looksLikeTempId(String(note.id))) {
+        } else {
             alert('Please save the note (by adding some content) before adding attachments.');
         }
     });
@@ -525,7 +525,7 @@ function switchToEditMode(contentEl) {
     contentEl.addEventListener('blur', handleBlur);
 
     const handlePasteImage = async (event) => {
-        if (looksLikeTempId(String(noteId))) {
+        if (!noteId) {
             alert('Please save the note (by adding some content) before pasting images.');
             return;
         }
@@ -632,7 +632,7 @@ function normalizeNewlines(str) {
  */
 function switchToRenderedMode(contentEl) {
     const noteEl = contentEl.closest('.note-item');
-    if (noteEl && noteEl.dataset.noteId && !looksLikeTempId(noteEl.dataset.noteId)) {
+            if (noteEl && noteEl.dataset.noteId) {
         // It's important that saveNoteImmediately is available in this scope.
         // Assuming it's imported or globally available.
         // console.log('[DEBUG switchToRenderedMode] Calling saveNoteImmediately for noteId:', noteEl.dataset.noteId);
@@ -1522,7 +1522,7 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
     if (!noteItem || !contentEl) return;
 
     const noteId = noteItem.dataset.noteId;
-    if (!noteId || looksLikeTempId(noteId)) return;
+    if (!noteId) return;
     
     let rawContent = contentEl.dataset.rawContent;
     const currentMarker = checkbox.dataset.markerType.toUpperCase();

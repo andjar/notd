@@ -6,9 +6,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../template_processor.php';
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// Error reporting is handled by config.php
 
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
@@ -16,13 +14,10 @@ require_once __DIR__ . '/../response_utils.php'; // Include the new response uti
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
-// Log function for debugging
+// Log function for debugging (disabled for production)
 function logError($message, $context = []) {
-    $logMessage = date('Y-m-d H:i:s') . " - " . $message;
-    if (!empty($context)) {
-        $logMessage .= " - Context: " . json_encode($context);
-    }
-    error_log($logMessage);
+    // Disabled to prevent HTML output
+    // error_log($message . " - Context: " . json_encode($context));
 }
 
 // Validate input

@@ -1,13 +1,8 @@
 /**
  * UUID v7 utility functions for notd frontend
  * 
- * UUIDv7 provides time-ordered UUIDs with microsecond precision.
- * Format: xxxxxxxx-xxxx-7xxx-xxxx-xxxxxxxxxxxx
- * - First 48 bits: Unix timestamp in milliseconds
- * - 4 bits: Version (0111 for v7)
- * - 12 bits: Random data
- * - 2 bits: Variant (10)
- * - 62 bits: Random data
+ * Simple, reliable UUID v7 implementation without external dependencies.
+ * Based on the UUID v7 specification: https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-04.html
  */
 
 /**
@@ -25,7 +20,6 @@ export function generateUuidV7() {
     // Generate random bytes for the rest of the UUID
     const randomBytes = new Uint8Array(10);
     crypto.getRandomValues(randomBytes);
-    const randomHex = Array.from(randomBytes, b => b.toString(16).padStart(2, '0')).join('');
     
     // Build the UUID parts according to UUIDv7 spec
     // time_hi (32 bits): first 8 hex chars of timestamp
@@ -35,17 +29,19 @@ export function generateUuidV7() {
     const timeMid = timestampHex.slice(8, 12);
     
     // time_hi_and_version (16 bits): version (4 bits) + rand_a (12 bits)
-    const versionAndRandA = '7' + randomHex.slice(0, 3);
+    const randA = Array.from(randomBytes.slice(0, 2), b => b.toString(16).padStart(2, '0')).join('');
+    const versionAndRandA = '7' + randA.slice(0, 3);
     
     // clock_seq_hi_and_reserved + clock_seq_low (16 bits): variant (2 bits) + rand_b (14 bits)
-    const randBHi = (randomBytes[3] & 0x3f) | 0x80;  // Set variant bits to 10
-    const clockSeq = randBHi.toString(16).padStart(2, '0') + randomHex.slice(8, 10);
+    const randB = randomBytes[2];
+    const randBHi = (randB & 0x3f) | 0x80;  // Set variant bits to 10
+    const clockSeq = randBHi.toString(16).padStart(2, '0') + randomBytes[3].toString(16).padStart(2, '0');
     
-    // node (48 bits): rand_c (48 bits)
-    const node = randomHex.slice(10, 22);
+    // node (48 bits): rand_c (48 bits) - need 12 characters from 6 bytes
+    const randC = Array.from(randomBytes.slice(4, 10), b => b.toString(16).padStart(2, '0')).join('');
     
     // Format as standard UUID string
-    return `${timeHi}-${timeMid}-${versionAndRandA}-${clockSeq}-${node}`;
+    return `${timeHi}-${timeMid}-${versionAndRandA}-${clockSeq}-${randC}`;
 }
 
 /**
@@ -83,15 +79,6 @@ export function extractTimestamp(uuid) {
  * @returns {boolean} True if it looks like a UUID
  */
 export function looksLikeUuid(value) {
-    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-/**
- * Check if a value looks like a temporary ID (for cleanup purposes)
- * 
- * @param {any} value - The value to check
- * @returns {boolean} True if it looks like a temporary ID
- */
-export function looksLikeTempId(value) {
-    return typeof value === 'string' && value.startsWith('temp-');
-}

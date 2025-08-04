@@ -261,9 +261,6 @@ class WebhooksManager {
      */
     public function dispatchEvent(array $webhook, string $eventType, array $payload, bool $isVerification = false): array {
         if (defined('WEBHOOKS_ENABLED') && WEBHOOKS_ENABLED === false) {
-            // Log that webhooks are disabled (optional, but good for debugging)
-            error_log("Webhook dispatch aborted: WEBHOOKS_ENABLED is false. Webhook ID: " . $webhook['id'] . ", Event: " . $eventType);
-            
             // Return a specific response indicating the service is unavailable or feature is disabled
             // Using 0 for httpCode as cURL error would, and a clear message.
             return [false, 0, 'Webhook dispatch failed: Webhooks are disabled by configuration.'];

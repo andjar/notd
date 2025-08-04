@@ -29,25 +29,25 @@ class UuidUtils {
         
         // Generate random bytes for the rest of the UUID
         $random_bytes = random_bytes(10);
-        $random_hex = bin2hex($random_bytes);
         
         // Build the UUID parts according to UUIDv7 spec
-        // time_hi_and_version (32 bits): first 8 hex chars of timestamp
+        // time_hi (32 bits): first 8 hex chars of timestamp
         $time_hi = substr($timestamp_hex, 0, 8);
         
         // time_mid (16 bits): next 4 hex chars of timestamp  
         $time_mid = substr($timestamp_hex, 8, 4);
         
         // time_hi_and_version (16 bits): version (4 bits) + rand_a (12 bits)
-        $version_and_rand_a = '7' . substr($random_hex, 0, 3);
+        $rand_a = bin2hex(substr($random_bytes, 0, 2));
+        $version_and_rand_a = '7' . substr($rand_a, 0, 3);
         
         // clock_seq_hi_and_reserved + clock_seq_low (16 bits): variant (2 bits) + rand_b (14 bits)
-        $rand_b_hi = hexdec(substr($random_hex, 3, 2));
-        $rand_b_hi = ($rand_b_hi & 0x3f) | 0x80;  // Set variant bits to 10
-        $clock_seq = sprintf('%02x%s', $rand_b_hi, substr($random_hex, 5, 2));
+        $rand_b = ord($random_bytes[2]);
+        $rand_b_hi = ($rand_b & 0x3f) | 0x80;  // Set variant bits to 10
+        $clock_seq = sprintf('%02x%02x', $rand_b_hi, ord($random_bytes[3]));
         
-        // node (48 bits): rand_c (48 bits)
-        $node = substr($random_hex, 7, 12);
+        // node (48 bits): rand_c (48 bits) - need 12 characters from 6 bytes
+        $rand_c = bin2hex(substr($random_bytes, 4, 6));
         
         // Format as standard UUID string
         return sprintf(
@@ -56,7 +56,7 @@ class UuidUtils {
             $time_mid,
             $version_and_rand_a,
             $clock_seq,
-            $node
+            $rand_c
         );
     }
     
@@ -99,6 +99,6 @@ class UuidUtils {
      * @return bool True if it looks like a UUIDv7
      */
     public static function looksLikeUuid($value): bool {
-        return is_string($value) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value);
+        return is_string($value) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $value);
     }
 }

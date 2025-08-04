@@ -49,9 +49,6 @@ class PatternProcessor {
      * @return array Results with properties and modified content
      */
     public function processContent($content, $entityType, $entityId, $context = []) {
-        error_log("[PATTERN_PROCESSOR_DEBUG] Starting content processing for {$entityType} {$entityId}");
-        error_log("[PATTERN_PROCESSOR_DEBUG] Content: " . $content);
-        
         $results = [
             'properties' => [],
             'content' => $content,
@@ -64,47 +61,31 @@ class PatternProcessor {
             return $a['options']['priority'] <=> $b['options']['priority'];
         });
         
-        error_log("[PATTERN_PROCESSOR_DEBUG] Sorted handlers: " . json_encode(array_keys($sortedHandlers)));
-        
         foreach ($sortedHandlers as $name => $handler) {
             try {
-                error_log("[PATTERN_PROCESSOR_DEBUG] Executing handler: {$name}");
-                error_log("[PATTERN_PROCESSOR_DEBUG] Pattern: " . $handler['pattern']);
-                
                 $handlerResult = $this->executeHandler($name, $handler, $results['content'], $entityType, $entityId, $context);
                 
                 if ($handlerResult) {
-                    error_log("[PATTERN_PROCESSOR_DEBUG] Handler {$name} returned: " . json_encode($handlerResult));
-                    
                     // Only merge properties if the handler is configured to extract them
                     if (isset($handlerResult['properties']) && $handler['options']['extract_properties']) {
                         $results['properties'] = array_merge($results['properties'], $handlerResult['properties']);
-                        error_log("[PATTERN_PROCESSOR_DEBUG] Merged properties from {$name}: " . json_encode($handlerResult['properties']));
-                        error_log("[PATTERN_PROCESSOR_DEBUG] Current total properties: " . json_encode($results['properties']));
                     }
                     
                     // Update content if handler modifies it
                     if (isset($handlerResult['content']) && $handler['options']['modify_content']) {
                         $results['content'] = $handlerResult['content'];
-                        error_log("[PATTERN_PROCESSOR_DEBUG] Updated content from {$name}");
                     }
                     
                     // Store metadata
                     if (isset($handlerResult['metadata'])) {
                         $results['metadata'][$name] = $handlerResult['metadata'];
-                        error_log("[PATTERN_PROCESSOR_DEBUG] Stored metadata from {$name}");
                     }
-                } else {
-                    error_log("[PATTERN_PROCESSOR_DEBUG] Handler {$name} returned no results");
                 }
             } catch (Exception $e) {
-                error_log("[PATTERN_PROCESSOR_ERROR] Handler '{$name}' failed: " . $e->getMessage());
-                error_log("[PATTERN_PROCESSOR_ERROR] Stack trace: " . $e->getTraceAsString());
                 throw $e; // Re-throw to be caught by caller
             }
         }
         
-        error_log("[PATTERN_PROCESSOR_DEBUG] Final results: " . json_encode($results));
         return $results;
     }
     
@@ -112,15 +93,9 @@ class PatternProcessor {
      * Execute a single pattern handler
      */
     private function executeHandler($name, $handler, $content, $entityType, $entityId, $context) {
-        error_log("[PATTERN_PROCESSOR_DEBUG] Executing handler {$name} with pattern: " . $handler['pattern']);
-        error_log("[PATTERN_PROCESSOR_DEBUG] Content to match: " . $content);
-        
         if (preg_match_all($handler['pattern'], $content, $matches, PREG_SET_ORDER)) {
-            error_log("[PATTERN_PROCESSOR_DEBUG] Found " . count($matches) . " matches for handler {$name}");
-            error_log("[PATTERN_PROCESSOR_DEBUG] Matches: " . json_encode($matches));
             return call_user_func($handler['handler'], $matches, $content, $entityType, $entityId, $context, $this->pdo);
         }
-        error_log("[PATTERN_PROCESSOR_DEBUG] No matches found for handler {$name}");
         return null;
     }
     
@@ -146,7 +121,6 @@ class PatternProcessor {
             $taskStatusPattern = '/^(' . implode('|', TASK_STATES) . ')\s+(.*)$/m';
         } else {
             // Fallback to a default pattern if TASK_STATES is not defined or empty
-            error_log("[PATTERN_PROCESSOR_WARNING] TASK_STATES not defined or empty. Using default task status pattern.");
             $taskStatusPattern = '/^(TODO)\s+(.*)$/m';
         }
         $this->registerHandler('task_status', $taskStatusPattern, 
@@ -185,8 +159,6 @@ class PatternProcessor {
      * Handler for property patterns {key::value}
      */
     public function handleProperties($matches, $content, $entityType, $entityId, $context, $pdo) {
-        error_log("[PATTERN_PROCESSOR_DEBUG] Processing property matches with new regex: " . json_encode($matches));
-        
         // Use an array to preserve all properties, including duplicates
         $properties = [];
         
@@ -201,8 +173,6 @@ class PatternProcessor {
             $propertyValue = trim($match[3]);
             $weight = strlen($colons);
             
-            error_log("[PATTERN_PROCESSOR_DEBUG] Processing property: {$propertyName}, Colons: {$colons}, Value: {$propertyValue}, Weight: {$weight}");
-            
             // It's possible $propertyName or $propertyValue could be empty if regex allows, though current one requires them.
             if (!empty($propertyName)) { // Value can be empty
                 // Store all properties in array - preserve duplicates
@@ -213,15 +183,11 @@ class PatternProcessor {
                     'type' => 'property', // Retain type if useful, or simplify
                     'raw_match' => $match[0]
                 ];
-                error_log("[PATTERN_PROCESSOR_DEBUG] Stored property: " . json_encode(end($properties)));
-            } else {
-                error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty property name.");
             }
         }
         
         // Return all properties as indexed array
         $result = ['properties' => $properties];
-        error_log("[PATTERN_PROCESSOR_DEBUG] Returning properties: " . json_encode($result));
         return $result;
     }
     
@@ -331,14 +297,12 @@ class PatternProcessor {
      * Handler for SQL query patterns SQL{query}
      */
     private function handleSqlQueries($matches, $content, $entityType, $entityId, $context, $pdo) {
-        error_log("[PATTERN_PROCESSOR_DEBUG] Processing SQL query matches: " . json_encode($matches));
         $properties = [];
 
         foreach ($matches as $match) {
             $sqlQuery = trim($match[1]); // Captured SQL query
             
             if (!empty($sqlQuery)) {
-                error_log("[PATTERN_PROCESSOR_DEBUG] Processing SQL query: " . $sqlQuery);
                 $properties[] = [
                     'name' => 'sql_query', // Or a more descriptive name like 'dynamic_sql_query'
                     'value' => $sqlQuery,
@@ -346,14 +310,10 @@ class PatternProcessor {
                     'raw_match' => $match[0], // The full SQL{...} match
                     'weight' => defined('SPECIAL_STATE_WEIGHTS') && isset(SPECIAL_STATE_WEIGHTS['SQL']) ? SPECIAL_STATE_WEIGHTS['SQL'] : 4
                 ];
-                error_log("[PATTERN_PROCESSOR_DEBUG] Stored SQL query property: " . json_encode(end($properties)));
-            } else {
-                error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty SQL query.");
             }
         }
         
         $result = ['properties' => $properties];
-        error_log("[PATTERN_PROCESSOR_DEBUG] Returning SQL query properties: " . json_encode($result));
         return $result;
     }
     
@@ -362,7 +322,6 @@ class PatternProcessor {
      * Matches URLs starting with http:// or https://
      */
     private function handleExternalUrls($matches, $content, $entityType, $entityId, $context, $pdo) {
-        error_log("[PATTERN_PROCESSOR_DEBUG] Processing external URL matches: " . json_encode($matches));
         $properties = [];
 
         foreach ($matches as $match) {
@@ -374,7 +333,6 @@ class PatternProcessor {
                     $url = 'https://' . $url;
                 }
                 
-                error_log("[PATTERN_PROCESSOR_DEBUG] Processing URL: " . $url);
                 $properties[] = [
                     'name' => 'external_url',
                     'value' => $url,
@@ -382,14 +340,10 @@ class PatternProcessor {
                     'raw_match' => $match[0],
                     'weight' => defined('SPECIAL_STATE_WEIGHTS') && isset(SPECIAL_STATE_WEIGHTS['URL']) ? SPECIAL_STATE_WEIGHTS['URL'] : 4
                 ];
-                error_log("[PATTERN_PROCESSOR_DEBUG] Stored URL property: " . json_encode(end($properties)));
-            } else {
-                error_log("[PATTERN_PROCESSOR_DEBUG] Skipping empty URL.");
             }
         }
         
         $result = ['properties' => $properties];
-        error_log("[PATTERN_PROCESSOR_DEBUG] Returning URL properties: " . json_encode($result));
         return $result;
     }
     
@@ -400,7 +354,6 @@ class PatternProcessor {
      */
     public function saveProperties($properties, $entityType, $entityId) {
         require_once __DIR__ . '/../config.php'; // Ensure PROPERTY_WEIGHTS is loaded
-        error_log("[PATTERN_PROCESSOR_DEBUG] Saving properties for {$entityType} {$entityId}: " . json_encode($properties));
         // Group properties by name for efficient processing
         $propertiesByName = [];
         foreach ($properties as $property) {
@@ -410,7 +363,6 @@ class PatternProcessor {
             }
             $propertiesByName[$name][] = $property;
         }
-        error_log("[PATTERN_PROCESSOR_DEBUG] Grouped properties: " . json_encode($propertiesByName));
         // Process each property group
         foreach ($propertiesByName as $name => $propertyGroup) {
             try {
@@ -422,7 +374,6 @@ class PatternProcessor {
                 $otherIdColumn = ($entityType === 'note') ? 'page_id' : 'note_id';
                 if ($updateBehavior === 'append') {
                     $sql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight) VALUES (?, NULL, ?, ?, ?)";
-                    error_log("[PATTERN_PROCESSOR_DEBUG] Using SQL for property '{$name}': " . trim($sql));
                     $stmt = $this->pdo->prepare($sql);
                     foreach ($propertyGroup as $property) {
                         $params = [
@@ -431,10 +382,8 @@ class PatternProcessor {
                             $property['value'],
                             $weight
                         ];
-                        error_log("[PATTERN_PROCESSOR_DEBUG] Executing with params: " . json_encode($params));
                         $stmt->execute($params);
                         if ($property === reset($propertyGroup)) {
-                            error_log("[PATTERN_PROCESSOR_DEBUG] Dispatching trigger for {$name}");
                             $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
                         }
                     }
@@ -443,7 +392,6 @@ class PatternProcessor {
                     $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND name = ?";
                     $deleteStmt = $this->pdo->prepare($deleteSql);
                     $deleteStmt->execute([$entityId, $name]);
-                    error_log("[PATTERN_PROCESSOR_DEBUG] Deleted existing properties for {$idColumn}={$entityId}, name='{$name}'");
                     
                     // For each property in the group, insert it with its individual weight
                     foreach ($propertyGroup as $property) {
@@ -455,22 +403,13 @@ class PatternProcessor {
                         $insertStmt = $this->pdo->prepare($insertSql);
                         $insertStmt->execute([$entityId, $property['name'], $property['value'], $propertyWeight]);
                         
-                        if ($insertStmt->rowCount() > 0) {
-                            error_log("[PATTERN_PROCESSOR_DEBUG] Inserted property '{$property['name']}' with value '{$property['value']}' and weight {$propertyWeight}");
-                        } else {
-                            error_log("[PATTERN_PROCESSOR_DEBUG] Failed to insert property '{$property['name']}'");
-                        }
-                        
                         // Dispatch trigger for the first property in the group
                         if ($property === reset($propertyGroup)) {
-                            error_log("[PATTERN_PROCESSOR_DEBUG] Dispatching trigger for {$name}");
                             $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
                         }
                     }
                 }
             } catch (Exception $e) {
-                error_log("[PATTERN_PROCESSOR_ERROR] Error saving property group '$name' for $entityType $entityId: " . $e->getMessage());
-                error_log("[PATTERN_PROCESSOR_ERROR] Stack trace: " . $e->getTraceAsString());
                 throw $e; // Re-throw to allow transaction rollback
             }
         }
