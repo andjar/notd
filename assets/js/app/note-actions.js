@@ -235,6 +235,7 @@ export const debouncedSaveNote = debounce(async (noteEl) => {
 export async function handleAddRootNote() {
     const appStore = getAppStore();
     if (!appStore.currentPageId) return;
+    
     const noteId = generateUuidV7(); // Generate UUID directly instead of temporary ID
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
     const rootNotes = appStore.notes.filter(n => !n.parent_note_id);

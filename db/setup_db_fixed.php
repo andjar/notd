@@ -1,4 +1,5 @@
 <?php
+
 require_once __DIR__ . '/../config.php';
 
 if (!function_exists('log_setup_local')) {

@@ -159,7 +159,7 @@ const notesAPI = {
     getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
     getNoteWithChildren: (noteId) => apiRequest(`notes.php?id=${noteId}&include_children=true`),
     batchUpdateNotes: (operations) => {
-        const body = { action: 'batch', operations };
+        const body = { batch: true, operations };
         return apiRequest('notes.php', 'POST', body);
     },
     // Individual wrapper functions for convenience

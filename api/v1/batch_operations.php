@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
@@ -47,10 +50,30 @@ if (!function_exists('_indexPropertiesFromContent')) {
 
         if ($entityType === 'note') {
              try {
-                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
-                $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
-            } catch (PDOException $e) {
-                // Silently handle internal flag update errors
+                // Use a more robust approach with retry logic for database locks
+                $maxRetries = 3;
+                $retryCount = 0;
+                $success = false;
+                
+                while (!$success && $retryCount < $maxRetries) {
+                    try {
+                        $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
+                        $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
+                        $success = true;
+                    } catch (PDOException $e) {
+                        $retryCount++;
+                        if ($retryCount >= $maxRetries) {
+                            // Log the error but don't fail the entire operation
+                            error_log("Could not update Notes.internal flag for note $entityId after $maxRetries attempts. Error: " . $e->getMessage());
+                        } else {
+                            // Wait a bit before retrying
+                            usleep(100000); // 100ms
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Silently handle internal flag update errors to prevent breaking the main operation
+                error_log("Exception updating Notes.internal flag for note $entityId: " . $e->getMessage());
             }
         }
     }
@@ -250,6 +273,8 @@ if (!function_exists('_deleteNoteInBatch')) {
 
 if (!function_exists('_handleBatchOperations')) {
     function _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties) {
+
+        
         if (!is_array($operations)) {
             throw new Exception('Batch request validation failed: "operations" must be an array.');
         }
@@ -259,6 +284,8 @@ if (!function_exists('_handleBatchOperations')) {
         $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
         $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
         $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
+        
+
 
         foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? []);
         foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $includeParentProperties);
