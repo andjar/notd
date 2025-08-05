@@ -86,7 +86,7 @@ function test_database_after_fix(PDO $pdo) {
         echo "✅ Tables found: " . implode(', ', $tables) . "\n";
         
         // Test 2: Create a test page with UUID
-        require_once __DIR__ . '/../api/uuid_utils.php';
+        require_once __DIR__ . '/../api/UuidUtils.php';
         use App\UuidUtils;
         
         $testPageId = UuidUtils::generateUuidV7();

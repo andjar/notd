@@ -23,9 +23,9 @@ try {
     require_once __DIR__ . '/../response_utils.php';
     echo "✓ response_utils.php included successfully\n";
     
-    echo "Step 7: Including uuid_utils.php\n";
-    require_once __DIR__ . '/../uuid_utils.php';
-    echo "✓ uuid_utils.php included successfully\n";
+    echo "Step 7: Including UuidUtils.php\n";
+    require_once __DIR__ . '/../UuidUtils.php';
+    echo "✓ UuidUtils.php included successfully\n";
     
     echo "Step 8: Testing database connection\n";
     $pdo = get_db_connection();

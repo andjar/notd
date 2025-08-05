@@ -10,7 +10,7 @@ class TransclusionChildrenTest extends TestCase {
         // Include necessary files
         require_once __DIR__ . '/../api/db_connect.php';
         require_once __DIR__ . '/../api/DataManager.php';
-        require_once __DIR__ . '/../api/uuid_utils.php';
+        require_once __DIR__ . '/../api/UuidUtils.php';
         require_once __DIR__ . '/../config.php';
 
         // Create test database

@@ -3,7 +3,7 @@
 // api/db_helpers.php
 // Helper functions for creating notes and pages with property indexing
 
-require_once __DIR__ . '/uuid_utils.php';
+require_once __DIR__ . '/UuidUtils.php';
 
 if (!function_exists('_create_note_and_index_properties')) {
     function _create_note_and_index_properties(PDO $pdo, string $page_id, string $content, int $order_index) {

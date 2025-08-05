@@ -20,7 +20,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../response_utils.php';
-require_once __DIR__ . '/../uuid_utils.php';
+require_once __DIR__ . '/../UuidUtils.php';
 
 use App\UuidUtils;
 

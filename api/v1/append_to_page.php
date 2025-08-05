@@ -8,7 +8,7 @@ require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../validator_utils.php';
 require_once __DIR__ . '/../PatternProcessor.php';
-require_once __DIR__ . '/../uuid_utils.php';
+require_once __DIR__ . '/../UuidUtils.php';
 
 use App\UuidUtils;
 
