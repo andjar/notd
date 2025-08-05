@@ -1,4 +1,4 @@
-import { saveNoteImmediately, handleNoteKeyDown } from '../app/note-actions.js';
+import { saveNoteImmediately } from '../app/note-actions.js';
 import { getRawTextWithNewlines, normalizeNewlines, switchToEditMode, switchToRenderedMode } from '../ui/note-renderer.js';
 
 /**
@@ -93,9 +93,6 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
             document.execCommand('insertText', false, text);
         },
 
-        handleNoteKeyDown(event) {
-            // Call the imported handleNoteKeyDown function
-            return handleNoteKeyDown(event);
-        }
+
     }
 }

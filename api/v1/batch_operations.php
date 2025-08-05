@@ -116,6 +116,12 @@ if (!function_exists('_createNoteInBatch')) {
         $orderIndex = $payload['order_index'] ?? null;
         $collapsed = $payload['collapsed'] ?? 0;
 
+        // Validate note ID if provided
+        $noteId = $payload['id'] ?? \App\UuidUtils::generateUuidV7();
+        if (!UuidUtils::looksLikeUuid($noteId)) {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid note ID format provided'];
+        }
+
         try {
             // 1. Create the note record
             $sqlFields = ['page_id', 'content', 'parent_note_id', 'collapsed'];
@@ -126,7 +132,6 @@ if (!function_exists('_createNoteInBatch')) {
                 $sqlParams[':order_index'] = (int)$orderIndex;
             }
             
-            $noteId = \App\UuidUtils::generateUuidV7();
             $sqlFields[] = 'id';
             $sqlParams[':id'] = $noteId;
             
@@ -201,6 +206,16 @@ if (!function_exists('_updateNoteInBatch')) {
 }
         if (array_key_exists('parent_note_id', $payload)) {
             $newParentNoteId = $payload['parent_note_id'];
+            
+            // **FIX**: Validate that the parent note exists if it's not null
+            if ($newParentNoteId !== null && $newParentNoteId !== '') {
+                $parentCheckStmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
+                $parentCheckStmt->execute([$newParentNoteId]);
+                if (!$parentCheckStmt->fetch()) {
+                    return ['type' => 'update', 'status' => 'error', 'message' => "Parent note with ID {$newParentNoteId} not found.", 'id' => $noteId];
+                }
+            }
+            
             $setClauses[] = "parent_note_id = ?";
             $executeParams[] = $newParentNoteId;
         }
@@ -345,20 +360,29 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
 
             $dataManager = new \App\DataManager($pdo);
 
-            if ($ownsPdo) { // Only manage transactions if this function created the PDO connection
+            // **RACE CONDITION FIX**: Always ensure we have a transaction, even with external PDO
+            $externalTransaction = false;
+            if (!$ownsPdo && $pdo && !$pdo->inTransaction()) {
+                // External PDO without transaction - start our own
+                $pdo->beginTransaction();
+                $externalTransaction = true;
+            } elseif ($ownsPdo) {
+                // We own the PDO, start transaction
                 $pdo->beginTransaction();
             }
 
             $results = _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties);
 
-            if ($ownsPdo && $pdo->inTransaction()) { // Check inTransaction before commit
+            // **RACE CONDITION FIX**: Commit transaction if we started it
+            if (($ownsPdo || $externalTransaction) && $pdo->inTransaction()) {
                 $pdo->commit();
             }
 
             return ['results' => $results];
 
         } catch (Exception $e) {
-            if ($ownsPdo && $pdo && $pdo->inTransaction()) {
+            // **RACE CONDITION FIX**: Rollback transaction if we started it
+            if (($ownsPdo || $externalTransaction) && $pdo && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
 
