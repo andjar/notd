@@ -4,7 +4,7 @@
  */
 
 require_once __DIR__ . '/api/DataManager.php';
-require_once __DIR__ . '/api/uuid_utils.php';
+require_once __DIR__ . '/api/UuidUtils.php';
 
 use App\DataManager;
 use App\UuidUtils;

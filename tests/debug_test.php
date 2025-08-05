@@ -39,7 +39,7 @@ $files = [
     'api/PatternProcessor.php',
     'api/PropertyTriggerService.php',
     'api/v1/WebhooksManager.php',
-    'api/uuid_utils.php'
+    'api/UuidUtils.php'
 ];
 
 foreach ($files as $file) {

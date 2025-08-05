@@ -23,7 +23,7 @@ if (file_exists($autoloadPath)) {
     require_once __DIR__ . '/../api/response_utils.php';
     require_once __DIR__ . '/../api/validator_utils.php';
     require_once __DIR__ . '/../api/db_helpers.php';
-    require_once __DIR__ . '/../api/uuid_utils.php';
+    require_once __DIR__ . '/../api/UuidUtils.php';
     require_once __DIR__ . '/../db/setup_db.php';
     require_once __DIR__ . '/../api/db_connect.php';
     

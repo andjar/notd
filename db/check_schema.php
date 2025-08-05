@@ -62,7 +62,7 @@ function check_database_schema() {
         // Test UUID insertion
         echo "=== Testing UUID Insertion ===\n";
         try {
-            require_once __DIR__ . '/../api/uuid_utils.php';
+            require_once __DIR__ . '/../api/UuidUtils.php';
             // Note: use statements must be at the top level, not inside functions
             // We'll use the full class name instead
             

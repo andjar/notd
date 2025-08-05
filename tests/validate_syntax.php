@@ -13,7 +13,7 @@ $files = [
     'api/response_utils.php',
     'api/validator_utils.php',
     'api/db_helpers.php',
-    'api/uuid_utils.php',
+    'api/UuidUtils.php',
     'db/setup_db.php'
 ];
 

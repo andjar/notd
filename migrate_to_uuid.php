@@ -12,7 +12,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/api/db_connect.php';
-require_once __DIR__ . '/api/uuid_utils.php';
+require_once __DIR__ . '/api/UuidUtils.php';
 
 use App\UuidUtils;
 

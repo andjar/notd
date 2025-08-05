@@ -4,8 +4,8 @@
  */
 
 require_once __DIR__ . '/api/DataManager.php';
-require_once __DIR__ . '/api/uuid_utils.php';
-require_once __DIR__ . '/api/v1/notes.php';
+require_once __DIR__ . '/api/UuidUtils.php';
+require_once __DIR__ . '/api/v1/batch_operations.php';
 
 use App\DataManager;
 use App\UuidUtils;
@@ -44,8 +44,8 @@ $createOperation = [
     ]
 ];
 
-$tempIdMap = [];
-$result = _createNoteInBatch($pdo, $dataManager, $createOperation['payload'], $tempIdMap);
+$includeParentProperties = false;
+$result = \App\_createNoteInBatch($pdo, $dataManager, $createOperation['payload'], $includeParentProperties);
 
 if ($result['status'] === 'success') {
     echo "   ✅ Note created successfully\n";
@@ -68,7 +68,7 @@ $updateOperation = [
     ]
 ];
 
-$updateResult = _updateNoteInBatch($pdo, $dataManager, $updateOperation['payload'], $tempIdMap);
+$updateResult = \App\_updateNoteInBatch($pdo, $dataManager, $updateOperation['payload'], $includeParentProperties);
 
 if ($updateResult['status'] === 'success') {
     echo "   ✅ Note updated successfully\n";
@@ -94,7 +94,7 @@ $createChildOperation = [
     ]
 ];
 
-$childResult = _createNoteInBatch($pdo, $dataManager, $createChildOperation['payload'], $tempIdMap);
+$childResult = \App\_createNoteInBatch($pdo, $dataManager, $createChildOperation['payload'], $includeParentProperties);
 
 if ($childResult['status'] === 'success') {
     echo "   ✅ Child note created successfully\n";
@@ -126,7 +126,7 @@ $deleteChildOperation = [
     ]
 ];
 
-$deleteChildResult = _deleteNoteInBatch($pdo, $deleteChildOperation['payload'], $tempIdMap);
+$deleteChildResult = \App\_deleteNoteInBatch($pdo, $deleteChildOperation['payload']);
 
 if ($deleteChildResult['status'] === 'success') {
     echo "   ✅ Child note deleted successfully\n";
@@ -142,7 +142,7 @@ $deleteParentOperation = [
     ]
 ];
 
-$deleteParentResult = _deleteNoteInBatch($pdo, $deleteParentOperation['payload'], $tempIdMap);
+$deleteParentResult = \App\_deleteNoteInBatch($pdo, $deleteParentOperation['payload']);
 
 if ($deleteParentResult['status'] === 'success') {
     echo "   ✅ Parent note deleted successfully\n";
