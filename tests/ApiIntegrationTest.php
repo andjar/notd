@@ -327,7 +327,7 @@ class ApiIntegrationTest extends TestCase
         $this->assertEquals(400, $response['status_code']);
 
         // Test non-existent resource
-        $response = $this->makeRequest('GET', '/notes?id=999999');
+        $response = $this->makeRequest('GET', '/notes?id=00000000-0000-0000-0000-000000000000');
         $this->assertEquals(404, $response['status_code']);
 
         // Test invalid method

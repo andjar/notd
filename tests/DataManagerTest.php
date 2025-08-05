@@ -19,6 +19,7 @@ class DataManagerTest extends TestCase
 
     public function testGetPageById()
     {
+        // Get the Home page ID from the seeded data
         $stmt = $this->pdo->query("SELECT id FROM Pages WHERE name = 'Home'");
         $pageId = $stmt->fetchColumn();
 
@@ -29,6 +30,7 @@ class DataManagerTest extends TestCase
 
     public function testGetNoteProperties()
     {
+        // Get the first note ID from the seeded data
         $stmt = $this->pdo->query("SELECT id FROM Notes WHERE content = 'First note'");
         $noteId = $stmt->fetchColumn();
 
@@ -39,15 +41,17 @@ class DataManagerTest extends TestCase
 
     public function testParentPropertiesInheritance()
     {
+        // Get the Home page ID from the seeded data
         $stmt = $this->pdo->query("SELECT id FROM Pages WHERE name = 'Home'");
         $pageId = $stmt->fetchColumn();
 
-        // Create parent note
+        // Create parent note with UUID
         $parentId = \App\UuidUtils::generateUuidV7();
         $this->pdo->exec("INSERT INTO Notes (id, page_id, content) VALUES ('$parentId', '$pageId', 'Parent Note')");
 
         // Add property to parent
-        $this->pdo->exec("INSERT INTO Properties (note_id, name, value) VALUES ('$parentId', 'inherited', 'parent-value')");
+        $propId = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Properties (id, note_id, name, value) VALUES ('$propId', '$parentId', 'inherited', 'parent-value')");
 
         // Create child note with parent
         $childId = \App\UuidUtils::generateUuidV7();
@@ -62,6 +66,7 @@ class DataManagerTest extends TestCase
 
     public function testPropertyVisibilityRules()
     {
+        // Get the first note ID from the seeded data
         $stmt = $this->pdo->query("SELECT id FROM Notes WHERE content = 'First note'");
         $noteId = $stmt->fetchColumn();
         
