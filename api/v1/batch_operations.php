@@ -10,6 +10,7 @@ require_once __DIR__ . '/../PatternProcessor.php';
 require_once __DIR__ . '/../uuid_utils.php';
 
 use App\UuidUtils;
+use PDO;
 
 // Define the _indexPropertiesFromContent function if it doesn't exist
 if (!function_exists('_indexPropertiesFromContent')) {
@@ -82,11 +83,31 @@ if (!function_exists('_indexPropertiesFromContent')) {
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
     function _createNoteInBatch($pdo, $dataManager, $payload, $includeParentProperties) {
-        if (!isset($payload['page_id']) || !UuidUtils::looksLikeUuid($payload['page_id'])) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing or invalid page_id for create operation'];
+        $pageId = $payload['page_id'] ?? null;
+        $pageName = $payload['page_name'] ?? null;
+
+        if ($pageId && UuidUtils::looksLikeUuid($pageId)) {
+            // Page ID is provided and valid, proceed.
+        } elseif ($pageName) {
+            // Page name is provided, try to find or create the page.
+            try {
+                $stmt = $pdo->prepare("SELECT id FROM Pages WHERE name = ?");
+                $stmt->execute([$pageName]);
+                $pageId = $stmt->fetchColumn();
+
+                if (!$pageId) {
+                    // Page does not exist, create it.
+                    $pageId = UuidUtils::generateUuidV7();
+                    $insertStmt = $pdo->prepare("INSERT INTO Pages (id, name, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))");
+                    $insertStmt->execute([$pageId, $pageName]);
+                }
+            } catch (Exception $e) {
+                return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to find or create page by name: ' . $e->getMessage()];
+            }
+        } else {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing or invalid page_id or page_name for create operation'];
         }
 
-        $pageId = $payload['page_id'];
         $content = $payload['content'] ?? '';
         $parentNoteId = null;
         if (array_key_exists('parent_note_id', $payload)) {

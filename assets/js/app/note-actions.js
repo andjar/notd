@@ -99,8 +99,8 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         console.log("Batch operations to send:", operations);
         const batchResponse = await notesAPI.batchUpdateNotes(operations);
         let allSubOperationsSucceeded = true;
-        if (batchResponse && Array.isArray(batchResponse.results)) {
-            batchResponse.results.forEach(opResult => {
+        if (batchResponse && Array.isArray(batchResponse)) {
+            batchResponse.forEach(opResult => {
                 if (opResult.status === 'error') {
                     allSubOperationsSucceeded = false;
                     console.error(`[${userActionName} BATCH] Server reported sub-operation error:`, opResult);
@@ -121,7 +121,7 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
             console.error(`[${userActionName} BATCH] Invalid response structure from server:`, batchResponse);
         }
         if (!allSubOperationsSucceeded) {
-            const errorDetails = batchResponse.results
+            const errorDetails = (batchResponse || [])
                 .filter(r => r.status === 'error')
                 .map(r => `${r.type} operation: ${r.message || 'Unknown error'}`)
                 .join(', ');
@@ -234,7 +234,7 @@ export const debouncedSaveNote = debounce(async (noteEl) => {
 // --- Event Handlers for Structural Changes ---
 export async function handleAddRootNote() {
     const appStore = getAppStore();
-    if (!appStore.currentPageId) return;
+    if (!appStore.currentPageName) return;
     
     const noteId = generateUuidV7(); // Generate UUID directly instead of temporary ID
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
@@ -244,7 +244,7 @@ export async function handleAddRootNote() {
     
     const validSiblingUpdates = siblingUpdates;
     
-    const optimisticNewNote = { id: noteId, page_id: appStore.currentPageId, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
+    const optimisticNewNote = { id: noteId, page_name: appStore.currentPageName, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
     
     const password = appStore.pagePassword;
@@ -256,7 +256,7 @@ export async function handleAddRootNote() {
         isEncrypted = true;
     }
 
-    const operations = [{ type: 'create', payload: { id: noteId, page_id: appStore.currentPageId, content: contentForServer, parent_note_id: null, order_index: targetOrderIndex } }];
+    const operations = [{ type: 'create', payload: { id: noteId, page_name: appStore.currentPageName, content: contentForServer, parent_note_id: null, order_index: targetOrderIndex } }];
     validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     validSiblingUpdates.forEach(upd => {
@@ -291,7 +291,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     
     const validSiblingUpdates = siblingUpdates;
     
-    const optimisticNewNote = { id: noteId, page_id: appStore.currentPageId, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
+    const optimisticNewNote = { id: noteId, page_name: appStore.currentPageName, content: '', parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
 
     const password = appStore.pagePassword;
@@ -303,7 +303,7 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
         isEncrypted = true;
     }
     
-    const operations = [{ type: 'create', payload: { id: noteId, page_id: appStore.currentPageId, content: contentForServer, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex } }];
+    const operations = [{ type: 'create', payload: { id: noteId, page_name: appStore.currentPageName, content: contentForServer, parent_note_id: noteData.parent_note_id, order_index: targetOrderIndex } }];
     validSiblingUpdates.forEach(upd => operations.push({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }));
     
     // **OPTIMIZATION**: Update sibling order indices immediately (only for valid notes)
@@ -845,7 +845,7 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
     
     const optimisticNewNote = { 
         id: noteId, 
-        page_id: appStore.currentPageId, 
+        page_name: appStore.currentPageName, 
         content: '', 
         parent_note_id: noteData.id, 
         order_index: targetOrderIndex, 
@@ -865,7 +865,7 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
         type: 'create', 
         payload: { 
             id: noteId,
-            page_id: appStore.currentPageId, 
+            page_name: appStore.currentPageName, 
             content: contentForServer, 
             parent_note_id: noteData.id, 
             order_index: targetOrderIndex

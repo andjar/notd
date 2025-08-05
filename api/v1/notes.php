@@ -81,14 +81,15 @@ if ($method === 'GET') {
     try {
         if (isset($input['batch']) && $input['batch'] === true) {
             // Batch operations
-            error_log("Processing batch operations");
-            error_log("Input data: " . json_encode($input));
-            $operations = $input['operations'] ?? [];
-            error_log("Operations: " . json_encode($operations));
-            $includeParentProperties = (bool)($input['include_parent_properties'] ?? false);
+            $response = \App\process_batch_request($input, $pdo);
             
-            $results = _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties);
-            \App\ApiResponse::success($results);
+            if (isset($response['error'])) {
+                // The process_batch_request function returns detailed error information
+                \App\ApiResponse::error($response['error'], $response['status_code'] ?? 500);
+            } else {
+                // The client expects the array of results directly in the 'data' property
+                \App\ApiResponse::success($response['results']);
+            }
         } else {
             error_log("Not processing batch operations");
             error_log("Input data: " . json_encode($input));

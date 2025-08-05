@@ -19,30 +19,39 @@ class DataManagerTest extends TestCase
 
     public function testGetPageById()
     {
-        $page = $this->dm->getPageById(1);
+        $stmt = $this->pdo->query("SELECT id FROM Pages WHERE name = 'Home'");
+        $pageId = $stmt->fetchColumn();
+
+        $page = $this->dm->getPageById($pageId);
         $this->assertEquals('Home', $page['name']);
         $this->assertArrayHasKey('properties', $page);
     }
 
     public function testGetNoteProperties()
     {
-        $props = $this->dm->getNoteProperties(1);
+        $stmt = $this->pdo->query("SELECT id FROM Notes WHERE content = 'First note'");
+        $noteId = $stmt->fetchColumn();
+
+        $props = $this->dm->getNoteProperties($noteId);
         $this->assertArrayHasKey('status', $props);
         $this->assertEquals('TODO', $props['status'][0]['value']);
     }
 
     public function testParentPropertiesInheritance()
     {
+        $stmt = $this->pdo->query("SELECT id FROM Pages WHERE name = 'Home'");
+        $pageId = $stmt->fetchColumn();
+
         // Create parent note
-        $this->pdo->exec("INSERT INTO Notes (page_id, content) VALUES (1, 'Parent Note')");
-        $parentId = $this->pdo->lastInsertId();
+        $parentId = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Notes (id, page_id, content) VALUES ('$parentId', '$pageId', 'Parent Note')");
 
         // Add property to parent
-        $this->pdo->exec("INSERT INTO Properties (note_id, name, value) VALUES ($parentId, 'inherited', 'parent-value')");
+        $this->pdo->exec("INSERT INTO Properties (note_id, name, value) VALUES ('$parentId', 'inherited', 'parent-value')");
 
         // Create child note with parent
-        $this->pdo->exec("INSERT INTO Notes (page_id, parent_note_id, content) VALUES (1, $parentId, 'Child Note')");
-        $childId = $this->pdo->lastInsertId();
+        $childId = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Notes (id, page_id, parent_note_id, content) VALUES ('$childId', '$pageId', '$parentId', 'Child Note')");
 
         // Retrieve child with parent properties
         $child = $this->dm->getNoteById($childId, true, true);
@@ -53,7 +62,10 @@ class DataManagerTest extends TestCase
 
     public function testPropertyVisibilityRules()
     {
-        $props = $this->dm->getNoteProperties(1, false); // exclude internal
+        $stmt = $this->pdo->query("SELECT id FROM Notes WHERE content = 'First note'");
+        $noteId = $stmt->fetchColumn();
+        
+        $props = $this->dm->getNoteProperties($noteId, false); // exclude internal
         $this->assertArrayHasKey('status', $props);
         $this->assertArrayNotHasKey('internal', $props);
     }
