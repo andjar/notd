@@ -2,6 +2,13 @@
 
 namespace App;
 
+// Start output buffering to prevent header issues
+ob_start();
+
+// Disable error handlers before including config.php to prevent header issues
+set_error_handler(null);
+set_exception_handler(null);
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../template_processor.php';
@@ -98,81 +105,84 @@ try {
             if ($overrideMethod === 'PUT') {
                 // UPDATE LOGIC
                 // Validate: current_name, content (new_name is optional)
-                if (!isset($input['type']) || !in_array($input['type'], ['note', 'page'])) {
-                    \App\ApiResponse::error('Invalid template type', 400);
-                    exit;
-                }
                 if (!isset($input['current_name']) || !isset($input['content'])) {
-                    \App\ApiResponse::error('Current template name and content are required for update', 400);
+                    \App\ApiResponse::error('Missing required fields: current_name, content', 400);
                     exit;
                 }
-                $processor = new \App\TemplateProcessor($input['type']);
-                $success = false;
-                if (isset($input['new_name']) && $input['new_name'] !== $input['current_name']) {
-                    $deleteSuccess = $processor->deleteTemplate($input['current_name']);
-                    if ($deleteSuccess) {
-                         $success = $processor->addTemplate($input['new_name'], $input['content']);
-                    }
-                } else {
-                    $deleteSuccess = $processor->deleteTemplate($input['current_name']);
-                    if ($deleteSuccess) {
-                        $success = $processor->addTemplate($input['current_name'], $input['content']);
-                    }
-                }
-                if ($success) {
+
+                $type = $input['type'];
+                $currentName = $input['current_name'];
+                $content = $input['content'];
+                $newName = $input['new_name'] ?? $currentName;
+
+                try {
+                    $processor = new \App\TemplateProcessor($type);
+                    $processor->updateTemplate($currentName, $content, $newName);
                     \App\ApiResponse::success(['message' => 'Template updated successfully']);
-                } else {
-                    \App\ApiResponse::error('Failed to update template', 500);
-                }
-
-            } elseif ($overrideMethod === 'DELETE') {
-                // DELETE LOGIC
-                // Validate: name, type
-                if (!isset($input['type']) || !in_array($input['type'], ['note', 'page'])) {
-                    \App\ApiResponse::error('Invalid template type', 400);
-                    exit;
-                }
-                if (!isset($input['name'])) {
-                    \App\ApiResponse::error('Template name is required for deletion', 400);
-                    exit;
-                }
-                $processor = new \App\TemplateProcessor($input['type']);
-                $success = $processor->deleteTemplate($input['name']);
-                if ($success) {
-                    \App\ApiResponse::success(['message' => 'Template deleted successfully']);
-                } else {
-                    \App\ApiResponse::error('Failed to delete template', 500);
-                }
-
-            } elseif ($overrideMethod === null || $overrideMethod === 'POST') {
-                // CREATE LOGIC (original POST)
-                // Validate: type, name, content
-                if (!isset($input['type']) || !in_array($input['type'], ['note', 'page'])) {
-                    \App\ApiResponse::error('Invalid template type', 400);
-                    exit;
-                }
-                if (!isset($input['name']) || !isset($input['content'])) {
-                    \App\ApiResponse::error('Template name and content are required', 400);
-                    exit;
-                }
-                $processor = new \App\TemplateProcessor($input['type']);
-                $success = $processor->addTemplate($input['name'], $input['content']);
-                if ($success) {
-                    \App\ApiResponse::success(['message' => 'Template created successfully'], 201);
-                } else {
-                    \App\ApiResponse::error('Failed to create template', 500);
+                } catch (Exception $e) {
+                    logError("Error updating template", [
+                        'current_name' => $currentName,
+                        'new_name' => $newName,
+                        'error' => $e->getMessage()
+                    ]);
+                    \App\ApiResponse::error('Failed to update template: ' . $e->getMessage(), 500);
                 }
             } else {
-                \App\ApiResponse::error('Invalid _method specified for POST.', 400);
+                // CREATE LOGIC
+                if (!isset($input['name']) || !isset($input['content'])) {
+                    \App\ApiResponse::error('Missing required fields: name, content', 400);
+                    exit;
+                }
+
+                $type = $input['type'];
+                $name = $input['name'];
+                $content = $input['content'];
+
+                try {
+                    $processor = new \App\TemplateProcessor($type);
+                    $processor->createTemplate($name, $content);
+                    \App\ApiResponse::success(['message' => 'Template created successfully'], 201);
+                } catch (Exception $e) {
+                    logError("Error creating template", [
+                        'name' => $name,
+                        'error' => $e->getMessage()
+                    ]);
+                    \App\ApiResponse::error('Failed to create template: ' . $e->getMessage(), 500);
+                }
             }
+    }
+    else if ($method === 'DELETE') {
+        // DELETE LOGIC
+        if (!isset($input['name'])) {
+            \App\ApiResponse::error('Missing required field: name', 400);
+            exit;
+        }
+
+        $type = $input['type'];
+        $name = $input['name'];
+
+        try {
+            $processor = new \App\TemplateProcessor($type);
+            $processor->deleteTemplate($name);
+            \App\ApiResponse::success(['message' => 'Template deleted successfully']);
+        } catch (Exception $e) {
+            logError("Error deleting template", [
+                'name' => $name,
+                'error' => $e->getMessage()
+            ]);
+            \App\ApiResponse::error('Failed to delete template: ' . $e->getMessage(), 500);
+        }
     }
     else {
         \App\ApiResponse::error('Method not allowed', 405);
     }
 } catch (Exception $e) {
-    logError("Unhandled exception", [
+    logError("Unhandled exception in templates.php", [
         'error' => $e->getMessage(),
         'trace' => $e->getTraceAsString()
     ]);
-    \App\ApiResponse::error($e->getMessage(), 500, 'Check server logs for more information');
+    \App\ApiResponse::error('Server error: ' . $e->getMessage(), 500);
 }
+
+// End output buffering and send the response
+ob_end_flush();

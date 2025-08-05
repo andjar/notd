@@ -1,4 +1,7 @@
 <?php
+
+namespace App;
+
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
@@ -7,6 +10,7 @@ require_once __DIR__ . '/../PatternProcessor.php';
 require_once __DIR__ . '/../uuid_utils.php';
 
 use App\UuidUtils;
+use PDO;
 
 // Define the _indexPropertiesFromContent function if it doesn't exist
 if (!function_exists('_indexPropertiesFromContent')) {
@@ -47,10 +51,30 @@ if (!function_exists('_indexPropertiesFromContent')) {
 
         if ($entityType === 'note') {
              try {
-                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
-                $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
-            } catch (PDOException $e) {
-                // Silently handle internal flag update errors
+                // Use a more robust approach with retry logic for database locks
+                $maxRetries = 3;
+                $retryCount = 0;
+                $success = false;
+                
+                while (!$success && $retryCount < $maxRetries) {
+                    try {
+                        $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
+                        $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
+                        $success = true;
+                    } catch (PDOException $e) {
+                        $retryCount++;
+                        if ($retryCount >= $maxRetries) {
+                            // Log the error but don't fail the entire operation
+                            error_log("Could not update Notes.internal flag for note $entityId after $maxRetries attempts. Error: " . $e->getMessage());
+                        } else {
+                            // Wait a bit before retrying
+                            usleep(100000); // 100ms
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Silently handle internal flag update errors to prevent breaking the main operation
+                error_log("Exception updating Notes.internal flag for note $entityId: " . $e->getMessage());
             }
         }
     }
@@ -59,11 +83,31 @@ if (!function_exists('_indexPropertiesFromContent')) {
 // Batch operation helper functions
 if (!function_exists('_createNoteInBatch')) {
     function _createNoteInBatch($pdo, $dataManager, $payload, $includeParentProperties) {
-        if (!isset($payload['page_id']) || !UuidUtils::looksLikeUuid($payload['page_id'])) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing or invalid page_id for create operation'];
+        $pageId = $payload['page_id'] ?? null;
+        $pageName = $payload['page_name'] ?? null;
+
+        if ($pageId && UuidUtils::looksLikeUuid($pageId)) {
+            // Page ID is provided and valid, proceed.
+        } elseif ($pageName) {
+            // Page name is provided, try to find or create the page.
+            try {
+                $stmt = $pdo->prepare("SELECT id FROM Pages WHERE name = ?");
+                $stmt->execute([$pageName]);
+                $pageId = $stmt->fetchColumn();
+
+                if (!$pageId) {
+                    // Page does not exist, create it.
+                    $pageId = UuidUtils::generateUuidV7();
+                    $insertStmt = $pdo->prepare("INSERT INTO Pages (id, name, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))");
+                    $insertStmt->execute([$pageId, $pageName]);
+                }
+            } catch (Exception $e) {
+                return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to find or create page by name: ' . $e->getMessage()];
+            }
+        } else {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing or invalid page_id or page_name for create operation'];
         }
 
-        $pageId = $payload['page_id'];
         $content = $payload['content'] ?? '';
         $parentNoteId = null;
         if (array_key_exists('parent_note_id', $payload)) {
@@ -71,6 +115,12 @@ if (!function_exists('_createNoteInBatch')) {
         }
         $orderIndex = $payload['order_index'] ?? null;
         $collapsed = $payload['collapsed'] ?? 0;
+
+        // Validate note ID if provided
+        $noteId = $payload['id'] ?? \App\UuidUtils::generateUuidV7();
+        if (!UuidUtils::looksLikeUuid($noteId)) {
+            return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid note ID format provided'];
+        }
 
         try {
             // 1. Create the note record
@@ -82,7 +132,6 @@ if (!function_exists('_createNoteInBatch')) {
                 $sqlParams[':order_index'] = (int)$orderIndex;
             }
             
-            $noteId = \App\UuidUtils::generateUuidV7();
             $sqlFields[] = 'id';
             $sqlParams[':id'] = $noteId;
             
@@ -157,6 +206,16 @@ if (!function_exists('_updateNoteInBatch')) {
 }
         if (array_key_exists('parent_note_id', $payload)) {
             $newParentNoteId = $payload['parent_note_id'];
+            
+            // **FIX**: Validate that the parent note exists if it's not null
+            if ($newParentNoteId !== null && $newParentNoteId !== '') {
+                $parentCheckStmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
+                $parentCheckStmt->execute([$newParentNoteId]);
+                if (!$parentCheckStmt->fetch()) {
+                    return ['type' => 'update', 'status' => 'error', 'message' => "Parent note with ID {$newParentNoteId} not found.", 'id' => $noteId];
+                }
+            }
+            
             $setClauses[] = "parent_note_id = ?";
             $executeParams[] = $newParentNoteId;
         }
@@ -250,6 +309,8 @@ if (!function_exists('_deleteNoteInBatch')) {
 
 if (!function_exists('_handleBatchOperations')) {
     function _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties) {
+
+        
         if (!is_array($operations)) {
             throw new Exception('Batch request validation failed: "operations" must be an array.');
         }
@@ -259,6 +320,8 @@ if (!function_exists('_handleBatchOperations')) {
         $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
         $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
         $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
+        
+
 
         foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? []);
         foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $includeParentProperties);
@@ -297,20 +360,29 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
 
             $dataManager = new \App\DataManager($pdo);
 
-            if ($ownsPdo) { // Only manage transactions if this function created the PDO connection
+            // **RACE CONDITION FIX**: Always ensure we have a transaction, even with external PDO
+            $externalTransaction = false;
+            if (!$ownsPdo && $pdo && !$pdo->inTransaction()) {
+                // External PDO without transaction - start our own
+                $pdo->beginTransaction();
+                $externalTransaction = true;
+            } elseif ($ownsPdo) {
+                // We own the PDO, start transaction
                 $pdo->beginTransaction();
             }
 
             $results = _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties);
 
-            if ($ownsPdo && $pdo->inTransaction()) { // Check inTransaction before commit
+            // **RACE CONDITION FIX**: Commit transaction if we started it
+            if (($ownsPdo || $externalTransaction) && $pdo->inTransaction()) {
                 $pdo->commit();
             }
 
             return ['results' => $results];
 
         } catch (Exception $e) {
-            if ($ownsPdo && $pdo && $pdo->inTransaction()) {
+            // **RACE CONDITION FIX**: Rollback transaction if we started it
+            if (($ownsPdo || $externalTransaction) && $pdo && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
 

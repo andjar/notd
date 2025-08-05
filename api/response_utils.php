@@ -28,6 +28,11 @@ if (!function_exists('send_json_error_response')) {
 
 class ApiResponse {
     public static function success($data, $statusCode = 200, $metadata = []) {
+        // Clear any output that might have been sent
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
         http_response_code($statusCode);
         header('Content-Type: application/json');
         
@@ -41,9 +46,15 @@ class ApiResponse {
         }
 
         echo json_encode($response);
+        exit;
     }
 
     public static function error($message, $statusCode = 400, $details = null) {
+        // Clear any output that might have been sent
+        if (ob_get_level()) {
+            ob_clean();
+        }
+        
         http_response_code($statusCode);
         header('Content-Type: application/json');
         
@@ -57,6 +68,7 @@ class ApiResponse {
         }
 
         echo json_encode($response);
+        exit;
     }
 }
 ?>

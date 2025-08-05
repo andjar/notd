@@ -20,20 +20,30 @@ class PropertyTest extends TestCase
 
     public function testSystemPropertyAppendBehavior()
     {
+        // Get the first note ID from the seeded data
+        $stmt = $this->pdo->query("SELECT id FROM Notes WHERE content = 'First note'");
+        $noteId = $stmt->fetchColumn();
+        
         // Add two system properties with same name and weight=4 (should append)
-        $this->pdo->exec("INSERT INTO Properties (note_id, name, value, weight) VALUES (1, 'log', 'entry1', 4)");
-        $this->pdo->exec("INSERT INTO Properties (note_id, name, value, weight) VALUES (1, 'log', 'entry2', 4)");
+        $prop1Id = \App\UuidUtils::generateUuidV7();
+        $prop2Id = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Properties (id, note_id, name, value, weight) VALUES ('$prop1Id', '$noteId', 'log', 'entry1', 4)");
+        $this->pdo->exec("INSERT INTO Properties (id, note_id, name, value, weight) VALUES ('$prop2Id', '$noteId', 'log', 'entry2', 4)");
 
-        $props = $this->dm->getNoteProperties(1, true);
+        $props = $this->dm->getNoteProperties($noteId, true);
         $this->assertCount(2, $props['log']);
     }
 
     public function testPropertyWeightConfiguration()
     {
-        $internalProps = $this->dm->getNoteProperties(1, false);
+        // Get the first note ID from the seeded data
+        $stmt = $this->pdo->query("SELECT id FROM Notes WHERE content = 'First note'");
+        $noteId = $stmt->fetchColumn();
+        
+        $internalProps = $this->dm->getNoteProperties($noteId, false);
         $this->assertArrayNotHasKey('internal', $internalProps); // weight=3 should be hidden unless requested
 
-        $allProps = $this->dm->getNoteProperties(1, true);
+        $allProps = $this->dm->getNoteProperties($noteId, true);
         $this->assertArrayHasKey('internal', $allProps);
     }
 
@@ -43,14 +53,18 @@ class PropertyTest extends TestCase
         // This was the bug we fixed where only the last property was retained
         
         // Create a test page with multiple properties of the same name
-        $this->pdo->exec("INSERT INTO Pages (name, content) VALUES ('Multiple Props Test', 'Test content')");
-        $pageId = $this->pdo->lastInsertId();
+        $pageId = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Pages (id, name, content) VALUES ('$pageId', 'Multiple Props Test', 'Test content')");
         
         // Add multiple properties with the same name but different values
-        $this->pdo->exec("INSERT INTO Properties (page_id, name, value, weight) VALUES ($pageId, 'favorite', 'true', 2)");
-        $this->pdo->exec("INSERT INTO Properties (page_id, name, value, weight) VALUES ($pageId, 'favorite', 'false', 2)");
-        $this->pdo->exec("INSERT INTO Properties (page_id, name, value, weight) VALUES ($pageId, 'type', 'person', 2)");
-        $this->pdo->exec("INSERT INTO Properties (page_id, name, value, weight) VALUES ($pageId, 'type', 'journal', 2)");
+        $prop1Id = \App\UuidUtils::generateUuidV7();
+        $prop2Id = \App\UuidUtils::generateUuidV7();
+        $prop3Id = \App\UuidUtils::generateUuidV7();
+        $prop4Id = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Properties (id, page_id, name, value, weight) VALUES ('$prop1Id', '$pageId', 'favorite', 'true', 2)");
+        $this->pdo->exec("INSERT INTO Properties (id, page_id, name, value, weight) VALUES ('$prop2Id', '$pageId', 'favorite', 'false', 2)");
+        $this->pdo->exec("INSERT INTO Properties (id, page_id, name, value, weight) VALUES ('$prop3Id', '$pageId', 'type', 'person', 2)");
+        $this->pdo->exec("INSERT INTO Properties (id, page_id, name, value, weight) VALUES ('$prop4Id', '$pageId', 'type', 'journal', 2)");
         
         // Get page properties
         $page = $this->dm->getPageById($pageId);
@@ -79,8 +93,8 @@ class PropertyTest extends TestCase
         require_once __DIR__ . '/../api/PatternProcessor.php';
         
         // Create a test page
-        $this->pdo->exec("INSERT INTO Pages (name, content) VALUES ('Extraction Test', 'Test content')");
-        $pageId = $this->pdo->lastInsertId();
+        $pageId = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Pages (id, name, content) VALUES ('$pageId', 'Extraction Test', 'Test content')");
         
         // Test content with multiple properties of the same name
         $testContent = "{favorite::true} {type::person} {favorite::false} {type::journal}";
@@ -122,12 +136,14 @@ class PropertyTest extends TestCase
     {
         // Test that replace behavior correctly handles multiple properties
         // Create a page with initial properties
-        $this->pdo->exec("INSERT INTO Pages (name, content) VALUES ('Replace Test', 'Test content')");
-        $pageId = $this->pdo->lastInsertId();
+        $pageId = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Pages (id, name, content) VALUES ('$pageId', 'Replace Test', 'Test content')");
         
         // Add initial properties
-        $this->pdo->exec("INSERT INTO Properties (page_id, name, value, weight) VALUES ($pageId, 'status', 'old', 2)");
-        $this->pdo->exec("INSERT INTO Properties (page_id, name, value, weight) VALUES ($pageId, 'priority', 'low', 2)");
+        $prop1Id = \App\UuidUtils::generateUuidV7();
+        $prop2Id = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Properties (id, page_id, name, value, weight) VALUES ('$prop1Id', '$pageId', 'status', 'old', 2)");
+        $this->pdo->exec("INSERT INTO Properties (id, page_id, name, value, weight) VALUES ('$prop2Id', '$pageId', 'priority', 'low', 2)");
         
         // Simulate content update with new properties (replace behavior)
         $newContent = "{status::new} {priority::high} {status::active}";

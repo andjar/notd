@@ -512,8 +512,7 @@ function renderBacklinks($backlinks) {
                                     @click="editNote()"
                                     @blur="isEditing = false"
                                     @input="handleInput($event)"
-                                    @paste="handlePaste($event)"
-                                    @keydown="handleNoteKeyDown($event)">
+                                    @paste="handlePaste($event)">
                                 </div>
                                 <div class="note-attachments"></div>
                             </div>
@@ -543,8 +542,7 @@ function renderBacklinks($backlinks) {
                                                 @click="editNote()"
                                                 @blur="isEditing = false"
                                                 @input="handleInput($event)"
-                                                @paste="handlePaste($event)"
-                                                @keydown="handleNoteKeyDown($event)">
+                                                @paste="handlePaste($event)">
                                             </div>
                                             <div class="note-attachments"></div>
                                         </div>
@@ -575,8 +573,7 @@ function renderBacklinks($backlinks) {
                                                             @click="editNote()"
                                                             @blur="isEditing = false"
                                                             @input="handleInput($event)"
-                                                            @paste="handlePaste($event)"
-                                                            @keydown="handleNoteKeyDown($event)">
+                                                            @paste="handlePaste($event)">
                                                         </div>
                                                         <div class="note-attachments"></div>
                                                     </div>

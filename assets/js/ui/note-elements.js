@@ -311,23 +311,20 @@ export async function handleNoteDrop(evt) {
     updateNoteVisualHierarchy(evt.item, newParentId);
 
     try {
-        const batchResponse = await window.notesAPI.batchUpdateNotes(operations);
+        // **FIX**: Use the new batch operations system with proper error handling
+        const { executeBatchOperations } = await import('../app/note-actions.js');
         
-        // Validate response
-        let allOperationsSucceeded = true;
-        if (batchResponse && Array.isArray(batchResponse.results)) {
-            batchResponse.results.forEach(opResult => {
-                if (opResult.status === 'error') {
-                    allOperationsSucceeded = false;
-                    console.error('[Drag Drop] Server reported error:', opResult);
-                }
-            });
-        } else {
-            allOperationsSucceeded = false;
-            console.error('[Drag Drop] Invalid response structure:', batchResponse);
-        }
+        const success = await executeBatchOperations(
+            originalNotesState,
+            operations,
+            () => {
+                // Optimistic DOM updater - visual changes already done above
+                console.log('[Drag Drop] Optimistic updates applied');
+            },
+            'Drag Drop'
+        );
         
-        if (!allOperationsSucceeded) {
+        if (!success) {
             throw new Error('One or more drag-drop operations failed on the server');
         }
         

@@ -23,8 +23,28 @@ class PropertyTriggerService {
 
     private function handleInternalPropertyForNote($entityId, $propertyName, $propertyValue) {
         if ($propertyName === 'internal') {
-            $stmt = $this->pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
-            $stmt->execute([(int)$propertyValue, $entityId]);
+            // Add retry logic for database locks
+            $maxRetries = 3;
+            $retryCount = 0;
+            $success = false;
+            
+            while (!$success && $retryCount < $maxRetries) {
+                try {
+                    $stmt = $this->pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
+                    $stmt->execute([(int)$propertyValue, $entityId]);
+                    $success = true;
+                } catch (PDOException $e) {
+                    $retryCount++;
+                    if ($retryCount >= $maxRetries) {
+                        // Log the error but don't fail the entire operation
+                        error_log("Could not update Notes.internal flag for note $entityId after $maxRetries attempts. Error: " . $e->getMessage());
+                        break;
+                    } else {
+                        // Wait a bit before retrying
+                        usleep(100000); // 100ms
+                    }
+                }
+            }
         }
     }
 

@@ -3,8 +3,8 @@
 namespace App;
 
 // Unified Pattern Processing System
-require_once 'db_connect.php';
-require_once 'PropertyTriggerService.php'; // New trigger service
+require_once __DIR__ . '/db_connect.php';
+require_once __DIR__ . '/PropertyTriggerService.php'; // New trigger service
 
 /**
  * Pattern Processing Registry and Engine
@@ -372,45 +372,67 @@ class PatternProcessor {
                     : 'replace';
                 $idColumn = ($entityType === 'note') ? 'note_id' : 'page_id';
                 $otherIdColumn = ($entityType === 'note') ? 'page_id' : 'note_id';
-                if ($updateBehavior === 'append') {
-                    $sql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight) VALUES (?, NULL, ?, ?, ?)";
-                    $stmt = $this->pdo->prepare($sql);
-                    foreach ($propertyGroup as $property) {
-                        $params = [
-                            $entityId,
-                            $property['name'],
-                            $property['value'],
-                            $weight
-                        ];
-                        $stmt->execute($params);
-                        if ($property === reset($propertyGroup)) {
-                            $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
+                
+                // Add retry logic for database operations
+                $maxRetries = 3;
+                $retryCount = 0;
+                $success = false;
+                
+                while (!$success && $retryCount < $maxRetries) {
+                    try {
+                        if ($updateBehavior === 'append') {
+                            $sql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight) VALUES (?, NULL, ?, ?, ?)";
+                            $stmt = $this->pdo->prepare($sql);
+                            foreach ($propertyGroup as $property) {
+                                $params = [
+                                    $entityId,
+                                    $property['name'],
+                                    $property['value'],
+                                    $weight
+                                ];
+                                $stmt->execute($params);
+                                if ($property === reset($propertyGroup)) {
+                                    $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
+                                }
+                            }
+                        } else { // replace
+                            // First, delete all existing properties for this entity and name
+                            $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND name = ?";
+                            $deleteStmt = $this->pdo->prepare($deleteSql);
+                            $deleteStmt->execute([$entityId, $name]);
+                            
+                            // For each property in the group, insert it with its individual weight
+                            foreach ($propertyGroup as $property) {
+                                $propertyWeight = isset($property['weight']) ? $property['weight'] : 3;
+                                
+                                // Insert new property
+                                $insertSql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight, created_at, updated_at) 
+                                            VALUES (?, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+                                $insertStmt = $this->pdo->prepare($insertSql);
+                                $insertStmt->execute([$entityId, $property['name'], $property['value'], $propertyWeight]);
+                                
+                                // Dispatch trigger for the first property in the group
+                                if ($property === reset($propertyGroup)) {
+                                    $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
+                                }
+                            }
                         }
-                    }
-                } else { // replace
-                    // First, delete all existing properties for this entity and name
-                    $deleteSql = "DELETE FROM Properties WHERE {$idColumn} = ? AND name = ?";
-                    $deleteStmt = $this->pdo->prepare($deleteSql);
-                    $deleteStmt->execute([$entityId, $name]);
-                    
-                    // For each property in the group, insert it with its individual weight
-                    foreach ($propertyGroup as $property) {
-                        $propertyWeight = isset($property['weight']) ? $property['weight'] : 3;
-                        
-                        // Insert new property
-                        $insertSql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight, created_at, updated_at) 
-                                    VALUES (?, NULL, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
-                        $insertStmt = $this->pdo->prepare($insertSql);
-                        $insertStmt->execute([$entityId, $property['name'], $property['value'], $propertyWeight]);
-                        
-                        // Dispatch trigger for the first property in the group
-                        if ($property === reset($propertyGroup)) {
-                            $this->propertyTriggerService->dispatch($entityType, $entityId, $name, $property['value']);
+                        $success = true;
+                    } catch (PDOException $e) {
+                        $retryCount++;
+                        if ($retryCount >= $maxRetries) {
+                            // Log the error but don't fail the entire operation
+                            error_log("Could not save properties for {$entityType} {$entityId} after {$maxRetries} attempts. Error: " . $e->getMessage());
+                            break;
+                        } else {
+                            // Wait a bit before retrying
+                            usleep(100000); // 100ms
                         }
                     }
                 }
             } catch (Exception $e) {
-                throw $e; // Re-throw to allow transaction rollback
+                // Log the error but don't fail the entire operation
+                error_log("Exception saving properties for {$entityType} {$entityId}: " . $e->getMessage());
             }
         }
     }

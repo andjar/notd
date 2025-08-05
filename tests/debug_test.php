@@ -24,7 +24,8 @@ $classes = [
     'App\DataManager',
     'App\PatternProcessor',
     'App\PropertyTriggerService',
-    'App\WebhooksManager'
+    'App\WebhooksManager',
+    'App\UuidUtils'
 ];
 
 foreach ($classes as $class) {
@@ -37,7 +38,8 @@ $files = [
     'api/DataManager.php',
     'api/PatternProcessor.php',
     'api/PropertyTriggerService.php',
-    'api/v1/WebhooksManager.php'
+    'api/v1/WebhooksManager.php',
+    'api/uuid_utils.php'
 ];
 
 foreach ($files as $file) {
@@ -67,6 +69,14 @@ try {
         echo "   ✅ Pages returned: " . count($pages['data']) . "\n";
     } else {
         echo "   ❌ DataManager class not found\n";
+    }
+    
+    if (class_exists('App\UuidUtils')) {
+        $uuid = \App\UuidUtils::generateUuidV7();
+        echo "   ✅ UUID generated: " . $uuid . "\n";
+        echo "   ✅ UUID is valid: " . (\App\UuidUtils::isValidUuidV7($uuid) ? 'YES' : 'NO') . "\n";
+    } else {
+        echo "   ❌ UuidUtils class not found\n";
     }
     
 } catch (Exception $e) {

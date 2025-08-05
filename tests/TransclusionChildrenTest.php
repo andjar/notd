@@ -10,6 +10,7 @@ class TransclusionChildrenTest extends TestCase {
         // Include necessary files
         require_once __DIR__ . '/../api/db_connect.php';
         require_once __DIR__ . '/../api/DataManager.php';
+        require_once __DIR__ . '/../api/uuid_utils.php';
         require_once __DIR__ . '/../config.php';
 
         // Create test database
@@ -28,30 +29,30 @@ class TransclusionChildrenTest extends TestCase {
 
     private function createTestPageAndNotes() {
         // Create a test page with unique name
+        $pageId = \App\UuidUtils::generateUuidV7();
         $uniquePageName = 'Test Page ' . uniqid();
-        $pageStmt = $this->pdo->prepare("INSERT INTO Pages (name, content, active) VALUES (?, ?, 1)");
-        $pageStmt->execute([$uniquePageName, 'Test page content']);
-        $pageId = $this->pdo->lastInsertId();
+        $pageStmt = $this->pdo->prepare("INSERT INTO Pages (id, name, content, active) VALUES (?, ?, ?, 1)");
+        $pageStmt->execute([$pageId, $uniquePageName, 'Test page content']);
 
         // Create parent note
-        $parentStmt = $this->pdo->prepare("INSERT INTO Notes (page_id, content, order_index, active) VALUES (?, ?, ?, 1)");
-        $parentStmt->execute([$pageId, 'Parent note content', 1]);
-        $parentId = $this->pdo->lastInsertId();
+        $parentId = \App\UuidUtils::generateUuidV7();
+        $parentStmt = $this->pdo->prepare("INSERT INTO Notes (id, page_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
+        $parentStmt->execute([$parentId, $pageId, 'Parent note content', 1]);
 
         // Create child note 1
-        $child1Stmt = $this->pdo->prepare("INSERT INTO Notes (page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
-        $child1Stmt->execute([$pageId, $parentId, 'Child 1 content', 1]);
-        $child1Id = $this->pdo->lastInsertId();
+        $child1Id = \App\UuidUtils::generateUuidV7();
+        $child1Stmt = $this->pdo->prepare("INSERT INTO Notes (id, page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, ?, 1)");
+        $child1Stmt->execute([$child1Id, $pageId, $parentId, 'Child 1 content', 1]);
 
         // Create child note 2
-        $child2Stmt = $this->pdo->prepare("INSERT INTO Notes (page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
-        $child2Stmt->execute([$pageId, $parentId, 'Child 2 content', 2]);
-        $child2Id = $this->pdo->lastInsertId();
+        $child2Id = \App\UuidUtils::generateUuidV7();
+        $child2Stmt = $this->pdo->prepare("INSERT INTO Notes (id, page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, ?, 1)");
+        $child2Stmt->execute([$child2Id, $pageId, $parentId, 'Child 2 content', 2]);
 
         // Create grandchild note
-        $grandchildStmt = $this->pdo->prepare("INSERT INTO Notes (page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
-        $grandchildStmt->execute([$pageId, $child1Id, 'Grandchild content', 1]);
-        $grandchildId = $this->pdo->lastInsertId();
+        $grandchildId = \App\UuidUtils::generateUuidV7();
+        $grandchildStmt = $this->pdo->prepare("INSERT INTO Notes (id, page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, ?, 1)");
+        $grandchildStmt->execute([$grandchildId, $pageId, $child1Id, 'Grandchild content', 1]);
 
         return [
             'pageId' => $pageId,
@@ -121,7 +122,7 @@ class TransclusionChildrenTest extends TestCase {
     }
 
     public function testGetNoteWithChildrenNonexistentNote() {
-        $noteWithChildren = $this->dataManager->getNoteWithChildren(99999);
+        $noteWithChildren = $this->dataManager->getNoteWithChildren('00000000-0000-0000-0000-000000000000');
         
         $this->assertNull($noteWithChildren);
     }
