@@ -25,9 +25,204 @@ export function getNoteDataById(noteId) {
     return appStore.notes.find(n => String(n.id) === String(noteId));
 }
 
+// **PERFORMANCE OPTIMIZATION**: Cache for DOM queries and calculations
+const domCache = new Map();
+const nestingLevelCache = new Map();
+
+// **RACE CONDITION FIX**: Track pending note creations to prevent "Note not found" errors
+const pendingNoteCreations = new Set();
+
+// **PERFORMANCE OPTIMIZATION**: Debounced DOM updates
+let pendingDOMUpdates = new Set();
+let domUpdateScheduled = false;
+
+function scheduleDOMUpdate(updateFn) {
+    pendingDOMUpdates.add(updateFn);
+    if (!domUpdateScheduled) {
+        domUpdateScheduled = true;
+        requestAnimationFrame(() => {
+            const updates = Array.from(pendingDOMUpdates);
+            pendingDOMUpdates.clear();
+            domUpdateScheduled = false;
+            
+            // Batch all DOM updates
+            updates.forEach(update => update());
+        });
+    }
+}
+
+// **PERFORMANCE OPTIMIZATION**: Optimized nesting level calculation with caching
+function calculateNestingLevel(parentId, notes) {
+    if (!parentId) return 0;
+    
+    // Check cache first
+    const cacheKey = `nesting_${parentId}`;
+    if (nestingLevelCache.has(cacheKey)) {
+        return nestingLevelCache.get(cacheKey);
+    }
+    
+    let level = 0;
+    let currentParentId = parentId;
+    
+    while (currentParentId) {
+        const parentNote = notes.find(n => String(n.id) === String(currentParentId));
+        if (!parentNote) break;
+        
+        level++;
+        currentParentId = parentNote.parent_note_id;
+    }
+    
+    // Cache the result
+    nestingLevelCache.set(cacheKey, level);
+    return level;
+}
+
+// **PERFORMANCE OPTIMIZATION**: Clear cache when notes change
+function clearNestingCache() {
+    nestingLevelCache.clear();
+}
+
+// **RACE CONDITION FIX**: Check if a note is pending creation
+function isNotePendingCreation(noteId) {
+    return pendingNoteCreations.has(String(noteId));
+}
+
+// **RACE CONDITION FIX**: Mark note as pending creation
+function markNotePendingCreation(noteId) {
+    pendingNoteCreations.add(String(noteId));
+}
+
+// **RACE CONDITION FIX**: Remove note from pending creation
+function removeNotePendingCreation(noteId) {
+    pendingNoteCreations.delete(String(noteId));
+}
+
+// **RACE CONDITION FIX**: Auto-cleanup pending creations after timeout
+function markNotePendingCreationWithTimeout(noteId) {
+    markNotePendingCreation(noteId);
+    // Auto-remove after 30 seconds to prevent memory leaks
+    setTimeout(() => {
+        removeNotePendingCreation(noteId);
+    }, 30000);
+}
+
+// **PERFORMANCE OPTIMIZATION**: Optimized DOM element retrieval with caching
 export function getNoteElementById(noteId) {
     if (!notesContainer || !noteId) return null;
-    return notesContainer.querySelector(`.note-item[data-note-id="${noteId}"]`);
+    
+    // Check cache first
+    const cacheKey = `element_${noteId}`;
+    if (domCache.has(cacheKey)) {
+        const cached = domCache.get(cacheKey);
+        if (cached && document.contains(cached)) {
+            return cached;
+        }
+        // Remove stale cache entry
+        domCache.delete(cacheKey);
+    }
+    
+    const element = notesContainer.querySelector(`.note-item[data-note-id="${noteId}"]`);
+    if (element) {
+        domCache.set(cacheKey, element);
+    }
+    return element;
+}
+
+// **PERFORMANCE OPTIMIZATION**: Batch DOM style updates
+function batchUpdateStyles(elements, styleUpdates) {
+    scheduleDOMUpdate(() => {
+        elements.forEach(({ element, updates }) => {
+            Object.entries(updates).forEach(([property, value]) => {
+                element.style.setProperty(property, value);
+            });
+        });
+    });
+}
+
+// **PERFORMANCE OPTIMIZATION**: Optimized subtree nesting update
+function updateSubtreeNestingLevels(noteElement, nestingLevel) {
+    const updates = [];
+    
+    function collectUpdates(element, level) {
+        updates.push({
+            element,
+            updates: { '--nesting-level': level }
+        });
+        
+        const childrenContainer = element.querySelector('.note-children');
+        if (childrenContainer) {
+            const childNotes = Array.from(childrenContainer.children).filter(el => el.classList.contains('note-item'));
+            childNotes.forEach(child => collectUpdates(child, level + 1));
+        }
+    }
+    
+    collectUpdates(noteElement, nestingLevel);
+    batchUpdateStyles(updates);
+}
+
+// **PERFORMANCE OPTIMIZATION**: Optimized DOM movement with minimal reflows
+function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
+    const notesContainer = document.getElementById('notes-container');
+    if (!notesContainer) return;
+
+    // **PERFORMANCE**: Use DocumentFragment to minimize reflows
+    const subtreeFragment = document.createDocumentFragment();
+    subtreeFragment.appendChild(noteElement);
+
+    // **PERFORMANCE**: Batch DOM operations
+    scheduleDOMUpdate(() => {
+        if (!newParentId) {
+            // Moving to root level
+            const rootNotes = Array.from(notesContainer.children).filter(el => 
+                el.classList.contains('note-item') && 
+                !el.closest('.note-children')
+            );
+            
+            if (targetOrderIndex >= rootNotes.length) {
+                notesContainer.appendChild(subtreeFragment);
+            } else {
+                const targetElement = rootNotes[targetOrderIndex];
+                notesContainer.insertBefore(subtreeFragment, targetElement);
+            }
+        } else {
+            // Moving to a specific parent
+            const parentElement = getNoteElementById(newParentId);
+            if (!parentElement) {
+                // Fallback: append to root
+                notesContainer.appendChild(subtreeFragment);
+                return;
+            }
+            
+            let childrenContainer = parentElement.querySelector('.note-children');
+            if (!childrenContainer) {
+                // Create children container if it doesn't exist
+                childrenContainer = document.createElement('div');
+                childrenContainer.className = 'note-children';
+                parentElement.appendChild(childrenContainer);
+                
+                // Add has-children class to parent
+                parentElement.classList.add('has-children');
+                
+                // **ENHANCEMENT**: Provide immediate visual feedback for new parent
+                provideBecomeParentFeedback(parentElement);
+            }
+            
+            const existingChildren = Array.from(childrenContainer.children).filter(el => 
+                el.classList.contains('note-item')
+            );
+            
+            if (targetOrderIndex >= existingChildren.length) {
+                childrenContainer.appendChild(subtreeFragment);
+            } else {
+                const targetElement = existingChildren[targetOrderIndex];
+                childrenContainer.insertBefore(subtreeFragment, targetElement);
+            }
+        }
+
+        // **PERFORMANCE**: Update nesting levels in next frame
+        const newNestingLevel = calculateNestingLevel(newParentId, getAppStore().notes);
+        updateSubtreeNestingLevels(noteElement, newNestingLevel);
+    });
 }
 
 function _finalizeNewNote(clientTempId, noteFromServer) {
@@ -82,6 +277,7 @@ function provideBecomeParentFeedback(noteElement) {
 
 let batchInProgress = false;
 let batchQueue = [];
+let currentBatchAbortController = null;
 
 async function executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, userActionName) {
     if (!operations || operations.length === 0) return true;
@@ -89,7 +285,12 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
     console.log(`[${userActionName}] Starting batch operation with ${operations.length} operations`);
     console.log(`[${userActionName}] Original notes count:`, originalNotesState?.length || 0);
     
-    // **SIMPLIFIED RACE CONDITION FIX**: Just queue operations if one is in progress
+    // **PERFORMANCE**: Cancel any ongoing batch operation
+    if (currentBatchAbortController) {
+        currentBatchAbortController.abort();
+    }
+    
+    // **PERFORMANCE**: Simplified race condition handling with abort controller
     if (batchInProgress) {
         console.log(`[${userActionName}] Batch already in progress, queuing operation`);
         return new Promise((resolve, reject) => {
@@ -98,6 +299,7 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
     }
     
     batchInProgress = true;
+    currentBatchAbortController = new AbortController();
     ui.updateSaveStatusIndicator('pending');
     let success = false;
     
@@ -108,12 +310,31 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         }
         
         console.log("Batch operations to send:", operations);
-        const batchResponse = await notesAPI.batchUpdateNotes(operations);
+        
+        // **PERFORMANCE**: Add timeout and abort support
+        const timeoutId = setTimeout(() => {
+            if (currentBatchAbortController) {
+                currentBatchAbortController.abort();
+            }
+        }, 10000); // 10 second timeout
+        
+        const batchResponse = await notesAPI.batchUpdateNotes(operations, currentBatchAbortController.signal);
+        clearTimeout(timeoutId);
+        
         let allSubOperationsSucceeded = true;
         
         if (batchResponse && Array.isArray(batchResponse)) {
             batchResponse.forEach(opResult => {
                 if (opResult.status === 'error') {
+                    // **RACE CONDITION FIX**: Check if this is a "Note not found" error for a pending creation
+                    if (opResult.message && opResult.message.includes('Note not found') && opResult.id) {
+                        if (isNotePendingCreation(opResult.id)) {
+                            console.warn(`[${userActionName} BATCH] Note ${opResult.id} is still pending creation, this is expected for race conditions`);
+                            // Don't mark as failed if it's a pending creation
+                            return;
+                        }
+                    }
+                    
                     allSubOperationsSucceeded = false;
                     console.error(`[${userActionName} BATCH] Server reported sub-operation error:`, opResult);
                     if (opResult.message) {
@@ -122,6 +343,11 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
                     if (opResult.id) {
                         console.error(`[${userActionName} BATCH] Failed operation ID:`, opResult.id);
                     }
+                } else if (opResult.type === 'create' && opResult.note) {
+                    // **RACE CONDITION FIX**: Remove from pending creations when successfully created
+                    removeNotePendingCreation(opResult.note.id);
+                    const appStore = getAppStore();
+                    appStore.updateNote(opResult.note);
                 } else if (opResult.type === 'update' && opResult.note) {
                     const appStore = getAppStore();
                     appStore.updateNote(opResult.note);
@@ -133,16 +359,18 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         }
         
         if (!allSubOperationsSucceeded) {
-            // **DATA LOSS FIX**: Since server operations are atomic (all succeed or all fail),
-            // we should revert to the state before this batch operation if any operation fails
+            // **PERFORMANCE**: More efficient error handling without full re-render
             console.warn(`[${userActionName}] Some operations failed, reverting to state before batch operation`);
             console.log(`[${userActionName}] Current notes count before revert:`, getAppStore().notes.length);
             
-            // Revert to the state before this batch operation
+            // **PERFORMANCE**: Optimized revert without full page re-render
             if (originalNotesState) {
                 const appStore = getAppStore();
                 appStore.setNotes(originalNotesState);
-                ui.displayNotes(appStore.notes, appStore.currentPageId);
+                
+                // **PERFORMANCE**: Only update affected notes instead of full re-render
+                updateAffectedNotesOnly(originalNotesState, operations);
+                
                 console.log(`[${userActionName}] Reverted to state before batch operation`);
                 console.log(`[${userActionName}] Notes count after revert:`, appStore.notes.length);
             }
@@ -158,6 +386,10 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         ui.updateSaveStatusIndicator('saved');
         console.log(`[${userActionName}] Batch operation completed successfully`);
         
+        // **PERFORMANCE**: Clear cache after successful operations
+        clearNestingCache();
+        domCache.clear();
+        
         // **CACHE INVALIDATION**: Remove the current page from cache so fresh data is loaded on next visit
         const appStore = getAppStore();
         if (appStore.currentPageName) {
@@ -165,17 +397,27 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
             console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName}`);
         }
     } catch (error) {
+        // **PERFORMANCE**: Handle abort errors gracefully
+        if (error.name === 'AbortError') {
+            console.log(`[${userActionName}] Batch operation was cancelled`);
+            ui.updateSaveStatusIndicator('error');
+            return false;
+        }
+        
         console.error(`[${userActionName}] Batch operation failed:`, error);
         const errorMessage = error.message || `Batch operation '${userActionName}' failed.`;
         alert(`${errorMessage} Reverting local changes.`);
         ui.updateSaveStatusIndicator('error');
         
-        // **DATA LOSS FIX**: Since server operations are atomic, revert to state before batch operation
+        // **PERFORMANCE**: Optimized revert without full page re-render
         if (originalNotesState) {
             console.log(`[${userActionName}] Reverting due to error. Current notes count:`, getAppStore().notes.length);
             const appStore = getAppStore();
             appStore.setNotes(originalNotesState);
-            ui.displayNotes(appStore.notes, appStore.currentPageId);
+            
+            // **PERFORMANCE**: Only update affected notes instead of full re-render
+            updateAffectedNotesOnly(originalNotesState, operations);
+            
             console.log(`[${userActionName}] Reverted to state before batch operation due to error`);
             console.log(`[${userActionName}] Notes count after error revert:`, appStore.notes.length);
         }
@@ -183,8 +425,9 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
         success = false;
     } finally {
         batchInProgress = false;
+        currentBatchAbortController = null;
         
-        // Process the next batch in the queue, if any
+        // **PERFORMANCE**: Process the next batch in the queue, if any
         if (batchQueue.length > 0) {
             const nextBatch = batchQueue.shift();
             // Call recursively, and resolve/reject the promise for the queued batch
@@ -198,6 +441,38 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
     }
     
     return success;
+}
+
+// **PERFORMANCE**: Optimized function to update only affected notes instead of full re-render
+function updateAffectedNotesOnly(originalNotesState, operations) {
+    const affectedNoteIds = new Set();
+    
+    // Collect all affected note IDs
+    operations.forEach(op => {
+        if (op.payload && op.payload.id) {
+            affectedNoteIds.add(op.payload.id);
+        }
+    });
+    
+    // Update only the affected notes in the DOM
+    affectedNoteIds.forEach(noteId => {
+        const noteElement = getNoteElementById(noteId);
+        if (noteElement) {
+            const originalNote = originalNotesState.find(n => String(n.id) === String(noteId));
+            if (originalNote) {
+                // Update the note element's data attributes and visual state
+                noteElement.dataset.noteId = originalNote.id;
+                noteElement.style.setProperty('--nesting-level', calculateNestingLevel(originalNote.parent_note_id, originalNotesState));
+                
+                // Update content if it changed
+                const contentEl = noteElement.querySelector('.note-content');
+                if (contentEl && contentEl.dataset.rawContent !== originalNote.content) {
+                    contentEl.dataset.rawContent = originalNote.content;
+                    contentEl.textContent = originalNote.content;
+                }
+            }
+        }
+    });
 }
 
 /**
@@ -227,6 +502,12 @@ export async function handleNoteAction(action, noteId) {
 // --- Note Saving Logic ---
 async function _saveNoteToServer(noteId, rawContent) {
     if (!getNoteDataById(noteId)) return null;
+    
+    // **RACE CONDITION FIX**: Check if note is pending creation
+    if (isNotePendingCreation(noteId)) {
+        console.warn(`[Save Note] Note ${noteId} is still pending creation, skipping save`);
+        return null;
+    }
     
     const appStore = getAppStore();
     const password = appStore.pagePassword;
@@ -283,6 +564,9 @@ export async function handleAddRootNote() {
     
     const optimisticNewNote = { id: noteId, page_name: appStore.currentPageName, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
+    
+    // **RACE CONDITION FIX**: Mark note as pending creation with auto-cleanup
+    markNotePendingCreationWithTimeout(noteId);
     
     // **DATA LOSS FIX**: Capture original state AFTER optimistic updates are applied
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
@@ -346,6 +630,9 @@ async function handleEnterKey(e, noteItem, noteData, contentDiv) {
     
     const optimisticNewNote = { id: noteId, page_name: appStore.currentPageName, content: '', parent_note_id: parentNoteId, order_index: targetOrderIndex, properties: {} };
     appStore.addNote(optimisticNewNote);
+    
+    // **RACE CONDITION FIX**: Mark note as pending creation with auto-cleanup
+    markNotePendingCreationWithTimeout(noteId);
     
     // **DATA LOSS FIX**: Capture original state AFTER optimistic updates are applied
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
@@ -532,28 +819,77 @@ function parseBasicMarkdown(text) {
     return html;
 }
 
+// **PERFORMANCE OPTIMIZATION**: Efficient state cloning
+function cloneNotesState(notes) {
+    // **FIX**: Convert Alpine.js reactive objects to plain objects before cloning
+    // This prevents DataCloneError with Alpine.js reactive properties
+    const plainNotes = notes.map(note => ({
+        id: note.id,
+        page_name: note.page_name,
+        content: note.content,
+        parent_note_id: note.parent_note_id,
+        order_index: note.order_index,
+        properties: note.properties ? { ...note.properties } : {},
+        created_at: note.created_at,
+        updated_at: note.updated_at
+    }));
+    
+    // **PERFORMANCE**: Use structuredClone for better performance than JSON.parse/stringify
+    if (typeof structuredClone !== 'undefined') {
+        try {
+            return structuredClone(plainNotes);
+        } catch (error) {
+            console.warn('structuredClone failed, falling back to JSON method:', error);
+            return JSON.parse(JSON.stringify(plainNotes));
+        }
+    }
+    // Fallback to JSON method for older browsers
+    return JSON.parse(JSON.stringify(plainNotes));
+}
+
+// **PERFORMANCE OPTIMIZATION**: Selective state updates
+function updateNotesState(notes, updates) {
+    const updatedNotes = [...notes];
+    
+    updates.forEach(update => {
+        const index = updatedNotes.findIndex(n => String(n.id) === String(update.id));
+        if (index !== -1) {
+            updatedNotes[index] = { ...updatedNotes[index], ...update };
+        }
+    });
+    
+    return updatedNotes;
+}
+
+// **PERFORMANCE OPTIMIZATION**: Optimized tab key handling
 async function handleTabKey(e, noteItem, noteData) {
     e.preventDefault();
     
-    // No need to check for temporary IDs since we use real UUIDs now
-    await saveNoteImmediately(noteItem); // **FIX**: Ensure content is saved before structural change
-
+    // **RACE CONDITION FIX**: Check if note is pending creation
+    if (isNotePendingCreation(noteData.id)) {
+        console.warn(`[Tab Key] Note ${noteData.id} is still pending creation, skipping indentation`);
+        return;
+    }
+    
+    // **PERFORMANCE**: Save content asynchronously without blocking
+    const savePromise = saveNoteImmediately(noteItem);
+    
     const appStore = getAppStore();
-    const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
+    // **PERFORMANCE**: Use efficient state cloning
+    const originalNotesState = cloneNotesState(appStore.notes);
     let operations = [];
     let newParentId = null;
-    let targetOrderIndex = null; // **FIX**: Declare targetOrderIndex in proper scope
+    let targetOrderIndex = null;
 
     if (e.shiftKey) { // Outdent
         if (!noteData.parent_note_id) return;
         const oldParentNote = getNoteDataById(noteData.parent_note_id);
         if (!oldParentNote) return;
         
-        // No need to check for temporary parent IDs since we use real UUIDs now
         newParentId = oldParentNote.parent_note_id;
 
         const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, String(oldParentNote.id), null);
-        targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
+        targetOrderIndex = calculatedOrderIndex;
         
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
@@ -566,32 +902,25 @@ async function handleTabKey(e, noteItem, noteData) {
         if (currentNoteIndexInSiblings < 1) return;
         
         const newParentNote = siblings[currentNoteIndexInSiblings - 1];
-        
-        // No need to check for temporary parent IDs since we use real UUIDs now
         newParentId = String(newParentNote.id);
         
-        // **FIX**: Calculate the correct position for the indented note
-        // Find the existing children of the new parent
+        // **PERFORMANCE**: Optimized position calculation
         const newParentChildren = appStore.notes.filter(n => String(n.parent_note_id) === String(newParentId)).sort((a,b) => a.order_index - b.order_index);
         
-        // Find the position where the note should be inserted
-        // It should be positioned after the new parent's last child, or at the beginning if no children exist
         let previousSiblingId = null;
         let nextSiblingId = null;
         
         if (newParentChildren.length > 0) {
-            // Insert at the end of the new parent's children
             const lastChild = newParentChildren[newParentChildren.length - 1];
             previousSiblingId = String(lastChild.id);
             nextSiblingId = null;
         } else {
-            // No existing children, insert at the beginning
             previousSiblingId = null;
             nextSiblingId = null;
         }
         
         const { targetOrderIndex: calculatedOrderIndex, siblingUpdates } = calculateOrderIndex(appStore.notes, newParentId, previousSiblingId, nextSiblingId);
-        targetOrderIndex = calculatedOrderIndex; // **FIX**: Assign to outer scope variable
+        targetOrderIndex = calculatedOrderIndex;
 
         operations.push({ type: 'update', payload: { id: noteData.id, parent_note_id: newParentId, order_index: targetOrderIndex } });
         siblingUpdates.forEach(upd => {
@@ -599,153 +928,63 @@ async function handleTabKey(e, noteItem, noteData) {
         });
     }
     
-    // **OPTIMIZATION**: Immediate visual feedback without delays
+    // **PERFORMANCE**: Immediate visual feedback with batched updates
     const optimisticDOMUpdater = () => {
-        // Update the note's visual indentation immediately
         const noteElement = getNoteElementById(noteData.id);
         if (noteElement && targetOrderIndex !== null) {
-            // Calculate new nesting level
-            const newNestingLevel = calculateNestingLevel(newParentId, appStore.notes);
-            
-            // Update CSS custom property for immediate visual feedback
-            noteElement.style.setProperty('--nesting-level', newNestingLevel);
-            
-            // Move the note element to its new position in the DOM
-            moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex);
-            
-            // Update the note's data in the store
-            const noteToMove = getNoteDataById(noteData.id);
-            if (noteToMove) {
-                noteToMove.parent_note_id = newParentId;
-                noteToMove.order_index = targetOrderIndex;
-            }
-            
-            // Update sibling order indices immediately
-            operations.forEach(op => {
-                if (op.type === 'update') {
-                    const note = getNoteDataById(op.payload.id);
-                    if (note) note.order_index = op.payload.order_index;
+            // **PERFORMANCE**: Batch all visual updates
+            scheduleDOMUpdate(() => {
+                // Update the note's visual indentation immediately
+                const newNestingLevel = calculateNestingLevel(newParentId, appStore.notes);
+                noteElement.style.setProperty('--nesting-level', newNestingLevel);
+                
+                // Move the note element to its new position in the DOM
+                moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex);
+                
+                // Update the note's data in the store
+                const noteToMove = getNoteDataById(noteData.id);
+                if (noteToMove) {
+                    noteToMove.parent_note_id = newParentId;
+                    noteToMove.order_index = targetOrderIndex;
+                }
+                
+                // Update sibling order indices immediately
+                operations.forEach(op => {
+                    if (op.type === 'update') {
+                        const note = getNoteDataById(op.payload.id);
+                        if (note) note.order_index = op.payload.order_index;
+                    }
+                });
+                
+                // **PERFORMANCE**: Focus with minimal delay
+                const newContentDiv = noteElement.querySelector('.note-content');
+                if (newContentDiv) {
+                    ui.switchToEditMode(newContentDiv);
+                    newContentDiv.focus();
+                    
+                    // **PERFORMANCE**: Optimized cursor positioning
+                    requestAnimationFrame(() => {
+                        const range = document.createRange();
+                        const sel = window.getSelection();
+                        range.selectNodeContents(newContentDiv);
+                        range.collapse(false);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    });
                 }
             });
-            
-            // **IMPROVEMENT**: Refocus immediately without delay
-            const newContentDiv = noteElement.querySelector('.note-content');
-            if (newContentDiv) {
-                ui.switchToEditMode(newContentDiv);
-                // Focus with proper cursor positioning
-                newContentDiv.focus();
-                const range = document.createRange();
-                const sel = window.getSelection();
-                range.selectNodeContents(newContentDiv);
-                range.collapse(false); // Collapse to end
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
         }
     };
     
+    // **PERFORMANCE**: Wait for save to complete before batch operation
+    await savePromise;
     await executeBatchOperations(originalNotesState, operations, optimisticDOMUpdater, e.shiftKey ? "Outdent Note" : "Indent Note");
-}
-
-// **NEW**: Helper function to calculate nesting level
-function calculateNestingLevel(parentId, notes) {
-    if (!parentId) return 0;
     
-    let level = 0;
-    let currentParentId = parentId;
-    
-    while (currentParentId) {
-        const parentNote = notes.find(n => String(n.id) === String(currentParentId));
-        if (!parentNote) break;
-        
-        level++;
-        currentParentId = parentNote.parent_note_id;
-    }
-    
-    return level;
+    // **PERFORMANCE**: Clear cache after structural changes
+    clearNestingCache();
 }
 
-// **NEW**: Helper function to move note element in DOM without full re-render
-function moveNoteElementInDOM(noteElement, newParentId, targetOrderIndex) {
-    const notesContainer = document.getElementById('notes-container');
-    if (!notesContainer) return;
-
-    // Remove from current position (move the whole subtree)
-    // Instead of just noteElement.remove(), move the note and its children as a block
-    const subtreeFragment = document.createDocumentFragment();
-    subtreeFragment.appendChild(noteElement);
-
-    // Move all children (if any)
-    const childrenContainer = noteElement.querySelector('.note-children');
-    if (childrenContainer && childrenContainer.children.length > 0) {
-        // Move all child notes as part of the fragment
-        // (they are already inside noteElement, so this is just for clarity)
-    }
-
-    if (!newParentId) {
-        // Moving to root level
-        const rootNotes = Array.from(notesContainer.children).filter(el => 
-            el.classList.contains('note-item') && 
-            !el.closest('.note-children')
-        );
-        
-        if (targetOrderIndex >= rootNotes.length) {
-            notesContainer.appendChild(subtreeFragment);
-        } else {
-            const targetElement = rootNotes[targetOrderIndex];
-            notesContainer.insertBefore(subtreeFragment, targetElement);
-        }
-    } else {
-        // Moving to a specific parent
-        const parentElement = getNoteElementById(newParentId);
-        if (!parentElement) {
-            // Fallback: append to root
-            notesContainer.appendChild(subtreeFragment);
-            return;
-        }
-        
-        let childrenContainer = parentElement.querySelector('.note-children');
-        if (!childrenContainer) {
-            // Create children container if it doesn't exist
-            childrenContainer = document.createElement('div');
-            childrenContainer.className = 'note-children';
-            parentElement.appendChild(childrenContainer);
-            
-            // Add has-children class to parent
-            parentElement.classList.add('has-children');
-            
-            // **ENHANCEMENT**: Provide immediate visual feedback for new parent
-            provideBecomeParentFeedback(parentElement);
-        }
-        
-        const existingChildren = Array.from(childrenContainer.children).filter(el => 
-            el.classList.contains('note-item')
-        );
-        
-        if (targetOrderIndex >= existingChildren.length) {
-            childrenContainer.appendChild(subtreeFragment);
-        } else {
-            const targetElement = existingChildren[targetOrderIndex];
-            childrenContainer.insertBefore(subtreeFragment, targetElement);
-        }
-    }
-
-    // After moving, update nesting level for the note and all descendants
-    const newNestingLevel = calculateNestingLevel(newParentId, getAppStore().notes);
-    updateSubtreeNestingLevels(noteElement, newNestingLevel);
-}
-
-// **NEW**: Recursively update --nesting-level for a note and all its descendants
-function updateSubtreeNestingLevels(noteElement, nestingLevel) {
-    noteElement.style.setProperty('--nesting-level', nestingLevel);
-    const childrenContainer = noteElement.querySelector('.note-children');
-    if (childrenContainer) {
-        const childNotes = Array.from(childrenContainer.children).filter(el => el.classList.contains('note-item'));
-        for (const child of childNotes) {
-            updateSubtreeNestingLevels(child, nestingLevel + 1);
-        }
-    }
-}
+// Duplicate functions removed - using optimized versions above
 
 async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
     const appStore = getAppStore();
@@ -913,6 +1152,9 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
         properties: {} 
     };
     appStore.addNote(optimisticNewNote);
+    
+    // **RACE CONDITION FIX**: Mark note as pending creation with auto-cleanup
+    markNotePendingCreationWithTimeout(noteId);
 
     // **DATA LOSS FIX**: Capture original state AFTER optimistic updates are applied
     const originalNotesState = JSON.parse(JSON.stringify(appStore.notes));
@@ -1007,3 +1249,6 @@ export async function handleTaskCheckboxClick(e) {
 
 // Export utility function for visual feedback
 export { provideBecomeParentFeedback };
+
+// Export batch operations for drag-and-drop
+export { executeBatchOperations };

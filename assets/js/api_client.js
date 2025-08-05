@@ -15,10 +15,11 @@ const API_BASE_URL = (document.querySelector('base[href]')?.href || '/') + 'api/
  * @param {string} endpoint - API endpoint path
  * @param {string} [method='GET'] - HTTP method
  * @param {Object|FormData|null} [body=null] - Request body
+ * @param {AbortSignal} [signal=null] - Abort signal for request cancellation
  * @returns {Promise<any>} API response data
  * @throws {Error} If the request fails or returns an error
  */
-async function apiRequest(endpoint, method = 'GET', body = null) {
+async function apiRequest(endpoint, method = 'GET', body = null, signal = null) {
     const options = {
         method,
         headers: {
@@ -26,6 +27,11 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         },
         credentials: 'same-origin'
     };
+
+    // **PERFORMANCE**: Add abort signal support
+    if (signal) {
+        options.signal = signal;
+    }
 
     if (body) {
         if (body instanceof FormData) {
@@ -79,6 +85,10 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
         return data.data;
 
     } catch (error) {
+        // **PERFORMANCE**: Handle abort errors gracefully
+        if (error.name === 'AbortError') {
+            throw error;
+        }
         throw error;
     }
 }
@@ -158,9 +168,9 @@ const notesAPI = {
     getPageData: (pageId) => apiRequest(`notes.php?page_id=${pageId}`),
     getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
     getNoteWithChildren: (noteId) => apiRequest(`notes.php?id=${noteId}&include_children=true`),
-    batchUpdateNotes: (operations) => {
+    batchUpdateNotes: (operations, signal = null) => {
         const body = { batch: true, operations };
-        return apiRequest('notes.php', 'POST', body);
+        return apiRequest('notes.php', 'POST', body, signal);
     },
     // Individual wrapper functions for convenience
     deleteNote: (noteId) => {
