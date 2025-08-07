@@ -1,11 +1,12 @@
 -- Notd Database Schema
--- Version: 3.0 (UUID-based IDs)
+-- Version: 4.0 (Unified Upsert with Separate Creation Timestamps)
 --
 -- This schema implements a "content-first" architecture where the `content`
 -- field of a Note or Page is the single source of truth for its properties.
 -- The `Properties` table serves as a queryable index of the properties
 -- parsed from the content.
--- All IDs now use UUID v7 format for better scalability and offline support.
+-- All IDs use UUID v7 format for better scalability and offline support.
+-- Creation timestamps are now stored separately to prevent overwrites.
 
 -- Enable Foreign Key support for data integrity
 PRAGMA foreign_keys = ON;
@@ -19,7 +20,6 @@ CREATE TABLE IF NOT EXISTS Pages (
     content TEXT, -- Content for the page itself, used for page-level properties
     alias TEXT,
     active INTEGER NOT NULL DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_pages_name ON Pages(LOWER(name));
@@ -36,13 +36,21 @@ CREATE TABLE IF NOT EXISTS Notes (
     order_index INTEGER NOT NULL DEFAULT 0,
     collapsed INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (page_id) REFERENCES Pages(id) ON DELETE CASCADE,
     FOREIGN KEY (parent_note_id) REFERENCES Notes(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_notes_page_id ON Notes(page_id);
 CREATE INDEX IF NOT EXISTS idx_notes_parent_note_id ON Notes(parent_note_id);
+
+-- Creation Timestamps Table
+-- Stores immutable creation timestamps for all entities to prevent overwrites
+CREATE TABLE IF NOT EXISTS CreationTimestamps (
+    entity_id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL, -- 'page' or 'note'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_creation_timestamps_entity ON CreationTimestamps(entity_type, entity_id);
 
 -- Attachments Table
 -- Stores file attachments linked to notes.

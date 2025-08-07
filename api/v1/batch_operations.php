@@ -80,13 +80,21 @@ if (!function_exists('_indexPropertiesFromContent')) {
     }
 }
 
-// Batch operation helper functions
-if (!function_exists('_createNoteInBatch')) {
-    function _createNoteInBatch($pdo, $dataManager, $payload, $includeParentProperties) {
+// Unified upsert operation helper functions
+if (!function_exists('_upsertNoteInBatch')) {
+    function _upsertNoteInBatch($pdo, $dataManager, $payload, $includeParentProperties) {
+        $noteId = $payload['id'] ?? \App\UuidUtils::generateUuidV7();
+        
+        // Validate UUID format
+        if (!\App\UuidUtils::looksLikeUuid($noteId)) {
+            return ['type' => 'upsert', 'status' => 'error', 'message' => 'Invalid note ID format provided'];
+        }
+
         $pageId = $payload['page_id'] ?? null;
         $pageName = $payload['page_name'] ?? null;
 
-        if ($pageId && UuidUtils::looksLikeUuid($pageId)) {
+        // Handle page resolution
+        if ($pageId && \App\UuidUtils::looksLikeUuid($pageId)) {
             // Page ID is provided and valid, proceed.
         } elseif ($pageName) {
             // Page name is provided, try to find or create the page.
@@ -97,15 +105,20 @@ if (!function_exists('_createNoteInBatch')) {
 
                 if (!$pageId) {
                     // Page does not exist, create it.
-                    $pageId = UuidUtils::generateUuidV7();
-                    $insertStmt = $pdo->prepare("INSERT INTO Pages (id, name, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))");
+                    $pageId = \App\UuidUtils::generateUuidV7();
+                    $insertStmt = $pdo->prepare("INSERT OR REPLACE INTO Pages (id, name, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
                     $insertStmt->execute([$pageId, $pageName]);
+                    
+                    // Ensure creation timestamp exists for the page
+                    $createPageSql = "INSERT OR IGNORE INTO CreationTimestamps (entity_id, entity_type, created_at) VALUES (?, 'page', CURRENT_TIMESTAMP)";
+                    $createPageStmt = $pdo->prepare($createPageSql);
+                    $createPageStmt->execute([$pageId]);
                 }
             } catch (Exception $e) {
-                return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to find or create page by name: ' . $e->getMessage()];
+                return ['type' => 'upsert', 'status' => 'error', 'message' => 'Failed to find or create page by name: ' . $e->getMessage()];
             }
         } else {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Missing or invalid page_id or page_name for create operation'];
+            return ['type' => 'upsert', 'status' => 'error', 'message' => 'Missing or invalid page_id or page_name for upsert operation'];
         }
 
         $content = $payload['content'] ?? '';
@@ -113,165 +126,96 @@ if (!function_exists('_createNoteInBatch')) {
         if (array_key_exists('parent_note_id', $payload)) {
             $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : $payload['parent_note_id'];
         }
-        $orderIndex = $payload['order_index'] ?? null;
+        $orderIndex = $payload['order_index'] ?? 0;
         $collapsed = $payload['collapsed'] ?? 0;
-
-        // Validate note ID if provided
-        $noteId = $payload['id'] ?? \App\UuidUtils::generateUuidV7();
-        if (!UuidUtils::looksLikeUuid($noteId)) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Invalid note ID format provided'];
-        }
+        $internal = $payload['internal'] ?? 0;
 
         try {
-            // 1. Create the note record
-            $sqlFields = ['page_id', 'content', 'parent_note_id', 'collapsed'];
-            $sqlParams = [':page_id' => $pageId, ':content' => $content, ':parent_note_id' => $parentNoteId, ':collapsed' => (int)$collapsed];
-
-            if ($orderIndex !== null && is_numeric($orderIndex)) {
-                $sqlFields[] = 'order_index';
-                $sqlParams[':order_index'] = (int)$orderIndex;
-            }
-            
-            $sqlFields[] = 'id';
-            $sqlParams[':id'] = $noteId;
-            
-            $sql = "INSERT INTO Notes (" . implode(', ', $sqlFields) . ") VALUES (:" . implode(', :', $sqlFields) . ")";
+            // 1. Upsert the note record using INSERT OR REPLACE
+            $sql = "INSERT OR REPLACE INTO Notes (id, page_id, content, parent_note_id, order_index, collapsed, internal, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
             
             $stmt = $pdo->prepare($sql);
-            $stmt->execute($sqlParams);
+            $stmt->execute([
+                $noteId,
+                $pageId,
+                $content,
+                $parentNoteId,
+                $orderIndex,
+                $collapsed,
+                $internal
+            ]);
 
-            // 2. Index properties from its content
+            // 2. Ensure creation timestamp exists (only insert if not exists)
+            $createSql = "INSERT OR IGNORE INTO CreationTimestamps (entity_id, entity_type, created_at) VALUES (?, 'note', CURRENT_TIMESTAMP)";
+            $createStmt = $pdo->prepare($createSql);
+            $createStmt->execute([$noteId]);
+
+            // 3. Index properties from its content
             if (trim($content) !== '') {
                 _indexPropertiesFromContent($pdo, 'note', $noteId, $content);
             }
 
-            // 3. Fetch the newly created note using DataManager for a consistent response
-            $newNote = $dataManager->getNoteById($noteId, false, $includeParentProperties);
+            // 4. Fetch the note using DataManager for a consistent response
+            $note = $dataManager->getNoteById($noteId, false, $includeParentProperties);
             
-            return ['type' => 'create', 'status' => 'success', 'note' => $newNote];
+            return ['type' => 'upsert', 'status' => 'success', 'note' => $note];
 
         } catch (Exception $e) {
-            return ['type' => 'create', 'status' => 'error', 'message' => 'Failed to create note: ' . $e->getMessage()];
+            return ['type' => 'upsert', 'status' => 'error', 'message' => 'Failed to upsert note: ' . $e->getMessage(), 'id' => $noteId];
         }
     }
 }
 
-if (!function_exists('_updateNoteInBatch')) {
-
-    function reorderNotes(PDO $pdo, string $pageId, string $noteId, int $oldIndex, int $newIndex): void {
-    if ($newIndex === $oldIndex) return;
-
-    if ($newIndex < $oldIndex) {
-        $stmt = $pdo->prepare("
-            UPDATE Notes
-            SET order_index = order_index + 1
-            WHERE page_id = ? AND order_index >= ? AND order_index < ? AND id != ?
-        ");
-        $stmt->execute([$pageId, $newIndex, $oldIndex, $noteId]);
-    } else {
-        $stmt = $pdo->prepare("
-            UPDATE Notes
-            SET order_index = order_index - 1
-            WHERE page_id = ? AND order_index > ? AND order_index <= ? AND id != ?
-        ");
-        $stmt->execute([$pageId, $oldIndex, $newIndex, $noteId]);
-    }
-}
-
-
-    function _updateNoteInBatch($pdo, $dataManager, $payload, $includeParentProperties) {
-        $noteId = $payload['id'] ?? null;
-        if ($noteId === null) return ['type' => 'update', 'status' => 'error', 'message' => 'Missing id for update operation'];
-
+if (!function_exists('_upsertPageInBatch')) {
+    function _upsertPageInBatch($pdo, $dataManager, $payload) {
+        $pageId = $payload['id'] ?? \App\UuidUtils::generateUuidV7();
+        
         // Validate UUID format
-        if (!UuidUtils::looksLikeUuid($noteId)) {
-             return ['type' => 'update', 'status' => 'error', 'message' => "Invalid or unresolved ID for update: {$payload['id']}", 'id' => $payload['id']];
+        if (!\App\UuidUtils::looksLikeUuid($pageId)) {
+            return ['type' => 'upsert', 'status' => 'error', 'message' => 'Invalid page ID format provided'];
+        }
+
+        $name = $payload['name'] ?? null;
+        $content = $payload['content'] ?? '';
+        $alias = $payload['alias'] ?? null;
+        $active = $payload['active'] ?? 1;
+
+        if (!$name) {
+            return ['type' => 'upsert', 'status' => 'error', 'message' => 'Page name is required for upsert operation'];
         }
 
         try {
-            $checkStmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
-            $checkStmt->execute([$noteId]);
-            if (!$checkStmt->fetch()) {
-                return ['type' => 'update', 'status' => 'error', 'message' => 'Note not found for update.', 'id' => $noteId];
-            }
-
-            $setClauses = [];
-            $executeParams = [];
-            $contentWasUpdated = false;
-
-   if (isset($payload['content'])) {
-    $setClauses[] = "content = ?";
-    $executeParams[] = $payload['content'];
-    $contentWasUpdated = true;
-}
-        if (array_key_exists('parent_note_id', $payload)) {
-            $newParentNoteId = $payload['parent_note_id'];
+            // 1. Upsert the page record using INSERT OR REPLACE
+            $sql = "INSERT OR REPLACE INTO Pages (id, name, content, alias, active, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
             
-            // **FIX**: Validate that the parent note exists if it's not null
-            if ($newParentNoteId !== null && $newParentNoteId !== '') {
-                $parentCheckStmt = $pdo->prepare("SELECT id FROM Notes WHERE id = ?");
-                $parentCheckStmt->execute([$newParentNoteId]);
-                if (!$parentCheckStmt->fetch()) {
-                    return ['type' => 'update', 'status' => 'error', 'message' => "Parent note with ID {$newParentNoteId} not found.", 'id' => $noteId];
-                }
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                $pageId,
+                $name,
+                $content,
+                $alias,
+                $active
+            ]);
+
+            // 2. Ensure creation timestamp exists (only insert if not exists)
+            $createSql = "INSERT OR IGNORE INTO CreationTimestamps (entity_id, entity_type, created_at) VALUES (?, 'page', CURRENT_TIMESTAMP)";
+            $createStmt = $pdo->prepare($createSql);
+            $createStmt->execute([$pageId]);
+
+            // 3. Index properties from its content
+            if (trim($content) !== '') {
+                _indexPropertiesFromContent($pdo, 'page', $pageId, $content);
             }
+
+            // 4. Fetch the page using DataManager for a consistent response
+            $page = $dataManager->getPageById($pageId);
             
-            $setClauses[] = "parent_note_id = ?";
-            $executeParams[] = $newParentNoteId;
-        }
-
-if (isset($payload['order_index'])) {
-    $newIndex = (int)$payload['order_index'];
-
-    // Fetch current order_index and page_id
-    $metaStmt = $pdo->prepare("SELECT order_index, page_id FROM Notes WHERE id = ?");
-    $metaStmt->execute([$noteId]);
-    $meta = $metaStmt->fetch(PDO::FETCH_ASSOC);
-    $oldIndex = (int)$meta['order_index'];
-    $pageId = $meta['page_id'];
-
-    reorderNotes($pdo, $pageId, $noteId, $oldIndex, $newIndex);
-
-    // Update this note's order_index
-    $setClauses[] = "order_index = ?";
-    $executeParams[] = $newIndex;
-}
-
-if (isset($payload['collapsed'])) {
-    $setClauses[] = "collapsed = ?";
-    $executeParams[] = (int)$payload['collapsed'];
-}
-
-if (isset($payload['page_id'])) {
-    $setClauses[] = "page_id = ?";
-    $executeParams[] = $payload['page_id'];
-}
-
-            if (empty($setClauses) && !$contentWasUpdated) {
-                return ['type' => 'update', 'status' => 'warning', 'message' => 'No updatable fields provided for note.', 'id' => $noteId];
-            }
-            
-            if (!empty($setClauses)) {
-                $setClauses[] = "updated_at = CURRENT_TIMESTAMP";
-                $sql = "UPDATE Notes SET " . implode(", ", $setClauses) . " WHERE id = ?";
-                $executeParams[] = $noteId;
-                
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute($executeParams);
-            }
-            
-            // Re-index all properties from content if it was provided.
-            if ($contentWasUpdated) {
-                _indexPropertiesFromContent($pdo, 'note', $noteId, $payload['content']);
-            }
-
-            // Fetch updated note using DataManager for a consistent response
-            $updatedNote = $dataManager->getNoteById($noteId, false, $includeParentProperties);
-
-            return ['type' => 'update', 'status' => 'success', 'note' => $updatedNote];
+            return ['type' => 'upsert', 'status' => 'success', 'page' => $page];
 
         } catch (Exception $e) {
-            return ['type' => 'update', 'status' => 'error', 'message' => 'Failed to update note: ' . $e->getMessage(), 'id' => $noteId];
+            return ['type' => 'upsert', 'status' => 'error', 'message' => 'Failed to upsert page: ' . $e->getMessage(), 'id' => $pageId];
         }
     }
 }
@@ -309,23 +253,34 @@ if (!function_exists('_deleteNoteInBatch')) {
 
 if (!function_exists('_handleBatchOperations')) {
     function _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties) {
-
-        
-        if (!is_array($operations)) {
-            throw new Exception('Batch request validation failed: "operations" must be an array.');
-        }
-
         $results = [];
-        // Process operations in a safe order: Delete -> Create -> Update
-        $deleteOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'delete');
-        $createOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'create');
-        $updateOps = array_filter($operations, fn($op) => ($op['type'] ?? '') === 'update');
         
-
-
+        // Group operations by type for better handling
+        $upsertOps = [];
+        $deleteOps = [];
+        
+        foreach ($operations as $op) {
+            $type = $op['type'] ?? '';
+            $payload = $op['payload'] ?? [];
+            
+            switch ($type) {
+                case 'upsert':
+                case 'create':
+                case 'update':
+                    // All create/update operations become upsert
+                    $upsertOps[] = $op;
+                    break;
+                case 'delete':
+                    $deleteOps[] = $op;
+                    break;
+                default:
+                    $results[] = ['type' => $type, 'status' => 'error', 'message' => "Unknown operation type: $type"];
+            }
+        }
+        
+        // Process operations in order: deletes first, then upserts
         foreach ($deleteOps as $op) $results[] = _deleteNoteInBatch($pdo, $op['payload'] ?? []);
-        foreach ($createOps as $op) $results[] = _createNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $includeParentProperties);
-        foreach ($updateOps as $op) $results[] = _updateNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $includeParentProperties);
+        foreach ($upsertOps as $op) $results[] = _upsertNoteInBatch($pdo, $dataManager, $op['payload'] ?? [], $includeParentProperties);
         
         return $results;
     }

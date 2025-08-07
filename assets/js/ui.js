@@ -349,8 +349,16 @@ function updateSaveStatusIndicator(newStatus) {
     const indicator = document.getElementById('save-status-indicator');
     if (!indicator) return;
 
-    const appStore = getAppStore();
-    appStore.setSaveStatus(newStatus);
+    // Try to get Alpine store, but don't fail if it's not ready yet
+    try {
+        const appStore = getAppStore();
+        if (appStore && typeof appStore.setSaveStatus === 'function') {
+            appStore.setSaveStatus(newStatus);
+        }
+    } catch (error) {
+        console.warn('Alpine store not ready yet, skipping store update:', error);
+    }
+    
     indicator.className = 'save-status-indicator';
     indicator.classList.add(`status-${newStatus}`);
 

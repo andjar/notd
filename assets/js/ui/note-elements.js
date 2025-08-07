@@ -279,10 +279,39 @@ export async function handleNoteDrop(evt) {
     // CRITICAL FIX: Filter out the note being moved from sibling updates to prevent conflicts
     const filteredSiblingUpdates = siblingUpdates.filter(upd => String(upd.id) !== String(noteId));
     
+    // Build full upsert payloads (server expects complete rows for unified upsert)
+    const findNoteById = (id) => window.notesForCurrentPage.find(n => String(n.id) === String(id));
+    const movedNoteFull = findNoteById(noteId);
+    const movedPayload = movedNoteFull ? {
+        id: movedNoteFull.id,
+        page_id: movedNoteFull.page_id,
+        content: movedNoteFull.content,
+        parent_note_id: newParentId,
+        order_index: targetOrderIndex,
+        collapsed: movedNoteFull.collapsed || 0,
+        internal: movedNoteFull.internal || 0
+    } : { id: noteId, parent_note_id: newParentId, order_index: targetOrderIndex };
+
+    const siblingUpserts = filteredSiblingUpdates.map(upd => {
+        const sib = findNoteById(upd.id);
+        if (sib) {
+            return { type: 'upsert', payload: {
+                id: sib.id,
+                page_id: sib.page_id,
+                content: sib.content,
+                parent_note_id: sib.parent_note_id || null,
+                order_index: upd.newOrderIndex,
+                collapsed: sib.collapsed || 0,
+                internal: sib.internal || 0
+            }};
+        }
+        return { type: 'upsert', payload: { id: upd.id, order_index: upd.newOrderIndex } };
+    });
+
     // Create a list of all operations needed for the batch update.
     const operations = [
-        { type: 'update', payload: { id: noteId, parent_note_id: newParentId, order_index: targetOrderIndex } },
-        ...filteredSiblingUpdates.map(upd => ({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }))
+        { type: 'upsert', payload: movedPayload },
+        ...siblingUpserts
     ];
     
     // **FIX**: Store original state for potential rollback

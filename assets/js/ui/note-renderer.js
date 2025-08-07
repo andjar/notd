@@ -513,6 +513,7 @@ function switchToEditMode(contentEl) {
             }
         }, 150);
 
+        // Save only on blur (exit edit mode)
         switchToRenderedMode(contentEl);
         contentEl.removeEventListener('blur', handleBlur);
         contentEl.removeEventListener('paste', handlePasteImage);
