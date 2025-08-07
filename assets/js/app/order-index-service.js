@@ -33,11 +33,14 @@ export function calculateOrderIndex(notesArray, parentId, previousSiblingId, nex
     const previousSibling = previousSiblingId ? parentChildren.find(n => String(n.id) === String(previousSiblingId)) : null;
     const nextSibling = nextSiblingId ? parentChildren.find(n => String(n.id) === String(nextSiblingId)) : null;
 
+    // **FIX**: Handle missing siblings gracefully instead of throwing errors
     if (previousSiblingId && !previousSibling) {
-        throw new Error(`calculateOrderIndex: Previous sibling with ID ${previousSiblingId} not found.`);
+        console.warn(`calculateOrderIndex: Previous sibling with ID ${previousSiblingId} not found. This may happen during optimistic updates.`);
+        // Continue with null previousSibling
     }
     if (nextSiblingId && !nextSibling) {
-        throw new Error(`calculateOrderIndex: Next sibling with ID ${nextSiblingId} not found.`);
+        console.warn(`calculateOrderIndex: Next sibling with ID ${nextSiblingId} not found. This may happen during optimistic updates.`);
+        // Continue with null nextSibling
     }
 
     const previousSiblingOrderIndex = previousSibling ? previousSibling.order_index : null;

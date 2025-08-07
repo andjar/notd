@@ -86,8 +86,6 @@ define('PROPERTY_WEIGHTS', [
 
 // --- Development and Debugging ---
 // WARNING: Do not use these settings in a production environment.
-ini_set('display_errors', 1); // Enable error display
-ini_set('display_startup_errors', 1); // Enable startup error display
 error_reporting(E_ALL); // Report all PHP errors
 
 // --- Timezone ---

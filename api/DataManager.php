@@ -34,7 +34,7 @@ class DataManager {
     /**
      * Retrieves properties for a single page.
      */
-    public function getPageProperties(int $pageId, bool $includeInternal = false): array {
+    public function getPageProperties($pageId, bool $includeInternal = false): array {
         $sql = "SELECT name, value, weight, created_at FROM Properties WHERE page_id = :pageId AND active = 1";
         if (!$includeInternal) {
             // Assuming weight 3+ is internal, consistent with config.php
@@ -49,7 +49,7 @@ class DataManager {
     /**
      * Retrieves properties for a single note.
      */
-    public function getNoteProperties(int $noteId, bool $includeInternal = false): array {
+    public function getNoteProperties($noteId, bool $includeInternal = false): array {
         $sql = "SELECT name, value, weight, created_at FROM Properties WHERE note_id = :noteId AND active = 1";
         if (!$includeInternal) {
             $sql .= " AND weight < 3";
@@ -99,67 +99,23 @@ class DataManager {
             ];
         }
 
+        // If parent properties are requested, fetch them for each note
         if ($includeParentProperties) {
-            // Fetch parent_note_id for all relevant notes
-            $noteParentMap = [];
-            $notesToFetchParentsFor = $noteIds; // Initially, all notes
-            $currentLevelNotes = $notesToFetchParentsFor;
-
-            // Prepare a statement to get note details (specifically parent_note_id)
-            // This is done outside the loop for efficiency if fetching many notes' parents
-            $parentNoteIdStmt = $this->pdo->prepare("SELECT id, parent_note_id FROM Notes WHERE id = :id AND active = 1");
-
             foreach ($noteIds as $noteId) {
-                $parentPropertiesData = [];
-                $currentParentId = null;
-
-                // Get the initial parent_note_id for the current noteId
-                // We need to fetch the note itself to find its parent_note_id first
-                $initialParentStmt = $this->pdo->prepare("SELECT parent_note_id FROM Notes WHERE id = :id AND active = 1");
-                $initialParentStmt->execute([':id' => $noteId]);
-                $noteDetails = $initialParentStmt->fetch(PDO::FETCH_ASSOC);
-                $currentParentId = $noteDetails ? $noteDetails['parent_note_id'] : null;
-
-                $visitedParentIds = []; // To prevent infinite loops
-
-                while ($currentParentId !== null && !isset($visitedParentIds[$currentParentId])) {
-                    $visitedParentIds[$currentParentId] = true;
-
-                    // Fetch details of the current parent note
-                    $parentNoteIdStmt->execute([':id' => $currentParentId]);
-                    $parentNode = $parentNoteIdStmt->fetch(PDO::FETCH_ASSOC);
-
-                    if ($parentNode) {
-                        // Fetch properties for this parent node
-                        $properties = $this->getNoteProperties($parentNode['id'], $includeInternal);
-                        foreach ($properties as $name => $valuesArray) {
-                            if (!isset($parentPropertiesData[$name])) {
-                                $parentPropertiesData[$name] = [];
-                            }
-                            foreach ($valuesArray as $propValueItem) {
-                                // Ensure uniqueness of property values directly
-                                if (!in_array($propValueItem['value'], array_column($parentPropertiesData[$name], 'value'))) {
-                                     $parentPropertiesData[$name][] = ['value' => $propValueItem['value']];
-                                }
-                            }
-                        }
-                        $currentParentId = $parentNode['parent_note_id'];
-                    } else {
-                        break;
-                    }
+                $parentProps = $this->getParentPropertiesForNote($noteId, $includeInternal);
+                if (!empty($parentProps)) {
+                    $results[$noteId]['parent_properties'] = $parentProps;
                 }
-                // Assign collected parent properties to the result for the current noteId
-                // The structure should be $parentPropertiesData['prop_name'] = [['value' => 'val1'], ['value' => 'val2']]
-                $results[$noteId]['parent_properties'] = $parentPropertiesData;
             }
         }
+
         return $results;
     }
 
     /**
      * Retrieves a single note by its ID, including its formatted properties.
      */
-    public function getNoteById(int $noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
+    public function getNoteById($noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE id = :id AND active = 1");
         $stmt->execute([':id' => $noteId]);
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -221,7 +177,7 @@ class DataManager {
      * Retrieves a note with all its children recursively, including properties.
      * Implements recursion protection to prevent infinite loops.
      * 
-     * @param int $noteId The ID of the root note to fetch
+     * @param mixed $noteId The ID of the root note to fetch
      * @param bool $includeInternal Whether to include internal properties
      * @param bool $includeParentProperties Whether to include parent properties
      * @param int $maxDepth Maximum recursion depth (default 10)
@@ -230,7 +186,7 @@ class DataManager {
      * @return array|null The note with nested children, or null if not found
      */
     public function getNoteWithChildren(
-        int $noteId, 
+        $noteId, 
         bool $includeInternal = false, 
         bool $includeParentProperties = false,
         int $maxDepth = 10,
@@ -239,13 +195,11 @@ class DataManager {
     ): ?array {
         // Recursion protection: check depth limit
         if ($currentDepth >= $maxDepth) {
-            error_log("getNoteWithChildren: Maximum depth ($maxDepth) reached for note $noteId");
             return null;
         }
 
         // Recursion protection: check for circular references
         if (in_array($noteId, $visitedIds)) {
-            error_log("getNoteWithChildren: Circular reference detected for note $noteId");
             return null;
         }
 
@@ -294,7 +248,7 @@ class DataManager {
     /**
      * Retrieves all notes for a page, with properties embedded.
      */
-    public function getNotesByPageId(int $pageId, bool $includeInternal = false): array {
+    public function getNotesByPageId($pageId, bool $includeInternal = false): array {
         // First check if the active column exists
         $checkColumnStmt = $this->pdo->query("PRAGMA table_info(Notes)");
         $columns = $checkColumnStmt->fetchAll(PDO::FETCH_COLUMN, 1);
@@ -327,9 +281,8 @@ class DataManager {
             $attachmentSql .= " GROUP BY note_id";
             
             $attachmentStmt = $this->pdo->prepare($attachmentSql);
-            // Bind each note ID as an integer
-            $params = array_map('intval', $noteIds);
-            $attachmentStmt->execute($params);
+            // Bind each note ID - no need to cast to int anymore since they're UUIDs
+            $attachmentStmt->execute($noteIds);
             $notesWithAttachments = $attachmentStmt->fetchAll(PDO::FETCH_COLUMN);
             $notesWithAttachmentsMap = array_flip($notesWithAttachments);
         }
@@ -345,7 +298,7 @@ class DataManager {
     /**
      * Retrieves a single page by its ID, with properties.
      */
-    public function getPageById(int $pageId): ?array {
+    public function getPageById($pageId): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = :id AND active = 1");
         $stmt->execute([':id' => $pageId]);
         $page = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -476,5 +429,99 @@ class DataManager {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':prefix' => $prefix]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Gets the creation timestamp for an entity from the separate CreationTimestamps table.
+     */
+    public function getCreationTimestamp(string $entityId, string $entityType): ?string {
+        $stmt = $this->pdo->prepare("SELECT created_at FROM CreationTimestamps WHERE entity_id = ? AND entity_type = ?");
+        $stmt->execute([$entityId, $entityType]);
+        $result = $stmt->fetchColumn();
+        return $result ?: null;
+    }
+
+    /**
+     * Upserts a note (create or update) with unified operation.
+     */
+    public function upsertNote(array $noteData): array {
+        $noteId = $noteData['id'];
+        $pageId = $noteData['page_id'];
+        $content = $noteData['content'] ?? '';
+        $parentNoteId = $noteData['parent_note_id'] ?? null;
+        $orderIndex = $noteData['order_index'] ?? 0;
+        $collapsed = $noteData['collapsed'] ?? 0;
+        $internal = $noteData['internal'] ?? 0;
+
+        $this->pdo->beginTransaction();
+        try {
+            // Upsert the note using INSERT OR REPLACE
+            $sql = "INSERT OR REPLACE INTO Notes (id, page_id, content, parent_note_id, order_index, collapsed, internal, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([
+                $noteId,
+                $pageId,
+                $content,
+                $parentNoteId,
+                $orderIndex,
+                $collapsed,
+                $internal
+            ]);
+
+            // Ensure creation timestamp exists (only insert if not exists)
+            $createSql = "INSERT OR IGNORE INTO CreationTimestamps (entity_id, entity_type, created_at) VALUES (?, 'note', CURRENT_TIMESTAMP)";
+            $createStmt = $this->pdo->prepare($createSql);
+            $createStmt->execute([$noteId]);
+
+            $this->pdo->commit();
+            
+            // Return the complete note with properties
+            return $this->getNoteById($noteId, false, true);
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Upserts a page (create or update) with unified operation.
+     */
+    public function upsertPage(array $pageData): array {
+        $pageId = $pageData['id'];
+        $name = $pageData['name'];
+        $content = $pageData['content'] ?? '';
+        $alias = $pageData['alias'] ?? null;
+        $active = $pageData['active'] ?? 1;
+
+        $this->pdo->beginTransaction();
+        try {
+            // Upsert the page using INSERT OR REPLACE
+            $sql = "INSERT OR REPLACE INTO Pages (id, name, content, alias, active, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([
+                $pageId,
+                $name,
+                $content,
+                $alias,
+                $active
+            ]);
+
+            // Ensure creation timestamp exists (only insert if not exists)
+            $createSql = "INSERT OR IGNORE INTO CreationTimestamps (entity_id, entity_type, created_at) VALUES (?, 'page', CURRENT_TIMESTAMP)";
+            $createStmt = $this->pdo->prepare($createSql);
+            $createStmt->execute([$pageId]);
+
+            $this->pdo->commit();
+            
+            // Return the complete page with properties
+            return $this->getPageById($pageId);
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
     }
 }

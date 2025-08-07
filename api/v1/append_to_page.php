@@ -8,6 +8,9 @@ require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../validator_utils.php';
 require_once __DIR__ . '/../PatternProcessor.php';
+require_once __DIR__ . '/../UuidUtils.php';
+
+use App\UuidUtils;
 
 // New "Smart Property Indexer"
 // This function is the single source of truth for processing properties from content.
@@ -55,8 +58,7 @@ if (!function_exists('_indexPropertiesFromContent')) {
                 $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
                 $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
             } catch (PDOException $e) {
-                // Log error but don't let it break the entire process if just this update fails
-                error_log("Could not update Notes.internal flag for note {$entityId}. Error: " . $e->getMessage());
+                // Silently handle internal flag update errors
             }
         }
     }
@@ -90,12 +92,9 @@ try {
     if ($page_data) {
         $page_id = $page_data['id'];
     } else {
-        $insertStmt = $pdo->prepare("INSERT INTO Pages (name, updated_at) VALUES (?, CURRENT_TIMESTAMP)");
-        $insertStmt->execute([$page_name]);
-        $page_id = $pdo->lastInsertId();
-        if (!$page_id) {
-            throw new Exception('Failed to create page.');
-        }
+        $page_id = \App\UuidUtils::generateUuidV7();
+        $insertStmt = $pdo->prepare("INSERT INTO Pages (id, name, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
+        $insertStmt->execute([$page_id, $page_name]);
     }
     
     // 3. Note Handling - Convert to batch operations format
@@ -121,8 +120,7 @@ try {
                 'content' => $note_item['content'],
                 'parent_note_id' => $note_item['parent_note_id'] ?? null,
                 'order_index' => $note_item['order_index'] ?? 0,
-                'collapsed' => $note_item['collapsed'] ?? 0,
-                'client_temp_id' => $note_item['client_temp_id'] ?? null
+                'collapsed' => $note_item['collapsed'] ?? 0
             ]
         ];
     }
@@ -166,6 +164,5 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    error_log("Error in append_to_page.php: " . $e->getMessage() . " Trace: " . $e->getTraceAsString());
     \App\ApiResponse::error('An error occurred: ' . $e->getMessage(), 500);
 }

@@ -9,11 +9,7 @@ import { splashScreen } from './app/splash-screen.js';
 import sidebarComponent from './app/sidebar-component.js';
 import calendarComponent from './app/calendar-component.js';
 import { sidebarState } from './app/sidebar.js';
-
-
-
-// Wait for Alpine to be available
-document.addEventListener('alpine:init', () => {
+import { saveNoteImmediately } from './app/note-actions.js';
 
 // Alpine.js directive for feather icons
 Alpine.directive('feather', (el, { expression }, { evaluate, effect }) => {
@@ -140,11 +136,6 @@ Alpine.store('app', {
     this.pageCache.clear();
   }
 });
-    Alpine.data('noteComponent', noteComponent);
-    Alpine.data('splashScreen', splashScreen);
-    Alpine.data('sidebarComponent', sidebarComponent);
-    Alpine.data('calendarComponent', calendarComponent);
-});
 
 // Alpine.start() is automatically called by the CDN version
 
@@ -191,6 +182,15 @@ import { initGlobalSearch, initPageSearchModal, initNoteSearchModal } from './ap
 // --- Global Function Exposure ---
 window.displayPageProperties = displayPagePropertiesFromEditor;
 window.parseAndRenderContent = parseAndRenderContent; // **ENHANCEMENT**: Expose markdown rendering function globally
+window.ui = ui; // Expose ui object globally
+window.initializeDragAndDrop = ui.initializeDragAndDrop; // Expose initializeDragAndDrop globally
+
+// Expose note-related functions for Alpine.js components
+window.switchToEditMode = ui.switchToEditMode;
+window.switchToRenderedMode = ui.switchToRenderedMode;
+window.getRawTextWithNewlines = ui.getRawTextWithNewlines;
+window.normalizeNewlines = ui.normalizeNewlines;
+window.saveNoteImmediately = saveNoteImmediately;
 
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
@@ -215,8 +215,8 @@ if (notesContainer) {
             const noteItem = e.target.closest('.note-item');
             if (noteItem) {
                 const contentDiv = e.target;
+                // Update raw content only; save occurs on blur/switchToRenderedMode
                 contentDiv.dataset.rawContent = ui.normalizeNewlines(ui.getRawTextWithNewlines(contentDiv));
-                debouncedSaveNote(noteItem);
             }
         }
     });
@@ -248,7 +248,7 @@ if (notesContainer) {
         const noteItem = noteWrapper.closest('.note-item');
         const noteId = noteItem?.dataset.noteId;
 
-        if (!noteId || noteId.startsWith('temp-')) {
+        if (!noteId) {
             alert('Please save the note before adding attachments.');
             return;
         }

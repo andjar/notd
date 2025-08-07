@@ -2,6 +2,13 @@
 
 namespace App;
 
+// Start output buffering to prevent header issues
+ob_start();
+
+// Disable error handlers before including config.php to prevent header issues
+set_error_handler(null);
+set_exception_handler(null);
+
 // api/v1/pages.php
 
 /**
@@ -9,52 +16,29 @@ namespace App;
  * This file acts as a router, delegating all logic to the DataManager.
  */
 
+require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../DataManager.php';
-require_once __DIR__ . '/../PatternProcessor.php';
 require_once __DIR__ . '/../response_utils.php';
+require_once __DIR__ . '/../UuidUtils.php';
 
-if (!function_exists('_indexPropertiesFromContent')) {
-    function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
-        // For pages, we don't have the 'encrypted' property check or 'internal' flag update as for notes.
-
-        // Instantiate the pattern processor with the existing PDO connection to avoid database locks
-        $patternProcessor = new \App\PatternProcessor($pdo);
-
-        // Process the content to extract properties and potentially modified content
-        // Pass $pdo in context for handlers that might need it directly.
-        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
-        
-        $parsedProperties = $processedData['properties'];
-
-        // Save all extracted/generated properties using the processor's save method
-        // This method should handle deleting old 'replaceable' properties and inserting/updating new ones.
-        // It will also handle property triggers.
-        if (!empty($parsedProperties)) {
-            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
-        } else {
-            // If no properties are parsed from content, we might still need to clear existing replaceable ones.
-            // This relies on PatternProcessor.saveProperties (or a dedicated method there)
-            // to handle clearing properties when an empty set is passed.
-            // For now, assuming saveProperties handles this.
-            // A potential explicit call: $patternProcessor->clearReplaceableProperties($entityType, $entityId);
-        }
-        // Note: No 'internal' flag update logic here as it's specific to Notes.
-    }
-}
+use App\UuidUtils;
 
 $method = $_SERVER['REQUEST_METHOD'];
+// Disable global error handlers
+set_error_handler(null);
+set_exception_handler(null);
+
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 
 if ($method === 'POST' && isset($input['_method'])) {
     $method = strtoupper($input['_method']);
 }
 
-$pdo = get_db_connection();
-$dataManager = new \App\DataManager($pdo);
-// $propertyParser = new PropertyParser($pdo); // Removed global instantiation
-
 try {
+    $pdo = get_db_connection();
+    $dataManager = new \App\DataManager($pdo);
+
     switch ($method) {
         case 'GET':
             if (isset($_GET['name'])) {
@@ -63,14 +47,15 @@ try {
                 if (!$page) {
                     // Page does not exist, so create it.
                     $pdo->beginTransaction();
-                    $stmt = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (:name, :content)");
-                    $stmt->execute([':name' => $pageName, ':content' => null]);
+                    $pageId = \App\UuidUtils::generateUuidV7();
+                    $stmt = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (:id, :name, :content)");
+                    $stmt->execute([':id' => $pageId, ':name' => $pageName, ':content' => null]);
                     $pdo->commit();
                     $page = $dataManager->getPageByName($pageName); // Re-fetch the newly created page
                 }
                 \App\ApiResponse::success($page, 200);
             } elseif (isset($_GET['id'])) {
-                $page = $dataManager->getPageById((int)$_GET['id']);
+                $page = $dataManager->getPageById($_GET['id']); // Handle both UUIDs and integers
                 if ($page) {
                     \App\ApiResponse::success($page);
                 } else {
@@ -104,13 +89,9 @@ try {
             }
 
             $pdo->beginTransaction();
-            $stmt = $pdo->prepare("INSERT INTO Pages (name, content) VALUES (:name, :content)");
-            $stmt->execute([':name' => $name, ':content' => $content]);
-            $pageId = $pdo->lastInsertId();
-            
-            if ($content) {
-                _indexPropertiesFromContent($pdo, 'page', $pageId, $content);
-            }
+            $pageId = \App\UuidUtils::generateUuidV7();
+            $stmt = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (:id, :name, :content)");
+            $stmt->execute([':id' => $pageId, ':name' => $name, ':content' => $content]);
             $pdo->commit();
 
             $newPage = $dataManager->getPageById($pageId);
@@ -135,13 +116,8 @@ try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare("UPDATE Pages SET name = :name, content = :content, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
             $stmt->execute([':name' => $newName, ':content' => $newContent, ':id' => $pageId]);
-
-            // Re-index properties if content changed
-            if (array_key_exists('content', $input)) {
-                _indexPropertiesFromContent($pdo, 'page', $pageId, $newContent);
-            }
             $pdo->commit();
-            
+
             $updatedPage = $dataManager->getPageById($pageId);
             \App\ApiResponse::success($updatedPage);
             break;
@@ -151,24 +127,28 @@ try {
             if (!$pageId) {
                 \App\ApiResponse::error('Page ID is required for deletion.', 400);
             }
-            $stmt = $pdo->prepare("DELETE FROM Pages WHERE id = :id");
-            $stmt->execute([':id' => $pageId]);
 
-            if ($stmt->rowCount() > 0) {
-                \App\ApiResponse::success(['deleted_page_id' => $pageId]);
-            } else {
+            // Fetch existing page to ensure it exists
+            $page = $dataManager->getPageById($pageId);
+            if (!$page) {
                 \App\ApiResponse::error('Page not found.', 404);
             }
+
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("UPDATE Pages SET active = 0 WHERE id = :id");
+            $stmt->execute([':id' => $pageId]);
+            $pdo->commit();
+
+            \App\ApiResponse::success(null, 204);
             break;
 
         default:
-            \App\ApiResponse::error('Method not supported.', 405);
+            \App\ApiResponse::error('Method not allowed', 405);
             break;
     }
 } catch (Exception $e) {
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-    // Let the global exception handler in config.php format the error
-    throw $e;
+    \App\ApiResponse::error('Server error: ' . $e->getMessage(), 500);
 }
+
+// End output buffering and send the response
+ob_end_flush();

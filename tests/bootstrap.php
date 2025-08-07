@@ -23,6 +23,7 @@ if (file_exists($autoloadPath)) {
     require_once __DIR__ . '/../api/response_utils.php';
     require_once __DIR__ . '/../api/validator_utils.php';
     require_once __DIR__ . '/../api/db_helpers.php';
+    require_once __DIR__ . '/../api/UuidUtils.php';
     require_once __DIR__ . '/../db/setup_db.php';
     require_once __DIR__ . '/../api/db_connect.php';
     
@@ -93,7 +94,7 @@ if (file_exists($schemaPath)) {
     error_log("Schema.sql not found, using fallback schema");
     // Fallback to basic schema if schema.sql doesn't exist
     $pdo->exec("CREATE TABLE Pages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY, -- UUID v7 format
         name TEXT UNIQUE NOT NULL,
         content TEXT,
         alias TEXT,
@@ -103,9 +104,10 @@ if (file_exists($schemaPath)) {
     )");
 
     $pdo->exec("CREATE TABLE Notes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        page_id INTEGER NOT NULL,
-        parent_note_id INTEGER,
+        id TEXT PRIMARY KEY, -- UUID v7 format
+        rowid INTEGER UNIQUE, -- Integer ID for FTS compatibility
+        page_id TEXT NOT NULL, -- UUID v7 format
+        parent_note_id TEXT, -- UUID v7 format
         content TEXT,
         internal INTEGER NOT NULL DEFAULT 0,
         order_index INTEGER NOT NULL DEFAULT 0,
@@ -118,9 +120,9 @@ if (file_exists($schemaPath)) {
     )");
 
     $pdo->exec("CREATE TABLE Properties (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        note_id INTEGER,
-        page_id INTEGER,
+        id TEXT PRIMARY KEY, -- UUID v7 format
+        note_id TEXT, -- UUID v7 format
+        page_id TEXT, -- UUID v7 format
         name TEXT NOT NULL,
         value TEXT,
         weight INTEGER NOT NULL DEFAULT 2,
@@ -132,8 +134,8 @@ if (file_exists($schemaPath)) {
     )");
 
     $pdo->exec("CREATE TABLE Attachments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        note_id INTEGER,
+        id TEXT PRIMARY KEY, -- UUID v7 format
+        note_id TEXT, -- UUID v7 format
         name TEXT NOT NULL,
         path TEXT NOT NULL UNIQUE,
         type TEXT,
@@ -145,7 +147,7 @@ if (file_exists($schemaPath)) {
 
     // Add missing tables for webhook functionality
     $pdo->exec("CREATE TABLE IF NOT EXISTS Webhooks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY, -- UUID v7 format
         url TEXT NOT NULL,
         entity_type TEXT NOT NULL,
         property_names TEXT NOT NULL,
@@ -160,8 +162,8 @@ if (file_exists($schemaPath)) {
     )");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS WebhookEvents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        webhook_id INTEGER NOT NULL,
+        id TEXT PRIMARY KEY, -- UUID v7 format
+        webhook_id TEXT NOT NULL, -- UUID v7 format
         event_type TEXT NOT NULL,
         payload TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
@@ -176,14 +178,16 @@ if (file_exists($schemaPath)) {
     error_log("Created fallback schema with all required tables");
 }
 
-// Seed test data
-$pdo->exec("INSERT INTO Pages (name, content) VALUES ('Home', 'Welcome')");
-$pageId = $pdo->lastInsertId();
+// Seed test data with UUIDs
+$homePageId = \App\UuidUtils::generateUuidV7();
+$pdo->exec("INSERT INTO Pages (id, name, content) VALUES ('$homePageId', 'Home', 'Welcome')");
 
-$pdo->exec("INSERT INTO Notes (page_id, content) VALUES ($pageId, 'First note')");
-$noteId = $pdo->lastInsertId();
+$firstNoteId = \App\UuidUtils::generateUuidV7();
+$pdo->exec("INSERT INTO Notes (id, page_id, content) VALUES ('$firstNoteId', '$homePageId', 'First note')");
 
-$pdo->exec("INSERT INTO Properties (note_id, name, value, weight) VALUES ($noteId, 'status', 'TODO', 2)");
-$pdo->exec("INSERT INTO Properties (note_id, name, value, weight) VALUES ($noteId, 'internal', 'secret', 3)");
+$statusPropId = \App\UuidUtils::generateUuidV7();
+$internalPropId = \App\UuidUtils::generateUuidV7();
+$pdo->exec("INSERT INTO Properties (id, note_id, name, value, weight) VALUES ('$statusPropId', '$firstNoteId', 'status', 'TODO', 2)");
+$pdo->exec("INSERT INTO Properties (id, note_id, name, value, weight) VALUES ('$internalPropId', '$firstNoteId', 'internal', 'secret', 3)");
 
 error_log("Test data seeded successfully");

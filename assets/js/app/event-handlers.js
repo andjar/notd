@@ -23,6 +23,31 @@ export function initGlobalEventListeners() {
             }
         }
 
+        // Close any active modal on Escape
+        if (e.key === 'Escape') {
+            const activeModals = document.querySelectorAll('.generic-modal.active, .generic-modal[style*="display: block"], #backlinks-modal.active');
+            let closed = false;
+            activeModals.forEach(modal => {
+                if (modal.id === 'backlinks-modal') {
+                    const evt = new Event('click');
+                    const closeBtn = document.getElementById('backlinks-modal-close');
+                    if (closeBtn) {
+                        closeBtn.click();
+                        closed = true;
+                    }
+                    modal.classList.remove('active');
+                } else {
+                    modal.classList.remove('active');
+                    modal.style.display = 'none';
+                    closed = true;
+                }
+            });
+            if (closed) {
+                e.preventDefault();
+                return;
+            }
+        }
+
         // Other global shortcuts can be added here
         // e.g., Ctrl+K for search
         if (e.ctrlKey && e.key === 'k') {

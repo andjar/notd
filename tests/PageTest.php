@@ -26,8 +26,9 @@ class PageTest extends TestCase
 
     public function testJournalPageExclusion()
     {
-        // Add a journal page
-        $this->pdo->exec("INSERT INTO Pages (name, content) VALUES ('Journal', '{type::journal}')");
+        // Add a journal page with UUID
+        $journalPageId = \App\UuidUtils::generateUuidV7();
+        $this->pdo->exec("INSERT INTO Pages (id, name, content) VALUES ('$journalPageId', 'Journal', '{type::journal}')");
 
         $result = $this->dm->getPages(1, 20, ['exclude_journal' => true]);
         $this->assertCount(1, $result['data']); // Should exclude journal page and only return Home

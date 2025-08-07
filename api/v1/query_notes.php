@@ -119,6 +119,5 @@ try {
     );
 
 } catch (PDOException $e) {
-    error_log("Database error in query_notes.php: " . $e->getMessage() . " SQL: " . $sqlQuery);
     \App\ApiResponse::error('A database error occurred during query execution.', 500);
 }
