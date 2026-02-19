@@ -2,9 +2,9 @@ name: Quick Tests
 
 on:
   push:
-    branches: [ main, feat/impr ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   quick-test:

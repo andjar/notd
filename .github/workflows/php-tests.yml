@@ -6,9 +6,9 @@ permissions:
 
 on:
   push:
-    branches: [ main, feat/impr, migr/** ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   test:
