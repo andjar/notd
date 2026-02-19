@@ -358,6 +358,8 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
     $baseWaitTime = 100; // milliseconds
 
     while ($retryCount <= $maxRetries) {
+        $externalTransaction = false;
+
         try {
             if ($pdo === null) {
                 $pdo = get_db_connection();
@@ -367,7 +369,6 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
             $dataManager = new \App\DataManager($pdo);
 
             // **RACE CONDITION FIX**: Always ensure we have a transaction, even with external PDO
-            $externalTransaction = false;
             if (!$ownsPdo && $pdo && !$pdo->inTransaction()) {
                 // External PDO without transaction - start our own
                 $pdo->beginTransaction();
@@ -378,6 +379,21 @@ function process_batch_request(array $requestData, PDO $existingPdo = null): arr
             }
 
             $results = _handleBatchOperations($pdo, $dataManager, $operations, $includeParentProperties);
+
+            $failedResults = array_filter($results, function ($result) {
+                return ($result['status'] ?? 'error') !== 'success';
+            });
+
+            if (!empty($failedResults)) {
+                $failureMessages = array_map(function ($result) {
+                    $type = $result['type'] ?? 'operation';
+                    $id = isset($result['id']) ? " ({$result['id']})" : '';
+                    $message = $result['message'] ?? 'unknown error';
+                    return "{$type}{$id}: {$message}";
+                }, $failedResults);
+
+                throw new \RuntimeException('Batch operation failed: ' . implode('; ', $failureMessages));
+            }
 
             // **RACE CONDITION FIX**: Commit transaction if we started it
             if (($ownsPdo || $externalTransaction) && $pdo->inTransaction()) {

@@ -633,12 +633,6 @@ function normalizeNewlines(str) {
  */
 function switchToRenderedMode(contentEl) {
     const noteEl = contentEl.closest('.note-item');
-            if (noteEl && noteEl.dataset.noteId) {
-        // It's important that saveNoteImmediately is available in this scope.
-        // Assuming it's imported or globally available.
-        // console.log('[DEBUG switchToRenderedMode] Calling saveNoteImmediately for noteId:', noteEl.dataset.noteId);
-        saveNoteImmediately(noteEl);
-    }
     if (contentEl.classList.contains('rendered-mode')) return;
 
     const rawTextValue = getRawTextWithNewlines(contentEl);
@@ -669,6 +663,10 @@ function switchToRenderedMode(contentEl) {
     // Ensure suggestion box is hidden if it was somehow left open
     // This is a fallback, should be handled by blur or selection.
     hideSuggestions();
+
+    if (noteEl && noteEl.dataset.noteId) {
+        saveNoteImmediately(contentEl);
+    }
 }
 
 /**
@@ -1244,21 +1242,22 @@ async function handleDelegatedCollapseArrowClick(targetElement) {
 
     try {
         // Use the notesAPI.batchUpdateNotes function
-        const result = await notesAPI.batchUpdateNotes([{
+        await notesAPI.batchUpdateNotes([{
             type: 'update',
             payload: {
                 id: noteId,
-                page_id: window.currentPageId,
                 collapsed: isCurrentlyCollapsed ? 1 : 0
             }
         }]);
 
         // Update local cache
         if (window.notesForCurrentPage) {
-            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-            if (noteToUpdate) {
-                noteToUpdate.collapsed = isCurrentlyCollapsed;
-            }
+            const updatedNotes = window.notesForCurrentPage.map(note =>
+                String(note.id) === String(noteId)
+                    ? { ...note, collapsed: isCurrentlyCollapsed ? 1 : 0 }
+                    : note
+            );
+            syncNotesState(updatedNotes);
         }
     } catch (error) {
         const errorMessage = error.message || 'Please try again.';

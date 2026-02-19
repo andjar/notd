@@ -32,33 +32,50 @@ export function getNoteDataById(noteId) {
 // from running simultaneously and reading stale state
 let _structuralOperationInProgress = false;
 const _operationQueue = [];
+const STRUCTURAL_LOCK_TIMEOUT_MS = 3000;
 
 async function acquireStructuralLock(operationName) {
     if (!_structuralOperationInProgress) {
         _structuralOperationInProgress = true;
         return true;
     }
+
     // Wait for the current operation to finish (with timeout)
     return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
+        const waiter = {
+            resolve,
+            timedOut: false,
+            timeoutId: null
+        };
+
+        waiter.timeoutId = setTimeout(() => {
+            waiter.timedOut = true;
+            const waiterIndex = _operationQueue.indexOf(waiter);
+            if (waiterIndex !== -1) {
+                _operationQueue.splice(waiterIndex, 1);
+            }
             console.warn(`[${operationName}] Timed out waiting for structural lock`);
             resolve(false);
-        }, 3000);
-        _operationQueue.push(() => {
-            clearTimeout(timeout);
-            _structuralOperationInProgress = true;
-            resolve(true);
-        });
+        }, STRUCTURAL_LOCK_TIMEOUT_MS);
+
+        _operationQueue.push(waiter);
     });
 }
 
 function releaseStructuralLock() {
-    if (_operationQueue.length > 0) {
-        const next = _operationQueue.shift();
-        next();
-    } else {
-        _structuralOperationInProgress = false;
+    while (_operationQueue.length > 0) {
+        const waiter = _operationQueue.shift();
+        if (!waiter || waiter.timedOut) {
+            continue;
+        }
+
+        clearTimeout(waiter.timeoutId);
+        _structuralOperationInProgress = true;
+        waiter.resolve(true);
+        return;
     }
+
+    _structuralOperationInProgress = false;
 }
 
 // **PERFORMANCE OPTIMIZATION**: Cache for DOM queries and calculations
@@ -252,8 +269,22 @@ async function executeBatchOperations(originalNotesState, operations, optimistic
             throw lastError;
         }
         
-        // **PERFORMANCE FIX**: Optimized state updates - only sort if needed
         if (response && Array.isArray(response)) {
+            const failedResults = response.filter(result => result?.status !== 'success');
+            if (failedResults.length > 0) {
+                const failureSummary = failedResults
+                    .map(result => {
+                        const resultType = result?.type || 'operation';
+                        const resultId = result?.id ? ` (${result.id})` : '';
+                        const resultMessage = result?.message || 'unknown error';
+                        return `${resultType}${resultId}: ${resultMessage}`;
+                    })
+                    .join('; ');
+
+                throw new Error(`[${userActionName}] Batch operation failed: ${failureSummary}`);
+            }
+
+            // **PERFORMANCE FIX**: Optimized state updates - only sort if needed
             const appStore = getAppStore();
             const updatedNotes = [...appStore.notes];
             let needsSort = false;
@@ -574,20 +605,44 @@ async function _saveNoteToServer(noteId, rawContent) {
     return success ? getNoteDataById(noteId) : null;
 }
 
+function getContentElementForSave(noteEl) {
+    if (!noteEl) return null;
+    if (noteEl.classList?.contains('note-content')) {
+        return noteEl;
+    }
+
+    return (
+        noteEl.querySelector?.(':scope > .note-header-row .note-content') ||
+        noteEl.querySelector?.('.note-header-row .note-content') ||
+        noteEl.querySelector?.('.note-content') ||
+        null
+    );
+}
+
 export async function saveNoteImmediately(noteEl) {
     if (!noteEl) return null;
-    
-    const noteId = noteEl.dataset.noteId;
+
+    const contentEl = getContentElementForSave(noteEl);
+    const noteId =
+        noteEl.dataset?.noteId ||
+        contentEl?.dataset?.noteId ||
+        noteEl.closest?.('.note-item')?.dataset?.noteId;
     if (!noteId) return null;
-    
+
     const note = getNoteDataById(noteId);
     if (!note) return null;
-    
-    const rawContent = noteEl.textContent;
-    if (!rawContent && note.content === rawContent) {
+
+    if (!contentEl) return null;
+
+    const rawContent = typeof contentEl.dataset.rawContent === 'string'
+        ? contentEl.dataset.rawContent
+        : ui.normalizeNewlines(ui.getRawTextWithNewlines(contentEl));
+    const existingContent = typeof note.content === 'string' ? note.content : '';
+
+    if (rawContent === existingContent) {
         return note; // No change, skip save
     }
-    
+
     const updatedNoteData = {
         id: noteId,
         page_id: note.page_id,
@@ -631,12 +686,11 @@ export async function handleAddRootNote() {
     const validSiblingUpdates = siblingUpdates;
     
     const optimisticNewNote = { id: noteId, page_name: appStore.currentPageName, content: '', parent_note_id: null, order_index: targetOrderIndex, properties: {} };
-    appStore.addNote(optimisticNewNote);
     
     // **RACE CONDITION FIX**: Mark note as pending creation with auto-cleanup
     // markNotePendingCreationWithTimeout(noteId); // Removed as per edit hint
     
-    // **DATA LOSS FIX**: Capture original state AFTER optimistic updates are applied
+    // Capture original state before optimistic note insertion so rollback can fully revert.
     // **PERFORMANCE**: Use shallow clone instead of deep clone (10-100x faster)
     const originalNotesState = cloneNotesState(appStore.notes);
     
@@ -665,12 +719,16 @@ export async function handleAddRootNote() {
         }
     });
     
-    validSiblingUpdates.forEach(upd => {
-        const note = getNoteDataById(upd.id);
-        if(note) note.order_index = upd.newOrderIndex;
-    });
-
     const optimisticDOMUpdater = () => {
+        validSiblingUpdates.forEach(upd => {
+            const note = getNoteDataById(upd.id);
+            if (note) {
+                note.order_index = upd.newOrderIndex;
+            }
+        });
+
+        appStore.addNote(optimisticNewNote);
+
         const noteEl = ui.addNoteElement(optimisticNewNote);
         const contentDiv = noteEl?.querySelector('.note-content');
         if (contentDiv) {
@@ -956,11 +1014,13 @@ async function handleTabKey(e, noteItem, noteData) {
         // **LOGSEQ BEHAVIOR**: Can't indent the first child further
         // In Logseq, Tab on the first child does nothing
         console.log('[Tab] Cannot indent: already first child at this level');
+        releaseStructuralLock();
         return;
     }
     
     if (!targetParentNote) {
         console.log('[Tab] Cannot indent: no suitable parent found');
+        releaseStructuralLock();
         return;
     }
     
@@ -1049,7 +1109,10 @@ async function handleBackspaceKey(e, noteItem, noteData, contentDiv) {
     if (!(await acquireStructuralLock('Backspace'))) return;
     
     const parentNote = getNoteDataById(noteData.parent_note_id);
-    if (!parentNote) return;
+    if (!parentNote) {
+        releaseStructuralLock();
+        return;
+    }
     
     const newNoteData = {
         id: noteData.id,
@@ -1413,12 +1476,11 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
         order_index: targetOrderIndex, 
         properties: {} 
     };
-    appStore.addNote(optimisticNewNote);
     
     // **RACE CONDITION FIX**: Mark note as pending creation with auto-cleanup
     // markNotePendingCreationWithTimeout(noteId); // Removed as per edit hint
 
-    // **DATA LOSS FIX**: Capture original state AFTER optimistic updates are applied
+    // Capture original state before optimistic note insertion so rollback can fully revert.
     // **PERFORMANCE**: Use shallow clone instead of deep clone (10-100x faster)
     const originalNotesState = cloneNotesState(appStore.notes);
 
@@ -1444,6 +1506,8 @@ async function handleCreateChildNote(e, noteItem, noteData, contentDiv) {
     ];
 
     const optimisticDOMUpdater = () => {
+        appStore.addNote(optimisticNewNote);
+
         // Create and insert child note element
         const newNoteEl = createOptimisticNoteElement(optimisticNewNote, noteData.id);
         if (newNoteEl) {
