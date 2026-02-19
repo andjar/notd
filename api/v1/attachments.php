@@ -165,7 +165,7 @@ public function handleRequest() {
 
     private function handlePostRequest() {
         
-        $validationRulesPOST = ['note_id' => 'required|isPositiveInteger'];
+        $validationRulesPOST = ['note_id' => 'required|isValidId'];
         $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
         if (!empty($errorsPOST)) {
             ob_end_clean();
@@ -404,8 +404,8 @@ private function handleDeleteRequest() {
 
     // Validate both IDs properly:
     $validationRules = [
-        'attachment_id' => 'required|isPositiveInteger',
-        'note_id' => 'required|isPositiveInteger',
+        'attachment_id' => 'required|isValidId',
+        'note_id' => 'required|isValidId',
     ];
     $errors = Validator::validate([
         'attachment_id' => $attachment_id,

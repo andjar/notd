@@ -14,8 +14,9 @@
         <div x-data="{ test: 'Alpine is working!' }" x-text="test"></div>
 
         <div class="controls">
-            <input type="text" id="search-bar" placeholder="Search by name..." x-model.debounce.300ms="searchTerm" @input="fetchAttachments(true)">
-            <select id="type-filter" x-model="filterType" @change="fetchAttachments(true)">
+            <!-- ✅ FIXED: Using x-model with $watch instead of redundant @input -->
+            <input type="text" id="search-bar" placeholder="Search by name..." x-model.debounce.300ms="searchTerm">
+            <select id="type-filter" x-model="filterType">
                 <option value="">All Types</option>
                 <template x-for="type in uniqueTypes" :key="type">
                     <option :value="type" x-text="type"></option>
@@ -90,6 +91,10 @@
                     console.log("=== fetchAttachments() called from init ===");
                     // Populate some default common types, API will add more if found
                     this.uniqueTypes = ['image/jpeg', 'image/png', 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+                    
+                    // ✅ FIXED: Using $watch for reactive filtering instead of @input/@change
+                    this.$watch('searchTerm', () => this.fetchAttachments(true));
+                    this.$watch('filterType', () => this.fetchAttachments(true));
                 },
 
                 formatFileSize(bytes) {

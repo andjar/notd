@@ -10,9 +10,11 @@ import { domRefs } from './ui/dom-refs.js';
 import { pagesAPI } from './api_client.js';
 import { getInitialPage } from './app/page-loader.js';
 
-// Get Alpine store reference
 function getAppStore() {
-    return window.Alpine.store('app');
+    if (typeof window !== 'undefined' && window.Alpine && window.Alpine.store) {
+        return window.Alpine.store('app');
+    }
+    throw new Error('Alpine store not available');
 }
 
 /**

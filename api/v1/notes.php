@@ -75,7 +75,8 @@ if ($method === 'GET') {
             \App\ApiResponse::error('Missing required parameter: id or page_id', 400);
         }
     } catch (Exception $e) {
-        \App\ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+        error_log('Notes GET error: ' . $e->getMessage());
+        \App\ApiResponse::error('An error occurred while fetching notes.', 500);
     }
 } elseif ($method === 'POST') {
     try {
@@ -91,16 +92,12 @@ if ($method === 'GET') {
                 \App\ApiResponse::success($response['results']);
             }
         } else {
-            error_log("Not processing batch operations");
-            error_log("Input data: " . json_encode($input));
-            error_log("batch field: " . (isset($input['batch']) ? 'set' : 'not set'));
-            error_log("batch value: " . ($input['batch'] ?? 'null'));
-            // Single note creation
-            if (!isset($input['page_id'])) {
-                \App\ApiResponse::error('Missing required field: page_id', 400);
+            // Single note creation via unified upsert
+            if (!isset($input['page_id']) && !isset($input['page_name'])) {
+                \App\ApiResponse::error('Missing required field: page_id or page_name', 400);
             }
             
-            $result = _createNoteInBatch($pdo, $dataManager, $input, false);
+            $result = _upsertNoteInBatch($pdo, $dataManager, $input, false);
             
             if ($result['status'] === 'success') {
                 \App\ApiResponse::success($result['note'], 201);
@@ -109,7 +106,8 @@ if ($method === 'GET') {
             }
         }
     } catch (Exception $e) {
-        \App\ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+        error_log('Notes POST error: ' . $e->getMessage());
+        \App\ApiResponse::error('An error occurred while creating/updating notes.', 500);
     }
 } elseif ($method === 'PUT') {
     try {
@@ -117,7 +115,7 @@ if ($method === 'GET') {
             \App\ApiResponse::error('Missing required field: id', 400);
         }
         
-        $result = _updateNoteInBatch($pdo, $dataManager, $input);
+        $result = _upsertNoteInBatch($pdo, $dataManager, $input, false);
         
         if ($result['status'] === 'success') {
             \App\ApiResponse::success($result['note']);
@@ -125,7 +123,8 @@ if ($method === 'GET') {
             \App\ApiResponse::error($result['message'], 400);
         }
     } catch (Exception $e) {
-        \App\ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+        error_log('Notes PUT error: ' . $e->getMessage());
+        \App\ApiResponse::error('An error occurred while updating the note.', 500);
     }
 } elseif ($method === 'DELETE') {
     try {
@@ -141,7 +140,8 @@ if ($method === 'GET') {
             \App\ApiResponse::error($result['message'], 400);
         }
     } catch (Exception $e) {
-        \App\ApiResponse::error('Server error: ' . $e->getMessage(), 500);
+        error_log('Notes DELETE error: ' . $e->getMessage());
+        \App\ApiResponse::error('An error occurred while deleting the note.', 500);
     }
 } else {
     \App\ApiResponse::error('Method not allowed', 405);

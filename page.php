@@ -275,6 +275,7 @@ function renderBacklinks($backlinks) {
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
     <script src="assets/libs/sjcl.js"></script>
+    <script src="assets/libs/purify.min.js"></script>
     
     <!-- Alpine.js Component Registration (must be before Alpine.js loads) -->
     <script>
@@ -753,8 +754,7 @@ function renderBacklinks($backlinks) {
 <body>
     <div id="splash-screen" 
          x-data="splashScreen()" 
-         x-show="show" 
-         x-init="init()"
+         x-show="show"
          @click="hideSplash()"
          x-transition:leave="transition ease-in duration-300" 
          x-transition:leave-start="opacity-100" 
@@ -832,7 +832,7 @@ function renderBacklinks($backlinks) {
         <!-- Left Sidebar -->
         <div id="left-sidebar-outer">
             <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn left-toggle" @click="toggleLeft()">
-                <i x-feather="leftIcon()"></i>
+                <i x-feather="leftIcon"></i>
             </button>
             <div id="left-sidebar" class="sidebar left-sidebar" :class="{ 'collapsed': leftCollapsed }">
                 <div class="sidebar-content">
@@ -883,10 +883,10 @@ function renderBacklinks($backlinks) {
                         </a>
                     </div>
                     <div class="sidebar-section">
-                        <div id="calendar-widget" class="calendar-widget" x-data="calendarComponent()" x-init="init()">
+                        <div id="calendar-widget" class="calendar-widget" x-data="calendarComponent()">
                             <div class="calendar-header">
                                 <button id="prev-month-btn" class="arrow-btn" @click="prevMonth()"><i data-feather="chevron-left"></i></button>
-                                <span id="current-month-year" class="month-year-display" x-text="monthYear()"></span>
+                                <span id="current-month-year" class="month-year-display" x-text="monthYear"></span>
                                 <button id="next-month-btn" class="arrow-btn" @click="nextMonth()"><i data-feather="chevron-right"></i></button>
                                 <button id="today-btn" class="arrow-btn today-btn" @click="goToday()">Today</button>
                             </div>
@@ -951,108 +951,8 @@ function renderBacklinks($backlinks) {
                 <!-- Page content will be rendered here by JavaScript -->
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
-            <div id="notes-container" class="outliner" x-data="{ notes: [] }">
-                <template x-for="note in notes" :key="note.id">
-                    <div class="note-item"
-                        x-data="noteComponent(note, 0)"
-                        :data-note-id="note.id"
-                        :style="`--nesting-level: ${nestingLevel}`"
-                        :class="{ 'has-children': note.children && note.children.length > 0, 'collapsed': note.collapsed, 'encrypted-note': note.is_encrypted, 'decrypted-note': note.is_encrypted && note.content && !note.content.startsWith('{') }">
-
-                        <div class="note-header-row">
-                            <div class="note-controls">
-                                <span class="note-collapse-arrow" x-show="note.children && note.children.length > 0" @click="toggleCollapse()" :data-collapsed="note.collapsed ? 'true' : 'false'">
-                                    <i data-feather="chevron-right"></i>
-                                </span>
-                                <span class="note-bullet" :data-note-id="note.id"></span>
-                            </div>
-                            <div class="note-content-wrapper">
-                                <div class="note-content rendered-mode"
-                                    x-ref="contentDiv"
-                                    :data-note-id="note.id"
-                                    :data-raw-content="note.content"
-                                    x-html="parseContent(note.content)"
-                                    @click="editNote()"
-                                    @blur="isEditing = false"
-                                    @input="handleInput($event)"
-                                    @paste="handlePaste($event)">
-                                </div>
-                                <div class="note-attachments"></div>
-                            </div>
-                        </div>
-
-                        <div class="note-children" :class="{ 'collapsed': note.collapsed }">
-                            <template x-for="childNote in note.children" :key="childNote.id">
-                                <div class="note-item"
-                                    x-data="noteComponent(childNote, $parent.nestingLevel + 1)"
-                                    :data-note-id="childNote.id"
-                                    :style="`--nesting-level: ${$parent.nestingLevel + 1}`"
-                                    :class="{ 'has-children': childNote.children && childNote.children.length > 0, 'collapsed': childNote.collapsed, 'encrypted-note': childNote.is_encrypted, 'decrypted-note': childNote.is_encrypted && childNote.content && !childNote.content.startsWith('{') }">
-
-                                    <div class="note-header-row">
-                                        <div class="note-controls">
-                                            <span class="note-collapse-arrow" x-show="childNote.children && childNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="childNote.collapsed ? 'true' : 'false'">
-                                                <i data-feather="chevron-right"></i>
-                                            </span>
-                                            <span class="note-bullet" :data-note-id="childNote.id"></span>
-                                        </div>
-                                        <div class="note-content-wrapper">
-                                            <div class="note-content rendered-mode"
-                                                x-ref="contentDiv"
-                                                :data-note-id="childNote.id"
-                                                :data-raw-content="childNote.content"
-                                                x-html="parseContent(childNote.content)"
-                                                @click="editNote()"
-                                                @blur="isEditing = false"
-                                                @input="handleInput($event)"
-                                                @paste="handlePaste($event)">
-                                            </div>
-                                            <div class="note-attachments"></div>
-                                        </div>
-                                    </div>
-
-                                    <div class="note-children" :class="{ 'collapsed': childNote.collapsed }">
-                                        <!-- Recursive rendering of grand-children -->
-                                        <template x-for="grandChildNote in childNote.children" :key="grandChildNote.id">
-                                            <div class="note-item"
-                                                x-data="noteComponent(grandChildNote, $parent.$parent.nestingLevel + 2)"
-                                                :data-note-id="grandChildNote.id"
-                                                :style="`--nesting-level: ${$parent.$parent.nestingLevel + 2}`"
-                                                :class="{ 'has-children': grandChildNote.children && grandChildNote.children.length > 0, 'collapsed': grandChildNote.collapsed, 'encrypted-note': grandChildNote.is_encrypted, 'decrypted-note': grandChildNote.is_encrypted && grandChildNote.content && !grandChildNote.content.startsWith('{') }">
-
-                                                <div class="note-header-row">
-                                                    <div class="note-controls">
-                                                        <span class="note-collapse-arrow" x-show="grandChildNote.children && grandChildNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="grandChildNote.collapsed ? 'true' : 'false'">
-                                                            <i data-feather="chevron-right"></i>
-                                                        </span>
-                                                        <span class="note-bullet" :data-note-id="grandChildNote.id"></span>
-                                                    </div>
-                                                    <div class="note-content-wrapper">
-                                                        <div class="note-content rendered-mode"
-                                                            x-ref="contentDiv"
-                                                            :data-note-id="grandChildNote.id"
-                                                            :data-raw-content="grandChildNote.content"
-                                                            x-html="parseContent(grandChildNote.content)"
-                                                            @click="editNote()"
-                                                            @blur="isEditing = false"
-                                                            @input="handleInput($event)"
-                                                            @paste="handlePaste($event)">
-                                                        </div>
-                                                        <div class="note-attachments"></div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="note-children" :class="{ 'collapsed': grandChildNote.collapsed }">
-                                                    <!-- Further nested children would go here, following the same pattern -->
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </template>
+            <div id="notes-container" class="outliner">
+                <!-- Notes are rendered dynamically by note-elements.js displayNotes() -->
             </div>
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
@@ -1062,7 +962,7 @@ function renderBacklinks($backlinks) {
         <!-- Right Sidebar -->
         <div id="right-sidebar-outer">
             <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn right-toggle" @click="toggleRight()">
-                <i x-feather="rightIcon()"></i>
+                <i x-feather="rightIcon"></i>
             </button>
             <div id="right-sidebar" class="sidebar right-sidebar" :class="{ 'collapsed': rightCollapsed }">
                 <div class="sidebar-content">

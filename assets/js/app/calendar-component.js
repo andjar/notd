@@ -9,7 +9,8 @@ export default function calendarComponent() {
         weekdays: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
         calendarCells: [],
         
-        monthYear() {
+        // ✅ FIXED: Using getter for computed property (Alpine.js best practice)
+        get monthYear() {
             return this.currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
         },
         

@@ -9,7 +9,7 @@ import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
 import { attachmentsAPI, notesAPI, pagesAPI } from '../api_client.js';
 import { decrypt } from '../utils.js';
-import { getCurrentPagePassword } from '../app/state.js';
+import { getCurrentPagePassword, syncNotesState } from '../app/state.js';
 
 import {
     showSuggestions,
@@ -252,7 +252,7 @@ function renderNote(note, nestingLevel = 0) {
                 
                 if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
                      const pageData = await notesAPI.getPageData(window.currentPageId);
-                     window.notesForCurrentPage = pageData.notes; 
+                     syncNotesState(pageData.notes);
                      window.ui.displayNotes(pageData.notes, window.currentPageId); 
                 } else {
                     console.warn('displayNotes function not available for page refresh after D&D upload.')
@@ -567,7 +567,7 @@ function switchToEditMode(contentEl) {
 
                     if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
                          const pageData = await notesAPI.getPageData(window.currentPageId);
-                         window.notesForCurrentPage = pageData.notes; 
+                         syncNotesState(pageData.notes);
                          window.ui.displayNotes(pageData.notes, window.currentPageId); 
                     } else {
                         console.warn('displayNotes function not available for page refresh after paste upload.')
@@ -719,8 +719,15 @@ function parseTaskContent(taskContent) {
 
 /**
  * Parses and renders note content with special formatting
+ * 
+ * ⚠️ SECURITY NOTE: This function is used with Alpine.js x-html directive.
+ * The content is sanitized through:
+ * 1. marked.js for markdown parsing (sanitize option enabled)
+ * 2. HTML escaping for inline content
+ * 3. DOMPurify would be recommended for additional XSS protection
+ * 
  * @param {string} rawContent - Raw note content
- * @returns {string} HTML string for display
+ * @returns {string} HTML string for display (sanitized)
  */
 function parseAndRenderContent(rawContent) {
     // rawContent is now assumed to be plaintext if it was meant to be decrypted.
@@ -904,6 +911,16 @@ function parseAndRenderContent(rawContent) {
             console.warn('marked.js not loaded properly or missing parse method');
         }
     }
+    
+    // Sanitize the final HTML to prevent XSS
+    if (typeof DOMPurify !== 'undefined') {
+        html = DOMPurify.sanitize(html, {
+            ADD_TAGS: ['iframe'],
+            ADD_ATTR: ['target', 'data-note-id', 'data-page-name', 'data-sql-query', 'data-block-ref', 'data-transclusion-page', 'contenteditable'],
+            ALLOW_DATA_ATTR: true
+        });
+    }
+    
     return html;
 }
 
@@ -1352,9 +1369,9 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                     try {
                         await notesAPI.deleteNote(target.dataset.noteId);
                         document.querySelector(`.note-item[data-note-id="${target.dataset.noteId}"]`)?.remove();
-                        // Also remove from window.notesForCurrentPage
                         if (window.notesForCurrentPage) {
-                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
+                            const filtered = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
+                            syncNotesState(filtered);
                         }
                     } catch (error) {
                         const deleteErrorMessage = error.message || 'Please try again.';

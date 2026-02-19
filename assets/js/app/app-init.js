@@ -73,6 +73,11 @@ export async function initializeApp() {
         await fetchAndDisplayPages(initialPageName);
         await prefetchRecentPagesData(); 
         
+        // Initialize print/export functionality
+        if (typeof window.initPrintExport === 'function') {
+            window.initPrintExport();
+        }
+        
         // Save status indicator is now always visible
         // const initialSaveIndicator = document.getElementById('save-status-indicator');
         // if (initialSaveIndicator) {

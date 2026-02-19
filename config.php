@@ -98,51 +98,35 @@ date_default_timezone_set('UTC');
 
 // Set custom error handler
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    // Respect the error_reporting level.
     if (!(error_reporting() & $errno)) {
         return false;
     }
 
-    // Only handle errors if headers haven't been sent yet.
+    // Always log full details server-side
+    error_log("PHP Error: [$errno] $errstr in $errfile on line $errline");
+
     if (!headers_sent()) {
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode([
             'status' => 'error',
-            'message' => 'An internal server error occurred.',
-            'details' => [
-                'type' => 'PHP Error',
-                'message' => $errstr,
-                'file' => $errfile,
-                'line' => $errline
-            ]
+            'message' => 'An internal server error occurred.'
         ]);
-    } else {
-        // Log the error if we can't send JSON.
-        error_log("PHP Error: [$errno] $errstr in $errfile on line $errline");
     }
     exit(1);
 });
 
-// Set custom exception handler
 set_exception_handler(function($e) {
+    // Always log full details server-side
+    error_log("Uncaught Exception: " . get_class($e) . " - " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine() . "\n" . $e->getTraceAsString());
+
     if (!headers_sent()) {
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode([
             'status' => 'error',
-            'message' => 'An uncaught exception occurred.',
-            'details' => [
-                'type' => get_class($e),
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => explode("\n", $e->getTraceAsString()) // More JSON-friendly trace
-            ]
+            'message' => 'An internal server error occurred.'
         ]);
-    } else {
-        // Log the exception if we can't send JSON.
-        error_log("Uncaught Exception: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
     }
     exit(1);
 });

@@ -74,4 +74,76 @@
 
 .round-button:hover {
   transform: scale(1.05);
+}
+
+/* Load More Notes Button */
+.load-more-notes-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ls-space-2);
+  width: 100%;
+  padding: var(--ls-space-3) var(--ls-space-4);
+  margin: var(--ls-space-4) 0;
+  font-size: var(--ls-font-size-base);
+  font-weight: var(--ls-font-weight-medium);
+  color: var(--ls-secondary-text-color);
+  background-color: var(--ls-secondary-background-color);
+  border: 1px dashed var(--ls-border-color);
+  border-radius: var(--ls-border-radius-medium);
+  cursor: pointer;
+  transition: all var(--ls-transition-medium);
+}
+
+.load-more-notes-btn:hover {
+  background-color: var(--ls-tertiary-background-color);
+  border-color: var(--ls-accent-9);
+  color: var(--ls-primary-text-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.load-more-notes-btn:active {
+  transform: translateY(0);
+}
+
+.load-more-notes-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+.load-more-notes-btn span {
+  line-height: 1;
+}
+
+/* Print and Export buttons in page header */
+#print-page-btn,
+#export-html-btn {
+  padding: var(--ls-space-1) var(--ls-space-2);
+  font-size: var(--ls-font-size-sm);
+  background: var(--ls-secondary-background-color);
+  border: 1px solid var(--ls-border-color);
+  border-radius: var(--ls-border-radius-medium);
+  color: var(--ls-secondary-text-color);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ls-space-1);
+  transition: all var(--ls-transition-fast);
+  margin-right: var(--ls-space-2);
+}
+
+#print-page-btn:hover,
+#export-html-btn:hover {
+  background: var(--ls-tertiary-background-color);
+  color: var(--ls-primary-text-color);
+  border-color: var(--ls-secondary-border-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#print-page-btn i,
+#export-html-btn i {
+  width: 16px;
+  height: 16px;
 } 

@@ -106,7 +106,7 @@ if (!function_exists('_upsertNoteInBatch')) {
                 if (!$pageId) {
                     // Page does not exist, create it.
                     $pageId = \App\UuidUtils::generateUuidV7();
-                    $insertStmt = $pdo->prepare("INSERT OR REPLACE INTO Pages (id, name, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)");
+                    $insertStmt = $pdo->prepare("INSERT INTO Pages (id, name, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = CURRENT_TIMESTAMP");
                     $insertStmt->execute([$pageId, $pageName]);
                     
                     // Ensure creation timestamp exists for the page
@@ -118,22 +118,66 @@ if (!function_exists('_upsertNoteInBatch')) {
                 return ['type' => 'upsert', 'status' => 'error', 'message' => 'Failed to find or create page by name: ' . $e->getMessage()];
             }
         } else {
+            // For updates to existing notes, page_id can be resolved from the existing record.
+            // Defer this check until after the existing note fetch below.
+            // Only error if this is a new note with no page context.
+        }
+
+        // DATA LOSS PREVENTION: Fetch existing note to merge with partial payloads.
+        // Without this, missing fields in the payload would overwrite existing data with defaults.
+        $existingNote = null;
+        try {
+            $existStmt = $pdo->prepare("SELECT page_id, content, parent_note_id, order_index, collapsed, internal FROM Notes WHERE id = ?");
+            $existStmt->execute([$noteId]);
+            $existingNote = $existStmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            // If we can't read existing data, proceed with defaults (new note case)
+        }
+
+        if ($existingNote) {
+            // Merge: payload values override existing values; missing fields keep existing
+            $content = array_key_exists('content', $payload) ? $payload['content'] : $existingNote['content'];
+            $parentNoteId = array_key_exists('parent_note_id', $payload) 
+                ? (($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : $payload['parent_note_id'])
+                : $existingNote['parent_note_id'];
+            $orderIndex = array_key_exists('order_index', $payload) ? $payload['order_index'] : $existingNote['order_index'];
+            $collapsed = array_key_exists('collapsed', $payload) ? $payload['collapsed'] : $existingNote['collapsed'];
+            $internal = array_key_exists('internal', $payload) ? $payload['internal'] : $existingNote['internal'];
+            // page_id: use existing if not provided (already resolved above, but ensure fallback)
+            if (!$pageId) {
+                $pageId = $existingNote['page_id'];
+            }
+        } else {
+            // New note: use payload values with safe defaults
+            $content = $payload['content'] ?? '';
+            $parentNoteId = null;
+            if (array_key_exists('parent_note_id', $payload)) {
+                $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : $payload['parent_note_id'];
+            }
+            $orderIndex = $payload['order_index'] ?? 0;
+            $collapsed = $payload['collapsed'] ?? 0;
+            $internal = $payload['internal'] ?? 0;
+        }
+
+        // Final validation: page_id must be resolved by now
+        if (!$pageId) {
             return ['type' => 'upsert', 'status' => 'error', 'message' => 'Missing or invalid page_id or page_name for upsert operation'];
         }
 
-        $content = $payload['content'] ?? '';
-        $parentNoteId = null;
-        if (array_key_exists('parent_note_id', $payload)) {
-            $parentNoteId = ($payload['parent_note_id'] === null || $payload['parent_note_id'] === '') ? null : $payload['parent_note_id'];
-        }
-        $orderIndex = $payload['order_index'] ?? 0;
-        $collapsed = $payload['collapsed'] ?? 0;
-        $internal = $payload['internal'] ?? 0;
-
         try {
-            // 1. Upsert the note record using INSERT OR REPLACE
-            $sql = "INSERT OR REPLACE INTO Notes (id, page_id, content, parent_note_id, order_index, collapsed, internal, updated_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+            // 1. Upsert the note record using ON CONFLICT to avoid DELETE+INSERT cascade
+            // CRITICAL: INSERT OR REPLACE triggers ON DELETE CASCADE on child notes,
+            // causing silent data loss. ON CONFLICT DO UPDATE performs a safe in-place update.
+            $sql = "INSERT INTO Notes (id, page_id, content, parent_note_id, order_index, collapsed, internal, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(id) DO UPDATE SET
+                        page_id = excluded.page_id,
+                        content = excluded.content,
+                        parent_note_id = excluded.parent_note_id,
+                        order_index = excluded.order_index,
+                        collapsed = excluded.collapsed,
+                        internal = excluded.internal,
+                        updated_at = CURRENT_TIMESTAMP";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
@@ -186,9 +230,16 @@ if (!function_exists('_upsertPageInBatch')) {
         }
 
         try {
-            // 1. Upsert the page record using INSERT OR REPLACE
-            $sql = "INSERT OR REPLACE INTO Pages (id, name, content, alias, active, updated_at) 
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+            // 1. Upsert the page record using ON CONFLICT to avoid DELETE+INSERT cascade
+            // CRITICAL: INSERT OR REPLACE would cascade-delete all notes on the page.
+            $sql = "INSERT INTO Pages (id, name, content, alias, active, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name = excluded.name,
+                        content = excluded.content,
+                        alias = excluded.alias,
+                        active = excluded.active,
+                        updated_at = CURRENT_TIMESTAMP";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([

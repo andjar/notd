@@ -455,9 +455,17 @@ class DataManager {
 
         $this->pdo->beginTransaction();
         try {
-            // Upsert the note using INSERT OR REPLACE
-            $sql = "INSERT OR REPLACE INTO Notes (id, page_id, content, parent_note_id, order_index, collapsed, internal, updated_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+            // Upsert the note using ON CONFLICT to avoid DELETE+INSERT cascade
+            $sql = "INSERT INTO Notes (id, page_id, content, parent_note_id, order_index, collapsed, internal, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(id) DO UPDATE SET
+                        page_id = excluded.page_id,
+                        content = excluded.content,
+                        parent_note_id = excluded.parent_note_id,
+                        order_index = excluded.order_index,
+                        collapsed = excluded.collapsed,
+                        internal = excluded.internal,
+                        updated_at = CURRENT_TIMESTAMP";
             
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([
@@ -497,9 +505,15 @@ class DataManager {
 
         $this->pdo->beginTransaction();
         try {
-            // Upsert the page using INSERT OR REPLACE
-            $sql = "INSERT OR REPLACE INTO Pages (id, name, content, alias, active, updated_at) 
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+            // Upsert the page using ON CONFLICT to avoid DELETE+INSERT cascade
+            $sql = "INSERT INTO Pages (id, name, content, alias, active, updated_at) 
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name = excluded.name,
+                        content = excluded.content,
+                        alias = excluded.alias,
+                        active = excluded.active,
+                        updated_at = CURRENT_TIMESTAMP";
             
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([

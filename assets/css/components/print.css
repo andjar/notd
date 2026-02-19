@@ -1,0 +1,609 @@
+/* ========================================
+   PRINT STYLES FOR PDF & HTML EXPORT
+   ======================================== */
+
+@media print {
+    /* ========== PAGE SETUP ========== */
+    @page {
+        size: A4;
+        margin: 2cm 1.5cm;
+    }
+
+    /* ========== RESET & BASE ========== */
+    * {
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    body {
+        background: white !important;
+        color: black !important;
+        font-size: 11pt;
+        line-height: 1.6;
+        font-family: 'Ubuntu', 'Segoe UI', Arial, sans-serif;
+    }
+
+    /* ========== HIDE UI ELEMENTS ========== */
+    /* Hide all navigation, controls, and UI elements */
+    #left-sidebar,
+    #right-sidebar,
+    #left-sidebar-outer,
+    #right-sidebar-outer,
+    .sidebar,
+    .sidebar-toggle-btn,
+    #add-root-note-btn,
+    #save-status-indicator,
+    #toggle-splash-btn,
+    #splash-screen,
+    .mobile-bottom-toolbar,
+    .note-collapse-arrow,
+    .action-button,
+    .round-button,
+    .sidebar-section,
+    .search-section,
+    .sidebar-footer,
+    .page-header-actions button,
+    #page-properties-gear,
+    .modal,
+    .generic-modal,
+    button,
+    input[type="checkbox"].task-checkbox,
+    .note-attachments,
+    .backlinks-expand-text {
+        display: none !important;
+    }
+
+    /* ========== LAYOUT ========== */
+    .app-container {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .main-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+    }
+
+    /* ========== PAGE HEADER ========== */
+    .page-header-container {
+        margin-bottom: 1.5cm;
+        padding-bottom: 0.5cm;
+        border-bottom: 2px solid #333;
+        page-break-after: avoid;
+    }
+
+    .page-title {
+        font-size: 20pt;
+        font-weight: 600;
+        color: #000 !important;
+        margin: 0 0 0.3cm 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        line-height: 1.3;
+    }
+
+    .page-title-content {
+        display: block;
+    }
+
+    /* Show namespace links in print */
+    .namespace-link {
+        color: #555 !important;
+        text-decoration: none !important;
+        border-bottom: 1px solid #999 !important;
+    }
+
+    /* ========== PAGE PROPERTIES ========== */
+    .page-properties {
+        margin-top: 0.3cm;
+        font-size: 9pt;
+        color: #555 !important;
+    }
+
+    .page-properties-pills {
+        list-style: none;
+        padding: 0;
+        margin: 0.3cm 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.2cm;
+    }
+
+    .pill {
+        display: inline-block;
+        padding: 0.1cm 0.3cm;
+        background: #f0f0f0 !important;
+        border: 1px solid #ccc !important;
+        border-radius: 0.2cm;
+        font-size: 8pt;
+        color: #333 !important;
+        page-break-inside: avoid;
+    }
+
+    .favorite-toggle {
+        display: inline-block;
+        margin-right: 0.3cm;
+    }
+
+    /* ========== NOTES & OUTLINER ========== */
+    .outliner,
+    #notes-container {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Expand all collapsed content for print */
+    .note-children {
+        display: block !important;
+        opacity: 1 !important;
+        max-height: none !important;
+    }
+
+    .note-item {
+        page-break-inside: avoid;
+        margin-bottom: 0.3cm;
+        position: relative;
+        padding-left: calc(var(--nesting-level, 0) * 0.8cm);
+    }
+
+    /* Deep nesting support */
+    .note-item[style*="--nesting-level: 1"] { padding-left: 0.8cm; }
+    .note-item[style*="--nesting-level: 2"] { padding-left: 1.6cm; }
+    .note-item[style*="--nesting-level: 3"] { padding-left: 2.4cm; }
+    .note-item[style*="--nesting-level: 4"] { padding-left: 3.2cm; }
+    .note-item[style*="--nesting-level: 5"] { padding-left: 4.0cm; }
+
+    .note-header-row {
+        display: flex;
+        align-items: flex-start;
+        page-break-inside: avoid;
+    }
+
+    /* ========== NOTE BULLETS ========== */
+    .note-controls {
+        display: flex;
+        align-items: flex-start;
+        margin-right: 0.3cm;
+        flex-shrink: 0;
+    }
+
+    .note-bullet {
+        display: inline-block;
+        width: 0.15cm;
+        height: 0.15cm;
+        background: #333 !important;
+        border-radius: 50%;
+        margin-top: 0.25cm;
+        flex-shrink: 0;
+    }
+
+    /* Different bullet styles for nesting */
+    .note-item[style*="--nesting-level: 0"] .note-bullet {
+        background: #000 !important;
+        width: 0.18cm;
+        height: 0.18cm;
+    }
+
+    .note-item[style*="--nesting-level: 1"] .note-bullet {
+        background: #333 !important;
+    }
+
+    .note-item[style*="--nesting-level: 2"] .note-bullet {
+        background: #666 !important;
+        width: 0.12cm;
+        height: 0.12cm;
+    }
+
+    .note-item[style*="--nesting-level: 3"] .note-bullet,
+    .note-item[style*="--nesting-level: 4"] .note-bullet,
+    .note-item[style*="--nesting-level: 5"] .note-bullet {
+        background: #999 !important;
+        width: 0.1cm;
+        height: 0.1cm;
+    }
+
+    /* ========== NOTE CONTENT ========== */
+    .note-content-wrapper {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .note-content {
+        font-size: 10pt;
+        line-height: 1.6;
+        color: #000 !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    /* Make sure all content is visible */
+    .note-content.rendered-mode,
+    .note-content.edit-mode {
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    /* ========== TYPOGRAPHY ========== */
+    .note-content h1,
+    .note-content h2,
+    .note-content h3,
+    .note-content h4,
+    .note-content h5,
+    .note-content h6 {
+        color: #000 !important;
+        margin-top: 0.4cm;
+        margin-bottom: 0.2cm;
+        page-break-after: avoid;
+        font-weight: 600;
+    }
+
+    .note-content h1 {
+        font-size: 16pt;
+        border-bottom: 2px solid #333;
+        padding-bottom: 0.1cm;
+    }
+
+    .note-content h2 {
+        font-size: 14pt;
+        border-bottom: 1px solid #666;
+        padding-bottom: 0.1cm;
+    }
+
+    .note-content h3 {
+        font-size: 12pt;
+    }
+
+    .note-content h4,
+    .note-content h5,
+    .note-content h6 {
+        font-size: 10pt;
+    }
+
+    .note-content p {
+        margin: 0.2cm 0;
+        orphans: 3;
+        widows: 3;
+    }
+
+    /* ========== LINKS ========== */
+    .note-content a,
+    a.wiki-link {
+        color: #0066cc !important;
+        text-decoration: underline !important;
+        word-wrap: break-word;
+    }
+
+    /* Show URL after external links */
+    .note-content a[href^="http"]::after,
+    .note-content a[href^="https://"]::after {
+        content: " (" attr(href) ")";
+        font-size: 8pt;
+        color: #666;
+        word-break: break-all;
+    }
+
+    /* Don't show URL for internal links */
+    .note-content a.wiki-link::after,
+    .note-content a[href^="/"]::after,
+    .note-content a[href^="#"]::after {
+        content: "" !important;
+    }
+
+    /* ========== LISTS ========== */
+    .note-content ul,
+    .note-content ol {
+        margin: 0.2cm 0 0.2cm 0.5cm;
+        padding-left: 0.5cm;
+    }
+
+    .note-content li {
+        margin: 0.1cm 0;
+        orphans: 2;
+        widows: 2;
+    }
+
+    /* ========== CODE & PREFORMATTED TEXT ========== */
+    .note-content pre {
+        background: #f5f5f5 !important;
+        border: 1px solid #ccc !important;
+        border-radius: 0.1cm;
+        padding: 0.3cm;
+        margin: 0.3cm 0;
+        page-break-inside: avoid;
+        font-size: 8pt;
+        line-height: 1.4;
+        overflow-x: visible;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .note-content code {
+        background: #f5f5f5 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 0.1cm;
+        padding: 0.05cm 0.15cm;
+        font-size: 9pt;
+        font-family: 'Courier New', monospace;
+    }
+
+    .note-content pre code {
+        border: none !important;
+        background: transparent !important;
+        padding: 0;
+    }
+
+    /* ========== BLOCKQUOTES ========== */
+    .note-content blockquote {
+        border-left: 3px solid #999 !important;
+        margin: 0.3cm 0 0.3cm 0.5cm;
+        padding-left: 0.4cm;
+        color: #333 !important;
+        font-style: italic;
+        page-break-inside: avoid;
+    }
+
+    /* ========== IMAGES ========== */
+    .note-content img,
+    .content-image {
+        max-width: 100% !important;
+        height: auto !important;
+        page-break-inside: avoid;
+        margin: 0.3cm 0;
+        border: 1px solid #ddd;
+        display: block;
+    }
+
+    /* ========== TABLES ========== */
+    .note-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.3cm 0;
+        page-break-inside: avoid;
+        font-size: 9pt;
+    }
+
+    .note-content th,
+    .note-content td {
+        border: 1px solid #999 !important;
+        padding: 0.2cm;
+        text-align: left;
+    }
+
+    .note-content th {
+        background: #f0f0f0 !important;
+        font-weight: 600;
+        page-break-after: avoid;
+    }
+
+    .note-content thead {
+        display: table-header-group;
+    }
+
+    .note-content tr {
+        page-break-inside: avoid;
+    }
+
+    /* ========== HORIZONTAL RULES ========== */
+    .note-content hr {
+        border: none !important;
+        border-top: 1px solid #999 !important;
+        margin: 0.5cm 0;
+        page-break-after: avoid;
+    }
+
+    /* ========== TASKS ========== */
+    .task-container {
+        display: flex;
+        align-items: flex-start;
+        margin: 0.1cm 0;
+        page-break-inside: avoid;
+    }
+
+    .task-checkbox-container {
+        margin-right: 0.2cm;
+        flex-shrink: 0;
+    }
+
+    /* Show task status in print */
+    .task-container.todo::before {
+        content: "☐ ";
+        font-size: 12pt;
+        margin-right: 0.1cm;
+    }
+
+    .task-container.done::before {
+        content: "☑ ";
+        font-size: 12pt;
+        margin-right: 0.1cm;
+    }
+
+    .task-container.doing::before {
+        content: "◐ ";
+        font-size: 12pt;
+        margin-right: 0.1cm;
+    }
+
+    .task-container.waiting::before {
+        content: "⏸ ";
+        font-size: 12pt;
+        margin-right: 0.1cm;
+    }
+
+    .task-container.canceled::before {
+        content: "✖ ";
+        font-size: 12pt;
+        margin-right: 0.1cm;
+    }
+
+    .task-keyword {
+        font-weight: 600;
+        margin-right: 0.2cm;
+    }
+
+    .task-keyword.todo { color: #666 !important; }
+    .task-keyword.done { color: #080 !important; }
+    .task-keyword.doing { color: #06c !important; }
+    .task-keyword.waiting { color: #f80 !important; }
+    .task-keyword.canceled { color: #999 !important; }
+
+    /* ========== PROPERTIES & TAGS ========== */
+    .property-inline {
+        background: #f5f5f5 !important;
+        border: 1px solid #ccc !important;
+        border-radius: 0.1cm;
+        padding: 0.05cm 0.2cm;
+        font-size: 8pt;
+        color: #555 !important;
+        white-space: nowrap;
+    }
+
+    /* ========== ENCRYPTED CONTENT ========== */
+    .encrypted-note .note-content::before {
+        content: "🔒 ";
+        margin-right: 0.1cm;
+    }
+
+    .decryption-failed .note-content {
+        color: #c00 !important;
+        font-style: italic;
+    }
+
+    /* ========== TRANSCLUSIONS & EMBEDS ========== */
+    .transclusion-container,
+    .block-transclusion {
+        border: 1px solid #ddd !important;
+        border-left: 3px solid #999 !important;
+        padding: 0.3cm;
+        margin: 0.3cm 0;
+        background: #fafafa !important;
+        page-break-inside: avoid;
+    }
+
+    .transclusion-header {
+        font-size: 8pt;
+        color: #666 !important;
+        margin-bottom: 0.2cm;
+        font-weight: 600;
+    }
+
+    /* ========== PAGE BREAKS ========== */
+    /* Avoid breaks after headings */
+    h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid;
+    }
+
+    /* Avoid breaks inside certain elements */
+    .note-item,
+    .task-container,
+    blockquote,
+    pre,
+    table {
+        page-break-inside: avoid;
+    }
+
+    /* Keep content together */
+    p {
+        orphans: 3;
+        widows: 3;
+    }
+
+    /* ========== PRINT UTILITIES ========== */
+    /* Force page break before element with this class */
+    .print-page-break {
+        page-break-before: always;
+    }
+
+    /* Avoid page break before element with this class */
+    .print-no-break {
+        page-break-inside: avoid;
+    }
+
+    /* ========== METADATA & FOOTER ========== */
+    /* Add page numbers and metadata */
+    @page {
+        @bottom-right {
+            content: counter(page) " / " counter(pages);
+            font-size: 8pt;
+            color: #999;
+        }
+    }
+
+    /* ========== SPECIAL CONTENT ========== */
+    /* Handle special markers and formatting */
+    .highlight {
+        background: #ffff99 !important;
+        padding: 0 0.1cm;
+    }
+
+    strong, b {
+        font-weight: 600;
+        color: #000 !important;
+    }
+
+    em, i {
+        font-style: italic;
+        color: #333 !important;
+    }
+
+    /* ========== CLEAN UP ========== */
+    /* Remove any remaining interactive elements */
+    *:hover,
+    *:focus,
+    *:active {
+        outline: none !important;
+        background-color: transparent !important;
+    }
+
+    /* Remove shadows and effects */
+    * {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+/* ========================================
+   EXPORT MODE (HTML Save)
+   ======================================== */
+/* These styles are applied when the page has .export-mode class */
+body.export-mode,
+.export-mode {
+    background: white;
+    color: black;
+    font-size: 11pt;
+    line-height: 1.6;
+    padding: 2cm;
+    max-width: 21cm;
+    margin: 0 auto;
+}
+
+.export-mode #left-sidebar,
+.export-mode #right-sidebar,
+.export-mode #left-sidebar-outer,
+.export-mode #right-sidebar-outer,
+.export-mode .sidebar-toggle-btn,
+.export-mode #add-root-note-btn,
+.export-mode #save-status-indicator,
+.export-mode #toggle-splash-btn,
+.export-mode .mobile-bottom-toolbar,
+.export-mode .action-button,
+.export-mode button {
+    display: none;
+}
+
+.export-mode .main-content {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+
