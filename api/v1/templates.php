@@ -117,7 +117,10 @@ try {
 
                 try {
                     $processor = new \App\TemplateProcessor($type);
-                    $processor->updateTemplate($currentName, $content, $newName);
+                    if ($currentName !== $newName) {
+                        $processor->deleteTemplate($currentName);
+                    }
+                    $processor->addTemplate($newName, $content);
                     \App\ApiResponse::success(['message' => 'Template updated successfully']);
                 } catch (Exception $e) {
                     logError("Error updating template", [
@@ -140,7 +143,7 @@ try {
 
                 try {
                     $processor = new \App\TemplateProcessor($type);
-                    $processor->createTemplate($name, $content);
+                    $processor->addTemplate($name, $content);
                     \App\ApiResponse::success(['message' => 'Template created successfully'], 201);
                 } catch (Exception $e) {
                     logError("Error creating template", [

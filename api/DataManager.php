@@ -323,7 +323,7 @@ class DataManager {
     /**
      * Retrieves page details by ID, optionally including notes.
      */
-    public function getPageDetailsById(int $id, bool $includeNotes = false): ?array {
+    public function getPageDetailsById(string $id, bool $includeNotes = false): ?array {
         $page = $this->getPageById($id);
         if ($page && $includeNotes) {
             $page['notes'] = $this->getNotesByPageId($page['id']);

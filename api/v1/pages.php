@@ -21,6 +21,8 @@ require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../UuidUtils.php';
+require_once __DIR__ . '/../PatternProcessor.php';
+require_once __DIR__ . '/batch_operations.php';
 
 use App\UuidUtils;
 
@@ -92,6 +94,9 @@ try {
             $pageId = \App\UuidUtils::generateUuidV7();
             $stmt = $pdo->prepare("INSERT INTO Pages (id, name, content) VALUES (:id, :name, :content)");
             $stmt->execute([':id' => $pageId, ':name' => $name, ':content' => $content]);
+            if ($content && trim($content) !== '') {
+                _indexPropertiesFromContent($pdo, 'page', $pageId, $content);
+            }
             $pdo->commit();
 
             $newPage = $dataManager->getPageById($pageId);
@@ -116,6 +121,9 @@ try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare("UPDATE Pages SET name = :name, content = :content, updated_at = CURRENT_TIMESTAMP WHERE id = :id");
             $stmt->execute([':name' => $newName, ':content' => $newContent, ':id' => $pageId]);
+            if ($newContent && trim($newContent) !== '') {
+                _indexPropertiesFromContent($pdo, 'page', $pageId, $newContent);
+            }
             $pdo->commit();
 
             $updatedPage = $dataManager->getPageById($pageId);

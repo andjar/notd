@@ -9,60 +9,9 @@ require_once __DIR__ . '/../DataManager.php';
 require_once __DIR__ . '/../validator_utils.php';
 require_once __DIR__ . '/../PatternProcessor.php';
 require_once __DIR__ . '/../UuidUtils.php';
+require_once __DIR__ . '/batch_operations.php';
 
 use App\UuidUtils;
-
-// New "Smart Property Indexer"
-// This function is the single source of truth for processing properties from content.
-if (!function_exists('_indexPropertiesFromContent')) {
-    function _indexPropertiesFromContent($pdo, $entityType, $entityId, $content) {
-        // For notes, check if encrypted. If so, do not process properties from content.
-        if ($entityType === 'note') {
-            $encryptedStmt = $pdo->prepare("SELECT 1 FROM Properties WHERE note_id = :note_id AND name = 'encrypted' AND value = 'true' LIMIT 1");
-            $encryptedStmt->execute([':note_id' => $entityId]);
-            if ($encryptedStmt->fetch()) {
-                return; // Note is encrypted, do not parse/modify properties from its content.
-            }
-        }
-
-        // Instantiate the pattern processor with the existing PDO connection to avoid database locks
-        $patternProcessor = new \App\PatternProcessor($pdo);
-
-        // Process the content to extract properties and potentially modified content
-        // Pass $pdo in context for handlers that might need it directly.
-        $processedData = $patternProcessor->processContent($content, $entityType, $entityId, ['pdo' => $pdo]);
-        
-        $parsedProperties = $processedData['properties'];
-
-        // Save all extracted/generated properties using the processor's save method
-        // This method should handle deleting old 'replaceable' properties and inserting/updating new ones.
-        // It will also handle property triggers.
-        if (!empty($parsedProperties)) {
-            $patternProcessor->saveProperties($parsedProperties, $entityType, $entityId);
-        }
-        
-        // Update the note's 'internal' flag based on the final set of properties applied.
-        $hasInternalTrue = false;
-        if (!empty($parsedProperties)) {
-            foreach ($parsedProperties as $prop) {
-                if (isset($prop['name']) && strtolower($prop['name']) === 'internal' && 
-                    isset($prop['value']) && strtolower((string)$prop['value']) === 'true') {
-                    $hasInternalTrue = true;
-                    break;
-                }
-            }
-        }
-
-        if ($entityType === 'note') {
-             try {
-                $updateStmt = $pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
-                $updateStmt->execute([$hasInternalTrue ? 1 : 0, $entityId]);
-            } catch (PDOException $e) {
-                // Silently handle internal flag update errors
-            }
-        }
-    }
-}
 
 
 header('Content-Type: application/json');
@@ -81,7 +30,7 @@ if (!isset($input['page_name']) || !is_string($input['page_name']) || empty(trim
     \App\ApiResponse::error('page_name is required and must be a non-empty string.', 400);
     exit;
 }
-$page_name = \Validator::sanitizeString($input['page_name']);
+$page_name = Validator::sanitizeString($input['page_name']);
 
 try {
     $pdo->beginTransaction();
@@ -125,9 +74,6 @@ try {
         ];
     }
 
-    // Include batch operations utility file
-    require_once __DIR__ . '/batch_operations.php';
-    
     // Process batch operations directly
     if (!empty($batch_operations)) {
         try {
