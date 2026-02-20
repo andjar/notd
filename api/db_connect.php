@@ -1,12 +1,12 @@
 <?php
 if (!function_exists('log_db_error')) {
     function log_db_error($message, $context = []) {
-        error_log(date('Y-m-d H:i:s') . " [DB] " . $message . " " . json_encode($context));
+        // Disabled to prevent HTML output
     }
 }
 
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db/setup_db.php';
+require_once __DIR__ . '/../db/setup_db_fixed.php';
 require_once __DIR__ . '/db_helpers.php'; // Moved helpers to separate file
 
 function get_db_connection() {
@@ -24,61 +24,24 @@ function get_db_connection() {
         $pdo = new PDO('sqlite:' . $db_path, null, null, [
             'ATTR_ERRMODE' => PDO::ERRMODE_EXCEPTION, 
             'ATTR_DEFAULT_FETCH_MODE' => PDO::FETCH_ASSOC,
-            'ATTR_TIMEOUT' => 30
+            'ATTR_TIMEOUT' => 30,
+            'ATTR_PERSISTENT' => false // Ensure fresh connections
         ]);
         $pdo->exec('PRAGMA foreign_keys = ON;');
-        $pdo->exec('PRAGMA busy_timeout = 5000;');        // Set timeout to 5 seconds for SQLite's internal retry
+        $pdo->exec('PRAGMA busy_timeout = 15000;');        // Increased timeout to 15 seconds for SQLite's internal retry
         $pdo->exec('PRAGMA journal_mode = WAL;');         // WAL mode for better concurrency
         $pdo->exec('PRAGMA synchronous = NORMAL;');       // Faster writes
         $pdo->exec('PRAGMA cache_size = 10000;');         // Larger cache
         $pdo->exec('PRAGMA temp_store = MEMORY;');        // Use memory for temp storage
 
+        // Check if Pages table exists and run setup if needed
         $stmt = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='Pages'");
         if ($stmt->fetch() === false) {
-            $lock_file = $db_path . '.setup.lock';
-            $lock_fp = fopen($lock_file, 'w+');
-            if ($lock_fp && flock($lock_fp, LOCK_EX)) {
-                try {
-                    if ($pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='Pages'")->fetch() === false) {
-                        log_db_error("Running database setup...");
-                        run_database_setup($pdo);
-                        
-                        $welcome_notes_path = __DIR__ . '/../assets/template/page/welcome_notes.json';
-                        if (file_exists($welcome_notes_path)) {
-                            log_db_error("Adding welcome notes...");
-                            $pdo->beginTransaction();
-                            try {
-                                // --- THIS IS THE FIX ---
-                                // Create page for today WITH content, using the new helper
-                                $todays_page_name = date('Y-m-d');
-                                $page_content = "{type::journal}";
-                                $page_id = _create_page_and_index_properties($pdo, $todays_page_name, $page_content);
-                                
-                                // Add welcome notes from JSON to this new page
-                                $notes_json = file_get_contents($welcome_notes_path);
-                                $notes_to_insert = json_decode($notes_json, true);
-                                if (is_array($notes_to_insert)) {
-                                    $order_index = 1;
-                                    foreach ($notes_to_insert as $note_content) {
-                                        _create_note_and_index_properties($pdo, $page_id, $note_content, $order_index++);
-                                    }
-                                }
-                                $pdo->commit();
-                                log_db_error("Welcome notes added successfully.");
-                            } catch (Exception $e) {
-                                $pdo->rollBack();
-                                log_db_error("Failed to add welcome notes: " . $e->getMessage());
-                                throw $e;
-                            }
-                        }
-                    }
-                } finally {
-                    flock($lock_fp, LOCK_UN);
-                    fclose($lock_fp);
-                    @unlink($lock_file);
-                }
-            }
+            log_db_error("Running database setup...");
+            run_database_setup_fixed($pdo);
+            log_db_error("Database setup completed.");
         }
+        
         return $pdo;
     } catch (Exception $e) {
         log_db_error("CRITICAL DATABASE SETUP FAILED: " . $e->getMessage());

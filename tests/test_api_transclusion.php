@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../api/db_connect.php';
 require_once __DIR__ . '/../api/DataManager.php';
+require_once __DIR__ . '/../api/UuidUtils.php';
 require_once __DIR__ . '/../config.php';
 
 echo "=== Testing Transclusion Children Feature ===\n";
@@ -23,26 +24,28 @@ echo "Creating test data...\n";
 
 // Create a test page
 $uniquePageName = 'API Test Page ' . uniqid();
-$pageStmt = $pdo->prepare("INSERT INTO Pages (name, content, active) VALUES (?, ?, 1)");
-$pageStmt->execute([$uniquePageName, 'Test page content']);
-$pageId = $pdo->lastInsertId();
+$pageId = \App\UuidUtils::generateUuidV7();
+$pageStmt = $pdo->prepare("INSERT INTO Pages (id, name, content, active) VALUES (?, ?, ?, 1)");
+$pageStmt->execute([$pageId, $uniquePageName, 'Test page content']);
 
 // Create parent note with transclusion
-$parentStmt = $pdo->prepare("INSERT INTO Notes (page_id, content, order_index, active) VALUES (?, ?, ?, 1)");
-$parentStmt->execute([$pageId, 'Parent note with transclusion !{{123}} here', 1]);
-$parentId = $pdo->lastInsertId();
+$parentId = \App\UuidUtils::generateUuidV7();
+$parentStmt = $pdo->prepare("INSERT INTO Notes (id, page_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
+$parentStmt->execute([$parentId, $pageId, 'Parent note with transclusion !{{123}} here', 1]);
 
 // Create the note to be transcluded (note 123 won't exist, let's use the actual ID)
-$transcludeStmt = $pdo->prepare("INSERT INTO Notes (page_id, content, order_index, active) VALUES (?, ?, ?, 1)");
-$transcludeStmt->execute([$pageId, 'This is the transcluded note content', 2]);
-$transcludeId = $pdo->lastInsertId();
+$transcludeId = \App\UuidUtils::generateUuidV7();
+$transcludeStmt = $pdo->prepare("INSERT INTO Notes (id, page_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
+$transcludeStmt->execute([$transcludeId, $pageId, 'This is the transcluded note content', 2]);
 
 // Create children for the transcluded note
-$child1Stmt = $pdo->prepare("INSERT INTO Notes (page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
-$child1Stmt->execute([$pageId, $transcludeId, 'First child of transcluded note', 1]);
+$child1Id = \App\UuidUtils::generateUuidV7();
+$child1Stmt = $pdo->prepare("INSERT INTO Notes (id, page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, ?, 1)");
+$child1Stmt->execute([$child1Id, $pageId, $transcludeId, 'First child of transcluded note', 1]);
 
-$child2Stmt = $pdo->prepare("INSERT INTO Notes (page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, 1)");
-$child2Stmt->execute([$pageId, $transcludeId, 'Second child of transcluded note', 2]);
+$child2Id = \App\UuidUtils::generateUuidV7();
+$child2Stmt = $pdo->prepare("INSERT INTO Notes (id, page_id, parent_note_id, content, order_index, active) VALUES (?, ?, ?, ?, ?, 1)");
+$child2Stmt->execute([$child2Id, $pageId, $transcludeId, 'Second child of transcluded note', 2]);
 
 echo "Test data created.\n";
 echo "Transcluded note ID: $transcludeId\n";

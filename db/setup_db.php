@@ -1,45 +1,44 @@
 <?php
+/**
+ * Database Setup Script
+ * Creates the database and tables for NotTD application
+ * Version 4.0 - Unified Upsert with Separate Creation Timestamps
+ */
+
 require_once __DIR__ . '/../config.php';
 
-if (!function_exists('log_setup_local')) {
-    function log_setup_local($message) {
-        error_log("[Database Setup] " . $message);
+try {
+    // Create database connection
+    $pdo = new PDO("sqlite:" . DB_PATH);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    
+    echo "Connected to database successfully.\n";
+    
+    // Read and execute schema
+    $schema = file_get_contents(__DIR__ . '/schema.sql');
+    if (!$schema) {
+        throw new Exception("Could not read schema file");
     }
-}
-
-/**
- * Runs the entire database schema setup.
- * This function requires a valid PDO connection to be passed to it.
- *
- * @param PDO $pdo The database connection object.
- * @throws Exception if any part of the setup fails.
- */
-function run_database_setup(PDO $pdo) {
-    try {
-        $schemaSql = file_get_contents(__DIR__ . '/schema.sql');
-        if ($schemaSql === false) {
-            throw new Exception("Could not read schema.sql file.");
+    
+    // Split schema into individual statements
+    $statements = array_filter(
+        array_map('trim', explode(';', $schema)),
+        function($stmt) { return !empty($stmt) && !preg_match('/^--/', $stmt); }
+    );
+    
+    echo "Executing schema statements...\n";
+    
+    foreach ($statements as $statement) {
+        if (!empty($statement)) {
+            $pdo->exec($statement);
+            echo "Executed: " . substr($statement, 0, 50) . "...\n";
         }
-
-        log_setup_local("Applying database schema from schema.sql...");
-        
-        $pdo->beginTransaction();
-        try {
-            // The 'exec' command can handle multiple statements separated by semicolons.
-            // This is simpler and more robust for applying a full schema.
-            $pdo->exec($schemaSql);
-            
-            $pdo->commit();
-            log_setup_local("Database schema applied successfully.");
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            log_setup_local("Database setup failed during schema application: " . $e->getMessage());
-            throw $e;
-        }
-        log_setup_local("Database setup completed successfully!");
-
-    } catch (Exception $e) {
-        log_setup_local("Database setup failed: " . $e->getMessage());
-        throw $e; // Re-throw to be handled by the caller
     }
+    
+    echo "Database setup completed successfully!\n";
+    echo "Schema version: 4.0 (Unified Upsert with Separate Creation Timestamps)\n";
+    
+} catch (Exception $e) {
+    echo "Error setting up database: " . $e->getMessage() . "\n";
+    exit(1);
 }

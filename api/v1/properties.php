@@ -31,8 +31,7 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $validationRules = [
             'entity_type' => 'required|isValidEntityType',
-            'entity_id' => 'required|isPositiveInteger'
-            // 'include_hidden' is the new parameter, replacing 'include_internal'
+            'entity_id' => 'required|isValidId'
         ];
         $errors = Validator::validate($_GET, $validationRules);
         if (!empty($errors)) {
@@ -41,7 +40,7 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
         }
 
         $entityType = $_GET['entity_type'];
-        $entityId = (int)$_GET['entity_id'];
+        $entityId = $_GET['entity_id'];
         // Use 'include_hidden' to control visibility of properties based on config.
         $includeHidden = filter_input(INPUT_GET, 'include_hidden', FILTER_VALIDATE_BOOLEAN);
 

@@ -4,16 +4,26 @@
  */
 
 // Alpine.js will be loaded from CDN and available as global Alpine
+// Import component definitions
 import noteComponent from './app/note-component.js';
 import { splashScreen } from './app/splash-screen.js';
 import sidebarComponent from './app/sidebar-component.js';
 import calendarComponent from './app/calendar-component.js';
 import { sidebarState } from './app/sidebar.js';
+import { saveNoteImmediately } from './app/note-actions.js';
 
-
-
-// Wait for Alpine to be available
+// Register Alpine components (Note: page.php also has inline registrations for SSR compatibility)
+// These module-based components serve as the source of truth for component logic
 document.addEventListener('alpine:init', () => {
+    // Register components from modules
+    // Note: page.php has duplicate inline definitions for initial page load
+    // The inline definitions in page.php should eventually be removed in favor of these
+    Alpine.data('noteComponentModule', noteComponent);
+    Alpine.data('sidebarComponentModule', sidebarComponent);
+    Alpine.data('calendarComponentModule', calendarComponent);
+    
+    console.log('[Alpine] Module-based components registered');
+});
 
 // Alpine.js directive for feather icons
 Alpine.directive('feather', (el, { expression }, { evaluate, effect }) => {
@@ -63,42 +73,45 @@ Alpine.store('app', {
   CACHE_MAX_AGE_MS: 5 * 60 * 1000, // 5 minutes
   MAX_PREFETCH_PAGES: 3,
   
+  // 🔄 COMPATIBILITY LAYER: Window global syncing for legacy code
+  // TODO: Gradually migrate all window.notesForCurrentPage references to Alpine.store('app')
+  // Affected files: note-elements.js, note-renderer.js, note-actions.js, ui.js, sidebar.js
   // Helper methods for state management
   setCurrentPageId(newId) {
     this.currentPageId = newId;
-    window.currentPageId = newId; // Keep window object in sync for debugging
+    window.currentPageId = newId; // DEPRECATED: For backward compatibility only
   },
   
   setCurrentPageName(newName) {
     this.currentPageName = newName;
-    window.currentPageName = newName;
+    window.currentPageName = newName; // DEPRECATED: For backward compatibility only
   },
   
   setSaveStatus(newStatus) {
     this.saveStatus = newStatus;
-    window.saveStatus = newStatus;
+    window.saveStatus = newStatus; // DEPRECATED: For backward compatibility only
   },
   
   setPagePassword(newPassword) {
     this.pagePassword = newPassword;
-    window.currentPagePassword = newPassword;
+    window.currentPagePassword = newPassword; // DEPRECATED: For backward compatibility only
   },
   
   setNotes(newNotes) {
     this.notes = newNotes;
-    window.notesForCurrentPage = newNotes;
+    window.notesForCurrentPage = newNotes; // DEPRECATED: For backward compatibility only
   },
   
   addNote(note) {
     this.notes.push(note);
     this.notes.sort((a, b) => a.order_index - b.order_index);
-    window.notesForCurrentPage = this.notes;
+    window.notesForCurrentPage = this.notes; // DEPRECATED: For backward compatibility only
   },
   
   removeNoteById(noteId) {
     const idx = this.notes.findIndex(n => String(n.id) === String(noteId));
     if (idx > -1) this.notes.splice(idx, 1);
-    window.notesForCurrentPage = this.notes;
+    window.notesForCurrentPage = this.notes; // DEPRECATED: For backward compatibility only
   },
   
   updateNote(updatedNote) {
@@ -108,12 +121,12 @@ Alpine.store('app', {
     } else {
       this.notes.push(updatedNote);
     }
-    window.notesForCurrentPage = this.notes;
+    window.notesForCurrentPage = this.notes; // DEPRECATED: For backward compatibility only
   },
   
   setFocusedNoteId(newNoteId) {
     this.focusedNoteId = newNoteId;
-    window.currentFocusedNoteId = newNoteId;
+    window.currentFocusedNoteId = newNoteId; // DEPRECATED: For backward compatibility only
   },
   
   // Page cache management
@@ -139,11 +152,6 @@ Alpine.store('app', {
   clearPageCache() {
     this.pageCache.clear();
   }
-});
-    Alpine.data('noteComponent', noteComponent);
-    Alpine.data('splashScreen', splashScreen);
-    Alpine.data('sidebarComponent', sidebarComponent);
-    Alpine.data('calendarComponent', calendarComponent);
 });
 
 // Alpine.start() is automatically called by the CDN version
@@ -188,9 +196,26 @@ import {
 import { initializeApp } from './app/app-init.js';
 import { initGlobalSearch, initPageSearchModal, initNoteSearchModal } from './app/search.js';
 
+// Print and export functionality
+import { printPage, exportAsHTML, initPrintExport } from './app/print-export.js';
+
 // --- Global Function Exposure ---
 window.displayPageProperties = displayPagePropertiesFromEditor;
 window.parseAndRenderContent = parseAndRenderContent; // **ENHANCEMENT**: Expose markdown rendering function globally
+window.ui = ui; // Expose ui object globally
+window.initializeDragAndDrop = ui.initializeDragAndDrop; // Expose initializeDragAndDrop globally
+
+// Expose print/export functions
+window.printPage = printPage;
+window.exportAsHTML = exportAsHTML;
+window.initPrintExport = initPrintExport;
+
+// Expose note-related functions for Alpine.js components
+window.switchToEditMode = ui.switchToEditMode;
+window.switchToRenderedMode = ui.switchToRenderedMode;
+window.getRawTextWithNewlines = ui.getRawTextWithNewlines;
+window.normalizeNewlines = ui.normalizeNewlines;
+window.saveNoteImmediately = saveNoteImmediately;
 
 // --- Event Handlers Setup ---
 const { notesContainer, addRootNoteBtn } = ui.domRefs;
@@ -215,8 +240,8 @@ if (notesContainer) {
             const noteItem = e.target.closest('.note-item');
             if (noteItem) {
                 const contentDiv = e.target;
+                // Update raw content only; save occurs on blur/switchToRenderedMode
                 contentDiv.dataset.rawContent = ui.normalizeNewlines(ui.getRawTextWithNewlines(contentDiv));
-                debouncedSaveNote(noteItem);
             }
         }
     });
@@ -248,7 +273,7 @@ if (notesContainer) {
         const noteItem = noteWrapper.closest('.note-item');
         const noteId = noteItem?.dataset.noteId;
 
-        if (!noteId || noteId.startsWith('temp-')) {
+        if (!noteId) {
             alert('Please save the note before adding attachments.');
             return;
         }

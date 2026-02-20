@@ -1,5 +1,5 @@
-import { saveNoteImmediately, handleNoteKeyDown } from '../app/note-actions.js';
-import { getRawTextWithNewlines, normalizeNewlines, switchToEditMode, switchToRenderedMode } from '../ui/note-renderer.js';
+import { saveNoteImmediately } from '../app/note-actions.js';
+import { getRawTextWithNewlines, normalizeNewlines, switchToEditMode, switchToRenderedMode, parseAndRenderContent } from '../ui/note-renderer.js';
 
 /**
  * Alpine.js component for rendering and managing a single note.
@@ -13,9 +13,9 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
         isEditing: false,
         contentEl: null, // Reference to the content editable div
 
-        // Expose parseAndRenderContent for x-html
+        // ✅ FIXED: Import and use parseAndRenderContent directly instead of window global
         parseContent(content) {
-            return window.parseAndRenderContent(content);
+            return parseAndRenderContent(content);
         },
 
         init() {
@@ -93,9 +93,6 @@ export default function noteComponent(initialNote, nestingLevel = 0) {
             document.execCommand('insertText', false, text);
         },
 
-        handleNoteKeyDown(event) {
-            // Call the imported handleNoteKeyDown function
-            return handleNoteKeyDown(event);
-        }
+
     }
 }

@@ -168,7 +168,6 @@ SQL
 
     } catch (PDOException $e) {
         // FTS5 might throw an error on invalid syntax
-        error_log("Search Error: " . $e->getMessage());
         \App\ApiResponse::error('Search failed. Please check your search term or contact support.', 500, ['details' => $e->getMessage()]);
     }
 } else {

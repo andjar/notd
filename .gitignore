@@ -4,6 +4,10 @@
 *.sqlite3
 *.db-journal
 
+# Composer dependencies
+vendor/
+composer.lock
+
 # Uploads directory
 uploads/*
 !uploads/.gitkeep
@@ -23,3 +27,5 @@ docs/.hugo_cache/
 # Temporary files
 docs/.DS_Store
 docs/Thumbs.db
+.DS_Store
+Thumbs.db

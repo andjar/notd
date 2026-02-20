@@ -27,11 +27,9 @@ try {
     echo json_encode($response);
     
 } catch (PDOException $e) {
-    error_log("Database error in recent_pages.php: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Database error']);
 } catch (Exception $e) {
-    error_log("Error in recent_pages.php: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Internal server error']);
 }

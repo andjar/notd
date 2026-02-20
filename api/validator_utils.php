@@ -16,6 +16,16 @@ if (!class_exists('App\\Validator')) {
         return filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) !== false;
     }
 
+    public static function isValidId($value) {
+        if (self::isPositiveInteger($value)) return true;
+        return self::isUuid($value);
+    }
+
+    public static function isUuid($value) {
+        if (!is_string($value)) return false;
+        return (bool)preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value);
+    }
+
     public static function isNotEmpty($value) {
         if (is_string($value)) {
             return trim($value) !== '';

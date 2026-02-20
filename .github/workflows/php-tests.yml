@@ -6,9 +6,9 @@ permissions:
 
 on:
   push:
-    branches: [ main, feat/impr, migr/** ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -34,8 +34,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        composer install --prefer-dist --no-progress --no-dev
-        composer require --dev phpunit/phpunit
+        composer install --prefer-dist --no-progress
         composer dump-autoload
 
     - name: Debug composer autoloader
@@ -70,20 +69,40 @@ jobs:
         cd tests
         php quick_test.php
       env:
-        DB_PATH: ./db/test_database.sqlite
-        UPLOADS_DIR: ./uploads/test
+        DB_PATH: ${{ github.workspace }}/db/test_database.sqlite
+        UPLOADS_DIR: ${{ github.workspace }}/uploads/test
         APP_ENV: testing
 
     - name: Start PHP built-in server
-      run: php -S localhost:80 -t . > /dev/null 2>&1 &
+      if: matrix.test-suite == 'integration'
+      run: php -S 127.0.0.1:8000 -t . > /tmp/php-server.log 2>&1 &
+      env:
+        DB_PATH: ${{ github.workspace }}/db/test_database.sqlite
+        UPLOADS_DIR: ${{ github.workspace }}/uploads/test
+        APP_ENV: testing
+
+    - name: Wait for API server
+      if: matrix.test-suite == 'integration'
+      run: |
+        for i in {1..20}; do
+          if curl -sf "http://127.0.0.1:8000/api/v1/ping.php" > /dev/null; then
+            echo "API server is ready"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "API server did not become ready in time"
+        cat /tmp/php-server.log || true
+        exit 1
 
     - name: Run ${{ matrix.test-suite }} tests
       run: |
         cd tests
         php run_tests.php ${{ matrix.test-suite }}
       env:
-        DB_PATH: ./db/test_database.sqlite
-        UPLOADS_DIR: ./uploads/test
+        DB_PATH: ${{ github.workspace }}/db/test_database.sqlite
+        UPLOADS_DIR: ${{ github.workspace }}/uploads/test
+        API_BASE_URL: http://127.0.0.1:8000/api/v1
         APP_ENV: testing
 
     - name: Debug test failures
@@ -96,6 +115,9 @@ jobs:
         echo ""
         echo "=== Bootstrap Debug ==="
         php debug_test.php
+        echo ""
+        echo "=== API Server Log (if any) ==="
+        cat /tmp/php-server.log || true
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
@@ -129,10 +151,17 @@ jobs:
 
     - name: Generate test summary
       run: |
-        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| PHP Version | Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------------|------------|--------|" >> $GITHUB_STEP_SUMMARY
+        SUMMARY_FILE="test-results/pr-summary.md"
+        : > "$SUMMARY_FILE"
+
+        write_summary_line () {
+          echo "$1" | tee -a "$GITHUB_STEP_SUMMARY" "$SUMMARY_FILE" > /dev/null
+        }
+
+        write_summary_line "## Test Results Summary"
+        write_summary_line ""
+        write_summary_line "| PHP Version | Test Suite | Status |"
+        write_summary_line "|-------------|------------|--------|"
         
         for result in test-results/*; do
           if [ -d "$result" ]; then
@@ -145,7 +174,7 @@ jobs:
               status="❌ Failed"
             fi
             
-            echo "| $version | $suite | $status |" >> $GITHUB_STEP_SUMMARY
+            write_summary_line "| $version | $suite | $status |"
           fi
         done
 
@@ -155,7 +184,16 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+          const summaryPath = 'test-results/pr-summary.md';
+          let summary = '';
+
+          if (fs.existsSync(summaryPath)) {
+            summary = fs.readFileSync(summaryPath, 'utf8').trim();
+          }
+
+          if (!summary) {
+            summary = 'Test summary was empty. Please check workflow logs for details.';
+          }
           
           github.rest.issues.createComment({
             issue_number: context.issue.number,

@@ -10,9 +10,11 @@ import { domRefs } from './ui/dom-refs.js';
 import { pagesAPI } from './api_client.js';
 import { getInitialPage } from './app/page-loader.js';
 
-// Get Alpine store reference
 function getAppStore() {
-    return window.Alpine.store('app');
+    if (typeof window !== 'undefined' && window.Alpine && window.Alpine.store) {
+        return window.Alpine.store('app');
+    }
+    throw new Error('Alpine store not available');
 }
 
 /**
@@ -349,8 +351,16 @@ function updateSaveStatusIndicator(newStatus) {
     const indicator = document.getElementById('save-status-indicator');
     if (!indicator) return;
 
-    const appStore = getAppStore();
-    appStore.setSaveStatus(newStatus);
+    // Try to get Alpine store, but don't fail if it's not ready yet
+    try {
+        const appStore = getAppStore();
+        if (appStore && typeof appStore.setSaveStatus === 'function') {
+            appStore.setSaveStatus(newStatus);
+        }
+    } catch (error) {
+        console.warn('Alpine store not ready yet, skipping store update:', error);
+    }
+    
     indicator.className = 'save-status-indicator';
     indicator.classList.add(`status-${newStatus}`);
 

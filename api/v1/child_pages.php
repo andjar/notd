@@ -5,10 +5,10 @@ namespace App;
 // api/v1/child_pages.php
 
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../api/db_connect.php';
-require_once __DIR__ . '/../../api/response_utils.php';
-require_once __DIR__ . '/../../api/DataManager.php';
-require_once __DIR__ . '/../../api/validator_utils.php';
+require_once __DIR__ . '/../db_connect.php';
+require_once __DIR__ . '/../response_utils.php';
+require_once __DIR__ . '/../DataManager.php';
+require_once __DIR__ . '/../validator_utils.php';
 
 header('Content-Type: application/json');
 
@@ -32,10 +32,7 @@ try {
     
     \App\ApiResponse::success($childPages);
 } catch (PDOException $e) {
-    // Log the error for debugging
-    error_log("Database error in child_pages.php: " . $e->getMessage());
     \App\ApiResponse::error('Database error.', 500);
 } catch (Exception $e) {
-    error_log("Error in child_pages.php: " . $e->getMessage());
     \App\ApiResponse::error('An unexpected error occurred.', 500);
 } 

@@ -7,6 +7,9 @@
 #notes-container {
   display: flex;
   flex-direction: column;
+  /* **PERFORMANCE**: Enable hardware acceleration for smooth animations */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .note-item {
@@ -16,6 +19,9 @@
   );
   margin: 0;
   padding: 0;
+  /* **PERFORMANCE**: Enable hardware acceleration for smooth indentation changes */
+  transform: translateZ(0);
+  will-change: transform, padding-left;
 }
 
 .note-header-row {
@@ -24,6 +30,8 @@
   position: relative;
   padding-left: calc(var(--nesting-level, 0) * var(--ls-indentation-unit));
   min-height: calc(var(--ls-font-size-base) * 1.3);
+  /* **PERFORMANCE**: Optimize transitions for indentation changes */
+  transition: padding-left 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .note-controls {
@@ -55,7 +63,11 @@
   cursor: pointer;
   z-index: 2;
   border-radius: 50%;
-  transition: background-color var(--ls-transition-fast);
+  /* **PERFORMANCE**: Optimize transition for better performance */
+  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  /* **PERFORMANCE**: Enable hardware acceleration */
+  transform: translateZ(0);
+  will-change: background-color, transform;
 }
 
 .note-bullet::before {
@@ -65,7 +77,11 @@
   background-color: var(--ls-block-bullet-color);
   border-radius: 50%;
   display: block;
-  transition: all var(--ls-transition-fast);
+  /* **PERFORMANCE**: Optimize transition for better performance */
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  /* **PERFORMANCE**: Enable hardware acceleration */
+  transform: translateZ(0);
+  will-change: background-color, transform;
 }
 
 .note-bullet:hover {
@@ -74,7 +90,7 @@
 
 .note-bullet:hover::before {
   background-color: var(--ls-block-bullet-active-color);
-  transform: scale(1.2);
+  transform: scale(1.2) translateZ(0);
 }
 
 .note-item.collapsed > .note-header-row .note-controls .note-bullet {
@@ -98,15 +114,9 @@
   top: var(--controls-top-offset);
   width: var(--control-icon-size);
   height: var(--control-icon-size);
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 50%;
-  opacity: 0;
-  pointer-events: none;
-  color: var(--ls-secondary-text-color);
-  transition: all var(--ls-transition-fast);
-  z-index: 3;
+  /* **PERFORMANCE**: Enable hardware acceleration for smooth animations */
+  transform: translateZ(0);
+  will-change: opacity, transform;
 }
 
 .note-item.has-children > .note-header-row .note-controls .note-collapse-arrow {
@@ -186,11 +196,15 @@
 
 /* Note Content */
 .note-content {
-  transition: all 0.2s ease;
+  /* **PERFORMANCE**: Optimize transitions for better performance */
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--ls-border-radius-low);
   min-height: 18px;
   padding: 2px 8px;
   line-height: 1.6;
+  /* **PERFORMANCE**: Enable hardware acceleration */
+  transform: translateZ(0);
+  will-change: transform, background-color, box-shadow;
 }
 
 .note-content[contenteditable="true"]:empty:before {
@@ -254,7 +268,7 @@
 
 .note-item.focused .note-bullet:not(.has-children-bullet)::before {
   background-color: var(--ls-block-bullet-active-color);
-  transform: scale(1.3);
+  transform: scale(1.3) translateZ(0);
 }
 
 .note-item.focused .note-bullet.has-children-bullet {
@@ -271,13 +285,11 @@
   border-radius: var(--ls-border-radius-medium);
   margin: var(--ls-space-1) 0;
   padding: var(--ls-space-1);
-  transition: all 0.2s ease;
-}
-
-.note-item.note-focused > .note-content-wrapper > .note-content {
-  background-color: transparent;
-  border: 1px solid var(--ls-accent-10);
-  box-shadow: 0 0 0 2px rgba(var(--ls-accent-10-rgb), 0.1);
+  /* **PERFORMANCE**: Optimize transition for better performance */
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  /* **PERFORMANCE**: Enable hardware acceleration */
+  transform: translateZ(0);
+  will-change: transform, background-color;
 }
 
 /* === Improved bullet alignment for tasks and headers === */

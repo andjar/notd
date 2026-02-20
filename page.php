@@ -275,8 +275,472 @@ function renderBacklinks($backlinks) {
     <script src="assets/libs/marked.min.js"></script>
     <script src="assets/libs/Sortable.min.js"></script>
     <script src="assets/libs/sjcl.js"></script>
-    <script type="module" src="assets/js/app.js"></script>
+    <script src="assets/libs/purify.min.js"></script>
+    
+    <!-- Alpine.js Component Registration (must be before Alpine.js loads) -->
+    <script>
+        // Define components inline to ensure they're available immediately
+        document.addEventListener('alpine:init', () => {
+            // Note Component
+            Alpine.data('noteComponent', (initialNote, nestingLevel = 0) => ({
+                note: initialNote,
+                nestingLevel: nestingLevel,
+                isEditing: false,
+                contentEl: null,
+                
+                parseContent(content) {
+                    return window.parseAndRenderContent ? window.parseAndRenderContent(content) : content;
+                },
+                
+                init() {
+                    this.contentEl = this.$refs.contentDiv;
+                    this.$watch('isEditing', (value) => {
+                        if (value) {
+                            this.switchToEditMode();
+                        } else {
+                            this.switchToRenderedMode();
+                        }
+                    });
+                    this.$nextTick(() => {
+                        if (window.FeatherManager) {
+                            window.FeatherManager.requestUpdate();
+                        } else {
+                            try {
+                                if (typeof feather !== 'undefined' && feather.replace) {
+                                    feather.replace();
+                                }
+                            } catch (error) {
+                                console.warn('Feather icon replacement failed in note component:', error.message);
+                            }
+                        }
+                    });
+                },
+                
+                toggleCollapse() {
+                    this.note.collapsed = !this.note.collapsed;
+                    console.log(`Toggling collapse for note ${this.note.id}, new state: ${this.note.collapsed}`);
+                },
+                
+                editNote() {
+                    if (this.isEditing) return;
+                    this.isEditing = true;
+                },
+                
+                switchToEditMode() {
+                    if (!this.contentEl) return;
+                    if (window.switchToEditMode) {
+                        window.switchToEditMode(this.contentEl);
+                    }
+                },
+                
+                switchToRenderedMode() {
+                    if (!this.contentEl) return;
+                    
+                    if (window.getRawTextWithNewlines && window.normalizeNewlines) {
+                        const rawTextValue = window.getRawTextWithNewlines(this.contentEl);
+                        const newContent = window.normalizeNewlines(rawTextValue);
+                        this.note.content = newContent;
+                    }
+                    
+                    if (window.switchToRenderedMode) {
+                        window.switchToRenderedMode(this.contentEl);
+                    }
+                    
+                    if (window.saveNoteImmediately) {
+                        const noteElement = this.contentEl.closest('.note-item');
+                        if (noteElement) {
+                            window.saveNoteImmediately(noteElement);
+                        }
+                    }
+                    
+                    this.isEditing = false;
+                },
+                
+                handleInput(event) {
+                    if (window.getRawTextWithNewlines) {
+                        this.note.content = window.getRawTextWithNewlines(event.target);
+                    }
+                },
+                
+                handlePaste(event) {
+                    event.preventDefault();
+                    const text = (event.clipboardData || window.clipboardData).getData('text');
+                    document.execCommand('insertText', false, text);
+                }
+            }));
+            
+            // Splash Screen Component (smoothed animation)
+            Alpine.data('splashScreen', () => ({
+                show: true,
+                time: '12:00',
+                date: 'Monday, 1 January',
+                bubbles: [],
+                dots: [],
+                animationId: null,
+                timeIntervalId: null,
+                startTime: Date.now(),
+                lastFrameTs: 0,
+                // Fixed radii like original
+                mainOrbRadius: 100,
+                dotRadius: 95, // Further out, almost at edge
+                
+                numBubbles: 20, // Match original
+                bubbleColors: [
+                    'rgba(255, 100, 0, 0.35)',
+                    'rgba(230, 50, 50, 0.35)',
+                    'rgba(200, 0, 100, 0.3)',
+                    'rgba(255, 150, 50, 0.3)'
+                ],
+                numDots: 24, // More dots around logo periphery
+                
+                init() {
+                    const isSubsequentLoad = sessionStorage.getItem('notd_initial_load_complete');
+                    
+                    if (isSubsequentLoad) {
+                        this.show = false;
+                        return;
+                    }
+                    
+                    sessionStorage.setItem('notd_initial_load_complete', 'true');
+                    
+                    this.initBubbles();
+                    this.initDots();
+                    this.updateTimeDate();
+                    this.startTimeUpdates();
+                    this.startAnimation();
+                    
+                    setTimeout(() => {
+                        this.show = false;
+                        this.stopAnimation();
+                        this.stopTimeUpdates();
+                    }, 2000);
+                },
+                
+                showSplash() {
+                    this.show = true;
+                    this.initBubbles();
+                    this.initDots();
+                    this.updateTimeDate();
+                    this.startTimeUpdates();
+                    this.startAnimation();
+                },
+                
+                hideSplash() {
+                    this.show = false;
+                    this.stopAnimation();
+                    this.stopTimeUpdates();
+                },
+                
+                getRandom(min, max) {
+                    return Math.random() * (max - min) + min;
+                },
+                
+                initBubbles() {
+                    this.bubbles = [];
+                    const canvas = document.getElementById('splash-background-bubbles-canvas');
+                    if (!canvas) return;
+                    
+                    // Use viewport center for bubble positioning (should align with main orb)
+                    const viewportCenterX = window.innerWidth / 2;
+                    const viewportCenterY = window.innerHeight / 2;
+                    
+                    // Get canvas position relative to viewport
+                    const canvasRect = canvas.getBoundingClientRect();
+                    const canvasCenterX = viewportCenterX - canvasRect.left;
+                    const canvasCenterY = viewportCenterY - canvasRect.top;
+                    
+                    for (let i = 0; i < this.numBubbles; i++) {
+                        const baseSize = this.getRandom(70, 120);
+                        const angle = this.getRandom(0, Math.PI * 2);
+                        const offsetFromCircumference = this.getRandom(-baseSize * 0.1, baseSize * 0.1);
+                        const distanceFromCenter = this.mainOrbRadius + offsetFromCircumference;
+                        
+                        // Position bubble with proper centering (subtract half size)
+                        const x = canvasCenterX + Math.cos(angle) * distanceFromCenter - baseSize / 2;
+                        const y = canvasCenterY + Math.sin(angle) * distanceFromCenter - baseSize / 2;
+
+                        const baseOpacity = this.getRandom(0.45, 0.65);
+                        const baseScale = this.getRandom(0.9, 1.1);
+                        const opacitySpeed = this.getRandom(0.2, 0.4);
+                        const scaleSpeed = this.getRandom(0.15, 0.35);
+                        const opacityPhase = this.getRandom(0, Math.PI * 2);
+                        const scalePhase = this.getRandom(0, Math.PI * 2);
+
+                        this.bubbles.push({
+                            id: i,
+                            size: baseSize,
+                            x: x,
+                            y: y,
+                            baseX: canvasCenterX,
+                            baseY: canvasCenterY,
+                            distance: distanceFromCenter,
+                            color: this.bubbleColors[Math.floor(this.getRandom(0, this.bubbleColors.length))],
+                            opacity: baseOpacity,
+                            scale: baseScale,
+                            baseOpacity,
+                            baseScale,
+                            opacitySpeed,
+                            scaleSpeed,
+                            opacityPhase,
+                            scalePhase,
+                            angle: angle,
+                            orbitSpeed: this.getRandom(0.02, 0.08) // Much slower, more floating feel
+                        });
+                    }
+                },
+                
+                initDots() {
+                    this.dots = [];
+                    const dotsContainer = document.getElementById('splash-orb-perimeter-dots');
+                    if (!dotsContainer) return;
+
+                    // Get container center for positioning (dots container is already centered on the logo)
+                    const centerX = dotsContainer.clientWidth / 2;
+                    const centerY = dotsContainer.clientHeight / 2;
+
+                    for (let i = 0; i < this.numDots; i++) {
+                        const angle = (i / this.numDots) * Math.PI * 2;
+                        const baseOpacity = this.getRandom(0.45, 0.8);
+                        const baseScale = this.getRandom(0.9, 1.1);
+                        this.dots.push({
+                            id: i,
+                            angle: angle,
+                            x: centerX + Math.cos(angle) * this.dotRadius,
+                            y: centerY + Math.sin(angle) * this.dotRadius,
+                            opacity: baseOpacity,
+                            scale: baseScale,
+                            baseOpacity,
+                            baseScale,
+                            opacitySpeed: this.getRandom(0.2, 0.5),
+                            scaleSpeed: this.getRandom(0.2, 0.5),
+                            opacityPhase: this.getRandom(0, Math.PI * 2),
+                            scalePhase: this.getRandom(0, Math.PI * 2),
+                            rotationSpeed: 0.01 // Extremely slow floating rotation
+                        });
+                    }
+                },
+                
+                updateTimeDate() {
+                    const now = new Date();
+                    this.time = now.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: true 
+                    });
+                    this.date = now.toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    });
+                },
+                
+                startTimeUpdates() {
+                    this.timeIntervalId = setInterval(() => {
+                        this.updateTimeDate();
+                    }, 1000);
+                },
+                
+                stopTimeUpdates() {
+                    if (this.timeIntervalId) {
+                        clearInterval(this.timeIntervalId);
+                        this.timeIntervalId = null;
+                    }
+                },
+                
+                startAnimation() {
+                    const animate = (timestamp) => {
+                        if (!this.lastFrameTs) this.lastFrameTs = timestamp;
+                        const dt = Math.min(0.05, Math.max(0.0, (timestamp - this.lastFrameTs) / 1000)); // cap dt to 50ms
+                        this.lastFrameTs = timestamp;
+
+                        const t = timestamp / 1000;
+                        this.updateBubbles(dt, t);
+                        this.updateDots(dt, t);
+                        this.animationId = requestAnimationFrame(animate);
+                    };
+                    this.animationId = requestAnimationFrame(animate);
+                },
+                
+                stopAnimation() {
+                    if (this.animationId) {
+                        cancelAnimationFrame(this.animationId);
+                        this.animationId = null;
+                        this.lastFrameTs = 0;
+                    }
+                },
+                
+                updateBubbles(dt, t) {
+                    const canvas = document.getElementById('splash-background-bubbles-canvas');
+                    if (!canvas) return;
+                    
+                    // Update center based on viewport (matches original behavior)
+                    const viewportCenterX = window.innerWidth / 2;
+                    const viewportCenterY = window.innerHeight / 2;
+                    const canvasRect = canvas.getBoundingClientRect();
+                    const canvasCenterX = viewportCenterX - canvasRect.left;
+                    const canvasCenterY = viewportCenterY - canvasRect.top;
+                    
+                    this.bubbles.forEach(bubble => {
+                        bubble.angle += bubble.orbitSpeed * dt;
+                        
+                        // Calculate position with proper centering (subtract half bubble size)
+                        bubble.x = canvasCenterX + Math.cos(bubble.angle) * bubble.distance - bubble.size / 2;
+                        bubble.y = canvasCenterY + Math.sin(bubble.angle) * bubble.distance - bubble.size / 2;
+
+                        // Smooth opacity/scale oscillation
+                        bubble.opacity = bubble.baseOpacity + 0.08 * Math.sin(bubble.opacityPhase + t * (2 * Math.PI * bubble.opacitySpeed));
+                        bubble.scale = bubble.baseScale + 0.06 * Math.sin(bubble.scalePhase + t * (2 * Math.PI * bubble.scaleSpeed));
+                    });
+                },
+                
+                updateDots(dt, t) {
+                    const dotsContainer = document.getElementById('splash-orb-perimeter-dots');
+                    if (!dotsContainer) return;
+
+                    const centerX = dotsContainer.clientWidth / 2;
+                    const centerY = dotsContainer.clientHeight / 2;
+                    
+                    this.dots.forEach(dot => {
+                        // Gentle rotation
+                        dot.angle += dot.rotationSpeed * dt;
+                        
+                        // Update position
+                        dot.x = centerX + Math.cos(dot.angle) * this.dotRadius;
+                        dot.y = centerY + Math.sin(dot.angle) * this.dotRadius;
+                        
+                        // Opacity and scale pulsing
+                        dot.opacity = dot.baseOpacity + 0.08 * Math.sin(dot.opacityPhase + t * (2 * Math.PI * dot.opacitySpeed));
+                        dot.scale = dot.baseScale + 0.08 * Math.sin(dot.scalePhase + t * (2 * Math.PI * dot.scaleSpeed));
+                    });
+                }
+            }));
+            
+            // Sidebar Component
+            Alpine.data('sidebarComponent', () => ({
+                leftCollapsed: localStorage.getItem('leftSidebarCollapsed') === 'true',
+                rightCollapsed: localStorage.getItem('rightSidebarCollapsed') === 'true',
+                
+                init() {
+                    // Initialize component
+                },
+                
+                toggleLeft() {
+                    this.leftCollapsed = !this.leftCollapsed;
+                    localStorage.setItem('leftSidebarCollapsed', this.leftCollapsed);
+                },
+                
+                toggleRight() {
+                    this.rightCollapsed = !this.rightCollapsed;
+                    localStorage.setItem('rightSidebarCollapsed', this.rightCollapsed);
+                },
+                
+                leftIcon() {
+                    return this.leftCollapsed ? 'chevron-right' : 'chevron-left';
+                },
+                
+                rightIcon() {
+                    return this.rightCollapsed ? 'chevron-left' : 'chevron-right';
+                }
+            }));
+            
+            // Calendar Component
+            Alpine.data('calendarComponent', () => ({
+                currentDate: new Date(),
+                days: [],
+                isLoading: false,
+                currentPageName: '',
+                weekdays: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+                calendarCells: [],
+                
+                monthYear() {
+                    return this.currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                },
+                
+                async init() {
+                    this.isLoading = true;
+                    try {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        this.currentPageName = urlParams.get('page') || '';
+                        
+                        if (window.calendarCache) {
+                            await window.calendarCache.init();
+                        }
+                        this.buildMonth();
+                    } catch (error) {
+                        console.error('Calendar initialization error:', error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                
+                buildMonth() {
+                    this.days = [];
+                    const year = this.currentDate.getFullYear();
+                    const month = this.currentDate.getMonth();
+                    const first = new Date(year, month, 1);
+                    const startDay = first.getDay() === 0 ? 6 : first.getDay() - 1;
+                    
+                    for (let i = 0; i < startDay; i++) {
+                        this.days.push({ empty: true });
+                    }
+                    
+                    const lastDay = new Date(year, month + 1, 0).getDate();
+                    const todayStr = this.formatDate(new Date());
+                    
+                    for (let d = 1; d <= lastDay; d++) {
+                        const dateStr = this.formatDate(new Date(year, month, d));
+                        this.days.push({
+                            empty: false,
+                            day: d,
+                            date: dateStr,
+                            today: dateStr === todayStr,
+                            hasPage: false,
+                            pageName: dateStr,
+                            isCurrentPage: dateStr === this.currentPageName
+                        });
+                    }
+                    
+                    this.calendarCells = [
+                        ...this.weekdays.map(w => ({ weekday: true, label: w })),
+                        ...this.days
+                    ];
+                },
+                
+                formatDate(date) {
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const d = String(date.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                },
+                
+                prevMonth() {
+                    this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() - 1, 1);
+                    this.buildMonth();
+                },
+                
+                nextMonth() {
+                    this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + 1, 1);
+                    this.buildMonth();
+                },
+                
+                goToday() {
+                    this.currentDate = new Date();
+                    this.buildMonth();
+                },
+                
+                dayClick(day) {
+                    if (day.empty) return;
+                    window.location.href = `page.php?page=${encodeURIComponent(day.date)}`;
+                }
+            }));
+            
+            console.log('All Alpine.js components registered successfully');
+        });
+    </script>
+    
     <script src="assets/libs/alpine.min.js" defer></script>
+    <script type="module" src="assets/js/app.js"></script>
     
     <script>
          window.APP_CONFIG = window.APP_CONFIG || {};
@@ -290,8 +754,7 @@ function renderBacklinks($backlinks) {
 <body>
     <div id="splash-screen" 
          x-data="splashScreen()" 
-         x-show="show" 
-         x-init="init()"
+         x-show="show"
          @click="hideSplash()"
          x-transition:leave="transition ease-in duration-300" 
          x-transition:leave-start="opacity-100" 
@@ -369,7 +832,7 @@ function renderBacklinks($backlinks) {
         <!-- Left Sidebar -->
         <div id="left-sidebar-outer">
             <button id="toggle-left-sidebar-btn" class="sidebar-toggle-btn left-toggle" @click="toggleLeft()">
-                <i x-feather="leftIcon()"></i>
+                <i x-feather="leftIcon"></i>
             </button>
             <div id="left-sidebar" class="sidebar left-sidebar" :class="{ 'collapsed': leftCollapsed }">
                 <div class="sidebar-content">
@@ -420,10 +883,10 @@ function renderBacklinks($backlinks) {
                         </a>
                     </div>
                     <div class="sidebar-section">
-                        <div id="calendar-widget" class="calendar-widget" x-data="calendarComponent()" x-init="init()">
+                        <div id="calendar-widget" class="calendar-widget" x-data="calendarComponent()">
                             <div class="calendar-header">
                                 <button id="prev-month-btn" class="arrow-btn" @click="prevMonth()"><i data-feather="chevron-left"></i></button>
-                                <span id="current-month-year" class="month-year-display" x-text="monthYear()"></span>
+                                <span id="current-month-year" class="month-year-display" x-text="monthYear"></span>
                                 <button id="next-month-btn" class="arrow-btn" @click="nextMonth()"><i data-feather="chevron-right"></i></button>
                                 <button id="today-btn" class="arrow-btn today-btn" @click="goToday()">Today</button>
                             </div>
@@ -488,111 +951,8 @@ function renderBacklinks($backlinks) {
                 <!-- Page content will be rendered here by JavaScript -->
             </div>
             <div id="note-focus-breadcrumbs-container"></div>
-            <div id="notes-container" class="outliner" x-data="{ notes: [] }" x-init="initializeDragAndDrop()">
-                <template x-for="note in notes" :key="note.id">
-                    <div class="note-item"
-                        x-data="noteComponent(note, 0)"
-                        :data-note-id="note.id"
-                        :style="`--nesting-level: ${nestingLevel}`"
-                        :class="{ 'has-children': note.children && note.children.length > 0, 'collapsed': note.collapsed, 'encrypted-note': note.is_encrypted, 'decrypted-note': note.is_encrypted && note.content && !note.content.startsWith('{') }">
-
-                        <div class="note-header-row">
-                            <div class="note-controls">
-                                <span class="note-collapse-arrow" x-show="note.children && note.children.length > 0" @click="toggleCollapse()" :data-collapsed="note.collapsed ? 'true' : 'false'">
-                                    <i data-feather="chevron-right"></i>
-                                </span>
-                                <span class="note-bullet" :data-note-id="note.id"></span>
-                            </div>
-                            <div class="note-content-wrapper">
-                                <div class="note-content rendered-mode"
-                                    x-ref="contentDiv"
-                                    :data-note-id="note.id"
-                                    :data-raw-content="note.content"
-                                    x-html="parseContent(note.content)"
-                                    @click="editNote()"
-                                    @blur="isEditing = false"
-                                    @input="handleInput($event)"
-                                    @paste="handlePaste($event)"
-                                    @keydown="handleNoteKeyDown($event)">
-                                </div>
-                                <div class="note-attachments"></div>
-                            </div>
-                        </div>
-
-                        <div class="note-children" :class="{ 'collapsed': note.collapsed }">
-                            <template x-for="childNote in note.children" :key="childNote.id">
-                                <div class="note-item"
-                                    x-data="noteComponent(childNote, $parent.nestingLevel + 1)"
-                                    :data-note-id="childNote.id"
-                                    :style="`--nesting-level: ${$parent.nestingLevel + 1}`"
-                                    :class="{ 'has-children': childNote.children && childNote.children.length > 0, 'collapsed': childNote.collapsed, 'encrypted-note': childNote.is_encrypted, 'decrypted-note': childNote.is_encrypted && childNote.content && !childNote.content.startsWith('{') }">
-
-                                    <div class="note-header-row">
-                                        <div class="note-controls">
-                                            <span class="note-collapse-arrow" x-show="childNote.children && childNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="childNote.collapsed ? 'true' : 'false'">
-                                                <i data-feather="chevron-right"></i>
-                                            </span>
-                                            <span class="note-bullet" :data-note-id="childNote.id"></span>
-                                        </div>
-                                        <div class="note-content-wrapper">
-                                            <div class="note-content rendered-mode"
-                                                x-ref="contentDiv"
-                                                :data-note-id="childNote.id"
-                                                :data-raw-content="childNote.content"
-                                                x-html="parseContent(childNote.content)"
-                                                @click="editNote()"
-                                                @blur="isEditing = false"
-                                                @input="handleInput($event)"
-                                                @paste="handlePaste($event)"
-                                                @keydown="handleNoteKeyDown($event)">
-                                            </div>
-                                            <div class="note-attachments"></div>
-                                        </div>
-                                    </div>
-
-                                    <div class="note-children" :class="{ 'collapsed': childNote.collapsed }">
-                                        <!-- Recursive rendering of grand-children -->
-                                        <template x-for="grandChildNote in childNote.children" :key="grandChildNote.id">
-                                            <div class="note-item"
-                                                x-data="noteComponent(grandChildNote, $parent.$parent.nestingLevel + 2)"
-                                                :data-note-id="grandChildNote.id"
-                                                :style="`--nesting-level: ${$parent.$parent.nestingLevel + 2}`"
-                                                :class="{ 'has-children': grandChildNote.children && grandChildNote.children.length > 0, 'collapsed': grandChildNote.collapsed, 'encrypted-note': grandChildNote.is_encrypted, 'decrypted-note': grandChildNote.is_encrypted && grandChildNote.content && !grandChildNote.content.startsWith('{') }">
-
-                                                <div class="note-header-row">
-                                                    <div class="note-controls">
-                                                        <span class="note-collapse-arrow" x-show="grandChildNote.children && grandChildNote.children.length > 0" @click="toggleCollapse()" :data-collapsed="grandChildNote.collapsed ? 'true' : 'false'">
-                                                            <i data-feather="chevron-right"></i>
-                                                        </span>
-                                                        <span class="note-bullet" :data-note-id="grandChildNote.id"></span>
-                                                    </div>
-                                                    <div class="note-content-wrapper">
-                                                        <div class="note-content rendered-mode"
-                                                            x-ref="contentDiv"
-                                                            :data-note-id="grandChildNote.id"
-                                                            :data-raw-content="grandChildNote.content"
-                                                            x-html="parseContent(grandChildNote.content)"
-                                                            @click="editNote()"
-                                                            @blur="isEditing = false"
-                                                            @input="handleInput($event)"
-                                                            @paste="handlePaste($event)"
-                                                            @keydown="handleNoteKeyDown($event)">
-                                                        </div>
-                                                        <div class="note-attachments"></div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="note-children" :class="{ 'collapsed': grandChildNote.collapsed }">
-                                                    <!-- Further nested children would go here, following the same pattern -->
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </template>
+            <div id="notes-container" class="outliner">
+                <!-- Notes are rendered dynamically by note-elements.js displayNotes() -->
             </div>
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
@@ -602,7 +962,7 @@ function renderBacklinks($backlinks) {
         <!-- Right Sidebar -->
         <div id="right-sidebar-outer">
             <button id="toggle-right-sidebar-btn" class="sidebar-toggle-btn right-toggle" @click="toggleRight()">
-                <i x-feather="rightIcon()"></i>
+                <i x-feather="rightIcon"></i>
             </button>
             <div id="right-sidebar" class="sidebar right-sidebar" :class="{ 'collapsed': rightCollapsed }">
                 <div class="sidebar-content">

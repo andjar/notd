@@ -7,6 +7,17 @@ function getAppStore() {
     throw new Error('Alpine store not available');
 }
 
+// 🔄 COMPATIBILITY LAYER: Syncing for legacy code
+// TODO: Remove window.notesForCurrentPage once all references are migrated to Alpine.store
+export function syncNotesState(notes) {
+    const appStore = getAppStore();
+    appStore.notes = notes;
+    // DEPRECATED: For backward compatibility only
+    if (typeof window !== 'undefined') {
+        window.notesForCurrentPage = notes;
+    }
+}
+
 // --- State management ---
 export function setCurrentPageId(newId) {
     getAppStore().setCurrentPageId(newId);
@@ -29,19 +40,35 @@ export function getCurrentPagePassword() {
 }
 
 export function setNotesForCurrentPage(newNotes) {
-    getAppStore().setNotes(newNotes);
+    // **FIX**: Use syncNotesState to ensure both stores are updated
+    syncNotesState(newNotes);
 }
 
 export function addNoteToCurrentPage(note) {
-    getAppStore().addNote(note);
+    const appStore = getAppStore();
+    appStore.addNote(note);
+    // Keep window global pointing to the same array
+    if (typeof window !== 'undefined') {
+        window.notesForCurrentPage = appStore.notes;
+    }
 }
 
 export function removeNoteFromCurrentPageById(noteId) {
-    getAppStore().removeNoteById(noteId);
+    const appStore = getAppStore();
+    appStore.removeNoteById(noteId);
+    // Keep window global pointing to the same array
+    if (typeof window !== 'undefined') {
+        window.notesForCurrentPage = appStore.notes;
+    }
 }
 
 export function updateNoteInCurrentPage(updatedNote) {
-    getAppStore().updateNote(updatedNote);
+    const appStore = getAppStore();
+    appStore.updateNote(updatedNote);
+    // Keep window global pointing to the same array
+    if (typeof window !== 'undefined') {
+        window.notesForCurrentPage = appStore.notes;
+    }
 }
 
 export function setCurrentFocusedNoteId(newNoteId) {

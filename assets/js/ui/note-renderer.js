@@ -9,7 +9,8 @@ import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
 import { attachmentsAPI, notesAPI, pagesAPI } from '../api_client.js';
 import { decrypt } from '../utils.js';
-import { getCurrentPagePassword } from '../app/state.js';
+import { getCurrentPagePassword, syncNotesState } from '../app/state.js';
+
 import {
     showSuggestions,
     hideSuggestions,
@@ -208,7 +209,7 @@ function renderNote(note, nestingLevel = 0) {
     contentWrapperEl.appendChild(contentEl);
 
     // Only create attachments div if the note actually has attachments
-    if (note.id && (typeof note.id === 'number' || (typeof note.id === 'string' && !note.id.startsWith('temp-'))) && note.has_attachments) {
+            if (note.id && note.has_attachments) {
         const attachmentsEl = document.createElement('div');
         attachmentsEl.className = 'note-attachments';
         contentWrapperEl.appendChild(attachmentsEl);
@@ -235,7 +236,7 @@ function renderNote(note, nestingLevel = 0) {
         contentWrapperEl.classList.remove('dragover');
 
         const files = Array.from(e.dataTransfer.files);
-        if (files.length > 0 && note.id && !String(note.id).startsWith('temp-')) {
+        if (files.length > 0 && note.id) {
             const formData = new FormData();
             for (const file of files) {
                 formData.append('attachmentFile', file);
@@ -251,7 +252,7 @@ function renderNote(note, nestingLevel = 0) {
                 
                 if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
                      const pageData = await notesAPI.getPageData(window.currentPageId);
-                     window.notesForCurrentPage = pageData.notes; 
+                     syncNotesState(pageData.notes);
                      window.ui.displayNotes(pageData.notes, window.currentPageId); 
                 } else {
                     console.warn('displayNotes function not available for page refresh after D&D upload.')
@@ -260,7 +261,7 @@ function renderNote(note, nestingLevel = 0) {
                 console.error('Error uploading file(s) via drag & drop:', error);
                 alert(`Failed to upload file(s): ${error.message}`);
             }
-        } else if (String(note.id).startsWith('temp-')) {
+        } else {
             alert('Please save the note (by adding some content) before adding attachments.');
         }
     });
@@ -512,6 +513,7 @@ function switchToEditMode(contentEl) {
             }
         }, 150);
 
+        // Save only on blur (exit edit mode)
         switchToRenderedMode(contentEl);
         contentEl.removeEventListener('blur', handleBlur);
         contentEl.removeEventListener('paste', handlePasteImage);
@@ -524,7 +526,7 @@ function switchToEditMode(contentEl) {
     contentEl.addEventListener('blur', handleBlur);
 
     const handlePasteImage = async (event) => {
-        if (String(noteId).startsWith('temp-')) {
+        if (!noteId) {
             alert('Please save the note (by adding some content) before pasting images.');
             return;
         }
@@ -565,7 +567,7 @@ function switchToEditMode(contentEl) {
 
                     if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
                          const pageData = await notesAPI.getPageData(window.currentPageId);
-                         window.notesForCurrentPage = pageData.notes; 
+                         syncNotesState(pageData.notes);
                          window.ui.displayNotes(pageData.notes, window.currentPageId); 
                     } else {
                         console.warn('displayNotes function not available for page refresh after paste upload.')
@@ -631,12 +633,6 @@ function normalizeNewlines(str) {
  */
 function switchToRenderedMode(contentEl) {
     const noteEl = contentEl.closest('.note-item');
-    if (noteEl && noteEl.dataset.noteId && !noteEl.dataset.noteId.startsWith('temp-')) {
-        // It's important that saveNoteImmediately is available in this scope.
-        // Assuming it's imported or globally available.
-        // console.log('[DEBUG switchToRenderedMode] Calling saveNoteImmediately for noteId:', noteEl.dataset.noteId);
-        saveNoteImmediately(noteEl);
-    }
     if (contentEl.classList.contains('rendered-mode')) return;
 
     const rawTextValue = getRawTextWithNewlines(contentEl);
@@ -667,6 +663,10 @@ function switchToRenderedMode(contentEl) {
     // Ensure suggestion box is hidden if it was somehow left open
     // This is a fallback, should be handled by blur or selection.
     hideSuggestions();
+
+    if (noteEl && noteEl.dataset.noteId) {
+        saveNoteImmediately(contentEl);
+    }
 }
 
 /**
@@ -717,8 +717,15 @@ function parseTaskContent(taskContent) {
 
 /**
  * Parses and renders note content with special formatting
+ * 
+ * ⚠️ SECURITY NOTE: This function is used with Alpine.js x-html directive.
+ * The content is sanitized through:
+ * 1. marked.js for markdown parsing (sanitize option enabled)
+ * 2. HTML escaping for inline content
+ * 3. DOMPurify would be recommended for additional XSS protection
+ * 
  * @param {string} rawContent - Raw note content
- * @returns {string} HTML string for display
+ * @returns {string} HTML string for display (sanitized)
  */
 function parseAndRenderContent(rawContent) {
     // rawContent is now assumed to be plaintext if it was meant to be decrypted.
@@ -902,6 +909,16 @@ function parseAndRenderContent(rawContent) {
             console.warn('marked.js not loaded properly or missing parse method');
         }
     }
+    
+    // Sanitize the final HTML to prevent XSS
+    if (typeof DOMPurify !== 'undefined') {
+        html = DOMPurify.sanitize(html, {
+            ADD_TAGS: ['iframe'],
+            ADD_ATTR: ['target', 'data-note-id', 'data-page-name', 'data-sql-query', 'data-block-ref', 'data-transclusion-page', 'contenteditable'],
+            ALLOW_DATA_ATTR: true
+        });
+    }
+    
     return html;
 }
 
@@ -1225,21 +1242,22 @@ async function handleDelegatedCollapseArrowClick(targetElement) {
 
     try {
         // Use the notesAPI.batchUpdateNotes function
-        const result = await notesAPI.batchUpdateNotes([{
+        await notesAPI.batchUpdateNotes([{
             type: 'update',
             payload: {
                 id: noteId,
-                page_id: window.currentPageId,
                 collapsed: isCurrentlyCollapsed ? 1 : 0
             }
         }]);
 
         // Update local cache
         if (window.notesForCurrentPage) {
-            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-            if (noteToUpdate) {
-                noteToUpdate.collapsed = isCurrentlyCollapsed;
-            }
+            const updatedNotes = window.notesForCurrentPage.map(note =>
+                String(note.id) === String(noteId)
+                    ? { ...note, collapsed: isCurrentlyCollapsed ? 1 : 0 }
+                    : note
+            );
+            syncNotesState(updatedNotes);
         }
     } catch (error) {
         const errorMessage = error.message || 'Please try again.';
@@ -1350,9 +1368,9 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                     try {
                         await notesAPI.deleteNote(target.dataset.noteId);
                         document.querySelector(`.note-item[data-note-id="${target.dataset.noteId}"]`)?.remove();
-                        // Also remove from window.notesForCurrentPage
                         if (window.notesForCurrentPage) {
-                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
+                            const filtered = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
+                            syncNotesState(filtered);
                         }
                     } catch (error) {
                         const deleteErrorMessage = error.message || 'Please try again.';
@@ -1521,7 +1539,7 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
     if (!noteItem || !contentEl) return;
 
     const noteId = noteItem.dataset.noteId;
-    if (!noteId || noteId.startsWith('temp-')) return;
+    if (!noteId) return;
     
     let rawContent = contentEl.dataset.rawContent;
     const currentMarker = checkbox.dataset.markerType.toUpperCase();

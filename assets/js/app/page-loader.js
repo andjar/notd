@@ -1,8 +1,10 @@
 // assets/js/app/page-loader.js
 
-// Get Alpine store reference
 function getAppStore() {
-    return window.Alpine.store('app');
+    if (typeof window !== 'undefined' && window.Alpine && window.Alpine.store) {
+        return window.Alpine.store('app');
+    }
+    throw new Error('Alpine store not available');
 }
 
 import { decrypt } from '../utils.js';
@@ -427,6 +429,19 @@ export async function loadPage(pageName, focusFirstNote = false, providedPageDat
             pageData = await _fetchPageFromNetwork(pageName);
         } else {
             console.log('[page-loader] Using cached page data for:', pageName);
+            // Validate cached data against server to avoid stale IDs after DB reset
+            try {
+                const fresh = await pagesAPI.getPageByName(pageName);
+                if (!fresh || !fresh.id || (pageData.id && fresh.id !== pageData.id)) {
+                    console.warn('[page-loader] Cache invalidated due to server mismatch or reset. Refetching.', { cachedId: pageData.id, freshId: fresh?.id });
+                    pageCache.removePage(pageName);
+                    pageData = await _fetchPageFromNetwork(pageName);
+                }
+            } catch (validationError) {
+                console.warn('[page-loader] Cache validation failed, refetching from network.', validationError);
+                pageCache.removePage(pageName);
+                pageData = await _fetchPageFromNetwork(pageName);
+            }
         }
         
         await _processAndRenderPage(pageData, focusFirstNote);

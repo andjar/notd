@@ -19,8 +19,7 @@ async function _updatePageContent(newContent) {
         // Properties are rendered server-side, no need for client-side rendering
         ui.updateSaveStatusIndicator('saved');
         
-        // **CACHE INVALIDATION**: Invalidate cache after page content update
-        const appStore = window.Alpine.store('app');
+        const appStore = window.Alpine?.store('app');
         if (appStore.currentPageName) {
             pageCache.removePage(appStore.currentPageName);
             console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName} (page content update)`);
@@ -114,8 +113,7 @@ async function handleEncryptPage() {
             // **FIX**: The batchUpdateNotes function expects the array of operations directly.
             await notesAPI.batchUpdateNotes(batchUpdates);
             
-            // **CACHE INVALIDATION**: Invalidate cache after batch operations
-            const appStore = window.Alpine.store('app');
+            const appStore = window.Alpine?.store('app');
             if (appStore.currentPageName) {
                 pageCache.removePage(appStore.currentPageName);
                 console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName} (property editor)`);

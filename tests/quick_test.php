@@ -94,8 +94,12 @@ try {
 echo "4. Testing page properties...\n";
 $tests_total++;
 try {
-    $page = $dm->getPageById(1);
-    assert_true($page !== null, "Page with ID 1 exists");
+    // Get the Home page ID from the seeded data
+    $stmt = $pdo->query("SELECT id FROM Pages WHERE name = 'Home'");
+    $pageId = $stmt->fetchColumn();
+    
+    $page = $dm->getPageById($pageId);
+    assert_true($page !== null, "Page with ID $pageId exists");
     assert_equal('Home', $page['name'], "Page name is 'Home'");
     assert_true(isset($page['properties']), "Page has properties");
     $tests_passed++;
@@ -107,7 +111,11 @@ try {
 echo "5. Testing note properties...\n";
 $tests_total++;
 try {
-    $props = $dm->getNoteProperties(1);
+    // Get the first note ID from the seeded data
+    $stmt = $pdo->query("SELECT id FROM Notes WHERE content = 'First note'");
+    $noteId = $stmt->fetchColumn();
+    
+    $props = $dm->getNoteProperties($noteId);
     assert_true(is_array($props), "getNoteProperties returns an array");
     assert_true(isset($props['status']), "Note has status property");
     assert_equal('TODO', $props['status'][0]['value'], "Status property value is 'TODO'");

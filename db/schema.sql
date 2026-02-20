@@ -1,10 +1,12 @@
 -- Notd Database Schema
--- Version: 2.0 (Content-first Property Model)
+-- Version: 4.0 (Unified Upsert with Separate Creation Timestamps)
 --
 -- This schema implements a "content-first" architecture where the `content`
 -- field of a Note or Page is the single source of truth for its properties.
 -- The `Properties` table serves as a queryable index of the properties
 -- parsed from the content.
+-- All IDs use UUID v7 format for better scalability and offline support.
+-- Creation timestamps are now stored separately to prevent overwrites.
 
 -- Enable Foreign Key support for data integrity
 PRAGMA foreign_keys = ON;
@@ -13,12 +15,11 @@ PRAGMA foreign_keys = ON;
 -- Pages are top-level containers for notes. They now include a `content`
 -- field to store page-level properties and other metadata.
 CREATE TABLE IF NOT EXISTS Pages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY, -- UUID v7 format
     name TEXT UNIQUE NOT NULL,
     content TEXT, -- Content for the page itself, used for page-level properties
     alias TEXT,
     active INTEGER NOT NULL DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_pages_name ON Pages(LOWER(name));
@@ -26,15 +27,15 @@ CREATE INDEX IF NOT EXISTS idx_pages_name ON Pages(LOWER(name));
 -- Notes Table
 -- Notes are the core content blocks, belonging to a single page.
 CREATE TABLE IF NOT EXISTS Notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    page_id INTEGER NOT NULL,
-    parent_note_id INTEGER,
+    id TEXT PRIMARY KEY, -- UUID v7 format (for API operations)
+    rowid INTEGER UNIQUE, -- Integer ID for FTS compatibility
+    page_id TEXT NOT NULL, -- UUID v7 format
+    parent_note_id TEXT, -- UUID v7 format
     content TEXT,
     internal INTEGER NOT NULL DEFAULT 0,
     order_index INTEGER NOT NULL DEFAULT 0,
     collapsed INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (page_id) REFERENCES Pages(id) ON DELETE CASCADE,
     FOREIGN KEY (parent_note_id) REFERENCES Notes(id) ON DELETE CASCADE
@@ -42,11 +43,20 @@ CREATE TABLE IF NOT EXISTS Notes (
 CREATE INDEX IF NOT EXISTS idx_notes_page_id ON Notes(page_id);
 CREATE INDEX IF NOT EXISTS idx_notes_parent_note_id ON Notes(parent_note_id);
 
+-- Creation Timestamps Table
+-- Stores immutable creation timestamps for all entities to prevent overwrites
+CREATE TABLE IF NOT EXISTS CreationTimestamps (
+    entity_id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL, -- 'page' or 'note'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_creation_timestamps_entity ON CreationTimestamps(entity_type, entity_id);
+
 -- Attachments Table
 -- Stores file attachments linked to notes.
 CREATE TABLE IF NOT EXISTS Attachments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    note_id INTEGER,
+    id TEXT PRIMARY KEY, -- UUID v7 format
+    note_id TEXT, -- UUID v7 format
     name TEXT NOT NULL,
     path TEXT NOT NULL UNIQUE,
     type TEXT,
@@ -61,9 +71,9 @@ CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON Attachments(note_id);
 -- This table is an INDEX of properties parsed from Note and Page content.
 -- It is managed by the backend and should not be written to directly.
 CREATE TABLE IF NOT EXISTS Properties (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    note_id INTEGER,
-    page_id INTEGER,
+    id TEXT PRIMARY KEY, -- UUID v7 format
+    note_id TEXT, -- UUID v7 format
+    page_id TEXT, -- UUID v7 format
     name TEXT NOT NULL,
     value TEXT,
     weight INTEGER NOT NULL DEFAULT 2, -- Derived from the number of colons (e.g., '::' -> 2, ':::' -> 3)
@@ -91,6 +101,12 @@ BEGIN
     UPDATE Pages SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
 END;
 
+CREATE TRIGGER IF NOT EXISTS update_notes_updated_at
+AFTER UPDATE ON Notes FOR EACH ROW
+BEGIN
+    UPDATE Notes SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS update_properties_updated_at
 AFTER UPDATE ON Properties FOR EACH ROW
 BEGIN
@@ -100,7 +116,7 @@ END;
 -- Webhooks Table
 -- Manages webhook subscriptions for real-time event notifications.
 CREATE TABLE IF NOT EXISTS Webhooks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY, -- UUID v7 format
     url TEXT NOT NULL,
     secret TEXT NOT NULL,
     entity_type TEXT NOT NULL, -- 'note' or 'page'
@@ -118,8 +134,8 @@ CREATE INDEX IF NOT EXISTS idx_webhooks_lookup ON Webhooks(entity_type, active);
 -- Webhook Events Log Table
 -- Logs all outgoing webhook attempts and their results.
 CREATE TABLE IF NOT EXISTS WebhookEvents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    webhook_id INTEGER NOT NULL,
+    id TEXT PRIMARY KEY, -- UUID v7 format
+    webhook_id TEXT NOT NULL, -- UUID v7 format
     event_type TEXT NOT NULL, -- e.g., 'property_change', 'test', 'verification'
     payload TEXT,
     response_code INTEGER,
@@ -130,20 +146,25 @@ CREATE TABLE IF NOT EXISTS WebhookEvents (
 );
 CREATE INDEX IF NOT EXISTS idx_webhook_events_webhook_id ON WebhookEvents(webhook_id);
 
--- FTS5 Virtual Table for Full-Text Search on Notes
+-- FTS Virtual Table for Full-Text Search on Notes
 -- This table is a shadow of the Notes table, indexed for fast searching.
 CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts4(
     content
 );
 
--- Triggers to keep the FTS table in sync with the Notes table
+-- Simple triggers to keep the FTS table in sync with the Notes table
 CREATE TRIGGER IF NOT EXISTS Notes_after_insert AFTER INSERT ON Notes BEGIN
-  INSERT INTO Notes_fts(rowid, content) VALUES (new.id, new.content);
+    INSERT INTO Notes_fts(content) VALUES (new.content);
+    UPDATE Notes SET rowid = (SELECT MAX(rowid) FROM Notes_fts) WHERE id = new.id;
 END;
-CREATE TRIGGER IF NOT EXISTS Notes_after_delete AFTER DELETE ON Notes BEGIN
-  DELETE FROM Notes_fts WHERE docid=old.id;
-END;
+
 CREATE TRIGGER IF NOT EXISTS Notes_after_update AFTER UPDATE ON Notes BEGIN
-  DELETE FROM Notes_fts WHERE docid=old.id;
-  INSERT INTO Notes_fts(rowid, content) VALUES (new.id, new.content);
+    UPDATE Notes_fts 
+    SET content = new.content 
+    WHERE rowid = new.rowid;
+END;
+
+CREATE TRIGGER IF NOT EXISTS Notes_after_delete AFTER DELETE ON Notes BEGIN
+    DELETE FROM Notes_fts 
+    WHERE rowid = old.rowid;
 END;

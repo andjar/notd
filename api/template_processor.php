@@ -24,11 +24,7 @@ class TemplateProcessor {
 
         $this->template_dir = __DIR__ . '/../assets/template/' . $type;
         
-        // Log directory creation attempt
-        error_log("Template directory path: " . $this->template_dir);
-        
         if (!file_exists($this->template_dir)) {
-            error_log("Creating template directory: " . $this->template_dir);
             if (!mkdir($this->template_dir, 0777, true)) {
                 throw new Exception("Failed to create template directory: " . $this->template_dir);
             }
@@ -46,10 +42,8 @@ class TemplateProcessor {
      */
     public function getAvailableTemplates() {
         $templates = [];
-        error_log("Reading templates from: " . $this->template_dir);
         
         if (!is_dir($this->template_dir)) {
-            error_log("Template directory does not exist: " . $this->template_dir);
             return $templates;
         }
         
@@ -60,11 +54,8 @@ class TemplateProcessor {
                 }
             }
             closedir($handle);
-        } else {
-            error_log("Failed to open template directory: " . $this->template_dir);
         }
         
-        error_log("Found templates: " . implode(", ", $templates));
         return $templates;
     }
 
@@ -76,23 +67,18 @@ class TemplateProcessor {
      */
     public function processTemplate($template_name, $data = []) {
         $template_path = $this->template_dir . '/' . $template_name . '.php';
-        error_log("Processing template: " . $template_path);
         
         if (!file_exists($template_path)) {
-            error_log("Template file not found: " . $template_path);
             throw new Exception("Template not found: $template_name");
         }
         
         if (!is_readable($template_path)) {
-            error_log("Template file not readable: " . $template_path);
             throw new Exception("Template not readable: $template_name");
         }
 
         try {
-            // Extract template content
-            ob_start();
-            include $template_path;
-            $content = ob_get_clean();
+            // Read template content as text (not as PHP)
+            $content = file_get_contents($template_path);
             
             if ($content === false) {
                 throw new Exception("Failed to read template content");
@@ -108,7 +94,6 @@ class TemplateProcessor {
 
             return $content;
         } catch (Exception $e) {
-            error_log("Error processing template: " . $e->getMessage());
             throw $e;
         }
     }
