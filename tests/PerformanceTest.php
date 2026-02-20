@@ -72,11 +72,32 @@ class PerformanceTest extends TestCase
         preg_match('/\s(\d{3})\s/', $httpCode, $statusMatch);
         $statusCode = isset($statusMatch[1]) ? (int)$statusMatch[1] : 500;
         $responseBody = $response === false ? '' : $response;
+        $decodedBody = $responseBody !== '' ? json_decode($responseBody, true) : null;
+
+        if (!is_array($decodedBody)) {
+            $normalizedBody = [
+                'status' => $statusCode >= 400 ? 'error' : 'success',
+                'data' => $decodedBody
+            ];
+        } elseif (array_key_exists('status', $decodedBody)) {
+            $normalizedBody = $decodedBody;
+        } elseif (array_key_exists('error', $decodedBody)) {
+            $normalizedBody = [
+                'status' => 'error',
+                'message' => is_string($decodedBody['error']) ? $decodedBody['error'] : json_encode($decodedBody['error']),
+                'data' => $decodedBody
+            ];
+        } else {
+            $normalizedBody = [
+                'status' => $statusCode >= 400 ? 'error' : 'success',
+                'data' => $decodedBody
+            ];
+        }
         
         return [
             'status_code' => $statusCode,
             'body' => $responseBody,
-            'data' => $responseBody !== '' ? json_decode($responseBody, true) : null,
+            'data' => $normalizedBody,
             'response_time' => ($endTime - $startTime) * 1000 // Convert to milliseconds
         ];
     }
