@@ -23,7 +23,6 @@ jobs:
     - name: Install dependencies
       run: |
         composer install --prefer-dist --no-progress
-        composer require --dev phpunit/phpunit
 
     - name: Create test directories
       run: |
@@ -35,18 +34,43 @@ jobs:
         cd tests
         php run_tests.php unit
       env:
-        DB_PATH: ./db/test_database.sqlite
-        UPLOADS_DIR: ./uploads/test
+        DB_PATH: ${{ github.workspace }}/db/test_database.sqlite
+        UPLOADS_DIR: ${{ github.workspace }}/uploads/test
         APP_ENV: testing
+
+    - name: Start PHP built-in server
+      run: php -S 127.0.0.1:8000 -t . > /tmp/php-server.log 2>&1 &
+      env:
+        DB_PATH: ${{ github.workspace }}/db/test_database.sqlite
+        UPLOADS_DIR: ${{ github.workspace }}/uploads/test
+        APP_ENV: testing
+
+    - name: Wait for API server
+      run: |
+        for i in {1..20}; do
+          if curl -sf "http://127.0.0.1:8000/api/v1/ping.php" > /dev/null; then
+            echo "API server is ready"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "API server did not become ready in time"
+        cat /tmp/php-server.log || true
+        exit 1
 
     - name: Run integration tests
       run: |
         cd tests
         php run_tests.php integration
       env:
-        DB_PATH: ./db/test_database.sqlite
-        UPLOADS_DIR: ./uploads/test
+        DB_PATH: ${{ github.workspace }}/db/test_database.sqlite
+        UPLOADS_DIR: ${{ github.workspace }}/uploads/test
+        API_BASE_URL: http://127.0.0.1:8000/api/v1
         APP_ENV: testing
+
+    - name: Debug server log on failure
+      if: failure()
+      run: cat /tmp/php-server.log || true
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
