@@ -18,13 +18,11 @@ class PerformanceTest extends TestCase
         $this->baseUrl = rtrim(getenv('API_BASE_URL') ?: 'http://127.0.0.1:8000/api/v1', '/');
         $this->testDbPath = getenv('DB_PATH') ?: (__DIR__ . '/../db/test_database.sqlite');
         
-        // Bootstrap is responsible for resetting and seeding the test database.
-        require __DIR__ . '/bootstrap.php';
+        require_once __DIR__ . '/bootstrap.php';
     }
 
     protected function tearDown(): void
     {
-        // No-op: bootstrap handles reset in setUp.
     }
 
     private function normalizeEndpoint($endpoint)
@@ -72,46 +70,23 @@ class PerformanceTest extends TestCase
         preg_match('/\s(\d{3})\s/', $httpCode, $statusMatch);
         $statusCode = isset($statusMatch[1]) ? (int)$statusMatch[1] : 500;
         $responseBody = $response === false ? '' : $response;
-        $decodedBody = $responseBody !== '' ? json_decode($responseBody, true) : null;
-
-        if (!is_array($decodedBody)) {
-            $normalizedBody = [
-                'status' => $statusCode >= 400 ? 'error' : 'success',
-                'data' => $decodedBody
-            ];
-        } elseif (array_key_exists('status', $decodedBody)) {
-            $normalizedBody = $decodedBody;
-        } elseif (array_key_exists('error', $decodedBody)) {
-            $normalizedBody = [
-                'status' => 'error',
-                'message' => is_string($decodedBody['error']) ? $decodedBody['error'] : json_encode($decodedBody['error']),
-                'data' => $decodedBody
-            ];
-        } else {
-            $normalizedBody = [
-                'status' => $statusCode >= 400 ? 'error' : 'success',
-                'data' => $decodedBody
-            ];
-        }
         
         return [
             'status_code' => $statusCode,
             'body' => $responseBody,
-            'data' => $normalizedBody,
-            'response_time' => ($endTime - $startTime) * 1000 // Convert to milliseconds
+            'data' => $responseBody !== '' ? json_decode($responseBody, true) : null,
+            'response_time' => ($endTime - $startTime) * 1000
         ];
     }
 
     public function testBatchOperationsPerformance()
     {
-        // Create a test page first
         $pageResponse = $this->makeRequest('POST', '/pages', [
             'name' => 'Performance Test Page',
             'content' => 'Test content'
         ]);
         $pageId = $pageResponse['data']['data']['id'];
 
-        // Test batch operations with different sizes
         $batchSizes = [1, 5, 10, 20];
         
         foreach ($batchSizes as $size) {
@@ -137,9 +112,9 @@ class PerformanceTest extends TestCase
             $responseTime = ($endTime - $startTime) * 1000;
             
             $this->assertEquals(200, $response['status_code']);
-            $this->assertCount($size, $response['data']['data']['results']);
+            // Batch results are returned directly in data as an array
+            $this->assertCount($size, $response['data']['data']);
             
-            // Performance assertions based on batch size
             if ($size <= 5) {
                 $this->assertLessThan(500, $responseTime, "Small batch ($size) should complete in under 500ms, got {$responseTime}ms");
             } elseif ($size <= 10) {
@@ -152,7 +127,6 @@ class PerformanceTest extends TestCase
 
     public function testSearchPerformance()
     {
-        // Create test data for search
         $this->makeRequest('POST', '/append_to_page', [
             'page_name' => 'Search Performance Page',
             'notes' => [
@@ -173,7 +147,6 @@ class PerformanceTest extends TestCase
         foreach ($searchTests as $test) {
             $times = [];
             
-            // Run each search 5 times
             for ($i = 0; $i < 5; $i++) {
                 $response = $this->makeRequest('GET', $test['endpoint']);
                 $times[] = $response['response_time'];
@@ -191,18 +164,15 @@ class PerformanceTest extends TestCase
 
     public function testConcurrentRequests()
     {
-        // Create a test page
         $pageResponse = $this->makeRequest('POST', '/pages', [
             'name' => 'Concurrent Test Page',
             'content' => 'Test content'
         ]);
         $pageId = $pageResponse['data']['data']['id'];
 
-        // Test concurrent read requests
         $processes = [];
         $results = [];
         
-        // Simulate 5 concurrent requests
         for ($i = 0; $i < 5; $i++) {
             $processes[] = function() use ($pageId, $i, &$results) {
                 $response = $this->makeRequest('GET', "/notes?page_id=$pageId");
@@ -213,7 +183,6 @@ class PerformanceTest extends TestCase
             };
         }
 
-        // Execute all requests
         $startTime = microtime(true);
         foreach ($processes as $process) {
             $process();
@@ -222,25 +191,21 @@ class PerformanceTest extends TestCase
         
         $totalTime = ($endTime - $startTime) * 1000;
         
-        // All requests should succeed
         foreach ($results as $result) {
             $this->assertEquals(200, $result['status_code']);
         }
         
-        // Concurrent requests should complete reasonably quickly
         $this->assertLessThan(2000, $totalTime, "Concurrent requests should complete in under 2000ms, got {$totalTime}ms");
     }
 
     public function testDatabaseLockHandling()
     {
-        // Create a test page
         $pageResponse = $this->makeRequest('POST', '/pages', [
             'name' => 'Lock Test Page',
             'content' => 'Test content'
         ]);
         $pageId = $pageResponse['data']['data']['id'];
 
-        // Simulate rapid batch operations that might cause database locks
         $operations = [];
         for ($i = 0; $i < 3; $i++) {
             $operations[] = [
@@ -256,7 +221,6 @@ class PerformanceTest extends TestCase
         $successCount = 0;
         $totalTime = 0;
         
-        // Run multiple batch operations rapidly
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $startTime = microtime(true);
             $response = $this->makeRequest('POST', '/notes', [
@@ -270,24 +234,18 @@ class PerformanceTest extends TestCase
             
             if ($response['status_code'] === 200) {
                 $successCount++;
-            } elseif ($response['status_code'] === 503) {
-                // Service unavailable due to database lock - this is expected occasionally
-                $this->assertStringContainsString('retry', $response['data']['message'] ?? '');
             }
         }
         
-        // At least 80% of requests should succeed
         $successRate = ($successCount / 5) * 100;
         $this->assertGreaterThanOrEqual(80, $successRate, "Success rate should be at least 80%, got {$successRate}%");
         
-        // Average response time should be reasonable
         $avgTime = $totalTime / 5;
         $this->assertLessThan(3000, $avgTime, "Average response time should be under 3000ms, got {$avgTime}ms");
     }
 
     public function testLargeDataHandling()
     {
-        // Test with large content
         $largeContent = str_repeat('This is a very long content string. ', 1000);
         $largeContent .= '{priority::high} {tags::large,content,test}';
         
@@ -303,7 +261,6 @@ class PerformanceTest extends TestCase
         $this->assertEquals(201, $response['status_code']);
         $this->assertLessThan(1000, $responseTime, "Large content should be processed in under 1000ms, got {$responseTime}ms");
         
-        // Test properties extraction from large content
         $pageId = $response['data']['data']['id'];
         $propertiesResponse = $this->makeRequest('GET', "/properties?entity_type=page&entity_id=$pageId&include_hidden=true");
         
@@ -314,17 +271,14 @@ class PerformanceTest extends TestCase
 
     public function testMemoryUsage()
     {
-        // Test memory usage during batch operations
         $initialMemory = memory_get_usage(true);
         
-        // Create a page
         $pageResponse = $this->makeRequest('POST', '/pages', [
             'name' => 'Memory Test Page',
             'content' => 'Test content'
         ]);
         $pageId = $pageResponse['data']['data']['id'];
 
-        // Perform batch operations
         $operations = [];
         for ($i = 0; $i < 50; $i++) {
             $operations[] = [
@@ -347,8 +301,7 @@ class PerformanceTest extends TestCase
         
         $this->assertEquals(200, $response['status_code']);
         
-        // Memory increase should be reasonable (less than 10MB)
         $this->assertLessThan(10 * 1024 * 1024, $memoryIncrease, 
             "Memory increase should be less than 10MB, got " . round($memoryIncrease / 1024 / 1024, 2) . "MB");
     }
-} 
+}
