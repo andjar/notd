@@ -15,29 +15,41 @@ class PerformanceTest extends TestCase
         if (getenv('CI')) {
             $this->markTestSkipped('Performance tests are skipped in CI environment.');
         }
-        $this->baseUrl = 'http://localhost/api/v1';
-        $this->testDbPath = __DIR__ . '/../db/test_database.sqlite';
+        $this->baseUrl = rtrim(getenv('API_BASE_URL') ?: 'http://127.0.0.1:8000/api/v1', '/');
+        $this->testDbPath = getenv('DB_PATH') ?: (__DIR__ . '/../db/test_database.sqlite');
         
-        // Ensure clean test database
-        if (file_exists($this->testDbPath)) {
-            unlink($this->testDbPath);
-        }
-        
-        // Run bootstrap to set up test database
-        require_once __DIR__ . '/bootstrap.php';
+        // Bootstrap is responsible for resetting and seeding the test database.
+        require __DIR__ . '/bootstrap.php';
     }
 
     protected function tearDown(): void
     {
-        // Clean up test database
-        if (!empty($this->testDbPath) && file_exists($this->testDbPath)) {
-            unlink($this->testDbPath);
+        // No-op: bootstrap handles reset in setUp.
+    }
+
+    private function normalizeEndpoint($endpoint)
+    {
+        $endpoint = '/' . ltrim($endpoint, '/');
+        $queryPos = strpos($endpoint, '?');
+        $path = $queryPos === false ? $endpoint : substr($endpoint, 0, $queryPos);
+        $query = $queryPos === false ? '' : substr($endpoint, $queryPos);
+
+        if (!str_ends_with($path, '.php')) {
+            $path .= '.php';
         }
+
+        return $path . $query;
     }
 
     private function makeRequest($method, $endpoint, $data = null)
     {
-        $url = $this->baseUrl . $endpoint;
+        $normalizedEndpoint = $this->normalizeEndpoint($endpoint);
+        $url = $this->baseUrl . $normalizedEndpoint;
+        $body = null;
+
+        if ($data !== null) {
+            $body = is_string($data) ? $data : json_encode($data);
+        }
         
         $context = stream_context_create([
             'http' => [
@@ -46,8 +58,9 @@ class PerformanceTest extends TestCase
                     'Content-Type: application/json',
                     'Accept: application/json'
                 ],
-                'content' => $data ? json_encode($data) : null,
-                'timeout' => 30
+                'content' => $body,
+                'timeout' => 30,
+                'ignore_errors' => true
             ]
         ]);
 
@@ -56,11 +69,14 @@ class PerformanceTest extends TestCase
         $endTime = microtime(true);
         
         $httpCode = $http_response_header[0] ?? 'HTTP/1.1 500 Internal Server Error';
+        preg_match('/\s(\d{3})\s/', $httpCode, $statusMatch);
+        $statusCode = isset($statusMatch[1]) ? (int)$statusMatch[1] : 500;
+        $responseBody = $response === false ? '' : $response;
         
         return [
-            'status_code' => (int) explode(' ', $httpCode)[1],
-            'body' => $response,
-            'data' => json_decode($response, true),
+            'status_code' => $statusCode,
+            'body' => $responseBody,
+            'data' => $responseBody !== '' ? json_decode($responseBody, true) : null,
             'response_time' => ($endTime - $startTime) * 1000 // Convert to milliseconds
         ];
     }
@@ -92,7 +108,7 @@ class PerformanceTest extends TestCase
 
             $startTime = microtime(true);
             $response = $this->makeRequest('POST', '/notes', [
-                'action' => 'batch',
+                'batch' => true,
                 'operations' => $operations
             ]);
             $endTime = microtime(true);
@@ -223,7 +239,7 @@ class PerformanceTest extends TestCase
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $startTime = microtime(true);
             $response = $this->makeRequest('POST', '/notes', [
-                'action' => 'batch',
+                'batch' => true,
                 'operations' => $operations
             ]);
             $endTime = microtime(true);
@@ -301,7 +317,7 @@ class PerformanceTest extends TestCase
         }
 
         $response = $this->makeRequest('POST', '/notes', [
-            'action' => 'batch',
+            'batch' => true,
             'operations' => $operations
         ]);
 

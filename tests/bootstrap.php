@@ -1,6 +1,20 @@
 <?php
 // Override database path for testing (must be set before config.php is included)
-$GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = getenv('DB_PATH') ?: __DIR__ . '/../db/test_database.sqlite';
+$defaultTestDbPath = __DIR__ . '/../db/test_database.sqlite';
+$dbPathFromEnv = getenv('DB_PATH');
+
+if ($dbPathFromEnv && $dbPathFromEnv !== '') {
+    // Support relative paths from project root and absolute paths from CI.
+    if (preg_match('/^(?:[A-Za-z]:[\\\\\\/]|\\/)/', $dbPathFromEnv) === 1) {
+        $resolvedTestDbPath = $dbPathFromEnv;
+    } else {
+        $resolvedTestDbPath = __DIR__ . '/../' . ltrim($dbPathFromEnv, './\\');
+    }
+} else {
+    $resolvedTestDbPath = $defaultTestDbPath;
+}
+
+$GLOBALS['DB_PATH_OVERRIDE_FOR_TESTING'] = $resolvedTestDbPath;
 
 // Always include config.php first (needed for DB_PATH constant)
 require_once __DIR__ . '/../config.php';
@@ -24,7 +38,6 @@ if (file_exists($autoloadPath)) {
     require_once __DIR__ . '/../api/validator_utils.php';
     require_once __DIR__ . '/../api/db_helpers.php';
     require_once __DIR__ . '/../api/UuidUtils.php';
-    require_once __DIR__ . '/../db/setup_db.php';
     require_once __DIR__ . '/../api/db_connect.php';
     
     // Include classes that are actually used by tests
@@ -71,7 +84,22 @@ if (!is_dir($dbDir)) {
 }
 
 if (file_exists(DB_PATH)) {
-    unlink(DB_PATH);
+    for ($attempt = 0; $attempt < 5; $attempt++) {
+        if (@unlink(DB_PATH)) {
+            break;
+        }
+        usleep(100000); // 100ms
+    }
+
+    if (file_exists(DB_PATH)) {
+        throw new RuntimeException('Could not remove existing test database at: ' . DB_PATH);
+    }
+}
+
+foreach ([DB_PATH . '-wal', DB_PATH . '-shm'] as $sidecarPath) {
+    if (file_exists($sidecarPath)) {
+        @unlink($sidecarPath);
+    }
 }
 
 // Create test database structure using the proper schema

@@ -151,10 +151,17 @@ jobs:
 
     - name: Generate test summary
       run: |
-        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| PHP Version | Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------------|------------|--------|" >> $GITHUB_STEP_SUMMARY
+        SUMMARY_FILE="test-results/pr-summary.md"
+        : > "$SUMMARY_FILE"
+
+        write_summary_line () {
+          echo "$1" | tee -a "$GITHUB_STEP_SUMMARY" "$SUMMARY_FILE" > /dev/null
+        }
+
+        write_summary_line "## Test Results Summary"
+        write_summary_line ""
+        write_summary_line "| PHP Version | Test Suite | Status |"
+        write_summary_line "|-------------|------------|--------|"
         
         for result in test-results/*; do
           if [ -d "$result" ]; then
@@ -167,7 +174,7 @@ jobs:
               status="❌ Failed"
             fi
             
-            echo "| $version | $suite | $status |" >> $GITHUB_STEP_SUMMARY
+            write_summary_line "| $version | $suite | $status |"
           fi
         done
 
@@ -177,7 +184,16 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+          const summaryPath = 'test-results/pr-summary.md';
+          let summary = '';
+
+          if (fs.existsSync(summaryPath)) {
+            summary = fs.readFileSync(summaryPath, 'utf8').trim();
+          }
+
+          if (!summary) {
+            summary = 'Test summary was empty. Please check workflow logs for details.';
+          }
           
           github.rest.issues.createComment({
             issue_number: context.issue.number,
