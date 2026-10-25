@@ -15,6 +15,7 @@ import * as outline from './outline.js';
 import { promptForPagePassword } from '../ui.js';
 import { recentHistory } from './recent-history.js';
 import { calendarCache } from './calendar-cache.js';
+import { sanitizeHtml } from '../ui/note-renderer.js';
 
 // --- Restored Utility Functions ---
 export function getPreviousDayPageName(currentDateStr) {
@@ -75,7 +76,7 @@ async function displayBacklinks(pageName) {
                 <div class="backlink-snippet">${link.content_snippet || ''}</div>
             </div>
         `).join('');
-        ui.domRefs.backlinksContainer.innerHTML = html;
+        ui.domRefs.backlinksContainer.innerHTML = sanitizeHtml(html);
     } catch (error) {
         console.error("Error fetching backlinks:", error);
         if (ui.domRefs.backlinksContainer) {
@@ -185,7 +186,7 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     // Render main content - clean properties from content before rendering
     const contentWithoutProperties = pageData.content ? pageData.content.replace(/\{[^}]+\}/g, '').trim() : '';
     if (contentWithoutProperties) {
-        pageContentDiv.innerHTML = parseContent(contentWithoutProperties);
+        pageContentDiv.innerHTML = sanitizeHtml(parseContent(contentWithoutProperties));
         pageContentDiv.style.display = 'block'; // Show the element when it has content
     } else {
         pageContentDiv.style.display = 'none'; // Hide the element when it's empty

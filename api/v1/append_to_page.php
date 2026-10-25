@@ -36,7 +36,7 @@ if (!is_array($notesInput) || empty($notesInput)) {
     return;
 }
 
-$pageName = \Validator::sanitizeString($input['page_name']);
+$pageName = Validator::sanitizeString($input['page_name']);
 $pdo = get_db_connection();
 $dataManager = new DataManager($pdo);
 

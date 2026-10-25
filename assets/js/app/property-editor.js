@@ -90,6 +90,9 @@ async function handleEncryptPage() {
 
         // 2. Encrypt every note on the page (through the ordered outbox, so
         //    no edit typed just before can overwrite the encrypted text).
+        // Set the password first so the server's echo of the encrypted text
+        // is decrypted again before it reaches the model.
+        setCurrentPagePassword(password);
         await outline.encryptAllNotes(password);
 
         // 3. Save the page content with the new property AND save the password in state

@@ -385,19 +385,26 @@ function updateSaveStatusIndicator(newStatus) {
 }
 
 function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
-    if (!domRefs.noteFocusBreadcrumbsContainer || !currentPageName) return;
-
-    let breadcrumbLinksHtml = `<a href="#" onclick="ui.showAllNotesAndLoadPage('${currentPageName}'); return false;">${currentPageName}</a>`;
-
+    const container = domRefs.noteFocusBreadcrumbsContainer;
+    if (!container || !currentPageName) return;
+    // Built with DOM nodes: note text and page names are never parsed as HTML.
+    container.textContent = '';
+    const link = (label, onClick) => {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = label;
+        a.addEventListener('click', (e) => { e.preventDefault(); onClick(); });
+        return a;
+    };
+    container.appendChild(link(currentPageName, () => showAllNotesAndLoadPage(currentPageName)));
     if (focusedNoteId) {
-        const ancestors = getNoteAncestors(focusedNoteId, allNotesOnPage);
-        ancestors.forEach(ancestor => {
-            const noteName = (ancestor.content || `Note ${ancestor.id}`).split('\n')[0].substring(0, 30);
-            breadcrumbLinksHtml += ` > <a href="#" onclick="ui.focusOnNote('${ancestor.id}'); return false;">${noteName}</a>`;
-        });
+        for (const ancestor of getNoteAncestors(focusedNoteId, allNotesOnPage)) {
+            const name = (ancestor.content || `Note ${ancestor.id}`).split('\n')[0].substring(0, 30);
+            container.appendChild(document.createTextNode(' > '));
+            container.appendChild(link(name, () => focusOnNote(ancestor.id)));
+        }
     }
-    domRefs.noteFocusBreadcrumbsContainer.innerHTML = breadcrumbLinksHtml;
-    domRefs.noteFocusBreadcrumbsContainer.style.display = 'block';
+    container.style.display = 'block';
 }
 
 function focusOnNote(noteId) {

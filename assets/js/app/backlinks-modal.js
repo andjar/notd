@@ -1,5 +1,6 @@
 import { domRefs } from '../ui/dom-refs.js';
 import { searchAPI } from '../api_client.js';
+import { sanitizeHtml } from '../ui/note-renderer.js';
 
 /**
  * Backlinks Modal functionality
@@ -146,7 +147,7 @@ export class BacklinksModal {
             `;
         }).join('');
 
-        domRefs.backlinksModalContent.innerHTML = backlinksHtml;
+        domRefs.backlinksModalContent.innerHTML = sanitizeHtml(backlinksHtml);
 
         // Reinitialize Feather icons
         if (window.feather) {

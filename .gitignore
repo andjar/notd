@@ -30,3 +30,4 @@ api/v1/php_error.log
 *.sqlite-wal
 db/*.lock
 tests/browser/latency.txt
+__pycache__/

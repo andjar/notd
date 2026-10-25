@@ -20,7 +20,10 @@
         }
     },
     "scripts": {
-        "test": "php test_runner.php",
-        "test:unit": "vendor/bin/phpunit tests/"
+        "test": "node tests/js/model.test.mjs && node tests/js/ordering_parity.mjs",
+        "test:api": "node tests/js/ops_api.test.mjs",
+        "test:browser": "python3 tests/browser/outline_test.py",
+        "test:unit": "vendor/bin/phpunit tests/",
+        "migrate": "php db/migrate_v3.php"
     }
 }
