@@ -23,3 +23,11 @@ docs/.hugo_cache/
 # Temporary files
 docs/.DS_Store
 docs/Thumbs.db
+tests/js/ordering_cases.json
+api/v1/php_error.log
+*.log
+*.sqlite-shm
+*.sqlite-wal
+db/*.lock
+tests/browser/latency.txt
+__pycache__/

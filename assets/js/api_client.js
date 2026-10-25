@@ -8,7 +8,7 @@
  * Base URL for API requests, derived from <base> tag or defaulting to root
  * @type {string}
  */
-const API_BASE_URL = (document.querySelector('base[href]')?.href || '/') + 'api/v1/';
+export const API_BASE_URL = (document.querySelector('base[href]')?.href || '/') + 'api/v1/';
 
 /**
  * Generic function to make API requests
@@ -158,20 +158,12 @@ const notesAPI = {
     getPageData: (pageId) => apiRequest(`notes.php?page_id=${pageId}`),
     getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
     getNoteWithChildren: (noteId) => apiRequest(`notes.php?id=${noteId}&include_children=true`),
-    batchUpdateNotes: (operations) => {
-        const body = { action: 'batch', operations };
-        return apiRequest('notes.php', 'POST', body);
-    },
-    // Individual wrapper functions for convenience
-    deleteNote: (noteId) => {
-        const operations = [{
-            type: 'delete',
-            payload: { id: noteId }
-        }];
-        return notesAPI.batchUpdateNotes(operations);
-    },
-    // The individual create, update wrappers were removed as they were causing confusion.
-    // All note modifications should go through note-actions.js which correctly uses the batch endpoint.
+    /**
+     * Sends intent operations directly (extensions and scripts). The main app
+     * goes through the outbox in app/outline.js instead, which orders,
+     * persists and retries them.
+     */
+    applyOps: (ops) => apiRequest('ops.php', 'POST', { ops }),
 };
 
 /**

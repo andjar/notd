@@ -50,7 +50,7 @@ window.addEventListener('DOMContentLoaded', async function () {
   // Notes API
   const notesAPI = {
     getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
-    batchUpdateNotes: (operations) => apiRequest('notes.php', 'POST', { action: 'batch', operations })
+    applyOps: (ops) => apiRequest('ops.php', 'POST', { ops })
   };
   // Pages API (optional, for page editing)
   const pagesAPI = {
@@ -145,9 +145,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         const { note_id, page_id } = getNoteOrPageIdFromUrl();
         if (note_id) {
           try {
-            await notesAPI.batchUpdateNotes([
-              { type: 'update', payload: { id: note_id, content: value } }
-            ]);
+            await notesAPI.applyOps([{ op_id: 'ext-' + Date.now().toString(36) + Math.random().toString(36).slice(2), type: 'edit', id: String(note_id), content: value }]);
             alert('Note saved!');
           } catch (err) {
             alert('Failed to save note: ' + (err.message || err));

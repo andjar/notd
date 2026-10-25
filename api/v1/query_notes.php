@@ -11,7 +11,20 @@ require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../response_utils.php';
 require_once __DIR__ . '/../DataManager.php';
 
-$pdo = get_db_connection();
+// User-supplied SQL runs on a read-only connection, so no query can write,
+// whatever the pattern checks below let through.
+get_db_connection(); // ensures the database and schema exist
+try {
+    $pdo = new \PDO('sqlite:' . DB_PATH, null, null, [
+        \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+        \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+    ] + (defined('PDO::SQLITE_ATTR_OPEN_FLAGS') ? [\PDO::SQLITE_ATTR_OPEN_FLAGS => \PDO::SQLITE_OPEN_READONLY] : []));
+    if (!defined('PDO::SQLITE_ATTR_OPEN_FLAGS')) {
+        $pdo->exec('PRAGMA query_only = ON');
+    }
+} catch (\PDOException $e) {
+    \App\ApiResponse::error('Could not open database: ' . $e->getMessage(), 500);
+}
 $input = json_decode(file_get_contents('php://input'), true);
 
 if (!isset($input['sql_query'])) {
@@ -54,7 +67,7 @@ if (!defined('ADVANCED_QUERY_MODE') || ADVANCED_QUERY_MODE !== true) {
 
     // Check for allowed columns to prevent data leakage from other columns.
     // This is a simple text-based check and not a full AST parser, but provides a good layer of security.
-    $allowedColumnsRegex = '/\b(N|P|Notes|Properties)\.(id|content|page_id|parent_note_id|created_at|updated_at|order_index|collapsed|active|note_id|name|value|weight)\b/i';
+    $allowedColumnsRegex = '/\b(N|P|Notes|Properties)\.(id|content|page_id|parent_note_id|created_at|updated_at|sort_key|version|collapsed|active|note_id|name|value|weight)\b/i';
     $strippedQuery = preg_replace($allowedColumnsRegex, '', $sqlQuery);
     if (preg_match('/(N|P|Notes|Properties)\.\w+/', $strippedQuery)) {
          \App\ApiResponse::error('Query references unauthorized columns.', 400);
@@ -93,6 +106,8 @@ try {
     $stmtFetchNotes = $pdo->prepare($sqlFetchNotes);
     $stmtFetchNotes->execute($noteIds);
     $notes = $stmtFetchNotes->fetchAll(\PDO::FETCH_ASSOC);
+    foreach ($notes as &$n) { unset($n['rid']); }
+    unset($n);
 
     // If properties are requested, fetch and format them using the DataManager
     if ($includeProperties && !empty($notes)) {

@@ -16,6 +16,12 @@ if (!class_exists('App\\Validator')) {
         return filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) !== false;
     }
 
+    /** Note ids are opaque strings (see App\Ordering::isValidId). */
+    public static function isNoteId($value) {
+        if (is_int($value)) $value = (string)$value;
+        return is_string($value) && preg_match('/^[A-Za-z0-9_-]{1,64}$/', $value) === 1;
+    }
+
     public static function isNotEmpty($value) {
         if (is_string($value)) {
             return trim($value) !== '';

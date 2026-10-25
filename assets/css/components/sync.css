@@ -1,0 +1,20 @@
+/* Sync status banner (app/outline.js): shown while offline or after a rejected change. */
+.sync-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  z-index: 2000;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  background: var(--ls-secondary-background-color, #f5f5f5);
+  color: var(--ls-primary-text-color, #222);
+  border: 1px solid var(--ls-secondary-border-color, #ccc);
+}
+.sync-banner[data-kind="warning"] { border-left: 4px solid #d29922; }
+.sync-banner[data-kind="error"] { border-left: 4px solid #cf222e; }
+.sync-banner[hidden] { display: none; }

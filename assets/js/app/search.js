@@ -4,6 +4,7 @@ import { calendarCache } from './calendar-cache.js';
 import { debounce, safeAddEventListener, decrypt } from '../utils.js';
 import { ui } from '../ui.js';
 import { getCurrentPagePassword } from './state.js';
+import { sanitizeHtml } from '../ui/note-renderer.js';
 
 // --- Global Search (Sidebar) ---
 
@@ -39,7 +40,7 @@ function displaySearchResults(results) {
             const password = getCurrentPagePassword();
             if (password) {
                 try {
-                    snippet = decrypt(snippet, password);
+                    snippet = decrypt(password, snippet);
                     if (snippet === null) {
                         snippet = '[DECRYPTION FAILED]';
                     }
@@ -74,7 +75,7 @@ function displaySearchResults(results) {
         `;
     }).join('');
 
-    searchResultsEl.innerHTML = html;
+    searchResultsEl.innerHTML = sanitizeHtml(html);
     searchResultsEl.classList.add('has-results');
 
     // Ensure Feather icons are rendered after new HTML is added
@@ -339,7 +340,7 @@ function renderNoteSearchResults(results) {
             const password = getCurrentPagePassword(); // Assuming this function is available and works
             if (password) {
                 try {
-                    snippet = decrypt(snippet, password); // Assuming decrypt is available
+                    snippet = decrypt(password, snippet); // Assuming decrypt is available
                     if (snippet === null) {
                         snippet = '[DECRYPTION FAILED]';
                     }
@@ -368,7 +369,7 @@ function renderNoteSearchResults(results) {
         `;
     }).join('');
 
-    searchResultsEl.innerHTML = html;
+    searchResultsEl.innerHTML = sanitizeHtml(html);
 
     if (typeof feather !== 'undefined') {
         feather.replace();
