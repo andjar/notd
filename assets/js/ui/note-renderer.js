@@ -5,6 +5,9 @@
  */
 
 import { saveNoteImmediately } from '../app/note-actions.js';
+import * as outline from '../app/outline.js';
+import { isBlurSuppressed } from './note-elements.js';
+import { NOTE_ID_PATTERN } from '../app/ids.js';
 import { domRefs } from './dom-refs.js';
 import { handleTransclusions } from '../app/page-loader.js';
 import { attachmentsAPI, notesAPI, pagesAPI } from '../api_client.js';
@@ -26,7 +29,7 @@ import {
 // import { focusOnNote } from './note-interactions.js'; // focusOnNote is used by renderNote's bullet click
 // import { showGenericConfirmModal } from './modals.js'; // Potentially for error handling if needed directly by render functions.
 
-// Globals assumed to be available: feather, Sortable, marked, window.notesForCurrentPage, window.currentPageId, displayNotes (potentially from main ui object for callbacks)
+// Globals assumed to be available: feather, Sortable, marked, DOMPurify
 
 // Helper function to get link query info
 /**
@@ -101,6 +104,43 @@ function getLinkQueryInfo(contentEl) {
 
 
 /**
+ * Uploads files as attachments of a note. The note may have been created a
+ * moment ago, so queued operations are flushed first.
+ */
+async function uploadFilesToNote(noteId, files, noteItemEl) {
+    if (!files.length) return;
+    try {
+        await outline.ensureSynced();
+        const formData = new FormData();
+        for (const file of files) formData.append('attachmentFile[]', file);
+        formData.append('note_id', noteId);
+        await attachmentsAPI.uploadAttachment(formData);
+        const feedback = document.createElement('div');
+        feedback.className = 'copy-feedback';
+        feedback.textContent = `Uploaded ${files.length} file${files.length > 1 ? 's' : ''}`;
+        document.body.appendChild(feedback);
+        setTimeout(() => feedback.remove(), 3000);
+        const note = outline.model.get(noteId);
+        if (note) note.has_attachments = true;
+        const wrapper = noteItemEl?.querySelector(':scope > .note-header-row .note-content-wrapper');
+        if (wrapper) {
+            let att = wrapper.querySelector('.note-attachments');
+            if (!att) {
+                att = document.createElement('div');
+                att.className = 'note-attachments';
+                wrapper.appendChild(att);
+            }
+            await renderAttachments(att, noteId, true);
+        }
+    } catch (error) {
+        console.error('Upload failed:', error);
+        alert(`Upload failed: ${error.message}`);
+    }
+}
+
+export { uploadFilesToNote };
+
+/**
  * Renders a single note element with proper structure and event handling
  * @param {Object} note - Note object
  * @param {number} [nestingLevel=0] - Nesting level for indentation
@@ -132,9 +172,9 @@ function renderNote(note, nestingLevel = 0) {
     bulletEl.className = 'note-bullet';
     bulletEl.dataset.noteId = note.id;
 
-    if (note.children && note.children.length > 0) {
-        noteItemEl.classList.add('has-children'); 
-
+    {
+        // Always present; CSS only shows it on .has-children, so a note that
+        // gains children later (indent, drag) can be collapsed right away.
         const arrowEl = document.createElement('span');
         arrowEl.className = 'note-collapse-arrow';
         arrowEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
@@ -208,7 +248,7 @@ function renderNote(note, nestingLevel = 0) {
     contentWrapperEl.appendChild(contentEl);
 
     // Only create attachments div if the note actually has attachments
-    if (note.id && (typeof note.id === 'number' || (typeof note.id === 'string' && !note.id.startsWith('temp-'))) && note.has_attachments) {
+    if (note.id && note.has_attachments) {
         const attachmentsEl = document.createElement('div');
         attachmentsEl.className = 'note-attachments';
         contentWrapperEl.appendChild(attachmentsEl);
@@ -230,39 +270,12 @@ function renderNote(note, nestingLevel = 0) {
     });
 
     contentWrapperEl.addEventListener('drop', async (e) => {
+        contentWrapperEl.classList.remove('dragover');
+        const files = Array.from(e.dataTransfer?.files || []);
+        if (files.length === 0) return; // a note being dragged: let Sortable handle it
         e.preventDefault();
         e.stopPropagation();
-        contentWrapperEl.classList.remove('dragover');
-
-        const files = Array.from(e.dataTransfer.files);
-        if (files.length > 0 && note.id && !String(note.id).startsWith('temp-')) {
-            const formData = new FormData();
-            for (const file of files) {
-                formData.append('attachmentFile', file);
-            }
-            formData.append('note_id', note.id);
-            try {
-                await attachmentsAPI.uploadAttachment(formData);
-                const feedback = document.createElement('div');
-                feedback.className = 'copy-feedback'; 
-                feedback.textContent = `Uploaded ${files.length} file${files.length > 1 ? 's' : ''}!`;
-                document.body.appendChild(feedback);
-                setTimeout(() => feedback.remove(), 3000);
-                
-                if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
-                     const pageData = await notesAPI.getPageData(window.currentPageId);
-                     window.notesForCurrentPage = pageData.notes; 
-                     window.ui.displayNotes(pageData.notes, window.currentPageId); 
-                } else {
-                    console.warn('displayNotes function not available for page refresh after D&D upload.')
-                }
-            } catch (error) {
-                console.error('Error uploading file(s) via drag & drop:', error);
-                alert(`Failed to upload file(s): ${error.message}`);
-            }
-        } else if (String(note.id).startsWith('temp-')) {
-            alert('Please save the note (by adding some content) before adding attachments.');
-        }
+        await uploadFilesToNote(note.id, files, noteItemEl);
     });
 
     const noteHeaderEl = document.createElement('div');
@@ -505,6 +518,9 @@ function switchToEditMode(contentEl) {
     }
 
     const handleBlur = () => {
+        // The view is moving this note (indent, drag, reorder) and will
+        // restore focus: keep editing.
+        if (isBlurSuppressed()) return;
         setTimeout(() => {
             if (suggestionBoxVisible) {
                 hideSuggestions();
@@ -524,11 +540,6 @@ function switchToEditMode(contentEl) {
     contentEl.addEventListener('blur', handleBlur);
 
     const handlePasteImage = async (event) => {
-        if (String(noteId).startsWith('temp-')) {
-            alert('Please save the note (by adding some content) before pasting images.');
-            return;
-        }
-
         const items = (event.clipboardData || event.originalEvent.clipboardData).items;
         let imageFile = null;
         for (let i = 0; i < items.length; i++) {
@@ -548,6 +559,7 @@ function switchToEditMode(contentEl) {
             formData.append('note_id', noteId);
 
             try {
+                await outline.ensureSynced(); // the note must exist on the server first
                 const result = await attachmentsAPI.uploadAttachment(formData);
                 console.log('Pasted image uploaded successfully:', result);
 
@@ -556,6 +568,7 @@ function switchToEditMode(contentEl) {
                     const imageMarkdown = `\n![Pasted Image](${result.url})\n`;
                     contentEl.textContent = currentRawContent + imageMarkdown;
                     contentEl.dataset.rawContent = contentEl.textContent;
+                    outline.editNote(noteId, contentEl.dataset.rawContent);
 
                     const feedback = document.createElement('div');
                     feedback.className = 'copy-feedback';
@@ -563,13 +576,6 @@ function switchToEditMode(contentEl) {
                     document.body.appendChild(feedback);
                     setTimeout(() => feedback.remove(), 3000);
 
-                    if (window.currentPageId && window.ui && typeof window.ui.displayNotes === 'function') {
-                         const pageData = await notesAPI.getPageData(window.currentPageId);
-                         window.notesForCurrentPage = pageData.notes; 
-                         window.ui.displayNotes(pageData.notes, window.currentPageId); 
-                    } else {
-                        console.warn('displayNotes function not available for page refresh after paste upload.')
-                    }
                 } else {
                     throw new Error('Upload result did not include a URL.');
                 }
@@ -631,11 +637,8 @@ function normalizeNewlines(str) {
  */
 function switchToRenderedMode(contentEl) {
     const noteEl = contentEl.closest('.note-item');
-    if (noteEl && noteEl.dataset.noteId && !noteEl.dataset.noteId.startsWith('temp-')) {
-        // It's important that saveNoteImmediately is available in this scope.
-        // Assuming it's imported or globally available.
-        // console.log('[DEBUG switchToRenderedMode] Calling saveNoteImmediately for noteId:', noteEl.dataset.noteId);
-        saveNoteImmediately(noteEl);
+    if (noteEl && noteEl.dataset.noteId) {
+        saveNoteImmediately(noteEl); // records the text in the model and sends it soon
     }
     if (contentEl.classList.contains('rendered-mode')) return;
 
@@ -867,7 +870,7 @@ function parseAndRenderContent(rawContent) {
 
         html = html.replace(/!\{\{(.*?)\}\}/g, (match, blockRef) => {
             const trimmedRef = blockRef ? blockRef.trim() : '';
-            if (/^\d+$/.test(trimmedRef)) {
+            if (NOTE_ID_PATTERN.test(trimmedRef)) {
                 return `<div class="transclusion-placeholder" data-block-ref="${trimmedRef}">Loading...</div>`;
             } else {
                 return `<div class="transclusion-placeholder error" data-block-ref="${trimmedRef}">Invalid block reference</div>`;
@@ -902,7 +905,21 @@ function parseAndRenderContent(rawContent) {
             console.warn('marked.js not loaded properly or missing parse method');
         }
     }
-    return html;
+    return sanitizeHtml(html);
+}
+
+/**
+ * Note content can come from outside (RSS, mail, the append API, pasted
+ * text), so rendered HTML is always passed through DOMPurify. If the library
+ * failed to load, fall back to plain escaped text rather than raw HTML.
+ */
+export function sanitizeHtml(html) {
+    if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+        return DOMPurify.sanitize(html, { ADD_ATTR: ['target', 'rel'] });
+    }
+    const div = document.createElement('div');
+    div.textContent = html;
+    return div.innerHTML;
 }
 
 window.parseAndRenderContent = parseAndRenderContent;
@@ -1210,59 +1227,11 @@ async function showConfirmationDialog(message) {
 
 
 
-async function handleDelegatedCollapseArrowClick(targetElement) {
-    const noteItem = targetElement.closest('.note-item');
-    const noteId = noteItem?.dataset.noteId;
+function handleDelegatedCollapseArrowClick(targetElement) {
+    const noteId = targetElement.closest('.note-item')?.dataset.noteId;
     if (!noteId) return;
-
-    const childrenContainer = noteItem.querySelector('.note-children');
-    const isCurrentlyCollapsed = noteItem.classList.toggle('collapsed');
-    
-    if (childrenContainer) {
-        childrenContainer.classList.toggle('collapsed', isCurrentlyCollapsed);
-    }
-    targetElement.dataset.collapsed = isCurrentlyCollapsed.toString();
-
-    try {
-        // Use the notesAPI.batchUpdateNotes function
-        const result = await notesAPI.batchUpdateNotes([{
-            type: 'update',
-            payload: {
-                id: noteId,
-                page_id: window.currentPageId,
-                collapsed: isCurrentlyCollapsed ? 1 : 0
-            }
-        }]);
-
-        // Update local cache
-        if (window.notesForCurrentPage) {
-            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-            if (noteToUpdate) {
-                noteToUpdate.collapsed = isCurrentlyCollapsed;
-            }
-        }
-    } catch (error) {
-        const errorMessage = error.message || 'Please try again.';
-        console.error(`handleDelegatedCollapseArrowClick: Error saving collapse state for note ${noteId}. Error:`, error);
-        console.error('Full error details:', {
-            noteId,
-            isCurrentlyCollapsed,
-            currentPageId: window.currentPageId,
-            error
-        });
-        
-        // Revert UI changes on error
-        noteItem.classList.toggle('collapsed'); // Toggle back
-        if (childrenContainer) childrenContainer.classList.toggle('collapsed'); // Toggle back
-        targetElement.dataset.collapsed = (!isCurrentlyCollapsed).toString();
-        
-        // Show feedback to user - using a temporary feedback div for this non-critical error
-        const feedback = document.createElement('div');
-        feedback.className = 'copy-feedback error-feedback'; // Added 'error-feedback' for specific styling
-        feedback.textContent = `Failed to save collapse state: ${errorMessage}`;
-        document.body.appendChild(feedback);
-        setTimeout(() => feedback.remove(), 3000); // Longer timeout for errors
-    }
+    const note = outline.model.get(noteId);
+    if (note) outline.setCollapsed(noteId, !note.collapsed);
 }
 
 function handleDelegatedBulletClick(targetElement) {
@@ -1345,69 +1314,44 @@ async function handleDelegatedBulletContextMenu(event, targetElement) {
                 document.body.appendChild(feedbackAnchor);
                 setTimeout(() => feedbackAnchor.remove(), 2000);
                 break;
-            case 'delete':
-                if (confirm(`Are you sure you want to delete note ${target.dataset.noteId}?`)) {
-                    try {
-                        await notesAPI.deleteNote(target.dataset.noteId);
-                        document.querySelector(`.note-item[data-note-id="${target.dataset.noteId}"]`)?.remove();
-                        // Also remove from window.notesForCurrentPage
-                        if (window.notesForCurrentPage) {
-                            window.notesForCurrentPage = window.notesForCurrentPage.filter(n => String(n.id) !== String(target.dataset.noteId));
-                        }
-                    } catch (error) {
-                        const deleteErrorMessage = error.message || 'Please try again.';
-                        console.error(`handleDelegatedBulletContextMenu (delete action): Error deleting note ${target.dataset.noteId}. Error:`, error);
-                        alert(`Failed to delete note. ${deleteErrorMessage}`);
-                    }
-                }
+            case 'delete': {
+                const childCount = outline.model.subtreeIds(target.dataset.noteId).length - 1;
+                const question = childCount > 0
+                    ? `Delete this note and its ${childCount} nested note${childCount > 1 ? 's' : ''}?`
+                    : 'Delete this note?';
+                if (confirm(question)) outline.deleteNote(target.dataset.noteId);
                 break;
-            case 'upload':
+            }
+            case 'upload': {
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.multiple = true;
+                const noteId = target.dataset.noteId;
                 input.onchange = async (uploadEvent) => {
-                    const files = Array.from(uploadEvent.target.files);
-                    for (const file of files) {
-                        const formData = new FormData();
-                        formData.append('attachmentFile', file);
-                        formData.append('note_id', target.dataset.noteId);
-                        try {
-                            await attachmentsAPI.uploadAttachment(formData);
-                            const feedbackUpload = document.createElement('div');
-                            feedbackUpload.className = 'copy-feedback'; // Success feedback
-                            feedbackUpload.textContent = `File "${file.name}" uploaded successfully!`;
-                            document.body.appendChild(feedbackUpload);
-                            setTimeout(() => feedbackUpload.remove(), 3000);
-                            if (window.ui && typeof window.ui.displayNotes === 'function' && target.dataset.pageId) {
-                                const pageData = await notesAPI.getPageData(target.dataset.pageId); // Refresh page
-                                window.ui.displayNotes(pageData.notes, target.dataset.pageId);
-                            } else {
-                                console.warn('handleDelegatedBulletContextMenu (upload action): displayNotes function or pageId not available to refresh after upload for noteId:', target.dataset.noteId);
-                            }
-                        } catch (error) {
-                            const uploadErrorMessage = error.message || 'Please try again.';
-                            console.error(`handleDelegatedBulletContextMenu (upload action): Error uploading file "${file.name}" for note ${target.dataset.noteId}. Error:`, error);
-                            alert(`Failed to upload file "${file.name}". ${uploadErrorMessage}`);
-                        }
-                    }
+                    const noteItem = document.querySelector(`.note-item[data-note-id="${CSS.escape(noteId)}"]`);
+                    await uploadFilesToNote(noteId, Array.from(uploadEvent.target.files), noteItem);
                 };
                 input.click();
                 break;
+            }
             case 'open-zen':
                 const zenNoteId = target.dataset.noteId;
-                const zenUrl = `/extensions/zen/index.html?note_id=${zenNoteId}`;
+                outline.outbox.flushSoon();
+                const zenUrl = `extensions/zen/index.html?note_id=${encodeURIComponent(zenNoteId)}`;
                 window.open(zenUrl, '_blank');
                 if (typeof closeMenu === 'function') closeMenu();
                 return;
             case 'open-excalidraw':
                 const excalidrawNoteId = target.dataset.noteId;
-                const excalidrawUrl = `/extensions/excalidraw_editor/excalidraw.html?note_id=${excalidrawNoteId}`;
+                outline.outbox.flushSoon();
+                const excalidrawUrl = `extensions/excalidraw_editor/excalidraw.html?note_id=${encodeURIComponent(excalidrawNoteId)}`;
                 window.open(excalidrawUrl, '_blank');
                 if (typeof closeMenu === 'function') closeMenu();
                 return;
             case 'open-math-notepad':
                 const mathNoteId = target.dataset.noteId;
-                const mathUrl = `/extensions/math_notepad/index.html?note_id=${mathNoteId}`;
+                outline.outbox.flushSoon();
+                const mathUrl = `extensions/math_notepad/index.html?note_id=${encodeURIComponent(mathNoteId)}`;
                 window.open(mathUrl, '_blank');
                 if (typeof closeMenu === 'function') closeMenu();
                 return;
@@ -1479,12 +1423,8 @@ async function handleDelegatedAttachmentDelete(targetElement) {
             }
         }
 
-        if (window.notesForCurrentPage) {
-            const noteToUpdate = window.notesForCurrentPage.find(n => String(n.id) === String(noteId));
-            if (noteToUpdate) {
-                noteToUpdate.has_attachments = remaining > 0;
-            }
-        }
+        const noteToUpdate = outline.model.get(noteId);
+        if (noteToUpdate) noteToUpdate.has_attachments = remaining > 0;
     } catch (error) {
         const msg = error.message || 'Please try again.';
         console.error(`Failed to delete attachment ${attachmentId} for note ${noteId}:`, error);
@@ -1521,7 +1461,7 @@ async function handleDelegatedTaskCheckboxClick(checkbox) {
     if (!noteItem || !contentEl) return;
 
     const noteId = noteItem.dataset.noteId;
-    if (!noteId || noteId.startsWith('temp-')) return;
+    if (!noteId) return;
     
     let rawContent = contentEl.dataset.rawContent;
     const currentMarker = checkbox.dataset.markerType.toUpperCase();

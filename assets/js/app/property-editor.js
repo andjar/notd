@@ -1,8 +1,7 @@
 import { getCurrentPageId, setCurrentPagePassword } from './state.js';
 import { ui, hidePagePropertiesModal, promptForEncryptionPassword } from '../ui.js';
-import { pagesAPI, notesAPI } from '../api_client.js';
-import { encrypt } from '../utils.js'; // Import encrypt from utils.js
-import { pageCache } from './page-cache.js';
+import { pagesAPI } from '../api_client.js';
+import * as outline from './outline.js';
 
 // Stores the full page content while the modal is open
 let pageContentForModal = '';
@@ -18,13 +17,6 @@ async function _updatePageContent(newContent) {
         displayPageProperties(updatedPage.properties || {});
         // Properties are rendered server-side, no need for client-side rendering
         ui.updateSaveStatusIndicator('saved');
-        
-        // **CACHE INVALIDATION**: Invalidate cache after page content update
-        const appStore = window.Alpine.store('app');
-        if (appStore.currentPageName) {
-            pageCache.removePage(appStore.currentPageName);
-            console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName} (page content update)`);
-        }
         
         hidePagePropertiesModal();
     } catch (error) {
@@ -96,31 +88,9 @@ async function handleEncryptPage() {
         
         textarea.value = newContent; // Update the textarea immediately
 
-        // 2. Encrypt all notes for the current page
-        const notes = await notesAPI.getPageData(getCurrentPageId());
-        const batchUpdates = notes.map(note => {
-            if (note.is_encrypted) return null; // Already encrypted, skip
-            return {
-                type: 'update', // batch operations need a type
-                payload: {
-                    id: note.id,
-                    content: encrypt(password, note.content),
-                    is_encrypted: 1
-                }
-            };
-        }).filter(Boolean); // Filter out nulls
-
-        if (batchUpdates.length > 0) {
-            // **FIX**: The batchUpdateNotes function expects the array of operations directly.
-            await notesAPI.batchUpdateNotes(batchUpdates);
-            
-            // **CACHE INVALIDATION**: Invalidate cache after batch operations
-            const appStore = window.Alpine.store('app');
-            if (appStore.currentPageName) {
-                pageCache.removePage(appStore.currentPageName);
-                console.log(`[CACHE] Invalidated cache for page: ${appStore.currentPageName} (property editor)`);
-            }
-        }
+        // 2. Encrypt every note on the page (through the ordered outbox, so
+        //    no edit typed just before can overwrite the encrypted text).
+        await outline.encryptAllNotes(password);
 
         // 3. Save the page content with the new property AND save the password in state
         await _updatePageContent(newContent);

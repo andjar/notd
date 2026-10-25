@@ -11,8 +11,8 @@ import { handleAddRootNote } from './note-actions.js';
 import { ui } from '../ui.js';
 import { parseProperties, parseContent, cleanProperties } from '../utils/content-parser.js';
 import { handleNoteAction } from './note-actions.js';
+import * as outline from './outline.js';
 import { promptForPagePassword } from '../ui.js';
-import { pageCache } from './page-cache.js';
 import { recentHistory } from './recent-history.js';
 import { calendarCache } from './calendar-cache.js';
 
@@ -153,10 +153,10 @@ export async function handleSqlQueries() {
 
 // --- Page Loading and Rendering ---
 
-async function handleCreateAndFocusFirstNote() {
+function handleCreateAndFocusFirstNote() {
     const appStore = getAppStore();
     if (!appStore.currentPageId) return;
-    await handleAddRootNote();
+    handleAddRootNote();
 }
 
 async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
@@ -338,13 +338,9 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
     // Handle URL anchor highlighting after notes are rendered
     handleUrlAnchor();
     
-    console.log('[DEBUG] Starting prefetch of linked pages');
-    prefetchLinkedPagesData();
-    console.log('[DEBUG] _renderPageContent complete');
-
     const appStore = getAppStore();
-    if (appStore.notes.length === 0 && pageData.id) {
-        await handleCreateAndFocusFirstNote();
+    if (outline.model.children(null).length === 0 && pageData.id) {
+        handleCreateAndFocusFirstNote();
     } else if (focusFirstNote && ui.domRefs.notesContainer) {
         const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
         if (firstNoteContent) ui.switchToEditMode(firstNoteContent);
@@ -401,9 +397,6 @@ async function _fetchPageFromNetwork(pageName) {
     // This check is now mostly for safety, as `notes` is explicitly assigned above.
     combinedPageData.notes = Array.isArray(combinedPageData.notes) ? combinedPageData.notes : [];
     
-    // Cache the page data for future loads
-    pageCache.setPage(pageName, combinedPageData);
-    
     return combinedPageData;
 }
 
@@ -415,18 +408,12 @@ export async function loadPage(pageName, focusFirstNote = false, providedPageDat
 
     try {
         let pageData = providedPageData;
-        
-        // Check localStorage cache first
         if (!pageData) {
-            pageData = pageCache.getPage(pageName);
-        }
-        
-        if (!pageData) {
-            console.log('[page-loader] Attempting to show loading message. notesContainer:', ui.domRefs.notesContainer);
+            // Pages are always read from the server (no stale local cache).
+            // Let queued edits land first so the fetched page includes them.
+            await outline.settle();
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
             pageData = await _fetchPageFromNetwork(pageName);
-        } else {
-            console.log('[page-loader] Using cached page data for:', pageName);
         }
         
         await _processAndRenderPage(pageData, focusFirstNote);
@@ -449,50 +436,13 @@ export async function loadPage(pageName, focusFirstNote = false, providedPageDat
     }
 }
 
-export async function prefetchLinkedPagesData() {
-    const appStore = getAppStore();
-    if (!appStore.notes) return;
-    const linkedPageNames = new Set();
-    const pageLinkRegex = /\[\[([^\]]+)\]\]/g;
-
-    appStore.notes.forEach(note => {
-        if (note.content) {
-            [...note.content.matchAll(pageLinkRegex)].forEach(match => {
-                const pageName = match[1].trim().split('|')[0].trim();
-                if (pageName) linkedPageNames.add(pageName);
-            });
-        }
-    });
-
-    let prefetchCounter = 0;
-    for (const name of linkedPageNames) {
-        if (prefetchCounter >= appStore.MAX_PREFETCH_PAGES) break;
-        if (name === appStore.currentPageName || appStore.hasPageCache(name)) continue;
-        
-        try {
-            await _fetchPageFromNetwork(name);
-        } catch (error) {
-            console.warn(`[Prefetch] Failed to prefetch linked page ${name}:`, error.message);
-        }
-    }
-}
-
-export async function prefetchRecentPagesData() {
-    try {
-        const appStore = getAppStore();
-        const { pages } = await pagesAPI.getPages({ sort_by: 'updated_at', sort_order: 'desc', per_page: appStore.MAX_PREFETCH_PAGES });
-        for (const page of pages) {
-            if (page.name === appStore.currentPageName || appStore.hasPageCache(page.name)) continue;
-            try {
-                await _fetchPageFromNetwork(page.name);
-            } catch (error) {
-                console.warn(`[Prefetch] Failed to prefetch recent page ${page.name}:`, error.message);
-            }
-        }
-    } catch (error) {
-        console.error('Error in prefetchRecentPagesData:', error);
-    }
-}
+/**
+ * Prefetching was removed: it fetched (and auto-created) every linked page on
+ * each visit to fill a cache that could serve stale data. Kept as no-ops for
+ * callers.
+ */
+export async function prefetchLinkedPagesData() {}
+export async function prefetchRecentPagesData() {}
 
 export async function fetchAndDisplayPages(activePageName) {
     try {
@@ -520,7 +470,7 @@ export function handleUrlAnchor() {
     if (!hash) return;
     
     // Parse hash for note anchor (e.g., #note-532)
-    const noteMatch = hash.match(/^#note-(\d+)$/);
+    const noteMatch = hash.match(/^#note-([A-Za-z0-9_-]+)$/);
     if (!noteMatch) return;
     
     const noteId = noteMatch[1];

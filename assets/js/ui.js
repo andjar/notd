@@ -4,7 +4,8 @@
  */
 
 // Import note-related functions that were split into separate modules
-import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree, initializeDragAndDrop, handleNoteDrop } from './ui/note-elements.js';
+import { displayNotes, removeNoteElement, initializeDragAndDrop, handleNoteDrop, focusNote, placeNote, renderAll } from './ui/note-elements.js';
+import { model as outlineModel } from './app/outline.js';
 import { renderNote, parseAndRenderContent, switchToEditMode, getRawTextWithNewlines, normalizeNewlines, renderAttachments, renderProperties, initializeDelegatedNoteEventListeners, renderTransclusion } from './ui/note-renderer.js';
 import { domRefs } from './ui/dom-refs.js';
 import { pagesAPI } from './api_client.js';
@@ -415,7 +416,7 @@ function focusOnNote(noteId) {
 
     elementsToShow.forEach(el => el.classList.remove('note-hidden'));
     
-    renderBreadcrumbs(noteId, window.notesForCurrentPage, window.currentPageName);
+    renderBreadcrumbs(noteId, outlineModel.list(), window.currentPageName);
 }
 
 function showAllNotes() {
@@ -856,9 +857,10 @@ function createCurrentPageNoteAnchorLink(noteId) {
 // Export the main UI object
 export const ui = {
     displayNotes,
-    addNoteElement,
+    renderAll,
+    placeNote,
+    focusNote,
     removeNoteElement,
-    buildNoteTree,
     initializeDragAndDrop,
     handleNoteDrop,
     renderNote,

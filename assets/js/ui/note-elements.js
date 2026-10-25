@@ -1,419 +1,324 @@
 /**
- * UI Module for Note Element specific functionalities
- * Handles DOM manipulation and rendering for note items
+ * DOM view of the outline. Everything here is derived from the model in
+ * app/outline.js: notes are placed by identity (before the element of their
+ * next sibling), never by numeric position, so the DOM cannot drift from the
+ * data.
+ *
  * @module ui/note-elements
  */
 
-import { domRefs } from './dom-refs.js';
-import { renderNote } from './note-renderer.js';
-import { calculateOrderIndex } from '../app/order-index-service.js';
-import { setNotesForCurrentPage } from '../app/state.js';
-import { pageCache } from '../app/page-cache.js';
-import { provideBecomeParentFeedback } from '../app/note-actions.js';
+import { renderNote, parseAndRenderContent, switchToEditMode, renderAttachments } from './note-renderer.js';
+import * as outline from '../app/outline.js';
 
-window.renderNote = renderNote;
+let blurSuppressed = 0;
+
+/** True while the view moves a focused note (its blur must not end editing). */
+export function isBlurSuppressed() {
+    return blurSuppressed > 0;
+}
+
+function container() {
+    return document.getElementById('notes-container');
+}
+
+export function getNoteElement(id) {
+    if (id === null || id === undefined) return null;
+    return container()?.querySelector(`.note-item[data-note-id="${CSS.escape(String(id))}"]`) || null;
+}
+
+function contentElementOf(id) {
+    return getNoteElement(id)?.querySelector(':scope > .note-header-row .note-content') || null;
+}
+
+function childrenContainerOf(parentId) {
+    if (parentId === null) return container();
+    const el = getNoteElement(parentId);
+    if (!el) return null;
+    let kids = el.querySelector(':scope > .note-children');
+    if (!kids) {
+        kids = document.createElement('div');
+        kids.className = 'note-children';
+        el.appendChild(kids);
+        initializeDragAndDrop(el);
+    }
+    return kids;
+}
+
+function setNestingLevels(el, level) {
+    el.style.setProperty('--nesting-level', level);
+    const kids = el.querySelector(':scope > .note-children');
+    if (!kids) return;
+    for (const child of kids.children) {
+        if (child.classList.contains('note-item')) setNestingLevels(child, level + 1);
+    }
+}
+
+function emptyMessage(show) {
+    const c = container();
+    if (!c) return;
+    const msg = c.querySelector(':scope > .no-notes-message');
+    if (show && !msg) {
+        const p = document.createElement('p');
+        p.className = 'no-notes-message';
+        p.textContent = 'No notes on this page yet. Click the + button to add your first note.';
+        c.appendChild(p);
+    } else if (!show && msg) {
+        msg.remove();
+    }
+}
+
+// --------------------------------------------------------------- rendering
+
+/** Re-renders the whole outline from the model. */
+export function renderAll() {
+    const c = container();
+    if (!c) return;
+    c.innerHTML = '';
+    for (const node of outline.model.tree(null)) c.appendChild(renderNote(node, 0));
+    emptyMessage(outline.model.children(null).length === 0);
+    initializeDragAndDrop(c);
+    if (typeof feather !== 'undefined') {
+        try { feather.replace(); } catch { /* icons are cosmetic */ }
+    }
+}
 
 /**
- * Displays notes in the container
- * @param {Array} notesData - Array of note objects
- * @param {number} pageId - Current page ID
+ * Back-compat entry point used by the page loader: loads `notesData` into
+ * the model (when given) and renders it.
  */
 export function displayNotes(notesData, pageId) {
-    const notesContainer = document.getElementById('notes-container');
-    if (!notesContainer) {
-        console.error('Notes container not found');
-        return;
+    if (Array.isArray(notesData)) {
+        outline.loadPage(pageId ?? outline.model.pageId, notesData);
     }
-    
-    // Ensure notesData is an array (handle null/undefined)
-    const safeNotesData = Array.isArray(notesData) ? notesData : [];
-    
-    // Clear the container first (removes "Loading page..." message)
-    notesContainer.innerHTML = '';
-    
-    if (safeNotesData.length === 0) {
-        // Update Alpine.js with empty array and update state
-        setNotesForCurrentPage([]);
-        if (notesContainer && notesContainer.__x) {
-            notesContainer.__x.getUnobservedData().notes = [];
-        }
-        // Show empty state message
-        notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
-        return;
-    }
-
-    const sortedNotes = [...safeNotesData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    setNotesForCurrentPage(sortedNotes);
-    
-    // Update Alpine.js data for future use
-    if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
-    }
-    
-    // Render notes using traditional DOM approach since Alpine.js template is not implemented yet
-    renderNotesInContainer(noteTree, notesContainer);
-    
-    // Initialize drag and drop after rendering
-    setTimeout(() => {
-        initializeDragAndDrop();
-    }, 0);
+    renderAll();
 }
 
-/**
- * Renders notes in the container using traditional DOM manipulation
- * @param {Array} noteTree - Tree structure of notes
- * @param {HTMLElement} container - Container element to render notes in
- */
-function renderNotesInContainer(noteTree, container) {
-    noteTree.forEach(note => {
-        const noteElement = renderNote(note, 0);
-        if (noteElement) {
-            container.appendChild(noteElement);
-        }
-    });
-    
-    // Replace feather icons after rendering
-    if (typeof feather !== 'undefined') {
-        setTimeout(() => {
-            try {
-                feather.replace();
-            } catch (error) {
-                console.warn('Feather icon replacement failed:', error.message);
-            }
-        }, 0);
+/** Inserts or moves a note's element to where the model says it belongs. */
+export function placeNote(id) {
+    const n = outline.model.get(id);
+    if (!n) return null;
+    let el = getNoteElement(id);
+    const target = childrenContainerOf(n.parent_note_id);
+    if (!target) return null;
+    if (!el) {
+        el = renderNote({ ...n, children: outline.model.tree(n.id) }, outline.model.depth(n.id));
+        initializeDragAndDrop(el);
+    }
+    const next = outline.model.nextSibling(id);
+    const ref = next ? getNoteElement(next.id) : null;
+    const before = ref && ref.parentElement === target ? ref : null;
+    if (el.parentElement !== target || el.nextElementSibling !== before) {
+        target.insertBefore(el, before);
+    }
+    setNestingLevels(el, outline.model.depth(id));
+    refreshParentState(n.parent_note_id);
+    emptyMessage(false);
+    return el;
+}
+
+/** Updates the has-children / collapsed state of a note's element. */
+export function refreshParentState(id) {
+    if (id === null || id === undefined) {
+        emptyMessage(outline.model.children(null).length === 0);
+        return;
+    }
+    const el = getNoteElement(id);
+    const n = outline.model.get(id);
+    if (!el || !n) return;
+    const has = outline.model.hasChildren(id);
+    el.classList.toggle('has-children', has);
+    el.classList.toggle('collapsed', !!n.collapsed);
+    const kids = el.querySelector(':scope > .note-children');
+    if (kids) kids.classList.toggle('collapsed', !!n.collapsed);
+    const arrow = el.querySelector(':scope > .note-header-row .note-collapse-arrow');
+    if (arrow) arrow.dataset.collapsed = n.collapsed ? 'true' : 'false';
+}
+
+export function removeNoteElement(id) {
+    getNoteElement(id)?.remove();
+}
+
+/** Re-renders a note's content from the model (skipped while it is being edited). */
+export function refreshNoteContent(id) {
+    const el = contentElementOf(id);
+    const n = outline.model.get(id);
+    if (!el || !n || el.classList.contains('edit-mode')) return;
+    el.dataset.rawContent = n.content || '';
+    el.innerHTML = n.content && n.content.trim() ? parseAndRenderContent(n.content) : '';
+}
+
+/** Updates server-derived decorations (attachments). */
+export function refreshNoteMeta(id) {
+    const n = outline.model.get(id);
+    const el = getNoteElement(id);
+    if (!n || !el || !n.has_attachments) return;
+    const wrapper = el.querySelector(':scope > .note-header-row .note-content-wrapper');
+    if (wrapper && !wrapper.querySelector('.note-attachments')) {
+        const att = document.createElement('div');
+        att.className = 'note-attachments';
+        wrapper.appendChild(att);
+        renderAttachments(att, n.id, true);
     }
 }
 
-/**
- * Adds a new note element to the DOM in its correct sorted position.
- * @param {Object} noteData - The data for the new note.
- * @returns {HTMLElement|null} The newly created note element.
- */
-export function addNoteElement(noteData) {
-    if (!noteData) return null;
-    
-    // Update the data structures
-    window.notesForCurrentPage.push(noteData);
-    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    
-    const notesContainer = document.getElementById('notes-container');
-    if (!notesContainer) return null;
-    
-    // Update Alpine.js data if available
-    if (notesContainer && notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
+/** Reflects a local model change (see OutlineModel.apply) in the DOM. */
+export function applyChange(change) {
+    switch (change.kind) {
+        case 'create':
+            placeNote(change.id);
+            break;
+        case 'move':
+            placeNote(change.id);
+            refreshParentState(change.oldParent);
+            break;
+        case 'delete':
+            removeNoteElement(change.id);
+            refreshParentState(change.oldParent);
+            break;
+        case 'collapse':
+            refreshParentState(change.id);
+            break;
+        case 'edit':
+            refreshNoteContent(change.id);
+            break;
     }
-    
-    // **FIX**: Create actual DOM element for immediate visual feedback
-    const noteElement = renderNote(noteData, 0);
-    if (!noteElement) return null;
-    
-    // Clear "no notes" message if it exists
-    const noNotesMessage = notesContainer.querySelector('.no-notes-message');
-    if (noNotesMessage) {
-        noNotesMessage.remove();
+}
+
+// ------------------------------------------------------------ focus/caret
+
+export function editingNoteId() {
+    const el = document.activeElement?.closest?.('.note-content.edit-mode');
+    return el && container()?.contains(el) ? el.dataset.noteId : null;
+}
+
+export function isEditing(id) {
+    return editingNoteId() === String(id);
+}
+
+export function currentText(id) {
+    const el = contentElementOf(id);
+    return el ? (el.dataset.rawContent ?? el.textContent ?? '') : null;
+}
+
+function caretOffset(el) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.setEnd(sel.anchorNode, sel.anchorOffset);
+    return range.toString().length;
+}
+
+function setCaret(el, offset) {
+    const sel = window.getSelection();
+    const range = document.createRange();
+    let remaining = offset;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    let placed = false;
+    while (node) {
+        if (remaining <= node.textContent.length) {
+            range.setStart(node, remaining);
+            placed = true;
+            break;
+        }
+        remaining -= node.textContent.length;
+        node = walker.nextNode();
     }
-    
-    // Insert the note in the correct position based on order_index
-    if (!noteData.parent_note_id) {
-        // Root note - find correct position among root notes
-        const rootNotes = Array.from(notesContainer.children).filter(el => 
-            el.classList.contains('note-item') && !el.closest('.note-children')
-        );
-        
-        let insertPosition = 0;
-        for (let i = 0; i < rootNotes.length; i++) {
-            const existingNoteId = rootNotes[i].dataset.noteId;
-            const existingNote = window.notesForCurrentPage.find(n => String(n.id) === String(existingNoteId));
-            if (existingNote && (existingNote.order_index || 0) > (noteData.order_index || 0)) {
-                insertPosition = i;
-                break;
-            }
-            insertPosition = i + 1;
-        }
-        
-        if (insertPosition >= rootNotes.length) {
-            notesContainer.appendChild(noteElement);
-        } else {
-            notesContainer.insertBefore(noteElement, rootNotes[insertPosition]);
-        }
+    if (!placed) {
+        range.selectNodeContents(el);
+        range.collapse(offset === 0);
     } else {
-        // Child note - find parent and insert
-        const parentElement = notesContainer.querySelector(`.note-item[data-note-id="${noteData.parent_note_id}"]`);
-        if (parentElement) {
-            let childrenContainer = parentElement.querySelector('.note-children');
-            if (!childrenContainer) {
-                childrenContainer = document.createElement('div');
-                childrenContainer.className = 'note-children';
-                parentElement.appendChild(childrenContainer);
-                parentElement.classList.add('has-children');
-                
-                // **ENHANCEMENT**: Provide immediate visual feedback for new parent
-                provideBecomeParentFeedback(parentElement);
-            }
-            childrenContainer.appendChild(noteElement);
-        } else {
-            // Fallback: add as root note
-            notesContainer.appendChild(noteElement);
-        }
+        range.collapse(true);
     }
-    
-    // Initialize drag and drop for the new element
-    setTimeout(() => {
-        initializeDragAndDrop();
-    }, 0);
-    
-    return noteElement;
+    sel.removeAllRanges();
+    sel.addRange(range);
 }
 
 /**
- * Removes a note element from the DOM.
- * @param {string} noteId - The ID of the note to remove.
+ * Runs `fn` (which may move or re-create the focused note's element) and
+ * puts the caret back where it was.
  */
-export function removeNoteElement(noteId) {
-    // Update data structures
-    window.notesForCurrentPage = window.notesForCurrentPage.filter(note => String(note.id) !== String(noteId));
-    const sortedNotes = [...window.notesForCurrentPage].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
-    const noteTree = buildNoteTree(sortedNotes);
-    
-    const notesContainer = document.getElementById('notes-container');
-    if (!notesContainer) return;
-    
-    // Update Alpine.js data if available
-    if (notesContainer.__x) {
-        notesContainer.__x.getUnobservedData().notes = noteTree;
-    }
-    
-    // **FIX**: Actually remove the DOM element for immediate visual feedback
-    const noteElement = notesContainer.querySelector(`.note-item[data-note-id="${noteId}"]`);
-    if (noteElement) {
-        // Handle parent cleanup if this was the last child
-        const parent = noteElement.closest('.note-children');
-        noteElement.remove();
-        
-        if (parent && parent.children.length === 0) {
-            const parentNoteItem = parent.closest('.note-item');
-            if (parentNoteItem) {
-                parentNoteItem.classList.remove('has-children');
-                parent.remove();
-            }
-        }
-        
-        // Show "no notes" message if no notes remain
-        if (window.notesForCurrentPage.length === 0) {
-            notesContainer.innerHTML = '<p class="no-notes-message">No notes on this page yet. Click the + button to add your first note.</p>';
-        }
-    }
-}
-
-/**
- * Builds a tree structure from flat note array
- * @param {Array} notes - Flat array of note objects
- * @param {number|null} [parentId=null] - Parent note ID
- * @returns {Array} Tree structure of notes
- */
-export function buildNoteTree(notes, parentId = null) {
-    if (!notes) return [];
-    
-    return notes
-        .filter(note => (note.parent_note_id || null) == parentId)
-        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-        .map(note => ({
-            ...note,
-            children: buildNoteTree(notes, note.id)
-        }));
-}
-
-/**
- * Initializes drag and drop functionality for notes using Sortable.js
- */
-export function initializeDragAndDrop() {
-    if (typeof Sortable === 'undefined') return;
-
-    const containers = [domRefs.notesContainer, ...document.querySelectorAll('.note-children')];
-    containers.forEach(container => {
-        if (container && !container.classList.contains('ui-sortable')) {
-            Sortable.create(container, {
-                group: 'notes',
-                animation: 150,
-                handle: '.note-bullet',
-                ghostClass: 'note-ghost',
-                onEnd: handleNoteDrop
-            });
-        }
-    });
-}
-
-window.initializeDragAndDrop = initializeDragAndDrop;
-
-/**
- * Handles the logic after a note is dropped via drag-and-drop.
- * @param {Object} evt - The event object from Sortable.js.
- */
-export async function handleNoteDrop(evt) {
-    const noteId = evt.item.dataset.noteId;
-    const newParentEl = evt.to.closest('.note-item');
-    const newParentId = newParentEl ? newParentEl.dataset.noteId : null;
-
-    if (newParentId === noteId || evt.item.contains(evt.to)) {
-        evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex]);
-        return;
-    }
-
-    const previousEl = evt.item.previousElementSibling;
-    const previousSiblingId = previousEl?.classList.contains('note-item') ? previousEl.dataset.noteId : null;
-
-    // Find the next sibling after the dropped note
-    const nextEl = evt.item.nextElementSibling;
-    const nextSiblingId = nextEl?.classList.contains('note-item') ? nextEl.dataset.noteId : null;
-
-    const { targetOrderIndex, siblingUpdates } = calculateOrderIndex(
-        window.notesForCurrentPage,
-        newParentId,
-        previousSiblingId,
-        nextSiblingId
-    );
-
-    // CRITICAL FIX: Filter out the note being moved from sibling updates to prevent conflicts
-    const filteredSiblingUpdates = siblingUpdates.filter(upd => String(upd.id) !== String(noteId));
-    
-    // Create a list of all operations needed for the batch update.
-    const operations = [
-        { type: 'update', payload: { id: noteId, parent_note_id: newParentId, order_index: targetOrderIndex } },
-        ...filteredSiblingUpdates.map(upd => ({ type: 'update', payload: { id: upd.id, order_index: upd.newOrderIndex } }))
-    ];
-    
-    // **FIX**: Store original state for potential rollback
-    const originalNotesState = JSON.parse(JSON.stringify(window.notesForCurrentPage));
-    const originalDOMState = {
-        noteElement: evt.item,
-        originalParent: evt.from,
-        originalIndex: evt.oldIndex
-    };
-    
-    // Optimistically update local state immediately
-    const noteToMove = window.notesForCurrentPage.find(n => n.id == noteId);
-    if(noteToMove) {
-        noteToMove.parent_note_id = newParentId;
-        noteToMove.order_index = targetOrderIndex;
-    }
-    
-    filteredSiblingUpdates.forEach(upd => {
-        const sib = window.notesForCurrentPage.find(n => n.id == upd.id);
-        if(sib) {
-            sib.order_index = upd.newOrderIndex;
-        }
-    });
-    
-    // **FIX**: Update visual hierarchy immediately without page reload
-    updateNoteVisualHierarchy(evt.item, newParentId);
-
+export function preserveFocus(fn) {
+    const id = editingNoteId();
+    if (!id) return fn();
+    const before = contentElementOf(id);
+    const offset = before ? caretOffset(before) : null;
+    blurSuppressed++;
+    let result;
     try {
-        const batchResponse = await window.notesAPI.batchUpdateNotes(operations);
-        
-        // Validate response
-        let allOperationsSucceeded = true;
-        if (batchResponse && Array.isArray(batchResponse.results)) {
-            batchResponse.results.forEach(opResult => {
-                if (opResult.status === 'error') {
-                    allOperationsSucceeded = false;
-                    console.error('[Drag Drop] Server reported error:', opResult);
-                }
-            });
-        } else {
-            allOperationsSucceeded = false;
-            console.error('[Drag Drop] Invalid response structure:', batchResponse);
-        }
-        
-        if (!allOperationsSucceeded) {
-            throw new Error('One or more drag-drop operations failed on the server');
-        }
-        
-        // **IMPROVEMENT**: Cache invalidation without full reload
-        pageCache.removePage(window.currentPageName);
-        
-        console.log('[Drag Drop] Successfully updated note positions');
-        
-    } catch (error) {
-        console.error("Failed to save note drop changes:", error);
-        
-        // **FIX**: Rollback optimistic changes on error
-        window.notesForCurrentPage = originalNotesState;
-        
-        // Rollback DOM changes
-        if (originalDOMState.originalParent && originalDOMState.noteElement) {
-            const children = Array.from(originalDOMState.originalParent.children);
-            if (originalDOMState.originalIndex >= children.length) {
-                originalDOMState.originalParent.appendChild(originalDOMState.noteElement);
-            } else {
-                originalDOMState.originalParent.insertBefore(
-                    originalDOMState.noteElement, 
-                    children[originalDOMState.originalIndex]
-                );
-            }
-            
-            // Restore original visual hierarchy
-            updateNoteVisualHierarchy(originalDOMState.noteElement, 
-                originalNotesState.find(n => n.id == noteId)?.parent_note_id || null
-            );
-        }
-        
-        alert("Could not save new note positions. Changes have been reverted.");
+        result = fn();
+    } finally {
+        blurSuppressed--;
+    }
+    const el = contentElementOf(id);
+    if (el) {
+        if (!el.classList.contains('edit-mode')) switchToEditMode(el);
+        if (document.activeElement !== el) el.focus({ preventScroll: true });
+        setCaret(el, offset ?? (el.textContent || '').length);
+    }
+    return result;
+}
+
+/** Puts a note in edit mode with the caret at 'start' or 'end'. */
+export function focusNote(id, where = 'end') {
+    const el = contentElementOf(id);
+    if (!el) return;
+    switchToEditMode(el);
+    el.focus({ preventScroll: true });
+    setCaret(el, where === 'start' ? 0 : (el.textContent || '').length);
+    el.scrollIntoView({ block: 'nearest' });
+}
+
+// ----------------------------------------------------------- save status
+
+export function setSaveStatus(status, title) {
+    if (window.ui && typeof window.ui.updateSaveStatusIndicator === 'function') {
+        window.ui.updateSaveStatusIndicator(status);
+        const indicator = document.getElementById('save-status-indicator');
+        if (indicator && title) indicator.title = title;
     }
 }
 
-/**
- * **NEW**: Updates the visual hierarchy of a note without full page reload
- * @param {HTMLElement} noteElement - The note element to update
- * @param {string|null} newParentId - The new parent ID
- */
-function updateNoteVisualHierarchy(noteElement, newParentId) {
-    if (!noteElement) return;
-    
-    // Calculate new nesting level
-    let nestingLevel = 0;
-    if (newParentId) {
-        // Count parent hierarchy
-        const allNotes = window.notesForCurrentPage;
-        let currentParentId = newParentId;
-        while (currentParentId) {
-            nestingLevel++;
-            const parentNote = allNotes.find(n => String(n.id) === String(currentParentId));
-            if (!parentNote) break;
-            currentParentId = parentNote.parent_note_id;
-        }
-    }
-    
-    // Update CSS custom property for visual indentation
-    noteElement.style.setProperty('--nesting-level', nestingLevel);
-    
-    // Update all descendant notes' nesting levels as well
-    updateDescendantNestingLevels(noteElement, nestingLevel);
-}
+// ------------------------------------------------------------ drag & drop
 
-/**
- * **NEW**: Recursively updates nesting levels for descendant notes
- * @param {HTMLElement} noteElement - The parent note element
- * @param {number} parentNestingLevel - The parent's nesting level
- */
-function updateDescendantNestingLevels(noteElement, parentNestingLevel) {
-    const childrenContainer = noteElement.querySelector('.note-children');
-    if (!childrenContainer) return;
-    
-    const childNotes = Array.from(childrenContainer.children).filter(el => 
-        el.classList.contains('note-item')
-    );
-    
-    for (const childNote of childNotes) {
-        const childNestingLevel = parentNestingLevel + 1;
-        childNote.style.setProperty('--nesting-level', childNestingLevel);
-        updateDescendantNestingLevels(childNote, childNestingLevel);
+/** Attaches Sortable to every children container under `root` that lacks one. */
+export function initializeDragAndDrop(root = container()) {
+    if (typeof Sortable === 'undefined' || !root) return;
+    const containers = [];
+    if (root.id === 'notes-container' || root.classList?.contains('note-children')) containers.push(root);
+    root.querySelectorAll?.('.note-children').forEach(c => containers.push(c));
+    for (const c of containers) {
+        if (c.dataset.sortable === '1') continue;
+        c.dataset.sortable = '1';
+        Sortable.create(c, {
+            group: 'notes',
+            animation: 150,
+            handle: '.note-bullet',
+            draggable: '.note-item',
+            ghostClass: 'note-ghost',
+            onEnd: handleNoteDrop,
+        });
     }
 }
 
+/** Translates a finished drag into one move op (or snaps back if invalid). */
+export function handleNoteDrop(evt) {
+    const id = evt.item?.dataset.noteId;
+    if (!id) return;
+    if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return;
+    const parentEl = evt.to.closest('.note-item');
+    const parentId = parentEl ? parentEl.dataset.noteId : null;
+    let prev = evt.item.previousElementSibling;
+    while (prev && !prev.classList.contains('note-item')) prev = prev.previousElementSibling;
+    const afterId = prev ? prev.dataset.noteId : null;
+    const oldParent = outline.model.get(id)?.parent_note_id ?? null;
+    if (!outline.moveNote(id, parentId, afterId)) {
+        placeNote(id); // invalid drop (e.g. into its own subtree): snap back
+    }
+    refreshParentState(oldParent);
+}
 
-// These functions are not used by other modules and can be kept internal to this file or moved if needed.
-function updateNoteElement() { /* placeholder if needed */ }
-function moveNoteElement() { /* placeholder if needed */ }
+if (typeof window !== 'undefined') {
+    window.initializeDragAndDrop = initializeDragAndDrop;
+}

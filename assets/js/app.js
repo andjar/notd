@@ -4,7 +4,6 @@
  */
 
 // Alpine.js will be loaded from CDN and available as global Alpine
-import noteComponent from './app/note-component.js';
 import { splashScreen } from './app/splash-screen.js';
 import sidebarComponent from './app/sidebar-component.js';
 import calendarComponent from './app/calendar-component.js';
@@ -51,7 +50,6 @@ Alpine.store('app', {
   currentPageName: null,
   saveStatus: 'saved', // valid: saved, saving, error
   pageCache: new Map(),
-  notes: [],
   focusedNoteId: null,
   pagePassword: null,
   
@@ -84,33 +82,9 @@ Alpine.store('app', {
     window.currentPagePassword = newPassword;
   },
   
-  setNotes(newNotes) {
-    this.notes = newNotes;
-    window.notesForCurrentPage = newNotes;
-  },
-  
-  addNote(note) {
-    this.notes.push(note);
-    this.notes.sort((a, b) => a.order_index - b.order_index);
-    window.notesForCurrentPage = this.notes;
-  },
-  
-  removeNoteById(noteId) {
-    const idx = this.notes.findIndex(n => String(n.id) === String(noteId));
-    if (idx > -1) this.notes.splice(idx, 1);
-    window.notesForCurrentPage = this.notes;
-  },
-  
-  updateNote(updatedNote) {
-    const idx = this.notes.findIndex(n => String(n.id) === String(updatedNote.id));
-    if (idx > -1) {
-      this.notes[idx] = { ...this.notes[idx], ...updatedNote };
-    } else {
-      this.notes.push(updatedNote);
-    }
-    window.notesForCurrentPage = this.notes;
-  },
-  
+  // Notes live in the outline model (app/outline.js), not in this store.
+  setNotes() {},
+
   setFocusedNoteId(newNoteId) {
     this.focusedNoteId = newNoteId;
     window.currentFocusedNoteId = newNoteId;
@@ -140,7 +114,6 @@ Alpine.store('app', {
     this.pageCache.clear();
   }
 });
-    Alpine.data('noteComponent', noteComponent);
     Alpine.data('splashScreen', splashScreen);
     Alpine.data('sidebarComponent', sidebarComponent);
     Alpine.data('calendarComponent', calendarComponent);
@@ -163,8 +136,10 @@ import { parseAndRenderContent } from './ui/note-renderer.js';
 import {
     handleAddRootNote,
     handleNoteKeyDown,
-    debouncedSaveNote
+    handleNoteInput
 } from './app/note-actions.js';
+import * as outline from './app/outline.js';
+import { uploadFilesToNote } from './ui/note-renderer.js';
 
 // Template handling
 import { initializeTemplateHandling } from './app/template-handler.js';
@@ -209,17 +184,8 @@ if (notesContainer) {
 
     // Click handler for task checkboxes is now in `ui.initializeDelegatedNoteEventListeners`
     
-    // Input handler for debounced saving of content
-    notesContainer.addEventListener('input', (e) => {
-        if (e.target.matches('.note-content.edit-mode')) {
-            const noteItem = e.target.closest('.note-item');
-            if (noteItem) {
-                const contentDiv = e.target;
-                contentDiv.dataset.rawContent = ui.normalizeNewlines(ui.getRawTextWithNewlines(contentDiv));
-                debouncedSaveNote(noteItem);
-            }
-        }
-    });
+    // Every keystroke updates the model; the outbox coalesces and sends.
+    notesContainer.addEventListener('input', handleNoteInput);
 }
 
 // --- Drag and Drop for File Uploads ---
@@ -240,41 +206,13 @@ if (notesContainer) {
     });
 
     notesContainer.addEventListener('drop', async (e) => {
-        e.preventDefault();
         const noteWrapper = e.target.closest('.note-content-wrapper');
-        if (!noteWrapper) return;
-        
+        if (!noteWrapper || !e.dataTransfer?.files?.length) return;
+        e.preventDefault();
         noteWrapper.classList.remove('dragover');
         const noteItem = noteWrapper.closest('.note-item');
         const noteId = noteItem?.dataset.noteId;
-
-        if (!noteId || noteId.startsWith('temp-')) {
-            alert('Please save the note before adding attachments.');
-            return;
-        }
-
-        const files = Array.from(e.dataTransfer.files);
-        if (files.length === 0) return;
-
-        ui.updateSaveStatusIndicator('pending');
-        try {
-            for (const file of files) {
-                const formData = new FormData();
-                formData.append('attachmentFile', file);
-                formData.append('note_id', noteId);
-                await attachmentsAPI.uploadAttachment(formData);
-            }
-            // Refresh attachments for the specific note instead of reloading the whole page
-            const attachmentsContainer = noteItem.querySelector('.note-attachments');
-            if(attachmentsContainer) {
-                 await ui.renderAttachments(attachmentsContainer, noteId, true);
-            }
-            ui.updateSaveStatusIndicator('saved');
-        } catch (error) {
-            console.error('Error uploading file(s) via drag and drop:', error);
-            alert('File upload failed: ' + error.message);
-            ui.updateSaveStatusIndicator('error');
-        }
+        if (noteId) await uploadFilesToNote(noteId, Array.from(e.dataTransfer.files), noteItem);
     });
 }
 
@@ -331,9 +269,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     try {
+        // Note click/collapse/checkbox handlers must be live as soon as notes
+        // are rendered, which happens inside initializeApp().
+        ui.initializeDelegatedNoteEventListeners(notesContainer);
         await initializeApp();
         initPropertyEditor(); // Initialize listeners for the property modal
-        ui.initializeDelegatedNoteEventListeners(notesContainer); // **FIXED**: Call the main event initializer
         initializeTemplateHandling(); // Initialize template functionality
 
         // Initialize search modals

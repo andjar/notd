@@ -29,3 +29,4 @@ api/v1/php_error.log
 *.sqlite-shm
 *.sqlite-wal
 db/*.lock
+tests/browser/latency.txt
