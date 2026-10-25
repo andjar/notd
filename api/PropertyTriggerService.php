@@ -186,8 +186,5 @@ class PropertyTriggerService {
     }
 }
 
-// Initialize and handle the request
-$pdo = get_db_connection();
-$propertyTriggerService = new \App\PropertyTriggerService($pdo);
-// No direct output from this service file. It's a library.
+// Library file: no side effects on include.
 ?>

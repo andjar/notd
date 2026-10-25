@@ -49,7 +49,7 @@ class DataManager {
     /**
      * Retrieves properties for a single note.
      */
-    public function getNoteProperties(int $noteId, bool $includeInternal = false): array {
+    public function getNoteProperties(string $noteId, bool $includeInternal = false): array {
         $sql = "SELECT name, value, weight, created_at FROM Properties WHERE note_id = :noteId AND active = 1";
         if (!$includeInternal) {
             $sql .= " AND weight < 3";
@@ -159,12 +159,13 @@ class DataManager {
     /**
      * Retrieves a single note by its ID, including its formatted properties.
      */
-    public function getNoteById(int $noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
+    public function getNoteById(string $noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE id = :id AND active = 1");
         $stmt->execute([':id' => $noteId]);
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($note) {
+            unset($note['rid']);
             // Check for attachments
             $attachmentStmt = $this->pdo->prepare("SELECT EXISTS(SELECT 1 FROM Attachments WHERE note_id = :note_id AND active = 1 LIMIT 1)");
             $attachmentStmt->execute([':note_id' => $noteId]);
@@ -221,7 +222,7 @@ class DataManager {
      * Retrieves a note with all its children recursively, including properties.
      * Implements recursion protection to prevent infinite loops.
      * 
-     * @param int $noteId The ID of the root note to fetch
+     * @param string $noteId The ID of the root note to fetch
      * @param bool $includeInternal Whether to include internal properties
      * @param bool $includeParentProperties Whether to include parent properties
      * @param int $maxDepth Maximum recursion depth (default 10)
@@ -230,7 +231,7 @@ class DataManager {
      * @return array|null The note with nested children, or null if not found
      */
     public function getNoteWithChildren(
-        int $noteId, 
+        string $noteId, 
         bool $includeInternal = false, 
         bool $includeParentProperties = false,
         int $maxDepth = 10,
@@ -262,7 +263,7 @@ class DataManager {
         $childrenStmt = $this->pdo->prepare("
             SELECT id FROM Notes 
             WHERE parent_note_id = :parent_id AND active = 1 
-            ORDER BY order_index ASC
+            ORDER BY sort_key ASC, id ASC
         ");
         $childrenStmt->execute([':parent_id' => $noteId]);
         $childIds = $childrenStmt->fetchAll(PDO::FETCH_COLUMN);
@@ -295,50 +296,50 @@ class DataManager {
      * Retrieves all notes for a page, with properties embedded.
      */
     public function getNotesByPageId(int $pageId, bool $includeInternal = false): array {
-        // First check if the active column exists
-        $checkColumnStmt = $this->pdo->query("PRAGMA table_info(Notes)");
-        $columns = $checkColumnStmt->fetchAll(PDO::FETCH_COLUMN, 1);
-        $hasActiveColumn = in_array('active', $columns);
+        $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE page_id = :pageId AND active = 1 ORDER BY sort_key ASC, id ASC");
+        $stmt->execute([':pageId' => $pageId]);
+        return $this->decorateNotes($stmt->fetchAll(PDO::FETCH_ASSOC), $includeInternal);
+    }
 
-        // Build the SQL query based on whether active column exists
-        $sql = "SELECT * FROM Notes WHERE page_id = :pageId";
-        if ($hasActiveColumn) {
-            $sql .= " AND active = 1";
+    /**
+     * Retrieves several notes by id (any page), with properties and attachment flags.
+     * Missing ids are simply absent from the result.
+     */
+    public function getNotesByIds(array $noteIds, bool $includeInternal = false): array {
+        $noteIds = array_values(array_unique(array_map('strval', $noteIds)));
+        if (empty($noteIds)) return [];
+        $out = [];
+        foreach (array_chunk($noteIds, 500) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE id IN ($placeholders) AND active = 1");
+            $stmt->execute($chunk);
+            $out = array_merge($out, $stmt->fetchAll(PDO::FETCH_ASSOC));
         }
-        $sql .= " ORDER BY order_index ASC";
-        
-        $notesStmt = $this->pdo->prepare($sql);
-        $notesStmt->execute([':pageId' => $pageId]);
-        $notes = $notesStmt->fetchAll(PDO::FETCH_ASSOC);
+        return $this->decorateNotes($out, $includeInternal);
+    }
 
+    /** Adds `properties` and `has_attachments` to raw note rows. */
+    private function decorateNotes(array $notes, bool $includeInternal): array {
         if (empty($notes)) return [];
-
         $noteIds = array_column($notes, 'id');
         $propertiesByNoteId = $this->getPropertiesForNoteIds($noteIds, $includeInternal);
 
-        // Fetch attachment status for all notes in this page
-        $notesWithAttachmentsMap = [];
-        if (!empty($noteIds)) {
-            $placeholders = implode(',', array_fill(0, count($noteIds), '?'));
-            $attachmentSql = "SELECT note_id FROM Attachments WHERE note_id IN ($placeholders)";
-            if ($hasActiveColumn) {
-                $attachmentSql .= " AND active = 1";
+        $withAttachments = [];
+        foreach (array_chunk($noteIds, 500) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+            $stmt = $this->pdo->prepare("SELECT DISTINCT note_id FROM Attachments WHERE note_id IN ($placeholders) AND active = 1");
+            $stmt->execute($chunk);
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) {
+                $withAttachments[$id] = true;
             }
-            $attachmentSql .= " GROUP BY note_id";
-            
-            $attachmentStmt = $this->pdo->prepare($attachmentSql);
-            // Bind each note ID as an integer
-            $params = array_map('intval', $noteIds);
-            $attachmentStmt->execute($params);
-            $notesWithAttachments = $attachmentStmt->fetchAll(PDO::FETCH_COLUMN);
-            $notesWithAttachmentsMap = array_flip($notesWithAttachments);
         }
 
         foreach ($notes as &$note) {
+            unset($note['rid']);
             $note['properties'] = $propertiesByNoteId[$note['id']] ?? [];
-            $note['has_attachments'] = isset($notesWithAttachmentsMap[$note['id']]);
+            $note['has_attachments'] = isset($withAttachments[$note['id']]);
         }
-
+        unset($note);
         return $notes;
     }
 
