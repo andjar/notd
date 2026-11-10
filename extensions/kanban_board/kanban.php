@@ -387,7 +387,7 @@ require_once '../../config.php';
                         dragClass: 'kanban-drag',
                         onEnd: async (evt) => {
                             const itemEl = evt.item;
-                            const noteId = parseInt(itemEl.dataset.noteId);
+                            const noteId = String(itemEl.dataset.noteId);
                             const oldStatus = itemEl.dataset.currentStatus.toUpperCase(); // Status the card HAD
 
                             const targetColumnEl = itemEl.closest('.kanban-column');
@@ -477,19 +477,12 @@ require_once '../../config.php';
                                     throw new Error('Notes API not loaded yet');
                                 }
                                 
-                                const batchOperation = {
-                                    type: 'update',
-                                    payload: { id: noteId, content: newContent }
-                                };
-                                console.log('[BATCH] Sending batchOperation:', batchOperation);
-                                const response = await notesAPI.batchUpdateNotes([batchOperation]);
-                                console.log('[BATCH] Batch update response:', response);
-                                const results = response.results || response.data?.results;
-                                console.log('[BATCH] Results from response:', results);
-                                const updateResult = results?.find(r => r.type === 'update' && r.note && r.note.id === noteId);
-                                console.log('[BATCH] Update result:', updateResult);
+                                const opId = 'kanban-' + crypto.getRandomValues(new Uint32Array(2)).join('-');
+                                const response = await notesAPI.applyOps([{ op_id: opId, type: 'edit', id: noteId, content: newContent }]);
+                                const confirmedNote = (response.notes || []).find(n => String(n.id) === noteId);
+                                const updateResult = confirmedNote ? { status: 'success', note: confirmedNote } : null;
 
-                                if (updateResult && updateResult.status === 'success') {
+                                if (updateResult) {
                                     // Remove all instances of this note from all columns (after backend response)
                                     this.columns.forEach(col => {
                                         col.tasks = col.tasks.filter(t => t.id !== noteId);

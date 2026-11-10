@@ -4,7 +4,8 @@
  */
 
 // Import note-related functions that were split into separate modules
-import { displayNotes, addNoteElement, removeNoteElement, buildNoteTree, initializeDragAndDrop, handleNoteDrop } from './ui/note-elements.js';
+import { displayNotes, removeNoteElement, initializeDragAndDrop, handleNoteDrop, focusNote, placeNote, renderAll } from './ui/note-elements.js';
+import { model as outlineModel } from './app/outline.js';
 import { renderNote, parseAndRenderContent, switchToEditMode, getRawTextWithNewlines, normalizeNewlines, renderAttachments, renderProperties, initializeDelegatedNoteEventListeners, renderTransclusion } from './ui/note-renderer.js';
 import { domRefs } from './ui/dom-refs.js';
 import { pagesAPI } from './api_client.js';
@@ -384,19 +385,26 @@ function updateSaveStatusIndicator(newStatus) {
 }
 
 function renderBreadcrumbs(focusedNoteId, allNotesOnPage, currentPageName) {
-    if (!domRefs.noteFocusBreadcrumbsContainer || !currentPageName) return;
-
-    let breadcrumbLinksHtml = `<a href="#" onclick="ui.showAllNotesAndLoadPage('${currentPageName}'); return false;">${currentPageName}</a>`;
-
+    const container = domRefs.noteFocusBreadcrumbsContainer;
+    if (!container || !currentPageName) return;
+    // Built with DOM nodes: note text and page names are never parsed as HTML.
+    container.textContent = '';
+    const link = (label, onClick) => {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = label;
+        a.addEventListener('click', (e) => { e.preventDefault(); onClick(); });
+        return a;
+    };
+    container.appendChild(link(currentPageName, () => showAllNotesAndLoadPage(currentPageName)));
     if (focusedNoteId) {
-        const ancestors = getNoteAncestors(focusedNoteId, allNotesOnPage);
-        ancestors.forEach(ancestor => {
-            const noteName = (ancestor.content || `Note ${ancestor.id}`).split('\n')[0].substring(0, 30);
-            breadcrumbLinksHtml += ` > <a href="#" onclick="ui.focusOnNote('${ancestor.id}'); return false;">${noteName}</a>`;
-        });
+        for (const ancestor of getNoteAncestors(focusedNoteId, allNotesOnPage)) {
+            const name = (ancestor.content || `Note ${ancestor.id}`).split('\n')[0].substring(0, 30);
+            container.appendChild(document.createTextNode(' > '));
+            container.appendChild(link(name, () => focusOnNote(ancestor.id)));
+        }
     }
-    domRefs.noteFocusBreadcrumbsContainer.innerHTML = breadcrumbLinksHtml;
-    domRefs.noteFocusBreadcrumbsContainer.style.display = 'block';
+    container.style.display = 'block';
 }
 
 function focusOnNote(noteId) {
@@ -415,7 +423,7 @@ function focusOnNote(noteId) {
 
     elementsToShow.forEach(el => el.classList.remove('note-hidden'));
     
-    renderBreadcrumbs(noteId, window.notesForCurrentPage, window.currentPageName);
+    renderBreadcrumbs(noteId, outlineModel.list(), window.currentPageName);
 }
 
 function showAllNotes() {
@@ -856,9 +864,10 @@ function createCurrentPageNoteAnchorLink(noteId) {
 // Export the main UI object
 export const ui = {
     displayNotes,
-    addNoteElement,
+    renderAll,
+    placeNote,
+    focusNote,
     removeNoteElement,
-    buildNoteTree,
     initializeDragAndDrop,
     handleNoteDrop,
     renderNote,

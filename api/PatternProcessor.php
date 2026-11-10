@@ -424,6 +424,14 @@ class PatternProcessor {
                     $sql = "INSERT INTO Properties ({$idColumn}, {$otherIdColumn}, name, value, weight) VALUES (?, NULL, ?, ?, ?)";
                     error_log("[PATTERN_PROCESSOR_DEBUG] Using SQL for property '{$name}': " . trim($sql));
                     $stmt = $this->pdo->prepare($sql);
+                    // A log property is appended only when its value changes;
+                    // re-saving unchanged content must not grow the log.
+                    $lastStmt = $this->pdo->prepare("SELECT value FROM Properties WHERE {$idColumn} = ? AND name = ? ORDER BY id DESC LIMIT 1");
+                    $lastStmt->execute([$entityId, $name]);
+                    $lastValue = $lastStmt->fetchColumn();
+                    if ($lastValue !== false && count($propertyGroup) === 1 && (string)$lastValue === (string)$propertyGroup[0]['value']) {
+                        continue;
+                    }
                     foreach ($propertyGroup as $property) {
                         $params = [
                             $entityId,

@@ -229,7 +229,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
     const notesAPI = {
         getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
-        batchUpdateNotes: (operations) => apiRequest('notes.php', 'POST', { action: 'batch', operations })
+        applyOps: (ops) => apiRequest('ops.php', 'POST', { ops })
     };
     const pagesAPI = {
         getPage: (pageId) => apiRequest(`pages.php?id=${pageId}`),
@@ -289,9 +289,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         const { note_id, page_id } = getNoteOrPageIdFromUrl();
         try {
             if (note_id) {
-                await notesAPI.batchUpdateNotes([
-                    { type: 'update', payload: { id: note_id, content: value } }
-                ]);
+                await notesAPI.applyOps([{ op_id: 'ext-' + Date.now().toString(36) + Math.random().toString(36).slice(2), type: 'edit', id: String(note_id), content: value }]);
                 alert('Note saved!');
             } else if (page_id) {
                 await pagesAPI.updatePage(page_id, { content: value });

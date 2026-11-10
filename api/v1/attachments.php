@@ -181,14 +181,14 @@ public function handleRequest() {
     private function handlePostRequest() {
         error_log("=== POST METHOD PROCESSING ===");
         
-        $validationRulesPOST = ['note_id' => 'required|isPositiveInteger'];
+        $validationRulesPOST = ['note_id' => 'required|isNoteId'];
         $errorsPOST = Validator::validate($_POST, $validationRulesPOST);
         if (!empty($errorsPOST)) {
             ob_end_clean();
             \App\ApiResponse::error('Invalid input for note ID.', 400, $errorsPOST);
             return;
         }
-        $note_id = (int)$_POST['note_id'];
+        $note_id = (string)$_POST['note_id'];
 
         if (!isset($_FILES['attachmentFile'])) {
             ob_end_clean();
@@ -307,7 +307,12 @@ public function handleRequest() {
     }
 
     private function handleGetByNoteId() {
-        $note_id = (int)$_GET['note_id'];
+        $note_id = (string)$_GET['note_id'];
+        if (!Validator::isNoteId($note_id)) {
+            ob_end_clean();
+            \App\ApiResponse::error('Invalid note id.', 400);
+            return;
+        }
         try {
             $stmt = $this->pdo->prepare("SELECT id, name, path, type, size, created_at FROM Attachments WHERE note_id = ? ORDER BY created_at DESC");
             $stmt->execute([$note_id]);
@@ -424,7 +429,7 @@ private function handleDeleteRequest() {
     // Validate both IDs properly:
     $validationRules = [
         'attachment_id' => 'required|isPositiveInteger',
-        'note_id' => 'required|isPositiveInteger',
+        'note_id' => 'required|isNoteId',
     ];
     $errors = Validator::validate([
         'attachment_id' => $attachment_id,
@@ -438,7 +443,7 @@ private function handleDeleteRequest() {
     }
 
     $attachment_id = (int)$attachment_id;
-    $note_id = (int)$note_id;
+    $note_id = (string)$note_id;
 
     try {
         $this->pdo->beginTransaction();

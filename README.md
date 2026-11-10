@@ -73,6 +73,47 @@ Setting it up is straightforward. You'll generally need a web server environment
 
 The application is also designed with [phpdesktop](https://github.com/cztomczak/phpdesktop) in mind, allowing it to be packaged as a standalone desktop application. If using a phpdesktop build, refer to its specific instructions.
 
+## How saving works
+
+Every change you make in the outline (typing, Enter, Tab, Shift+Tab, drag and drop, collapsing, deleting) becomes a small operation that is applied in the browser immediately and queued for the server:
+
+- **One model.** The page's notes live in one in-memory model (`assets/js/app/outline-model.js`); the DOM is rendered from it and notes are placed by identity, so what you see is what is saved.
+- **Ordered, persisted queue.** Operations are sent strictly in order by `assets/js/app/outbox.js`. The queue is kept in `localStorage`, so edits survive a reload, a crash or a lost connection and are sent when the server is reachable again. A banner shows when you are working offline.
+- **Stable ids.** Notes get their permanent id when they are created in the browser, so you can keep typing, indenting or attaching files without waiting for the server.
+- **Fractional ordering.** Siblings are ordered by a `sort_key` string (`api/Ordering.php` / `assets/js/app/fractional-index.js`). Moving a note rewrites only that note.
+- **One write endpoint.** `api/v1/ops.php` applies a batch of operations atomically, validates parents (same page, no cycles) and ignores operations it has already applied, so retries are safe. `api/v1/notes.php` is read-only.
+
+### Upgrading an existing database
+
+Schema v3 changes note ids to strings and replaces `order_index` with `sort_key`. Migrate once (a backup is written next to the database):
+
+```
+php db/migrate_v3.php            # uses DB_PATH from config.php
+php db/migrate_v3.php path/to/database.sqlite
+```
+
+Existing note ids are kept (as strings), so `!{{123}}` transclusions and `#note-123` links keep working.
+
+### Hosting notes
+
+On Apache, `db/.htaccess` and `tests/.htaccess` block HTTP access to the database and test scripts. Other servers (nginx, `php -S`) need an equivalent rule if the app is reachable from other machines. notd has no login of its own; put it behind HTTP authentication when it is not running only on your computer.
+
+## Tests
+
+No build step is needed for the app or the tests.
+
+```
+node tests/js/model.test.mjs          # client model + outbox (no server)
+node tests/js/ordering_parity.mjs     # JS and PHP order keys agree
+
+# with a server: PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:8765 tests/browser/router.php
+node tests/js/ops_api.test.mjs        # write endpoint: ordering, cycles, atomicity, idempotency
+python3 tests/browser/outline_test.py # browser: indent/outdent, drag, latency, offline, two tabs
+python3 tests/browser/features_test.py
+```
+
+The browser tests need `pip install playwright && playwright install chromium`.
+
 ## Contributing
 
 We warmly welcome contributions to **notd**! Whether you have ideas for new features, bug fixes, or general improvements, your help is appreciated.

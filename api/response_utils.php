@@ -41,6 +41,17 @@ class ApiResponse {
         }
 
         echo json_encode($response);
+        self::finish();
+    }
+
+    /**
+     * Ends the request after a response has been sent, so endpoint code never
+     * falls through after an error. Skipped under the CLI (unit tests).
+     */
+    private static function finish(): void {
+        if (PHP_SAPI !== 'cli') {
+            exit;
+        }
     }
 
     public static function error($message, $statusCode = 400, $details = null) {
@@ -57,6 +68,7 @@ class ApiResponse {
         }
 
         echo json_encode($response);
+        self::finish();
     }
 }
 ?>
