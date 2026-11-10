@@ -3,22 +3,31 @@ title: "API Reference"
 weight: 20
 ---
 
-This document provides a detailed specification for the API endpoints, revised to operate exclusively with GET and POST methods, and incorporating best practices for consistency, pagination, and versioning.
+Everything the notd frontend does goes through this HTTP API, so scripts and extensions have the same abilities as the UI.
 
-**Key Design Principles:**
-*   **API Versioning:** All endpoints are prefixed with `/api/v1/`.
-*   **GET/POST Only:** Write operations (create, update, delete) are handled via POST requests, using an `_method` override key in the JSON payload.
-*   **Content as Single Source of Truth:** Properties for notes and pages are derived directly from their respective `content` fields. The `Properties` database table serves as a queryable index of this content.
-*   **Universal Pagination:** All list-returning endpoints support `page` and `per_page` and include a consistent pagination object.
-*   **Response Standardization:**
-    *   Unified success/error reporting using `status: "success"` or `status: "error"`.
-    *   Successful responses wrap their payload in a `data` key.
+*   **Base URL:** `/api/v1/` below the folder notd is served from. Endpoints are plain PHP files (`/api/v1/pages.php`); on Apache the `.php` suffix can be omitted.
+*   **No authentication.** notd is made for a single user on their own machine. Put it behind HTTP authentication if other machines can reach it.
+*   **GET and POST only.** Updates and deletes are POST requests with `"_method": "PUT"` or `"_method": "DELETE"` in the JSON body, because some embedded web servers (phpdesktop) only pass GET and POST.
+*   **One response envelope.** Success: `{"status": "success", "data": ...}`. Failure: `{"status": "error", "message": "..."}` with a `4xx` or `5xx` status code.
+*   **Content is the source of truth.** Properties are parsed from the `content` of notes and pages. The `Properties` table is an index of that content and is never written directly.
+
+| Task | Endpoint |
+|---|---|
+| Add notes from a script | [`append_to_page.php`]({{< relref "append-to-page.md" >}}) |
+| Create, edit, move, delete notes | [`ops.php`]({{< relref "ops.md" >}}) |
+| Read notes | [`notes.php`]({{< relref "notes.md" >}}) |
+| Pages and namespaces | [`pages.php`, `child_pages.php`]({{< relref "pages.md" >}}) |
+| Full-text search, backlinks, tasks, favorites | [`search.php`]({{< relref "search.md" >}}) |
+| Find notes with SQL | [`query_notes.php`]({{< relref "query-notes.md" >}}) |
+| Files | [`attachments.php`]({{< relref "attachments.md" >}}) |
+| Templates | [`templates.php`]({{< relref "templates.md" >}}) |
+| Notifications to other systems | [`webhooks.php`]({{< relref "webhooks.md" >}}) |
 
 ## General Concepts
 
 ### Content-Driven Properties
 
-The `Properties` table is no longer directly managed. Instead, it is an index populated by parsing the `content` of a Note or Page. This is the new core of the system.
+The `Properties` table is an index populated by parsing the `content` of a note or page.
 
 #### Syntax
 
@@ -41,11 +50,11 @@ The system automatically adds certain special properties with specific weights t
 
 These special properties are managed by the system and should not be manually modified. They are used for internal tracking and functionality.
 
-#### Configuration (`config.php`)
+#### Configuration
 
-The behavior of properties based on their weight is defined in `config.php` and interpreted by the **frontend**. The API's role is simply to parse and return the properties with their weight.
+The behavior of properties based on their weight is defined by `PROPERTY_WEIGHTS` (defaults in `config.php`, overrides in `config.local.php`) and interpreted by the **frontend**. The API's role is simply to parse and return the properties with their weight.
 
-**Example `config.php` structure:**
+**Default:**
 ```php
 define('PROPERTY_WEIGHTS', [
     2 => [
@@ -71,7 +80,7 @@ define('PROPERTY_WEIGHTS', [
 
 #### Backend Logic
 
-When a Note or Page is created or updated via the API:
+When a note or page is created or updated:
 1.  The backend receives the new `content`.
 2.  It parses all property strings from the content.
 3.  For each parsed property, it intelligently updates the `Properties` table:
@@ -101,14 +110,13 @@ The response for a paginated list will include a `pagination` object:
 
 ### Error Responses
 
-Errors are returned with an appropriate `4xx` or `5xx` status code and a consistent JSON structure.
+Errors are returned with a `4xx` or `5xx` status code:
 
 ```json
 {
     "status": "error",
-    "message": "A human-readable error message.",
-    "details": {
-        "field_name": "Specific error for this field."
-    }
+    "message": "A human-readable error message."
 }
 ```
+
+Some validation errors add a `details` object. Unexpected server errors only include file names and stack traces when `NOTD_DEBUG` is enabled; they are always written to the PHP error log.

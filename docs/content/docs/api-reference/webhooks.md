@@ -3,7 +3,13 @@ title: "Webhooks"
 weight: 110
 ---
 
-Manages webhook subscriptions for event notifications.
+Manages webhook subscriptions. A webhook is an HTTP POST that notd sends to a URL of your choice when a property changes.
+
+*   Deliveries are sent **after** the change has been saved, never while the database is locked, and not at all if the change was rolled back.
+*   Only **verified** and active webhooks receive events: call the verify action once after creating a webhook.
+*   Each delivery carries the headers `X-Notd-Event` and `X-Notd-Signature` (HMAC-SHA256 of the body with the webhook's secret).
+*   `PUT` and `DELETE` can also be sent as `POST` with `"_method": "PUT"` or `"_method": "DELETE"` in the JSON body.
+*   Set `WEBHOOKS_ENABLED` to `false` in the configuration to stop all deliveries.
 
 ### `POST /api/v1/webhooks.php` (Create)
 *   **Description**: Registers a new webhook.
@@ -16,7 +22,7 @@ Manages webhook subscriptions for event notifications.
       "event_types": ["property_change", "entity_created"]
     }
     ```
-*   **Response (201 Created)**:
+*   **Response (200 OK)**:
     ```json
     {
         "status": "success",

@@ -178,3 +178,15 @@ Manages pages, which now also have a `content` field to drive their properties.
         "pagination": { "total_items": 1, "...": "..." }
     }
     ```
+
+### `GET /api/v1/child_pages.php?namespace={page_name}`
+*   **Description**: Lists the pages directly below a page in the namespace hierarchy. For `namespace=Projects` this returns `Projects/Alpha` but not `Projects/Alpha/Notes`.
+*   **Response (200 OK)**:
+    ```json
+    {
+        "status": "success",
+        "data": [
+            { "id": 12, "name": "Projects/Alpha", "updated_at": "2026-11-10 18:20:45" }
+        ]
+    }
+    ```

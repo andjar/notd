@@ -1,52 +1,34 @@
 ---
-title: "API Overview"
+title: "Overview"
 weight: 10
 ---
 
-The Notd Outliner is a powerful note-taking and knowledge management system that combines a robust PHP-based API with a rich, interactive frontend. While this section focuses on the API, notd's strength lies in the seamless integration between backend data management and frontend user experience.
+**notd** is a small outliner for notes, journals and tasks, inspired by [Logseq](https://logseq.com/). It runs on anything that runs PHP and keeps everything in one SQLite file that you own.
 
-## Frontend Highlights
+## What it does
 
-Before diving into the API, explore notd's powerful frontend features:
+- **Outline editing.** Every note is a bullet that can be nested, collapsed, dragged and reordered. Notes are written in Markdown.
+- **Journal.** Each day has its own page; notd opens today's page by default.
+- **Links and backlinks.** `[[Page Name]]` links pages; every page shows what links to it.
+- **Tasks.** Start a note with `TODO`, `DOING`, `DONE`, ... and it becomes a task with a checkbox.
+- **Properties.** `{key::value}` anywhere in a note or page becomes searchable metadata.
+- **Queries and transclusion.** List notes with `SQL{...}`; embed a note elsewhere with `!{{note-id}}`.
+- **Attachments, templates, namespaces, favorites, per-page encryption.**
+- **Extensions.** Kanban board, pomodoro timer, attachment dashboard, distraction-free editor and more.
+- **An HTTP API** that can do everything the interface can.
 
-- **📝 Rich Text Editing** - Markdown-based with live preview and syntax highlighting
-- **🔍 SQL Queries** - Execute dynamic queries directly in your notes for data-driven content
-- **🔗 Transclusion** - Embed content from other notes for modular documentation
-- **🔐 Encryption** - Client-side AES-256 encryption for sensitive content
-- **📅 Journal System** - Date-based pages for daily workflows and organization
-- **✅ Task Management** - Built-in TODO system with multiple states and visual indicators
-- **🔄 Backlinking** - Discover connections between your notes automatically
-- **⭐ Favorites** - Quick access to important pages and content
-- **🧩 Extensions** - 8 powerful extensions including Kanban boards, Excalidraw, and more
-- **🔎 Advanced Search** - Fast, comprehensive search with property filtering and encryption support
+## Built to last
 
-[→ Explore the Frontend Guide](/docs/frontend-guide/) for complete documentation of user-facing features.
+notd is deliberately made of few, well-understood parts:
 
-## Base URL
+- **PHP + SQLite on the server, plain JavaScript modules in the browser.** There is no build step, no package manager and no framework to keep up with. The few libraries it uses are stored in the repository.
+- **Your data is plain text** in a documented SQLite schema (unless you choose to encrypt a page). Any SQLite tool can read it.
+- **Works offline.** Nothing is loaded from the internet. Edits made while the server is unreachable are kept in the browser and sent when it is back.
+- **Runs anywhere PHP runs**: a laptop (`php -S`), a NAS, a shared web host, or packaged as a desktop app with [phpdesktop](https://github.com/cztomczak/phpdesktop).
 
-All API endpoints are served from `/api/v1/` relative to your application root.
+## Where to go next
 
-## Authentication
-
-This API does not require authentication as it's designed for offline use.
-
-## Response Format
-
-All API responses follow a consistent JSON format:
-
-### Success Response
-```json
-{
-  "status": "success",
-  "data": {...}
-}
-```
-
-### Error Response
-```json
-{
-  "status": "error",
-  "message": "Error description",
-  "details": {...}
-}
-```
+- [Installation]({{< relref "quick-start.md" >}}): get it running, configure it, upgrade it.
+- [Core concepts]({{< relref "core-concepts.md" >}}): pages, notes, properties, tasks.
+- [User guide]({{< relref "../frontend-guide/_index.md" >}}): how to use the interface.
+- [API reference]({{< relref "../api-reference/_index.md" >}}) and [Development]({{< relref "../development/_index.md" >}}): how to script and change it.

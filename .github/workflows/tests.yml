@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md']
+  pull_request:
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, mbstring, curl
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: PHP syntax
+        run: |
+          find . -name '*.php' -not -path './docs/*' -not -path './vendor/*' -print0 \
+            | xargs -0 -n1 php -l > /dev/null
+
+      - name: Model and ordering tests
+        run: |
+          node tests/js/model.test.mjs
+          node tests/js/ordering_parity.mjs
+
+      - name: Start server on a throw-away database
+        run: |
+          NOTD_DB_PATH="$RUNNER_TEMP/notd-test.sqlite" PHP_CLI_SERVER_WORKERS=4 \
+            php -S 127.0.0.1:8765 tests/browser/router.php > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8765/api/v1/ping.php > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/server.log"; exit 1
+
+      - name: API tests
+        run: node tests/js/ops_api.test.mjs
+
+      - name: Browser tests
+        run: |
+          pip install playwright
+          python3 -m playwright install --with-deps chromium
+          python3 tests/browser/outline_test.py
+          python3 tests/browser/features_test.py
+
+      - name: Server log
+        if: failure()
+        run: tail -n 100 "$RUNNER_TEMP/server.log"

@@ -1,96 +1,90 @@
 ---
 title: "Extensions"
 weight: 25
+aliases: ["/docs/extensions/excalidraw-editor/", "/docs/extensions/additional-extensions/"]
 ---
 
-notd features a powerful extension system that adds specialized functionality to your note-taking workflow. Each extension is designed to handle specific use cases while integrating seamlessly with the core system.
+Extensions are small apps in the `extensions/` folder that work on your notes through the [API]({{< relref "../api-reference/_index.md" >}}).
 
-## Available Extensions
+## Turning extensions on
 
-notd includes 8 built-in extensions:
+Extensions listed in `ACTIVE_EXTENSIONS` get an icon in the left sidebar. Set the list in `config.local.php` using the folder names:
 
-### **Kanban Board** 📋
-Visual task management with customizable boards, filters, and drag-and-drop functionality.
-
-### **Excalidraw Editor** ✏️  
-Integrated drawing and diagramming tool for visual thinking and sketching.
-
-### **Attachment Dashboard** 📎
-Centralized file management for organizing and accessing your attachments.
-
-### **Math Notepad** 🧮
-Mathematical notation support and calculation capabilities within your notes.
-
-### **Pomodoro Timer** ⏲️
-Built-in time management tool following the Pomodoro Technique.
-
-### **RSS Handler** 📰
-RSS feed integration for staying updated with external content sources.
-
-### **Mail Handler** 📧
-Email integration for capturing and organizing email-related notes.
-
-### **Zen Mode** 🧘
-Distraction-free writing environment for focused work sessions.
-
-## Extension Architecture
-
-Extensions in notd:
-- **Self-contained** - Each extension has its own directory with all necessary files
-- **Configurable** - JSON-based configuration for customization
-- **Integrated** - Seamless integration with the core notd interface
-- **Responsive** - Work across different screen sizes and devices
-
-## Accessing Extensions
-
-Extensions can be accessed through:
-- **Extension menu** in the main interface
-- **Direct URLs** to extension pages
-- **Keyboard shortcuts** (where supported)
-- **Context menus** for relevant content
-
-## Extension Configuration
-
-Most extensions support configuration through `config.json` files in their respective directories:
-
-```
-extensions/
-├── kanban_board/
-│   ├── config.json
-│   ├── index.php
-│   └── ...
-├── excalidraw_editor/
-│   ├── config.json  
-│   ├── index.php
-│   └── ...
+```php
+define('ACTIVE_EXTENSIONS', ['kanban_board', 'pomodoro_timer', 'attachment_dashboard']);
 ```
 
-## Integration with Core Features
+Zen, Excalidraw and the math notepad work on a single note and are opened from the note menu (right-click a bullet), whether or not they are in the list.
 
-Extensions integrate with notd's core features:
+## Included extensions
 
-### **Properties Integration**
-Extensions can read and write page/note properties:
-```markdown
-{board::project-alpha}  # Kanban board assignment
-{timer::pomodoro}       # Pomodoro session tracking
-{attachment::diagram}   # File type classification
+| Extension | Folder | What it does | Opened from |
+|---|---|---|---|
+| [Kanban board]({{< relref "kanban-board.md" >}}) | `kanban_board` | All tasks as cards in columns by state; drag a card to change its state. | Sidebar |
+| Pomodoro timer | `pomodoro_timer` | Work/break timer that logs each finished session as a note. | Sidebar |
+| Attachment dashboard | `attachment_dashboard` | Searchable, filterable list of every uploaded file. | Sidebar |
+| Zen | `zen` | Distraction-free full-screen Markdown editor for one note. | Note menu |
+| Math notepad | `math_notepad` | Calculation pad: write expressions and variables line by line and see results; saved into the note. | Note menu |
+| Excalidraw | `excalidraw_editor` | Whiteboard drawing saved to the note as an image attachment. **Needs an internet connection**: Excalidraw itself is loaded from a CDN. | Note menu |
+| RSS handler | `rss_handler` | Command-line script that appends new feed items as notes. | `php extensions/rss_handler/rss_handler.php` |
+| Mail handler | `mail_handler` | Command-line script that turns an e-mail piped to it into a note. Experimental. | `php extensions/mail_handler/mail_handler.php < mail.eml` |
+
+### Pomodoro timer
+
+Settings are in `extensions/pomodoro_timer/config.json`:
+
+| Key | Meaning |
+|---|---|
+| `workDurationMinutes`, `shortBreakDurationMinutes`, `longBreakDurationMinutes` | Lengths of the three session types. |
+| `pomodorosBeforeLongBreak` | Work sessions before a long break. |
+| `pageTemplate` | Page that receives the session log. `<today>` is replaced with the date, so `<today>/Pomodoro` logs to a child page of the day's journal. |
+| `noteTemplate` | Text of the logged note. Placeholders: `{noteTitle}`, `{date}`, `{duration}`, `{pomodoroType}`, `{customProperties}`. |
+
+Text typed in the field below the timer as `key:value, key2:value2` is added to the logged note as properties.
+
+### RSS handler
+
+Configure feeds in `extensions/rss_handler/config.json`, then run the script from a scheduler (cron, Task Scheduler):
+
+```json
+{
+  "api_url": "http://localhost:8000/api",
+  "default_page_name_for_rss": "Inbox/rss",
+  "feeds": [
+    "https://example.com/feed.xml",
+    { "url": "https://example.org/feed", "page_name": "<today>/rss" }
+  ]
+}
 ```
 
-### **Search Integration**
-Extension content is searchable through the global search system.
+Each new item is appended to its page as a note. Items already imported are recognised and skipped.
 
-### **Backlink Support**
-Extensions can create and reference page links, contributing to the backlink system.
+### Zen and math notepad themes
 
-### **Template Support**
-Extensions can use and create templates for consistent workflows.
+Both use the bundled CodeMirror editor. `defaultLightTheme` and `defaultDarkTheme` in each extension's `config.json` name a theme from `extensions/zen/codemirror/themes/`.
 
-## Getting Started with Extensions
+## Writing an extension
 
-1. **Explore the extensions** - Click through each one to understand capabilities
-2. **Configure as needed** - Customize settings through config files
-3. **Integrate with workflow** - Use properties and links to connect with your notes
-4. **Create templates** - Build reusable patterns that incorporate extensions
+An extension is a folder in `extensions/` with:
 
-Navigate through this section to learn about each extension in detail.
+- `config.json` containing at least `{"featherIcon": "<icon name>"}` (an icon from [Feather](https://feathericons.com/)); add your own settings next to it,
+- `index.php`, the page that opens when the sidebar icon is clicked.
+
+Inside, use the HTTP API. The usual calls:
+
+| Need | Call |
+|---|---|
+| Add notes to a page | `POST api/v1/append_to_page.php` |
+| Read a note / a page's notes | `GET api/v1/notes.php?id=...` / `?page_id=...` |
+| Change a note | `POST api/v1/ops.php` with an `edit` operation |
+| Find notes | `GET api/v1/search.php?q=...`, `?tasks=TODO`, or `POST api/v1/query_notes.php` |
+
+To match the look of the app, load the theme and stylesheet and the bundled libraries with relative paths, so the extension also works offline and when notd is served from a sub-folder:
+
+```php
+<?php $assetBase = '../../'; require '../../assets/css/theme_loader.php'; ?>
+<link rel="stylesheet" href="../../assets/css/main.css">
+<script src="../../assets/libs/alpine.min.js" defer></script>
+```
+
+The kanban board (`extensions/kanban_board/kanban.php`) is a good example to copy from.

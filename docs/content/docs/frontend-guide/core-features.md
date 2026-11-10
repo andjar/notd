@@ -1,117 +1,96 @@
 ---
-title: "Core Features"
+title: "Writing Notes"
 weight: 10
 ---
 
-## Rich Text Editing with Markdown
+## Markdown
 
 ![](/images/markdown.png)
 
-notd uses Markdown for formatting notes with live preview capabilities. The editor supports:
+Notes are Markdown. A note shows the rendered text; click it to edit the source.
 
-- **Headers** using `# ## ###`
-- **Lists** with `-` or `1.`
-- **Links** using `[text](url)`
-- **Code blocks** with triple backticks
-- **Emphasis** with `*italic*` and `**bold**`
+- `**bold**`, `*italic*`, `` `code` ``, `[text](url)`
+- `#`, `##`, `###` headings
+- lists, quotes, tables and fenced code blocks
+- `Shift + Enter` for a line break within a note
 
-### Page Links
+Brackets, braces and quotes are closed automatically as you type.
 
-Create internal links to other pages using double square brackets:
+## Page links
 
 ```markdown
 [[Page Name]]
+[[Projects/Alpha]]
 ```
 
-This creates a clickable link to the specified page. If the page doesn't exist, it will be created when clicked.
+Typing `[[` suggests existing pages. A link to a page that does not exist yet creates it when clicked. See [Backlinks]({{< relref "backlinks-favorites.md" >}}).
 
-## SQL Queries in Notes [DOCUMENTATION NOT UPDATED YET]
-
-Execute dynamic SQL queries directly within your notes using the `SQL{}` syntax:
+## Properties
 
 ```markdown
-SQL{SELECT N.id FROM Notes N WHERE content LIKE '%project%' ORDER BY updated_at DESC}
+{key::value}     public: shown as a pill
+{key:::value}    internal: hidden when reading
+{key::::value}   log: every value is kept as history
 ```
 
-This powerful feature allows you to:
-- Generate dynamic lists of pages
-- Create custom reports
-- Build interactive dashboards
-- Query your data in real-time
+Properties make notes findable: by [search]({{< relref "search-navigation.md" >}}), by queries (below) and by the kanban board. Quick ways to type common ones:
 
-### SQL Query Examples
+| Type | Becomes |
+|---|---|
+| `:t` + space | `{tag::}` |
+| `:k` + space | `{keyword::}` |
+| `:d` + space | `{date::2026-11-10}` (today) |
+| `:r` + space | `{timestamp::...}` (now) |
 
-**List all pages updated today:**
-```sql
-SQL{SELECT name, updated_at FROM Pages WHERE DATE(updated_at) = DATE('now')}
+Page-level properties are edited with the gear icon next to the page title.
+
+## Queries
+
+`SQL{...}` in a note lists the notes that a query selects. The query must return note ids:
+
+```markdown
+SQL{SELECT id FROM Notes WHERE content LIKE 'TODO %' ORDER BY updated_at DESC}
 ```
 
-**Find notes with specific properties:**
-```sql
-SQL{SELECT N.content, P.name as page_name 
-    FROM Notes N 
-    JOIN Pages P ON N.page_id = P.id 
-    JOIN Properties Prop ON N.id = Prop.note_id 
-    WHERE Prop.name = 'priority' AND Prop.value = 'high'}
+To filter by property, join the property index:
+
+```markdown
+SQL{SELECT DISTINCT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'priority' AND P.value = 'high'}
 ```
+
+Three query shapes are accepted:
+
+1. `SELECT id FROM Notes WHERE ...`
+2. `SELECT [DISTINCT] N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE ...`
+3. `SELECT id FROM Notes WHERE id IN (SELECT note_id FROM Properties WHERE ...)`
+
+Queries can only read. Counting, grouping or selecting other columns is not possible unless `ADVANCED_QUERY_MODE` is turned on in the [configuration]({{< relref "../overview/quick-start.md" >}}); even then the first column must be a note id, because the result is always shown as a list of notes.
 
 ## Transclusion
 
-Embed content from other notes or pages using transclusion:
+Embed a note, with its children, in another place:
 
 ```markdown
-!{{note_id}}
+!{{0192f6a0-7c3e-7b1a-9f3e-2b1c4d5e6f70}}
 ```
 
-This feature allows you to:
-- Reuse content across multiple notes
-- Create modular documentation
-- Build dynamic content that updates automatically
-- Reference shared information
+Right-click the bullet of the note you want to embed and choose **Copy transclusion link**, then paste. The embedded copy always shows the current text of the original. Transclusions nest up to three levels.
 
-## Client-Side Encryption
+## Attachments
 
-Protect sensitive content by opening page properties and clicking "Encrypt". Note that encryption happens client-side, and content will NOT be recoverable if you lose the key.
+Drag a file onto a note, paste an image into it, or right-click its bullet and choose **Upload**. Images are shown inline; other files become download links. The limit is 10 MB per file. The Attachment Dashboard extension lists all files.
 
-### How Encryption Works
+## Templates
 
-1. Content is encrypted client-side before being sent to the server
-2. Uses the SJCL (Stanford JavaScript Crypto Library) for AES-256
-3. Password-protected - only you can decrypt your content
-4. Server never sees the unencrypted content
+Type `/` in a note to pick a template and insert it. Templates are files in `assets/template/note/` (and `assets/template/page/` for page templates). They can contain placeholders:
 
-### Setting Up Encryption
+`{{date}}`, `{{time}}`, `{{datetime}}`, `{{year}}`, `{{month}}`, `{{day}}`, `{{weekday}}`, `{{timestamp}}`, `{{random}}`, `{{uuid}}`
 
-To use encryption:
-1. Open page properties and click "Encrypt"
-2. You'll be prompted for a password when viewing the page
+## Encryption
 
-### Encryption Best Practices
+A page can be encrypted with a password: click the gear next to the page title and choose **Encrypt**.
 
-- Use strong, unique passwords
-- Don't forget your password - there's no recovery mechanism
-- Consider using encryption for personal notes, passwords, or sensitive data
-- Encrypted content won't appear in search results for other users
-
-## Properties System
-
-Add metadata to notes and pages using the property syntax:
-
-```markdown
-{property::value}        # Public property
-{property:::value}       # Internal property
-{property::::value}      # System log property
-```
-
-### Common Properties
-
-- `{status::todo}` - Mark as a task
-- `{priority::high}` - Set priority level
-- `{category::work}` - Categorize content
-- `{favorite::true}` - Add to favorites
-
-### Property Weights
-
-- `::` (weight 2) - Public properties, visible in UI
-- `:::` (weight 3) - Internal properties, for system use
-- `::::` (weight 4) - System logs, automatic tracking
+- Notes are encrypted in the browser (AES, using the SJCL library) before they are sent, so the database only contains ciphertext for that page.
+- You are asked for the password when you open the page.
+- **There is no recovery.** If the password is lost, so is the content.
+- Encrypted notes cannot be found by full-text search, and their properties are not indexed.

@@ -13,7 +13,7 @@ relativeURLs = false
     weight = 10
 
 [[menu.main]]
-    name = "Frontend Guide"
+    name = "User Guide"
     url = "/docs/frontend-guide/"
     weight = 15
 
@@ -28,9 +28,14 @@ relativeURLs = false
     weight = 25
 
 [[menu.main]]
+    name = "Development"
+    url = "/docs/development/"
+    weight = 30
+
+[[menu.main]]
     name = "OpenAPI"
     url = "/docs/openapi/"
-    weight = 30
+    weight = 35
 
 [[menu.main]]
     name = "FAQ"
@@ -40,13 +45,7 @@ relativeURLs = false
 # Parameters
 [params]
     author = "Anders Hagen Jarmund"
-    description = "Documentation for Your PHP/JS Outliner"
-    
-    # SEO
-    [params.seo]
-        [params.seo.webmaster_verifications]
-            google = "" # Add your Google verification code
-            bing = ""   # Add your Bing verification code
+    description = "notd: a simple outliner built to last"
     
     # Control what gets indexed
     noindex_kinds = [
@@ -61,6 +60,6 @@ relativeURLs = false
             unsafe = true
     [markup.highlight]
         style = "github"
-        lineNos = true
+        lineNos = false
         codeFences = true
         tabWidth = 4
