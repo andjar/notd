@@ -21,7 +21,7 @@ function normalize(note) {
             ? null : String(note.parent_note_id),
         sort_key: note.sort_key || 'a0',
         content: note.content ?? '',
-        collapsed: note.collapsed ? 1 : 0,
+        collapsed: Number(note.collapsed) ? 1 : 0, // tolerate "0"/"1" strings
     };
 }
 

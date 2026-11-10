@@ -106,8 +106,7 @@ try {
     $stmtFetchNotes = $pdo->prepare($sqlFetchNotes);
     $stmtFetchNotes->execute($noteIds);
     $notes = $stmtFetchNotes->fetchAll(\PDO::FETCH_ASSOC);
-    foreach ($notes as &$n) { unset($n['rid']); }
-    unset($n);
+    $notes = array_map([\App\DataManager::class, 'castNoteRow'], $notes);
 
     // If properties are requested, fetch and format them using the DataManager
     if ($includeProperties && !empty($notes)) {
