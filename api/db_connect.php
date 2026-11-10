@@ -7,10 +7,9 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/setup_db.php';
-require_once __DIR__ . '/db_helpers.php';
 
 /** Must equal `PRAGMA user_version` in db/schema.sql. */
-const NOTD_SCHEMA_VERSION = 3;
+const NOTD_SCHEMA_VERSION = 4;
 
 class SchemaVersionException extends RuntimeException {}
 
@@ -83,21 +82,106 @@ function notd_prepare_database(PDO $pdo): void
         if ($version === 0) {
             // Created before versions were stamped: v3 has Notes.sort_key, v2 does not.
             $columns = array_column($pdo->query('PRAGMA table_info(Notes)')->fetchAll(), 'name');
-            if (in_array('sort_key', $columns, true)) {
-                $pdo->exec('PRAGMA user_version = ' . NOTD_SCHEMA_VERSION);
-                return;
+            if (!in_array('sort_key', $columns, true)) {
+                throw new SchemaVersionException(
+                    'This database uses an older notd schema. Run "php db/migrate_v3.php" once to upgrade it (a backup is kept).'
+                );
             }
+            $version = 3;
+        }
+        if ($version > NOTD_SCHEMA_VERSION) {
             throw new SchemaVersionException(
-                'This database uses an older notd schema. Run "php db/migrate_v3.php" once to upgrade it (a backup is kept).'
+                "This database (schema $version) was written by a newer notd than this one (schema " . NOTD_SCHEMA_VERSION . '). Update notd.'
             );
         }
-        throw new SchemaVersionException($version > NOTD_SCHEMA_VERSION
-            ? "This database (schema $version) was written by a newer notd than this one (schema " . NOTD_SCHEMA_VERSION . '). Update notd.'
-            : "This database uses schema $version; this notd needs schema " . NOTD_SCHEMA_VERSION . '. See the upgrade notes in the README.');
+        notd_migrate($pdo, $version);
     } finally {
         flock($lock, LOCK_UN);
         fclose($lock);
         @unlink(DB_PATH . '.setup.lock');
+    }
+}
+
+/**
+ * Upgrades the database from $version to NOTD_SCHEMA_VERSION with the steps in
+ * db/migrations.php. The file is copied first, and all steps run in one
+ * transaction: the upgrade happens completely or not at all.
+ */
+function notd_migrate(PDO $pdo, int $version): void
+{
+    $steps = require __DIR__ . '/../db/migrations.php';
+    for ($v = $version + 1; $v <= NOTD_SCHEMA_VERSION; $v++) {
+        if (!isset($steps[$v])) {
+            throw new SchemaVersionException("This database uses schema $version and there is no upgrade path to schema " . NOTD_SCHEMA_VERSION . '.');
+        }
+    }
+    $pdo->exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    $backup = DB_PATH . '.v' . $version . '-backup';
+    if (!is_file($backup) && !@copy(DB_PATH, $backup)) {
+        throw new Exception("Could not back up the database to $backup before upgrading it.");
+    }
+    $pdo->exec('BEGIN IMMEDIATE');
+    try {
+        for ($v = $version + 1; $v <= NOTD_SCHEMA_VERSION; $v++) {
+            $steps[$v]($pdo);
+        }
+        $pdo->exec('PRAGMA user_version = ' . NOTD_SCHEMA_VERSION);
+        $pdo->exec('COMMIT');
+    } catch (Throwable $e) {
+        $pdo->exec('ROLLBACK');
+        throw new Exception('Upgrading the database failed (' . $e->getMessage() . "). Nothing was changed; a copy is at $backup.");
+    }
+    error_log("[notd] database upgraded from schema $version to " . NOTD_SCHEMA_VERSION . "; backup at $backup");
+}
+
+/** True if the error means "another connection holds the write lock". */
+function notd_is_busy(Throwable $e): bool
+{
+    return $e instanceof PDOException
+        && (in_array((int)($e->errorInfo[1] ?? 0), [5, 6], true) || stripos($e->getMessage(), 'database is locked') !== false);
+}
+
+/**
+ * Runs $fn inside a write transaction and returns its result.
+ *
+ * Every change to the database goes through here. The transaction takes the
+ * write lock up front (BEGIN IMMEDIATE), so concurrent writers queue instead
+ * of failing halfway; if the lock cannot be had, the whole unit is retried.
+ * When $fn throws, everything is rolled back and webhooks queued by the
+ * failed work are dropped. Nested calls join the outer transaction.
+ */
+function notd_write(PDO $pdo, callable $fn)
+{
+    static $depth = 0;
+    if ($depth > 0) {
+        return $fn($pdo);
+    }
+    for ($attempt = 1; ; $attempt++) {
+        $began = false;
+        try {
+            $pdo->exec('BEGIN IMMEDIATE');
+            $began = true;
+            $depth++;
+            try {
+                $result = $fn($pdo);
+            } finally {
+                $depth--;
+            }
+            $pdo->exec('COMMIT');
+            return $result;
+        } catch (Throwable $e) {
+            if ($began) {
+                try { $pdo->exec('ROLLBACK'); } catch (Throwable $ignored) { /* already rolled back */ }
+            }
+            if (class_exists('App\PropertyTriggerService', false)) {
+                \App\PropertyTriggerService::discardPendingWebhooks();
+            }
+            if (notd_is_busy($e) && $attempt < 5) {
+                usleep(100000 * $attempt);
+                continue;
+            }
+            throw $e;
+        }
     }
 }
 
@@ -109,15 +193,10 @@ function notd_add_welcome_notes(PDO $pdo): void
     if (!is_array($notes)) {
         return;
     }
-    $pdo->beginTransaction();
-    try {
-        $pageId = _create_page_and_index_properties($pdo, date('Y-m-d'), '{type::journal}');
-        foreach ($notes as $content) {
-            _create_note_and_index_properties($pdo, (int)$pageId, $content);
-        }
-        $pdo->commit();
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        throw $e;
-    }
+    require_once __DIR__ . '/bootstrap.php';
+    notd_write($pdo, static function (PDO $pdo) use ($notes) {
+        $pageId = (new \App\PageStore($pdo))->ensure(gmdate('Y-m-d'));
+        $ops = new \App\NoteOps($pdo);
+        $ops->apply($ops->appendCreateOps($pageId, array_map(static fn($c) => ['content' => (string)$c], $notes)));
+    });
 }

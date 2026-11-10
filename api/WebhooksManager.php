@@ -4,10 +4,6 @@ namespace App;
 
 use PDO;
 
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/db_connect.php';
-require_once __DIR__ . '/response_utils.php';
-require_once __DIR__ . '/validator_utils.php';
 
 class WebhooksManager {
     private $pdo;
@@ -20,17 +16,11 @@ class WebhooksManager {
      * Main request router.
      */
     public function handleRequest() {
-        $method = $_SERVER['REQUEST_METHOD'];
+        $method = notd_request_method();
         $action = $_GET['action'] ?? null;
         $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
-        $input = $method === 'GET' ? null : json_decode(file_get_contents('php://input'), true);
-        // PUT and DELETE may be sent as POST with {"_method": "PUT"|"DELETE"},
-        // like the other endpoints (phpdesktop only passes GET and POST).
-        if ($method === 'POST' && is_array($input) && isset($input['_method'])) {
-            $method = strtoupper((string)$input['_method']);
-            unset($input['_method']);
-        }
-
+        $input = notd_json_input();
+        unset($input['_method']);
         try {
             switch ($method) {
                 case 'GET':

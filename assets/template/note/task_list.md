@@ -1,6 +1,3 @@
-<?php
-// Task List Template
-?>
 # Task List: {{list_title}}
 
 **Date:** {{date}}

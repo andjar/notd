@@ -1,6 +1,3 @@
-<?php
-// Bookmark Template
-?>
 # Bookmark: {{bookmark_title}}
 
 **URL:** {{url}}

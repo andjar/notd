@@ -1,6 +1,3 @@
-<?php
-// Book Notes Template
-?>
 # Book Notes: {{book_title}}
 
 **Author:** {{author}}

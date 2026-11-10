@@ -1,6 +1,3 @@
-<?php
-// R Snippet Template
-?>
 # R Snippet: {{snippet_name}}
 
 **Description:** {{description}}

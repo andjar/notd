@@ -1,7 +1,3 @@
-<?php
-// Book Page Template
-// Contains multiple notes that will be created when this template is used
-?>
 [
     {
         "title": "Book Information: {{book_title}}",

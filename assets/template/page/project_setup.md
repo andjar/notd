@@ -1,7 +1,3 @@
-<?php
-// Project Setup Page Template
-// Contains multiple notes that will be created when this template is used
-?>
 [
     {
         "title": "Project Overview: {{project_name}}",

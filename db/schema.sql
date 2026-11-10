@@ -10,9 +10,9 @@
 PRAGMA foreign_keys = ON;
 
 -- Schema version. api/db_connect.php compares it with NOTD_SCHEMA_VERSION and
--- refuses to run against an older or newer database. Bump both together and
--- add a migration script in db/ whenever the schema changes.
-PRAGMA user_version = 3;
+-- upgrades an older database with the steps in db/migrations.php. Raise both
+-- together and add a step there whenever the schema changes.
+PRAGMA user_version = 4;
 
 -- Pages Table
 -- Pages are top-level containers for notes. They now include a `content`
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS Pages (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_pages_name ON Pages(LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_pages_updated_at ON Pages(updated_at);
 
 -- Notes Table
 -- Notes are the core content blocks, belonging to a single page.
@@ -101,6 +102,7 @@ CREATE TABLE IF NOT EXISTS Properties (
 CREATE INDEX IF NOT EXISTS idx_properties_note_id_name ON Properties(note_id, name);
 CREATE INDEX IF NOT EXISTS idx_properties_page_id_name ON Properties(page_id, name);
 CREATE INDEX IF NOT EXISTS idx_properties_name_value ON Properties(name, value);
+CREATE INDEX IF NOT EXISTS idx_properties_name_value_nocase ON Properties(name, value COLLATE NOCASE); -- backlinks: page names ignore case
 CREATE INDEX IF NOT EXISTS idx_properties_weight ON Properties(weight); -- New index for querying by weight
 
 -- Triggers to automatically update `updated_at` timestamps
@@ -151,8 +153,11 @@ CREATE INDEX IF NOT EXISTS idx_webhook_events_webhook_id ON WebhookEvents(webhoo
 
 -- FTS4 Virtual Table for Full-Text Search on Notes
 -- Keyed by Notes.rid (an INTEGER PRIMARY KEY, so it survives VACUUM).
+-- unicode61 folds case for all letters (the default tokenizer only knows ASCII),
+-- so a search for "ørret" finds "Ørret".
 CREATE VIRTUAL TABLE IF NOT EXISTS Notes_fts USING fts4(
-    content
+    content,
+    tokenize=unicode61
 );
 
 -- Triggers to keep the FTS table in sync with the Notes table

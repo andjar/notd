@@ -80,6 +80,12 @@ notd_default('PROPERTY_WEIGHTS', [
     // You can add more weights here, e.g., weight 5 for "Archived" properties.
 ]);
 
+// --- Security ---
+// Requests that change data are refused when another website initiated them.
+// Only set this to true if a reverse proxy rewrites host names in a way that
+// makes notd reject its own pages.
+notd_default('ALLOW_CROSS_SITE_REQUESTS', false);
+
 // --- Errors ---
 // With NOTD_DEBUG on, PHP errors are displayed and API error responses carry
 // file names and stack traces. Leave it off unless you are developing.

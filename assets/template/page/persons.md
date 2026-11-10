@@ -1,7 +1,3 @@
-<?php
-// Person Page Template
-// Contains multiple notes that will be created when this template is used
-?>
 [
     {
         "title": "Biographical Information: {{person_name}}",

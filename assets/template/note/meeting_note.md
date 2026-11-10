@@ -1,7 +1,3 @@
-<?php
-// Meeting Note Template
-// Usage: /meeting_note
-?>
 # Meeting Notes: {{title}}
 
 **Date:** {{date}}

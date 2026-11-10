@@ -1,107 +1,38 @@
 <?php
-// Include the main configuration file to make constants available.
-require_once 'config.php';
-require_once 'api/db_connect.php';
+/**
+ * The application page: page.php?page=<name>.
+ *
+ * The server renders what frames the outline (title, sidebars); the notes
+ * themselves are loaded and rendered in the browser.
+ */
 
-// --- Failsafe Redirect ---
-// Get the page name from the URL.
-$pageName = isset($_GET['page']) ? trim($_GET['page']) : null;
+require_once __DIR__ . '/api/bootstrap.php';
 
-// If no page name is provided, redirect to default page
-if (empty($pageName)) {
-    $default_page_name = date('Y-m-d');
-    $redirect_url = 'page.php?page=' . urlencode($default_page_name);
-    header('Location: ' . $redirect_url, true, 302);
+$pageName = isset($_GET['page']) ? trim((string)$_GET['page']) : '';
+if ($pageName === '') {
+    // "Today" depends on where the user is, which only the browser knows.
+    require __DIR__ . '/index.php';
     exit;
 }
 
-// --- Database Connection for Server-Side Rendering ---
-try {
-    $pdo = get_db_connection();
-} catch (PDOException $e) {
-    error_log("Database connection failed: " . $e->getMessage());
-    $pdo = null;
+$pdo = get_db_connection();
+$dataManager = new \App\DataManager($pdo);
+
+// Opening a date creates that day's journal page. Other pages are created by
+// the browser when the user confirms the name.
+if (\App\PageStore::isJournalName($pageName)) {
+    (new \App\PageStore($pdo))->ensure($pageName);
 }
 
-// --- Server-Side Data Fetching ---
-$pageData = null;
-$pageProperties = [];
-$recentPages = [];
-$favorites = [];
-$childPages = [];
-$backlinks = [];
-
-if ($pdo) {
-    // Get current page data
-    $stmt = $pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(?) AND active = 1");
-    $stmt->execute([$pageName]);
-    $pageData = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($pageData) {
-        // Get page properties
-        $stmt = $pdo->prepare("SELECT name, value, weight FROM Properties WHERE page_id = ? AND active = 1 ORDER BY created_at ASC");
-        $stmt->execute([$pageData['id']]);
-        $properties = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        foreach ($properties as $prop) {
-            $key = $prop['name'];
-            if (!isset($pageProperties[$key])) {
-                $pageProperties[$key] = [];
-            }
-            $pageProperties[$key][] = [
-                'value' => $prop['value'],
-                'internal' => (int)($prop['weight'] ?? 2) > 2
-            ];
-        }
-        
-        // Get recent pages (last 7 updated pages)
-        $stmt = $pdo->prepare("SELECT id, name, updated_at FROM Pages WHERE active = 1 ORDER BY updated_at DESC LIMIT 7");
-        $stmt->execute();
-        $recentPages = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Get favorites
-        $stmt = $pdo->prepare("SELECT DISTINCT P.id, P.name, P.updated_at FROM Pages P JOIN Properties Prop ON P.id = Prop.page_id WHERE Prop.name = 'favorite' AND Prop.value = 'true' AND P.active = 1 ORDER BY P.updated_at DESC");
-        $stmt->execute();
-        $favorites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Get child pages (direct children only)
-        $prefix = rtrim($pageName, '/') . '/';
-        $stmt = $pdo->prepare("SELECT id, name, updated_at FROM Pages WHERE LOWER(name) LIKE LOWER(?) || '%' AND LOWER(name) != LOWER(?) AND SUBSTR(LOWER(name), LENGTH(LOWER(?)) + 1) NOT LIKE '%/%' AND active = 1 ORDER BY name ASC");
-        $stmt->execute([$prefix, $pageName, $prefix]);
-        $childPages = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Get backlinks
-        $stmt = $pdo->prepare("SELECT N.id as note_id, N.content, N.page_id, P.name as page_name FROM Properties Prop JOIN Notes N ON Prop.note_id = N.id JOIN Pages P ON N.page_id = P.id WHERE Prop.name = 'links_to_page' AND Prop.value = ? GROUP BY N.id ORDER BY N.updated_at DESC LIMIT 10");
-        $stmt->execute([$pageName]);
-        $backlinks = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
+$pageData = $dataManager->getPageByName($pageName);
+if ($pageData) {
+    $pageName = $pageData['name']; // the stored spelling
 }
-
-// --- Journal Page Creation ---
-// Only create journal pages for date-based pages that don't exist
-if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $pageName) && $pdo) {
-    try {
-        // Check if page exists
-        $stmt = $pdo->prepare("SELECT id FROM Pages WHERE name = ?");
-        $stmt->execute([$pageName]);
-        $pageId = $stmt->fetchColumn();
-        
-        if (!$pageId) {
-            // Create the date-based page
-            $pdo->beginTransaction();
-            $insertPage = $pdo->prepare("INSERT INTO Pages (name, created_at, updated_at) VALUES (?, datetime('now'), datetime('now'))");
-            $insertPage->execute([$pageName]);
-            $pageId = $pdo->lastInsertId();
-            
-            // Add journal type property
-            $insertProp = $pdo->prepare("INSERT INTO Properties (page_id, name, value, weight) VALUES (?, 'type', 'journal', 2)");
-            $insertProp->execute([$pageId]);
-            $pdo->commit();
-        }
-    } catch (PDOException $e) {
-        error_log("Error creating journal page: " . $e->getMessage());
-    }
-}
+$pageProperties = $pageData['properties'] ?? [];
+$recentPages = $dataManager->getRecentPages(7);
+$favorites = $dataManager->getFavoritePages();
+$childPages = $dataManager->getChildPages($pageName);
+$backlinks = $dataManager->getBacklinks($pageName, 50);
 
 // --- Frontend Configuration ---
 // Pass relevant backend configuration settings to the frontend JavaScript.
@@ -373,7 +304,7 @@ function renderBacklinks($backlinks) {
             <div id="left-sidebar" class="sidebar left-sidebar" :class="{ 'collapsed': leftCollapsed }">
                 <div class="sidebar-content">
                     <div class="app-header">
-                        <a href="/" id="app-title" class="app-title">
+                        <a href="./" id="app-title" class="app-title">
                             <svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 374.77 123.57" class="app-logo">
                                 <defs>
                                     <style>

@@ -1,6 +1,3 @@
-<?php
-// Project Plan Template
-?>
 # Project Plan: {{project_name}}
 
 **Project Lead:** {{project_lead}}

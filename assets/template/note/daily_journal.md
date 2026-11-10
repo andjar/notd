@@ -1,6 +1,3 @@
-<?php
-// Daily Journal Template
-?>
 # Daily Journal: {{journal_date}}
 
 **Overall Mood:** {{mood}} (e.g., Happy, Sad, Productive, Stressed, Calm)

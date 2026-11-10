@@ -52,7 +52,9 @@ jobs:
           cat "$RUNNER_TEMP/server.log"; exit 1
 
       - name: API tests
-        run: node tests/js/ops_api.test.mjs
+        run: |
+          node tests/js/ops_api.test.mjs
+          node tests/js/api.test.mjs
 
       - name: Browser tests
         run: |

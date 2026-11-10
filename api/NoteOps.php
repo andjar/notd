@@ -24,10 +24,6 @@ namespace App;
 
 use PDO;
 
-require_once __DIR__ . '/Ordering.php';
-require_once __DIR__ . '/PatternProcessor.php';
-require_once __DIR__ . '/DataManager.php';
-
 class OpValidationException extends \InvalidArgumentException {}
 
 class NoteOps
@@ -38,6 +34,7 @@ class NoteOps
 
     private PDO $pdo;
     private DataManager $dm;
+    private ?PropertyIndex $index = null;
     /** @var array<string,bool> */
     private array $touched = [];
     /** @var string[] */
@@ -392,42 +389,16 @@ class NoteOps
      */
     public function indexProperties(string $noteId, string $content): void
     {
-        $enc = $this->pdo->prepare("SELECT 1 FROM Properties WHERE note_id = ? AND name = 'encrypted' AND value = 'true' LIMIT 1");
-        $enc->execute([$noteId]);
-        if ($enc->fetch()) {
-            return;
-        }
-
-        $appendWeights = [];
-        if (defined('PROPERTY_WEIGHTS')) {
-            foreach (PROPERTY_WEIGHTS as $weight => $cfg) {
-                if (($cfg['update_behavior'] ?? 'replace') === 'append') {
-                    $appendWeights[] = (int)$weight;
-                }
-            }
-        }
-        if ($appendWeights) {
-            $in = implode(',', $appendWeights);
-            $this->pdo->prepare("DELETE FROM Properties WHERE note_id = ? AND weight NOT IN ($in)")->execute([$noteId]);
-        } else {
-            $this->pdo->prepare("DELETE FROM Properties WHERE note_id = ?")->execute([$noteId]);
-        }
-
-        $processor = new PatternProcessor($this->pdo);
-        $processed = $processor->processContent($content, 'note', $noteId, ['pdo' => $this->pdo]);
-        $props = $processed['properties'] ?? [];
-        if (!empty($props)) {
-            $processor->saveProperties($props, 'note', $noteId);
-        }
-
+        $this->index = $this->index ?? new PropertyIndex($this->pdo);
         $internal = false;
-        foreach ($props as $p) {
-            if (strtolower($p['name'] ?? '') === 'internal' && strtolower((string)($p['value'] ?? '')) === 'true') {
+        foreach ($this->index->reindex('note', $noteId, $content) as $p) {
+            if (strtolower($p['name']) === 'internal' && strtolower($p['value']) === 'true') {
                 $internal = true;
                 break;
             }
         }
-        $this->pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?")->execute([$internal ? 1 : 0, $noteId]);
+        $this->pdo->prepare('UPDATE Notes SET internal = ? WHERE id = ? AND internal != ?')
+            ->execute([$internal ? 1 : 0, $noteId, $internal ? 1 : 0]);
     }
 
     /**
@@ -459,5 +430,45 @@ class NoteOps
             $lastId = $id;
         }
         return $ops;
+    }
+
+    /**
+     * Appends a tree of notes at the end of a page (or under $parentId).
+     * Each item is a string or {"content": "...", "collapsed"?: bool, "children"?: [...]}.
+     * The caller owns the transaction.
+     *
+     * @return array the created notes, flat, parents before children
+     * @throws OpValidationException if an item has no string content
+     */
+    public function appendTree(int $pageId, array $items, ?string $parentId = null): array
+    {
+        $created = [];
+        // Level by level, so every parent exists before its children are added.
+        $queue = [[$parentId, array_values($items)]];
+        while ($queue) {
+            [$parent, $level] = array_shift($queue);
+            foreach ($level as $k => $item) {
+                if (is_string($item)) {
+                    $level[$k] = $item = ['content' => $item];
+                }
+                if (!is_array($item) || !isset($item['content']) || !is_string($item['content'])) {
+                    throw new OpValidationException("Each note must be a string or an object with a 'content' string.");
+                }
+            }
+            $ops = $this->appendCreateOps($pageId, $level, $parent);
+            $result = $this->apply($ops);
+            $byId = array_column($result['notes'], null, 'id');
+            foreach ($ops as $op) {
+                if (isset($byId[$op['id']])) {
+                    $created[] = $byId[$op['id']];
+                }
+            }
+            foreach ($level as $k => $item) {
+                if (!empty($item['children']) && is_array($item['children'])) {
+                    $queue[] = [$ops[$k]['id'], array_values($item['children'])];
+                }
+            }
+        }
+        return $created;
     }
 }

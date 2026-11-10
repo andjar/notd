@@ -25,3 +25,6 @@
 
 // Show PHP errors and include stack traces in API error responses.
 // define('NOTD_DEBUG', false);
+
+// Accept data-changing requests initiated by other websites (not recommended).
+// define('ALLOW_CROSS_SITE_REQUESTS', false);

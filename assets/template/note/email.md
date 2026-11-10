@@ -1,6 +1,3 @@
-<?php
-// Email Template
-?>
 ## Email: {{subject}}
 
 **To:** {{to_address}}
