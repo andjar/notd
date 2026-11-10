@@ -3,7 +3,7 @@
  * @module app
  */
 
-// Alpine.js will be loaded from CDN and available as global Alpine
+// Alpine.js is loaded from assets/libs and available as the global Alpine
 import { splashScreen } from './app/splash-screen.js';
 import sidebarComponent from './app/sidebar-component.js';
 import calendarComponent from './app/calendar-component.js';
@@ -49,18 +49,9 @@ Alpine.store('app', {
   currentPageId: null,
   currentPageName: null,
   saveStatus: 'saved', // valid: saved, saving, error
-  pageCache: new Map(),
   focusedNoteId: null,
   pagePassword: null,
-  
-  // Additional state variables from state.js
-  lastResponse: null,
-  activeRequests: 0,
-  
-  // Constants
-  CACHE_MAX_AGE_MS: 5 * 60 * 1000, // 5 minutes
-  MAX_PREFETCH_PAGES: 3,
-  
+
   // Helper methods for state management
   setCurrentPageId(newId) {
     this.currentPageId = newId;
@@ -82,44 +73,15 @@ Alpine.store('app', {
     window.currentPagePassword = newPassword;
   },
   
-  // Notes live in the outline model (app/outline.js), not in this store.
-  setNotes() {},
-
   setFocusedNoteId(newNoteId) {
     this.focusedNoteId = newNoteId;
     window.currentFocusedNoteId = newNoteId;
-  },
-  
-  // Page cache management
-  setPageCache(key, value) {
-    console.log('[CACHE] setPageCache:', key);
-    this.pageCache.set(key, value);
-  },
-  
-  getPageCache(key) {
-    console.log('[CACHE] getPageCache:', key);
-    return this.pageCache.get(key);
-  },
-  
-  hasPageCache(key) {
-    return this.pageCache.has(key);
-  },
-  
-  deletePageCache(key) {
-    console.log('[CACHE] deletePageCache:', key);
-    return this.pageCache.delete(key);
-  },
-  
-  clearPageCache() {
-    this.pageCache.clear();
   }
 });
     Alpine.data('splashScreen', splashScreen);
     Alpine.data('sidebarComponent', sidebarComponent);
     Alpine.data('calendarComponent', calendarComponent);
 });
-
-// Alpine.start() is automatically called by the CDN version
 
 // Page management
 import { loadPage } from './app/page-loader.js';

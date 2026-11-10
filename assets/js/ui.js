@@ -769,11 +769,9 @@ function displayBacklinksInSidebar(pageName) {
     // Only execute if the backlinks container is empty (fallback)
     const container = document.getElementById('backlinks-container');
     if (!container || container.querySelector('.backlinks-list').children.length > 0) {
-        console.log('Backlinks container not found or already populated');
         return;
     }
 
-    console.log('Starting backlinks display for page:', pageName);
     
     // Clear the entire container first to avoid duplicate headers
     container.innerHTML = '';
@@ -792,7 +790,6 @@ function displayBacklinksInSidebar(pageName) {
     // Use searchAPI instead of direct fetch
     window.searchAPI.getBacklinks(pageName)
         .then(backlinks => {
-            console.log('Received backlinks:', backlinks);
             
             // Handle both array and object formats
             const backlinksArray = Array.isArray(backlinks) ? backlinks : 
@@ -835,7 +832,6 @@ function displayBacklinksInSidebar(pageName) {
         })
         .catch(error => {
             console.error('Error fetching backlinks:', error);
-            console.log('Container after error:', container.innerHTML);
             listContainer.innerHTML = '<p>Error loading backlinks.</p>';
         });
 }

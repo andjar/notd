@@ -6,19 +6,54 @@ use PDO;
 
 require_once __DIR__ . '/db_connect.php';
 require_once __DIR__ . '/response_utils.php';
-require_once __DIR__ . '/v1/WebhooksManager.php'; // Include the new WebhooksManager
+require_once __DIR__ . '/WebhooksManager.php';
 
 class PropertyTriggerService {
     private $pdo;
-    private $webhooksManager; // Add WebhooksManager instance
 
-    // Trigger handler functions will be defined as private methods here
-    // e.g., private function handleInternalPropertyForNote(...) { ... }
-    // e.g., private function handleAliasProperty(...) { ... }
+    /** Webhook deliveries waiting for the end of the request: [webhook, eventType, payload]. */
+    private static array $pendingWebhooks = [];
+    private static bool $flushRegistered = false;
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
-        $this->webhooksManager = new \App\WebhooksManager($pdo); // Instantiate WebhooksManager
+    }
+
+    /**
+     * Webhooks are HTTP calls to other servers, so they are never sent while a
+     * write transaction is open (a slow receiver would block every other
+     * save). They are queued and sent when the request ends.
+     */
+    private static function queueWebhook(array $webhook, string $eventType, array $payload): void {
+        self::$pendingWebhooks[] = [$webhook, $eventType, $payload];
+        if (!self::$flushRegistered) {
+            self::$flushRegistered = true;
+            register_shutdown_function([self::class, 'flushWebhooks']);
+        }
+    }
+
+    /** Call after rolling back a transaction: its changes did not happen. */
+    public static function discardPendingWebhooks(): void {
+        self::$pendingWebhooks = [];
+    }
+
+    public static function flushWebhooks(): void {
+        $pending = self::$pendingWebhooks;
+        self::$pendingWebhooks = [];
+        if (!$pending) {
+            return;
+        }
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request(); // the client already has its answer
+        }
+        try {
+            $manager = new WebhooksManager(get_db_connection());
+            foreach ($pending as [$webhook, $eventType, $payload]) {
+                $manager->dispatchEvent($webhook, $eventType, $payload);
+            }
+        } catch (\Throwable $e) {
+            error_log('Webhook delivery failed: ' . $e->getMessage());
+        }
     }
 
     private function handleInternalPropertyForNote($entityId, $propertyName, $propertyValue) {
@@ -117,10 +152,9 @@ class PropertyTriggerService {
                     ]
                 ];
 
-                // Use the WebhooksManager to dispatch the event
-                $this->webhooksManager->dispatchEvent($webhook, 'property_change', $payload);
+                self::queueWebhook($webhook, 'property_change', $payload);
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log("Error during webhook dispatch: " . $e->getMessage());
         }
     }
@@ -159,10 +193,9 @@ class PropertyTriggerService {
                     ], $data)
                 ];
 
-                // Use the WebhooksManager to dispatch the event
-                $this->webhooksManager->dispatchEvent($webhook, $eventType, $payload);
+                self::queueWebhook($webhook, $eventType, $payload);
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log("Error during entity event webhook dispatch: " . $e->getMessage());
         }
     }
@@ -186,5 +219,3 @@ class PropertyTriggerService {
     }
 }
 
-// Library file: no side effects on include.
-?>

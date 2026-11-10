@@ -81,9 +81,11 @@ try {
     ]);
 } catch (\InvalidArgumentException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
+    \App\PropertyTriggerService::discardPendingWebhooks();
     ApiResponse::error($e->getMessage(), 400);
 } catch (\Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
+    \App\PropertyTriggerService::discardPendingWebhooks();
     error_log("append_to_page.php failed: " . $e->getMessage());
     ApiResponse::error('An error occurred: ' . $e->getMessage(), 500);
 }

@@ -31,11 +31,11 @@ try {
     $childPages = $dataManager->getChildPages($namespace);
     
     \App\ApiResponse::success($childPages);
-} catch (PDOException $e) {
+} catch (\PDOException $e) {
     // Log the error for debugging
     error_log("Database error in child_pages.php: " . $e->getMessage());
     \App\ApiResponse::error('Database error.', 500);
-} catch (Exception $e) {
+} catch (\Exception $e) {
     error_log("Error in child_pages.php: " . $e->getMessage());
     \App\ApiResponse::error('An unexpected error occurred.', 500);
 } 

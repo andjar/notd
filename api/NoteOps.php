@@ -33,6 +33,8 @@ class OpValidationException extends \InvalidArgumentException {}
 class NoteOps
 {
     public const TYPES = ['create', 'move', 'edit', 'collapse', 'delete'];
+    /** Applied op ids are remembered this long; a retry after that would be applied again. */
+    public const OP_LOG_DAYS = 90;
 
     private PDO $pdo;
     private DataManager $dm;
@@ -76,6 +78,11 @@ class NoteOps
             $status = $this->{'apply' . ucfirst($op['type'])}($op, $i);
             $this->markApplied($opId);
             $results[] = ['op_id' => $opId, 'status' => $status];
+        }
+
+        // The op log only has to outlive client retries. Trim it now and then.
+        if (random_int(1, 100) === 1) {
+            $this->pdo->exec("DELETE FROM AppliedOps WHERE applied_at < datetime('now', '-" . self::OP_LOG_DAYS . " days')");
         }
 
         $deleted = array_flip($this->deleted);

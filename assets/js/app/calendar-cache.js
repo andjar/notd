@@ -26,7 +26,6 @@ class CalendarCache {
             this.pagesCache = cached.pages || [];
             this.dateToPageMap = new Map(cached.dateToPageMap || []);
             this.isInitialized = true;
-            console.log('[Calendar Cache] Loaded from cache:', this.pagesCache.length, 'pages');
             return true;
         }
 
@@ -52,7 +51,6 @@ class CalendarCache {
      */
     async refresh() {
         try {
-            console.log('[Calendar Cache] Fetching fresh data from server...');
             const response = await pagesAPI.getPages({ per_page: 5000 });
             this.pagesCache = response?.pages || [];
             
@@ -63,7 +61,6 @@ class CalendarCache {
             this.saveToStorage();
             
             this.isInitialized = true;
-            console.log('[Calendar Cache] Refreshed:', this.pagesCache.length, 'pages');
             return true;
         } catch (error) {
             console.error('[Calendar Cache] Error refreshing data:', error);

@@ -161,12 +161,6 @@ function handleCreateAndFocusFirstNote() {
 }
 
 async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
-    console.log('[DEBUG] Starting _renderPageContent with:', { 
-        pageName: pageData.name, 
-        hasNotes: Boolean(pageData.notes?.length),
-        hasProperties: Boolean(pageProperties),
-        focusFirstNote 
-    });
 
     const pageContentDiv = ui.domRefs.pageContent;
     const pageTitleDiv = ui.domRefs.pageTitle;
@@ -199,10 +193,6 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
 
     // Render notes
     if (pageData.notes && pageData.notes.length > 0) {
-        console.log('[DEBUG] Processing notes for rendering:', { 
-            noteCount: pageData.notes.length,
-            hasEncryptProperty: Boolean(pageProperties.encrypt)
-        });
 
         let notesToRender = pageData.notes;
         const pageEncryptProperty = pageProperties.encrypt && Array.isArray(pageProperties.encrypt) && pageProperties.encrypt.length > 0
@@ -210,20 +200,14 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
             : null;
 
         if (pageEncryptProperty) {
-            console.log('[DEBUG] Page has encryption property:', { 
-                hasValue: Boolean(pageEncryptProperty.value),
-                valueLength: pageEncryptProperty.value?.length
-            });
 
             const appStore = getAppStore();
             let password = appStore.pagePassword;
             const pageHash = pageEncryptProperty.value;
 
             if (!password) {
-                console.log('[DEBUG] No stored password, prompting user');
                 try {
                     password = await promptForPagePassword();
-                    console.log('[DEBUG] Password received from prompt');
                     const passwordHash = sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(password));
 
                     if (passwordHash !== pageHash) {
@@ -234,16 +218,13 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                         alert("Wrong password!");
                         appStore.setPagePassword(null);
                         pageContentDiv.innerHTML = '<p>Decryption failed: Incorrect password.</p>';
-                        appStore.setNotes([]);
                         ui.displayNotes([], appStore.currentPageId);
                         return; // Stop rendering
                     }
-                    console.log('[DEBUG] Password verified, setting current password');
                     appStore.setPagePassword(password);
                 } catch (error) {
                     console.error("[DEBUG] Password prompt failed:", error);
                     pageContentDiv.innerHTML = '<p>Password entry cancelled. Cannot display page.</p>';
-                    appStore.setNotes([]);
                     ui.displayNotes([], appStore.currentPageId);
                     return; // Stop rendering
                 }
@@ -259,13 +240,11 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                 });
                 appStore.setPagePassword(null);
                 pageContentDiv.innerHTML = '<p>Decryption failed: Stored password is incorrect for this page. Please reload.</p>';
-                appStore.setNotes([]);
                 ui.displayNotes([], appStore.currentPageId);
                 return;
             }
 
             // Decrypt notes
-            console.log('[DEBUG] Starting note decryption');
             const decryptedNotes = [];
             let decryptionErrorOccurred = false;
             for (const note of notesToRender) {
@@ -277,18 +256,7 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
 
                 if ((note.is_encrypted || isEncryptedContent) && note.content) {
                     try {
-                        console.log('[DEBUG] Before decryption:', { 
-                            noteId: note.id, 
-                            content: note.content,
-                            isEncrypted: note.is_encrypted,
-                            isEncryptedContent
-                        });
                         const decryptedContent = decrypt(currentPassword, note.content);
-                        console.log('[DEBUG] After decryption:', { 
-                            noteId: note.id, 
-                            decryptedContent,
-                            isEncrypted: false 
-                        });
                         decryptedNotes.push({ ...note, content: decryptedContent, is_encrypted: false });
                     } catch (e) {
                         console.error(`[DEBUG] Decryption failed for note ${note.id}:`, e);
@@ -296,41 +264,25 @@ async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
                         decryptionErrorOccurred = true;
                     }
                 } else {
-                    console.log('[DEBUG] Note not encrypted:', { 
-                        noteId: note.id, 
-                        content: note.content,
-                        isEncrypted: note.is_encrypted,
-                        isEncryptedContent
-                    });
                     decryptedNotes.push(note);
                 }
             }
             notesToRender = decryptedNotes;
-            console.log('[DEBUG] Note decryption complete:', { 
-                totalNotes: notesToRender.length,
-                decryptionErrors: decryptionErrorOccurred,
-                sampleNote: notesToRender[0] // Log first note to see its state
-            });
         }
         
-        console.log('[DEBUG] Setting notes for current page and displaying');
         const appStore = getAppStore();
-        appStore.setNotes(notesToRender);
         ui.displayNotes(notesToRender, appStore.currentPageId);
         if (focusFirstNote && pageData.notes[0]) {
             handleNoteAction('focus', pageData.notes[0].id);
         }
     } else {
-        console.log('[DEBUG] No notes to render');
         const appStore = getAppStore();
-        appStore.setNotes([]);
         ui.displayNotes([], appStore.currentPageId); // Clear notes view
         if (focusFirstNote) {
             await handleNoteAction('create', null);
         }
     }
 
-    console.log('[DEBUG] Rendering additional page elements');
     // displayBacklinks(pageData.name); // Disabled - conflicts with Alpine.js
     // displayChildPages(pageData.name); // Disabled - conflicts with Alpine.js
     handleTransclusions();
@@ -352,7 +304,6 @@ async function _processAndRenderPage(pageData, focusFirstNote) {
     const appStore = getAppStore();
     appStore.setCurrentPageName(pageData.name);
     appStore.setCurrentPageId(pageData.id);
-    appStore.setNotes(pageData.notes || []);
     appStore.setPagePassword(null); // Reset password for new page
 
     // Add to recent history
@@ -425,7 +376,6 @@ export async function loadPage(pageName, focusFirstNote = false, providedPageDat
         appStore.setCurrentPageName(`Error: ${pageName}`);
         appStore.setCurrentPageId(null);
         ui.updatePageTitle(appStore.currentPageName);
-        console.log('[page-loader] Attempting to display error message. notesContainer:', ui.domRefs.notesContainer);
         try {
             if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
         } catch (innerError) {
@@ -442,8 +392,6 @@ export async function loadPage(pageName, focusFirstNote = false, providedPageDat
  * each visit to fill a cache that could serve stale data. Kept as no-ops for
  * callers.
  */
-export async function prefetchLinkedPagesData() {}
-export async function prefetchRecentPagesData() {}
 
 export async function fetchAndDisplayPages(activePageName) {
     try {
@@ -475,7 +423,6 @@ export function handleUrlAnchor() {
     if (!noteMatch) return;
     
     const noteId = noteMatch[1];
-    console.log(`[URL Anchor] Looking for note with ID: ${noteId}`);
     
     // Find the note element in the DOM
     const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
@@ -485,7 +432,6 @@ export function handleUrlAnchor() {
         setTimeout(() => {
             const retryElement = document.querySelector(`[data-note-id="${noteId}"]`);
             if (retryElement) {
-                console.log(`[URL Anchor] Found note ${noteId} on retry`);
                 highlightNoteElement(retryElement);
             }
         }, 500);
@@ -524,5 +470,4 @@ function highlightNoteElement(noteElement) {
         noteElement.classList.remove('anchor-highlight');
     }, 3000); // Keep highlight for 3 seconds
     
-    console.log(`[URL Anchor] Successfully highlighted note ${noteId}`);
 }

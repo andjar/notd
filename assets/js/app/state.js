@@ -41,16 +41,8 @@ export function getCurrentPageName() {
     return getAppStore().currentPageName;
 }
 
-export function getSaveStatus() {
-    return getAppStore().saveStatus;
-}
-
 // Notes are held by the outline model: import { model } from './outline.js'.
 
 export function getCurrentFocusedNoteId() {
     return getAppStore().focusedNoteId;
 }
-
-// --- Constants ---
-export const CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
-export const MAX_PREFETCH_PAGES = 3;

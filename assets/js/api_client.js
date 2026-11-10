@@ -129,11 +129,6 @@ const pagesAPI = {
      * @returns {Promise<Array>} Array of child page objects
      */
     getChildPages: (namespace) => apiRequest(`child_pages.php?namespace=${encodeURIComponent(namespace)}`),
-    /**
-     * Get recent pages from server
-     * @returns {Promise<Array>} Array of recent page objects
-     */
-    getRecentPages: () => apiRequest('recent_pages.php'),
     createPage: (pageName, content = null) => {
         const payload = { name: pageName };
         if (content !== null) {
@@ -239,15 +234,6 @@ const queryAPI = {
     }
 };
 
-/**
- * API functions for managing favorites
- * @namespace favoritesAPI
- */
-const favoritesAPI = {
-    getFavorites: () => apiRequest('favorites.php'),
-    addFavorite: (pageName) => apiRequest('favorites.php', 'POST', { page_name: pageName }),
-    removeFavorite: (pageName) => apiRequest('favorites.php', 'POST', { _method: 'DELETE', page_name: pageName })
-};
 export {
     pagesAPI,
     notesAPI,
@@ -256,6 +242,5 @@ export {
     searchAPI,
     templatesAPI,
     queryAPI,
-    favoritesAPI,
     apiRequest
 };

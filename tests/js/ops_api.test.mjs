@@ -198,5 +198,47 @@ await test('notes.php rejects writes', async () => {
   eq(r.status, 405, '405');
 });
 
+await test('webhooks: managed at webhooks.php, delivered after the batch commits', async () => {
+  const { createServer } = await import('node:http');
+  const received = [];
+  const server = createServer((req, res) => {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => { received.push({ event: req.headers['x-notd-event'], signature: req.headers['x-notd-signature'], body: JSON.parse(body) }); res.end('ok'); });
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  let hookId = null;
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/hook`;
+    const created = await raw('webhooks.php', { url, entity_type: 'note', property_names: ['status'] });
+    eq(created.status, 200, 'webhook created');
+    hookId = created.json.data.id;
+    ok(/^whsec_/.test(created.json.data.secret || ''), 'secret returned on creation');
+    eq((await raw(`webhooks.php?action=verify&id=${hookId}`, {})).status, 200, 'verified');
+    eq(received.map(r => r.event), ['verification'], 'verification request received');
+
+    const p = await page('t-hook');
+    const ids = await seed(p, ['plain']);
+    await ops([{ op_id: opId(), type: 'edit', id: ids.plain, content: 'now {status::open} {other::x}' }]);
+    for (let i = 0; i < 40 && received.length < 2; i++) await new Promise(r => setTimeout(r, 50));
+    eq(received.slice(1).map(r => [r.event, r.body.data.property_name, r.body.data.value, r.body.data.entity_id]),
+      [['property_change', 'status', 'open', ids.plain]], 'one delivery, only for the subscribed property');
+    ok(/^[0-9a-f]{64}$/.test(received[1]?.signature || ''), 'delivery is signed');
+
+    // A batch that fails validation is rolled back and must not notify anyone.
+    const bad = await raw('ops.php', { ops: [
+      { op_id: opId(), type: 'edit', id: ids.plain, content: '{status::closed}' },
+      { op_id: opId(), type: 'edit', id: ids.plain },
+    ] });
+    eq(bad.status, 400, 'invalid batch rejected');
+    await new Promise(r => setTimeout(r, 300));
+    eq(received.length, 2, 'no delivery for a rolled-back batch');
+  } finally {
+    if (hookId) await raw(`webhooks.php?id=${hookId}`, { _method: 'DELETE' });
+    server.close();
+  }
+  eq((await raw('webhooks.php')).json.data.filter(w => w.id === hookId), [], 'webhook deleted');
+});
+
 console.log(`\n${passes} assertions passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

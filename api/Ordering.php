@@ -13,13 +13,21 @@ final class Ordering
     public const DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
     private const SMALLEST_INTEGER = 'A00000000000000000000000000';
 
-    /** A new note ID: 16 lowercase hex characters (matches the client's newId()). */
+    /** A new note ID: a UUIDv7 (RFC 9562), the same format the client generates (assets/js/app/ids.js). */
     public static function newId(): string
     {
-        return bin2hex(random_bytes(8));
+        $b = random_bytes(16);
+        $ms = (int)floor(microtime(true) * 1000);
+        for ($i = 5; $i >= 0; $i--) {
+            $b[$i] = chr($ms & 0xff);
+            $ms >>= 8;
+        }
+        $b[6] = chr((ord($b[6]) & 0x0f) | 0x70); // version 7
+        $b[8] = chr((ord($b[8]) & 0x3f) | 0x80); // RFC variant
+        $h = bin2hex($b);
+        return substr($h, 0, 8) . '-' . substr($h, 8, 4) . '-' . substr($h, 12, 4) . '-' . substr($h, 16, 4) . '-' . substr($h, 20);
     }
 
-    /** Note IDs are opaque strings; legacy numeric IDs are valid too. */
     public static function isValidId($id): bool
     {
         return is_string($id) && preg_match('/^[A-Za-z0-9_-]{1,64}$/', $id) === 1;

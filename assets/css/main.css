@@ -1,6 +1,4 @@
-/* ========== MODULAR CSS STRUCTURE ========== */
-/* This file imports all the modular CSS components */
-
+/* notd styles: imports every part. See README.md in this folder. */
 /* Base styles */
 @import url('base/variables.css');
 @import url('base/reset.css');
@@ -30,23 +28,3 @@
 @import url('components/attachments.css');
 @import url('components/mobile-toolbar.css');
 @import url('components/sync.css');
-
-
-
-/* Additional component files can be added here as they are created */
-/* @import url('components/search.css'); */
-/* @import url('components/properties.css'); */
-/* @import url('components/pills.css'); */
-/* @import url('components/transclusions.css'); */
-/* @import url('components/encryption.css'); */
-
-/* Utilities */
-/* @import url('utilities/animations.css'); */
-/* @import url('utilities/helpers.css'); */
-
-/* Theme overrides */
-/* @import url('themes/dark.css'); */
-/* @import url('themes/light.css'); */
-
-/* Responsive */
-/* @import url('utilities/responsive.css'); */ 

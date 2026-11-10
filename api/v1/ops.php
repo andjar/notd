@@ -59,10 +59,12 @@ while (true) {
         return;
     } catch (OpValidationException $e) {
         if ($inTx) $pdo->exec('ROLLBACK');
+        \App\PropertyTriggerService::discardPendingWebhooks();
         ApiResponse::error($e->getMessage(), 400);
         return;
     } catch (Throwable $e) {
         if ($inTx) $pdo->exec('ROLLBACK');
+        \App\PropertyTriggerService::discardPendingWebhooks();
         $busy = $e instanceof PDOException && (in_array((int)($e->errorInfo[1] ?? 0), [5, 6], true)
             || stripos($e->getMessage(), 'database is locked') !== false);
         if ($busy && $attempts < 5) {

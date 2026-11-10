@@ -165,9 +165,10 @@ try {
             \App\ApiResponse::error('Method not supported.', 405);
             break;
     }
-} catch (Exception $e) {
+} catch (\Exception $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
+        \App\PropertyTriggerService::discardPendingWebhooks();
     }
     // Let the global exception handler in config.php format the error
     throw $e;

@@ -4,10 +4,10 @@ namespace App;
 
 use PDO;
 
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../db_connect.php';
-require_once __DIR__ . '/../response_utils.php';
-require_once __DIR__ . '/../validator_utils.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/db_connect.php';
+require_once __DIR__ . '/response_utils.php';
+require_once __DIR__ . '/validator_utils.php';
 
 class WebhooksManager {
     private $pdo;
@@ -23,6 +23,13 @@ class WebhooksManager {
         $method = $_SERVER['REQUEST_METHOD'];
         $action = $_GET['action'] ?? null;
         $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+        $input = $method === 'GET' ? null : json_decode(file_get_contents('php://input'), true);
+        // PUT and DELETE may be sent as POST with {"_method": "PUT"|"DELETE"},
+        // like the other endpoints (phpdesktop only passes GET and POST).
+        if ($method === 'POST' && is_array($input) && isset($input['_method'])) {
+            $method = strtoupper((string)$input['_method']);
+            unset($input['_method']);
+        }
 
         try {
             switch ($method) {
@@ -36,7 +43,6 @@ class WebhooksManager {
                     }
                     break;
                 case 'POST':
-                    $input = json_decode(file_get_contents('php://input'), true);
                     if ($action === 'verify' && $id) {
                         $this->verifyWebhookEndpoint($id);
                     } elseif ($action === 'test' && $id) {
@@ -47,7 +53,6 @@ class WebhooksManager {
                     break;
                 case 'PUT':
                     if ($id) {
-                        $input = json_decode(file_get_contents('php://input'), true);
                         $this->updateWebhook($id, $input);
                     } else {
                         \App\ApiResponse::error('Webhook ID is required for updating.', 400);
@@ -64,7 +69,7 @@ class WebhooksManager {
                     \App\ApiResponse::error('Method Not Allowed', 405);
                     break;
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \App\ApiResponse::error('An unexpected error occurred: ' . $e->getMessage(), 500);
         }
     }
@@ -339,16 +344,5 @@ class WebhooksManager {
             ],
             'history' => $history
         ]);
-    }
-}
-
-// Initialize and handle the request
-if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
-    try {
-        $pdo = get_db_connection();
-        $manager = new \App\WebhooksManager($pdo);
-        $manager->handleRequest();
-    } catch (Exception $e) {
-        \App\ApiResponse::error('Database connection failed or other critical error.', 500, ['details' => $e->getMessage()]);
     }
 }

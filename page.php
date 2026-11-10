@@ -266,7 +266,7 @@ function renderBacklinks($backlinks) {
     
     <!-- Theme and App Styles -->
     <?php include 'assets/css/theme_loader.php'; ?>
-    <link rel="stylesheet" href="assets/css/style_modular.css">
+    <link rel="stylesheet" href="assets/css/main.css">
     
     <!-- Libraries -->
     <script src="assets/libs/feather.min.js"></script>

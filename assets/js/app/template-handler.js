@@ -15,7 +15,6 @@ class TemplateAutocomplete {
     }
 
     async init() {
-        console.log('[Templates] Initializing template autocomplete');
         this.dropdownEl = document.createElement('div');
         this.dropdownEl.className = 'template-autocomplete-dropdown';
         this.dropdownEl.style.display = 'none';
@@ -41,11 +40,9 @@ class TemplateAutocomplete {
     }
 
     async loadTemplates() {
-        console.log('[Templates] Loading templates');
         try {
             const response = await templatesAPI.getTemplates('note');
             this.templates = Array.isArray(response) ? response : (response.data || []);
-            console.log('[Templates] Templates loaded:', this.templates);
             
             if (this.templates.length === 0) {
                 this.templates = [{name: "No templates available", content: ""}];
@@ -304,6 +301,5 @@ export function handleNoteInput(e) {
 
 // Initialize template functionality
 export function initializeTemplateHandling() {
-    console.log('[Templates] Initializing template handling');
     document.addEventListener('input', handleNoteInput);
 } 
