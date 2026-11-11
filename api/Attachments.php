@@ -21,6 +21,15 @@ class Attachments
         'pdf' => 'application/pdf',
         'txt' => 'text/plain', 'md' => 'text/markdown', 'csv' => 'text/csv',
         'json' => 'application/json', 'excalidraw' => 'application/json',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'odt' => 'application/vnd.oasis.opendocument.text',
+        'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        'odp' => 'application/vnd.oasis.opendocument.presentation',
+        'zip' => 'application/zip',
+        'mp3' => 'audio/mpeg', 'm4a' => 'audio/mp4', 'ogg' => 'audio/ogg', 'wav' => 'audio/wav',
+        'mp4' => 'video/mp4', 'webm' => 'video/webm',
     ];
 
     private PDO $pdo;

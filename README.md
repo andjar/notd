@@ -32,7 +32,7 @@ Requires PHP 7.4+ with `pdo_sqlite` and `mbstring`.
 ```bash
 git clone https://github.com/andjar/notd.git
 cd notd
-php -S localhost:8000
+php -S localhost:8000 router.php
 ```
 
 Open <http://localhost:8000>. The database is created on first use.
