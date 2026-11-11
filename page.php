@@ -361,7 +361,7 @@ function renderBacklinks($backlinks) {
                 <h1 id="page-title" class="page-title">
                     <span class="page-title-content">
                         <?php echo renderPageTitle($pageName); ?>
-                        <i id="page-properties-gear" class="page-title-gear" data-feather="settings" title="Page Properties"></i>
+                        <button type="button" id="page-properties-gear" class="page-title-gear" title="Page settings: rename, print, export, lock, delete" aria-label="Page settings"><i data-feather="settings"></i></button>
                     </span>
                 </h1>
                 <div class="page-header-actions">
@@ -370,9 +370,11 @@ function renderBacklinks($backlinks) {
                         <?php
                         foreach ($pageProperties as $key => $instances) {
                             if ($key === 'favorite' || $key === 'encrypt') continue;
+                            // A date title already says it is a journal page.
+                            if ($key === 'type' && count($instances) === 1 && $instances[0]['value'] === 'journal') continue;
                             foreach ($instances as $instance) {
                                 if ($instance['internal'] && !$renderInternal) continue;
-                                echo '<span>' . htmlspecialchars($key) . ':' . htmlspecialchars($instance['value']) . '</span> ';
+                                echo '<span class="page-property"><b>' . htmlspecialchars($key) . '</b> ' . htmlspecialchars($instance['value']) . '</span> ';
                             }
                         }
                         if (isset($pageProperties['encrypt'])) {

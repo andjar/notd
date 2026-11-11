@@ -195,8 +195,8 @@ function notd_add_welcome_notes(PDO $pdo): void
     }
     require_once __DIR__ . '/bootstrap.php';
     notd_write($pdo, static function (PDO $pdo) use ($notes) {
-        $pageId = (new \App\PageStore($pdo))->ensure(gmdate('Y-m-d'));
-        $ops = new \App\NoteOps($pdo);
-        $ops->apply($ops->appendCreateOps($pageId, array_map(static fn($c) => ['content' => (string)$c], $notes)));
+        // The server's local date; the browser opens its own local "today", which is the same for most setups.
+        $pageId = (new \App\PageStore($pdo))->ensure(date('Y-m-d'));
+        (new \App\NoteOps($pdo))->appendTree($pageId, $notes);
     });
 }

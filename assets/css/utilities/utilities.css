@@ -179,7 +179,10 @@
   padding: var(--ls-space-1);
   border-radius: var(--ls-border-radius-low);
   transition: all var(--ls-transition-fast);
-  opacity: 0; /* Invisible by default */
+  border: 0;
+  background: none;
+  margin-left: var(--ls-space-1);
+  vertical-align: middle;
   width: 22px; /* Smaller size */
   height: 22px; /* Smaller size */
   display: flex;
@@ -187,9 +190,7 @@
   justify-content: center;
 }
 
-.page-title:hover .page-title-gear {
-  opacity: 1; /* Only visible on hover */
-}
+
 
 .page-title-gear:hover {
   color: var(--ls-primary-text-color);

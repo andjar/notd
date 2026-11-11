@@ -31,7 +31,7 @@ export default function calendarComponent() {
         calendarCells: [],
 
         monthYear() {
-            return this.currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            return this.currentDate.toLocaleString('default', { month: 'short', year: 'numeric' });
         },
 
         init() {

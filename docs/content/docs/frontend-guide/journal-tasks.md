@@ -34,17 +34,17 @@ DOING Write documentation {assigned::john}
 WAITING Client approval for design
 ```
 
-Each task must be its own note. Tick the checkbox to mark a task `DONE`; untick it to return it to `TODO`. For other states, edit the keyword.
+Each task must be its own note. Tick the checkbox to mark a task `DONE`; untick it to return it to `TODO` (`Ctrl + Z` undoes either). For other states, edit the keyword.
 
 <div class="message focus" data-component="message">
-Every change of state is recorded as a <code>status</code> log property on the note, and completing a task records <code>done_at</code>. The history stays even when the keyword changes again.
+A task's <code>status</code> property is always its current keyword, so searches and queries see the task as it is now. The first time a task is marked done, <code>done_at</code> records when.
 </div>
 
-The list of keywords is the `TASK_STATES` setting. The interface also understands `NLR` (no longer required); add it to `TASK_STATES` if you want it indexed and shown on the kanban board.
+The list of keywords is the `TASK_STATES` setting.
 
 ### Organising tasks
 
-![](/images/task_page.png)
+![A project page with a query listing all open tasks](/images/task_page.png)
 
 Add properties to tasks and use them to slice your work:
 

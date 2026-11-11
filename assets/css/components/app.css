@@ -314,3 +314,40 @@ mark {
   content-visibility: auto;
   contain-intrinsic-size: auto 2em;
 }
+
+/* Query results: a quiet list grouped by page, not a stack of cards. */
+.sql-query-results .transclusion-header {
+  background: none;
+  border: 0;
+  padding: 0 0 var(--ls-space-1);
+}
+
+.sql-query-results .transclusion-body {
+  padding: 0;
+  background: none;
+}
+
+.calendar-header {
+  gap: var(--ls-space-1);
+}
+
+.calendar-header .month-year-display {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.calendar-header .arrow-btn {
+  flex-shrink: 0;
+}
+
+/* Buttons that happen to be links are not marked as external links. */
+a.button::after {
+  content: none !important;
+}
+
+a.button {
+  color: inherit;
+  text-decoration: none;
+}
