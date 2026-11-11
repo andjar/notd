@@ -109,12 +109,12 @@ def test_zoom(ctx):
     pg, ids = seed(f'E-zoom-{RUN}', ['A', ' a1', '  a2', 'B'])
     page = ctx.open(pg['name'])
     page.locator(f'.note-bullet[data-note-id="{ids["a1"]}"]').click()
-    visible = [t.strip() for t in page.locator('#notes-container .note-content:visible').all_inner_texts()]
+    visible = [t.strip() for t in page.locator('#notes-container .note-content:visible').all_text_contents()]
     check('zoom shows the note and its children only', visible == ['a1', 'a2'], str(visible))
     crumbs = page.locator('#note-focus-breadcrumbs-container').inner_text()
     check('breadcrumbs show the path', 'A' in crumbs and pg['name'] in crumbs, crumbs)
     page.locator('#note-focus-breadcrumbs-container a').first.click()
-    visible = [t.strip() for t in page.locator('#notes-container .note-content:visible').all_inner_texts()]
+    visible = [t.strip() for t in page.locator('#notes-container .note-content:visible').all_text_contents()]
     check('zoom out shows everything', visible == ['A', 'a1', 'a2', 'B'], str(visible))
 
 
