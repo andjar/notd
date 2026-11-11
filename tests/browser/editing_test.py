@@ -96,7 +96,7 @@ def test_page_link_suggestions(ctx):
     api('pages.php', {'name': target})
     pg, ids = seed(f'E-link-{RUN}', ['A'])
     page = ctx.open(pg['name'])
-    focus(page, 'A'); page.keyboard.type(' [[' + target[:-2])
+    focus(page, 'A'); page.keyboard.type(' [[' + target)
     page.wait_for_selector('.autocomplete-popup:not([hidden]) li', timeout=5000)
     page.keyboard.press('Enter')
     page.keyboard.type(' end')
