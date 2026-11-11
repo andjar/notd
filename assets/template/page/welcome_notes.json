@@ -1,10 +1,42 @@
 [
-    "## Welcome to `notd`! 👋\nThis is your first note. You can use this space to jot down your thoughts, ideas, or anything else you want to remember.",
-    "## Task Management 📝\nYou can create task lists by starting your notes with the special keywords: `TODO`, `DOING`, `DONE`, `WAITING`, `CANCELLED`, `SOMEDAY`, `NLR` (no longer relevant).",
-    "## Shortcuts ⌨️\nUse text expanders to quickly add properties such as `:t` tags or `:k` keywords, `:d` date or `:d` timestamp.",
-    "## Properties ✨\nAdd properties to your notes to organize them further. For example, you can add a {priority::high} property to important notes, set a {favorite::true} or add a {tag::tag}.",
-    "## Templates 🎨\nUse templates to quickly create notes with a consistent format. Just write `/` to get started.",
-    "## Encryption 🔒\nEnable encryption for your notes through page properties. Note that this is an experimental feature. After enabling encryption, you'll need to reload the page before adding new notes.",
-    "## SQL Queries 🔍\nYou can run SQL queries to get data from your database. Just write `SQL {SELECT * FROM Notes WHERE page_id = 1}` (remove space after `SQL`) to get started."
+    {
+        "content": "## Welcome to notd 👋",
+        "children": [
+            "Every bullet is a note. Click one to edit it; `Enter` starts the next note and `Tab` nests it under the one above.",
+            "Notes are **Markdown**: `**bold**`, `*italic*`, `` `code` ``, lists, tables and links.",
+            "Click a bullet to zoom into it, and the arrow beside it to fold its children away. `Ctrl + Z` undoes what you just did."
+        ]
+    },
+    {
+        "content": "## Pages and links 🔗",
+        "children": [
+            "Type `[[` to link to a page, for example [[Getting started]]. A page you link to lists this note under its backlinks.",
+            "Every day has its own journal page; the calendar on the left takes you to any day.",
+            "`Ctrl + Space` finds or creates a page; `Shift + Space` searches all notes."
+        ]
+    },
+    {
+        "content": "## Tasks ✅",
+        "children": [
+            "TODO Start a note with a task keyword to make it a task",
+            "DONE Tick the box to mark it done",
+            "The keywords are `TODO`, `DOING`, `DONE`, `WAITING`, `SOMEDAY` and `CANCELLED`."
+        ]
+    },
+    {
+        "content": "## Properties and queries ✨",
+        "children": [
+            "Write properties anywhere in a note, like {priority::high} or {project::notd}. They make notes findable by search and queries.",
+            "`:d` followed by a space inserts today's date, `:t` a tag.",
+            "A query lists the notes it finds, for example all open tasks: `SQL{SELECT id FROM Notes WHERE content LIKE 'TODO %'}` (write it without the backticks)."
+        ]
+    },
+    {
+        "content": "## More 🧰",
+        "children": [
+            "Type `/` to insert a template. Paste or drop a file onto a note to attach it.",
+            "The ⚙ next to the page title renames, prints, exports, locks or deletes the page; the ☆ adds it to your favourites.",
+            "When you are done exploring, delete these notes: right-click a bullet and choose **Delete**."
+        ]
+    }
 ]
-  

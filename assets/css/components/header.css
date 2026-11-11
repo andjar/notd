@@ -38,22 +38,33 @@
     color: var(--ls-primary-text-color);
 }
 
-/* 3. The container for all the actions that will appear on hover */
+/* 3. Star and page properties, after the title */
 .page-header-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: var(--ls-space-3);
-
-    /* --- The Magic --- */
-    opacity: 0; /* Hidden by default */
-    transform: translateX(-8px); /* Start slightly to the left */
-    transition: opacity 150ms ease-in-out, transform 150ms ease-in-out;
 }
 
-/* 4. The reveal on hover */
-.page-header-container:hover .page-header-actions {
-    opacity: 1; /* Fade it in */
-    transform: translateX(0); /* Slide it in from the left */
+/* 4. The star and the gear stay out of the way until the header is hovered
+      or focused; a page that is a favourite always shows its star. Touch
+      screens, which cannot hover, always show them. */
+.favorite-toggle:not(.is-favorite),
+.page-title-gear {
+    opacity: 0;
+    transition: opacity 150ms ease-in-out;
+}
+.page-header-container:hover .favorite-toggle,
+.page-header-container:focus-within .favorite-toggle,
+.page-header-container:hover .page-title-gear,
+.page-header-container:focus-within .page-title-gear {
+    opacity: 1;
+}
+@media (hover: none) {
+    .favorite-toggle:not(.is-favorite),
+    .page-title-gear {
+        opacity: 0.6;
+    }
 }
 
 /* 5. Styling for the individual actions */
@@ -72,6 +83,10 @@
     gap: var(--ls-space-2);
     font-size: var(--ls-font-size-sm);
     color: var(--ls-secondary-text-color);
+}
+.page-properties > span b {
+    font-weight: var(--ls-font-weight-medium, 500);
+    color: var(--ls-primary-text-color);
 }
 .page-properties > span {
     background-color: var(--ls-tertiary-background-color);

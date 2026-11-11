@@ -103,8 +103,17 @@ async function hydrateQuery(placeholder, depth, seen) {
     if (!result.data.length) {
         box.innerHTML = '<p class="sql-query-empty">No notes match this query.</p>';
     }
+    // Consecutive results from the same page share one heading.
+    let group = null;
     for (const note of result.data) {
-        box.appendChild(frame('sql-query-result', note));
+        if (!group || group.dataset.page !== String(note.page_name)) {
+            group = frame('sql-query-result', note);
+            group.dataset.page = String(note.page_name);
+            group.querySelector('.transclusion-link')?.setAttribute('href', pageUrl(note.page_name));
+            box.appendChild(group);
+        } else {
+            group.querySelector('.embedded-note-tree').appendChild(noteTree(note));
+        }
     }
     const total = result.pagination?.total_items ?? result.data.length;
     if (total > result.data.length) {
