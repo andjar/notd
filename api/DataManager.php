@@ -183,6 +183,22 @@ class DataManager
         return $this->decorateNotes($stmt->fetchAll(PDO::FETCH_ASSOC), $includeInternal);
     }
 
+    /** Adds `page_name` to notes (one query for all of them). Used where notes of several pages are shown together. */
+    public function withPageNames(array $notes): array
+    {
+        $pageIds = array_values(array_unique(array_map('intval', array_column($notes, 'page_id'))));
+        $names = [];
+        foreach (array_chunk($pageIds, 500) as $chunk) {
+            $stmt = $this->pdo->prepare('SELECT id, name FROM Pages WHERE id IN (' . self::placeholders($chunk) . ')');
+            $stmt->execute($chunk);
+            $names += $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        }
+        foreach ($notes as &$note) {
+            $note['page_name'] = $names[$note['page_id']] ?? null;
+        }
+        return $notes;
+    }
+
     /** Several notes by id (any page). Missing ids are absent from the result. */
     public function getNotesByIds(array $noteIds, bool $includeInternal = false): array
     {
@@ -324,6 +340,34 @@ class DataManager
         );
         $stmt->execute([PageStore::likeEscape($prefix) . '%', mb_strlen($prefix) + 1]);
         return array_map([self::class, 'castPageRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /** The names of all pages, alphabetically. Cheap enough to send whole: it feeds link suggestions and the page finder. */
+    public function getPageNames(bool $excludeJournal = false): array
+    {
+        $where = 'active = 1' . ($excludeJournal ? ' AND NOT ' . self::IS_JOURNAL : '');
+        return $this->pdo->query("SELECT name FROM Pages WHERE $where ORDER BY name COLLATE NOCASE")->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    /**
+     * The days of a month (YYYY-MM) that have a page: journal pages with at
+     * least one note, and pages carrying a {date::YYYY-MM-DD} property.
+     *
+     * @return array<int, array{date: string, page_name: string}>
+     */
+    public function getDatesWithPages(string $month): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT p.name AS date, p.name AS page_name FROM Pages p
+              WHERE p.name GLOB ? AND p.active = 1 AND EXISTS (SELECT 1 FROM Notes n WHERE n.page_id = p.id)
+             UNION
+             SELECT prop.value, p.name FROM Properties prop JOIN Pages p ON p.id = prop.page_id
+              WHERE prop.name = 'date' AND prop.value GLOB ? AND p.active = 1
+             ORDER BY 1"
+        );
+        $glob = $month . '-[0-9][0-9]';
+        $stmt->execute([$glob, $glob]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function getRecentPages(int $limit = 7): array

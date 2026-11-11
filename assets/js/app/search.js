@@ -1,472 +1,210 @@
-import { pagesAPI, searchAPI } from '../api_client.js';
-import { loadPage, fetchAndDisplayPages } from './page-loader.js';
-import { calendarCache } from './calendar-cache.js';
-import { debounce, safeAddEventListener, decrypt } from '../utils.js';
-import { ui } from '../ui.js';
-import { getCurrentPagePassword } from './state.js';
-import { sanitizeHtml } from '../ui/note-renderer.js';
+/**
+ * Finding things: the search box in the sidebar, the page finder
+ * (Ctrl+Space) and the note search (Shift+Space).
+ *
+ * @module app/search
+ */
 
-// --- Global Search (Sidebar) ---
+import { searchAPI } from '../api_client.js';
+import { pageNames, matchNames } from './page-names.js';
+import { debounce, escapeHtml, pageUrl, isDateName, looksEncrypted } from '../utils.js';
 
-function highlightSearchTerms(text, searchTerm) {
-    if (!searchTerm || !text) return text;
-    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, '<span class="search-result-highlight">$1</span>');
+const $ = (id) => document.getElementById(id);
+
+/** A search snippet as safe HTML: the server marks matches with <mark>. */
+function snippetHtml(result) {
+    const text = result.content_snippet ?? result.content ?? '';
+    if (looksEncrypted(result.content)) return '<em>Encrypted note</em>';
+    return escapeHtml(text).replace(/&lt;(\/?)mark&gt;/g, '<$1mark>');
 }
 
-function displaySearchResults(results) {
-    const searchResultsEl = ui.domRefs.searchResults;
-    if (!searchResultsEl) return;
-
-    if (!results || results.length === 0) {
-        searchResultsEl.innerHTML = '<div class="search-result-item">No results found</div>';
-        searchResultsEl.classList.add('has-results');
-        return;
-    }
-
-    const html = results.map(result => {
-        let snippet = result.content_snippet;
-        let isEncrypted = false;
-
-        // Check if the page has an 'encrypted' property set to 'true'
-        // Check both direct properties and parent properties
-        const isEncryptedInProps = (props) => props && Array.isArray(props.encrypted) && 
-            props.encrypted.some(p => String(p.value).toLowerCase() === 'true');
-        
-        isEncrypted = isEncryptedInProps(result.properties) || 
-                     isEncryptedInProps(result.parent_properties);
-
-        if (isEncrypted) {
-            const password = getCurrentPagePassword();
-            if (password) {
-                try {
-                    snippet = decrypt(password, snippet);
-                    if (snippet === null) {
-                        snippet = '[DECRYPTION FAILED]';
-                    }
-                } catch (e) {
-                    console.error('Failed to decrypt search result snippet:', e);
-                    snippet = '[DECRYPTION FAILED]';
-                }
-            } else {
-                snippet = '[ENCRYPTED CONTENT - Enter password to view]';
-            }
-        }
-
-        const encryptedIcon = isEncrypted ? '<i data-feather="lock" class="encrypted-icon"></i> ' : '';
-        
-        // Add parent properties display if they exist
-        const parentPropsHtml = result.parent_properties && Object.keys(result.parent_properties).length > 0 
-            ? `<div class="search-result-parent-props">
-                ${Object.entries(result.parent_properties).map(([key, values]) => 
-                    `<span class="parent-prop">${key}: ${values.map(v => v.value).join(', ')}</span>`
-                ).join('')}
-               </div>`
-            : '';
-        
-        return `
-            <div class="search-result-item">
-                <a href="page.php?page=${encodeURIComponent(result.page_name)}" class="search-result-link">
-                    <div class="search-result-title">${encryptedIcon}${result.page_name}</div>
-                    ${parentPropsHtml}
-                    <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.globalSearchInput.value)}</div>
-                </a>
-            </div>
-        `;
-    }).join('');
-
-    searchResultsEl.innerHTML = sanitizeHtml(html);
-    searchResultsEl.classList.add('has-results');
-
-    // Ensure Feather icons are rendered after new HTML is added
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
-
-    // No need for click handler - links will navigate directly
-}
-
-const debouncedSearch = debounce(async (query, includeParentProps = false) => {
-    const searchResultsEl = ui.domRefs.searchResults;
-    if (!searchResultsEl) return;
-
-    if (!query.trim()) {
-        searchResultsEl.classList.remove('has-results');
-        searchResultsEl.innerHTML = '';
-        return;
-    }
-    
-    try {
-        const response = await searchAPI.search(query, { includeParentProps });
-        if (response && Array.isArray(response.results)) {
-            displaySearchResults(response.results);
-        } else {
-            console.warn('Search API returned unexpected format:', response);
-            displaySearchResults([]);
-        }
-    } catch (error) {
-        console.error('Search error:', error);
-        searchResultsEl.innerHTML = '<div class="search-result-item">Error performing search</div>';
-        searchResultsEl.classList.add('has-results');
-    }
-}, 300);
-
-export function initGlobalSearch() {
-    if (ui.domRefs.globalSearchInput) {
-        // Add a checkbox for including parent properties
-        const searchContainer = ui.domRefs.globalSearchInput.closest('.search-container');
-        if (searchContainer && !searchContainer.querySelector('.include-parent-props')) {
-            const checkboxContainer = document.createElement('div');
-            checkboxContainer.className = 'include-parent-props';
-            checkboxContainer.innerHTML = `
-                <label>
-                    <input type="checkbox" id="includeParentProps">
-                    Include parent properties
-                </label>
-            `;
-            searchContainer.appendChild(checkboxContainer);
-            
-            const checkbox = checkboxContainer.querySelector('#includeParentProps');
-            safeAddEventListener(checkbox, 'change', (e) => {
-                debouncedSearch(ui.domRefs.globalSearchInput.value, e.target.checked);
-            }, 'includeParentPropsCheckbox');
-        }
-
-        safeAddEventListener(ui.domRefs.globalSearchInput, 'input', (e) => {
-            const includeParentProps = document.querySelector('#includeParentProps')?.checked || false;
-            debouncedSearch(e.target.value, includeParentProps);
-        }, 'globalSearchInput');
-    }
-}
-
-
-// --- Page Search Modal ---
-
-let allPagesForSearch = [];
-let selectedSearchResultIndex = -1;
-
-async function openSearchOrCreatePageModal() {
-    if (!ui.domRefs.pageSearchModal) return;
-    try {
-        // **FIXED**: Destructure the `pages` array from the response object.
-        const { pages } = await pagesAPI.getPages({ excludeJournal: true, per_page: 5000 });
-        allPagesForSearch = pages || [];
-    } catch (error) {
-        console.error('Failed to fetch pages for search modal:', error);
-        allPagesForSearch = []; 
-    }
-    ui.domRefs.pageSearchModalInput.value = '';
-    renderPageSearchResults('');
-    ui.domRefs.pageSearchModal.classList.add('active');
-    ui.domRefs.pageSearchModalInput.focus();
-}
-
-function closeSearchOrCreatePageModal() {
-    if (ui.domRefs.pageSearchModal) ui.domRefs.pageSearchModal.classList.remove('active');
-    selectedSearchResultIndex = -1;
-}
-
-function renderPageSearchResults(query) {
-    if (!ui.domRefs.pageSearchModalResults) return;
-    ui.domRefs.pageSearchModalResults.innerHTML = '';
-    selectedSearchResultIndex = -1; 
-
-    const lowerCaseQuery = query.toLowerCase();
-    const filteredPages = allPagesForSearch.filter(page => 
-        page.name.toLowerCase().includes(lowerCaseQuery)
-    );
-
-    filteredPages.slice(0, 10).forEach(page => {
-        const li = document.createElement('li');
-        const link = document.createElement('a');
-        link.href = `page.php?page=${encodeURIComponent(page.name)}`;
-        link.textContent = page.name;
-        link.className = 'page-search-result-link';
-        li.appendChild(link);
-        ui.domRefs.pageSearchModalResults.appendChild(li);
-    });
-
-    const exactMatch = allPagesForSearch.some(page => page.name.toLowerCase() === lowerCaseQuery);
-    if (query.trim() !== '' && !exactMatch) {
-        const li = document.createElement('li');
-        li.classList.add('create-new-option');
-        const link = document.createElement('a');
-        link.href = `page.php?page=${encodeURIComponent(query)}`;
-        link.innerHTML = `Create page: <span>"${query}"</span>`;
-        link.className = 'page-search-result-link create-new-link';
-        li.appendChild(link);
-        ui.domRefs.pageSearchModalResults.appendChild(li);
-    }
-    
-    if (ui.domRefs.pageSearchModalResults.children.length > 0) {
-        selectedSearchResultIndex = 0;
-        ui.domRefs.pageSearchModalResults.children[0].classList.add('selected');
-    }
-}
-
-async function selectAndActionPageSearchResult(pageName, isCreate) {
-    closeSearchOrCreatePageModal();
-    if (isCreate) {
+/** Runs `search(query)` for the latest input only; older answers are dropped. */
+function latestOnly(search, show) {
+    let sequence = 0;
+    return async (query) => {
+        const mine = ++sequence;
         try {
-            const newPage = await pagesAPI.createPage(pageName);
-            if (newPage && newPage.id) {
-                // Add new page to calendar cache if it's a date-based page
-                calendarCache.addPage(newPage);
-                
-                await fetchAndDisplayPages(newPage.name); 
-                await loadPage(newPage.name, true); 
-            } else {
-                alert(`Failed to create page: ${pageName}`);
-            }
+            const results = query.trim() ? await search(query.trim()) : null;
+            if (mine === sequence) show(results, null);
         } catch (error) {
-            console.error('Error creating page from search modal:', error);
-            alert(`Error creating page: ${error.message}`);
+            if (mine === sequence) show(null, error);
         }
-    } else {
-        await loadPage(pageName);
-    }
+    };
 }
 
-export function initPageSearchModal() {
-    if (ui.domRefs.openPageSearchModalBtn) {
-        safeAddEventListener(ui.domRefs.openPageSearchModalBtn, 'click', openSearchOrCreatePageModal, 'openPageSearchModalBtn');
-    }
-    if (ui.domRefs.pageSearchModalCancel) {
-        safeAddEventListener(ui.domRefs.pageSearchModalCancel, 'click', closeSearchOrCreatePageModal, 'pageSearchModalCancel');
-    }
+// ------------------------------------------------------------ sidebar search
 
-    if (ui.domRefs.pageSearchModalInput) {
-        ui.domRefs.pageSearchModalInput.addEventListener('input', (e) => renderPageSearchResults(e.target.value));
+function initSidebarSearch() {
+    const input = $('global-search-input');
+    const box = $('search-results');
+    if (!input || !box) return;
 
-        ui.domRefs.pageSearchModalInput.addEventListener('keydown', (e) => {
-            const items = ui.domRefs.pageSearchModalResults.children;
-            if (e.key !== 'Enter' && items.length === 0) return;
+    const show = (results, error) => {
+        if (error) {
+            box.innerHTML = `<div class="search-result-item">${escapeHtml(error.message)}</div>`;
+        } else if (results === null) {
+            box.innerHTML = '';
+        } else if (!results.length) {
+            box.innerHTML = '<div class="search-result-item">No results found</div>';
+        } else {
+            box.innerHTML = results.map((r) => `
+                <div class="search-result-item">
+                    <a href="${escapeHtml(pageUrl(r.page_name, r.note_id))}" class="search-result-link">
+                        <div class="search-result-title">${escapeHtml(r.page_name)}</div>
+                        <div class="search-result-snippet">${snippetHtml(r)}</div>
+                    </a>
+                </div>`).join('');
+        }
+        box.classList.toggle('has-results', box.innerHTML !== '');
+    };
+    const run = debounce(latestOnly(async (q) => (await searchAPI.notes(q, { perPage: 20 })).results || [], show), 250);
 
-            switch (e.key) {
-                case 'ArrowDown':
-                    e.preventDefault();
-                    if (selectedSearchResultIndex < items.length - 1) {
-                        items[selectedSearchResultIndex]?.classList.remove('selected');
-                        selectedSearchResultIndex++;
-                        items[selectedSearchResultIndex]?.classList.add('selected');
-                    }
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    if (selectedSearchResultIndex > 0) {
-                        items[selectedSearchResultIndex]?.classList.remove('selected');
-                        selectedSearchResultIndex--;
-                        items[selectedSearchResultIndex]?.classList.add('selected');
-                    }
-                    break;
-                case 'Enter':
-                    e.preventDefault();
-                    const pageName = ui.domRefs.pageSearchModalInput.value.trim();
-                    if (!pageName) {
-                        closeSearchOrCreatePageModal();
-                        return;
-                    }
-                    
-                    if (selectedSearchResultIndex > -1 && items[selectedSearchResultIndex]) {
-                        const selectedItem = items[selectedSearchResultIndex];
-                        if (pageName.toLowerCase() === selectedItem.dataset.pageName.toLowerCase()) {
-                           selectAndActionPageSearchResult(selectedItem.dataset.pageName, selectedItem.dataset.isCreate === 'true');
-                           return;
-                        }
-                    }
-                    const exactMatch = allPagesForSearch.find(p => p.name.toLowerCase() === pageName.toLowerCase());
-                    if (exactMatch) {
-                        selectAndActionPageSearchResult(exactMatch.name, false);
-                    } else {
-                        selectAndActionPageSearchResult(pageName, true);
-                    }
-                    break;
-                case 'Escape':
-                    closeSearchOrCreatePageModal();
-                    break;
-            }
-        });
-    }
-
-    document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.code === 'Space') {
-            e.preventDefault();
-            openSearchOrCreatePageModal();
+    input.addEventListener('input', () => run(input.value));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            input.value = '';
+            show(null, null);
+            input.blur();
+        } else if (e.key === 'Enter') {
+            box.querySelector('a')?.click();
         }
     });
 }
 
-// --- Note Search Modal ---
+// ------------------------------------------------------------------ pickers
+//
+// A picker is a modal with a text field and a list of links: arrows move the
+// selection, Enter follows the selected link.
 
-let noteSearchSelectedResultIndex = -1;
+function picker({ modal, input, list, cancel, results }) {
+    if (!modal || !input || !list) return { open() {} };
+    let selected = -1;
 
-function openNoteSearchModal() {
-    if (!ui.domRefs.noteSearchModal) return;
-    ui.domRefs.noteSearchModalInput.value = '';
-    if (ui.domRefs.noteSearchModalResults) ui.domRefs.noteSearchModalResults.innerHTML = '';
-    noteSearchSelectedResultIndex = -1;
-    ui.domRefs.noteSearchModal.classList.add('active');
-    ui.domRefs.noteSearchModalInput.focus();
-}
-
-function closeNoteSearchModal() {
-    if (ui.domRefs.noteSearchModal) ui.domRefs.noteSearchModal.classList.remove('active');
-    noteSearchSelectedResultIndex = -1;
-}
-
-function renderNoteSearchResults(results) {
-    const searchResultsEl = ui.domRefs.noteSearchModalResults;
-    if (!searchResultsEl) return;
-
-    searchResultsEl.innerHTML = ''; // Clear previous results
-    noteSearchSelectedResultIndex = -1;
-
-    if (!results || results.length === 0) {
-        searchResultsEl.innerHTML = '<li class="no-results-item">No notes found</li>';
-        return;
-    }
-
-    const html = results.map(result => {
-        let snippet = result.content_snippet || result.content; // Fallback to full content if snippet is missing
-        let isEncrypted = false;
-
-        const isEncryptedInProps = (props) => props && Array.isArray(props.encrypted) &&
-            props.encrypted.some(p => String(p.value).toLowerCase() === 'true');
-
-        isEncrypted = isEncryptedInProps(result.properties) ||
-                     isEncryptedInProps(result.parent_properties);
-
-        if (isEncrypted) {
-            const password = getCurrentPagePassword(); // Assuming this function is available and works
-            if (password) {
-                try {
-                    snippet = decrypt(password, snippet); // Assuming decrypt is available
-                    if (snippet === null) {
-                        snippet = '[DECRYPTION FAILED]';
-                    }
-                } catch (e) {
-                    console.error('Failed to decrypt search result snippet:', e);
-                    snippet = '[DECRYPTION FAILED]';
-                }
+    const select = (index) => {
+        const rows = list.children;
+        if (!rows.length) {
+            selected = -1;
+            return;
+        }
+        selected = (index + rows.length) % rows.length;
+        Array.from(rows).forEach((row, i) => row.classList.toggle('selected', i === selected));
+        rows[selected].scrollIntoView({ block: 'nearest' });
+    };
+    const show = (rows, error) => {
+        list.replaceChildren();
+        if (error) rows = [{ text: error.message }];
+        for (const row of rows || []) {
+            const li = document.createElement('li');
+            if (row.className) li.className = row.className;
+            if (row.href) {
+                const a = document.createElement('a');
+                a.href = row.href;
+                a.className = 'page-search-result-link';
+                if (row.html) a.innerHTML = row.html; else a.textContent = row.text;
+                li.appendChild(a);
             } else {
-                snippet = '[ENCRYPTED CONTENT - Enter password to view]';
+                li.className = 'no-results-item';
+                li.textContent = row.text;
             }
+            list.appendChild(li);
         }
+        select(0);
+    };
+    const refresh = results.immediate
+        ? latestOnly(results.find, show)
+        : debounce(latestOnly(results.find, show), 250);
+    const close = () => modal.classList.remove('active');
+    const open = () => {
+        input.value = '';
+        show(null, null);
+        modal.classList.add('active');
+        input.focus();
+        if (results.initial) results.initial().then((rows) => { if (!input.value) show(rows, null); });
+    };
 
-        const encryptedIcon = isEncrypted ? '<i data-feather="lock" class="encrypted-icon"></i> ' : '';
-        const pageNamePrefix = result.page_name ? `<span class="search-result-page-name">${result.page_name}</span> > ` : '';
-
-        // Use result.note_id for data-note-id if available, otherwise it's a page result from global search
-        const noteIdAttr = result.note_id ? `data-note-id="${result.note_id}"` : '';
-
-        return `
-            <li class="page-search-result-item" data-page-name="${encodeURIComponent(result.page_name)}" ${noteIdAttr}>
-                <a href="page.php?page=${encodeURIComponent(result.page_name)}" class="page-search-result-link">
-                    <div class="search-result-title">${pageNamePrefix}${encryptedIcon}${highlightSearchTerms(result.content.split('\\n')[0], ui.domRefs.noteSearchModalInput.value)}</div>
-                    <div class="search-result-snippet">${highlightSearchTerms(snippet, ui.domRefs.noteSearchModalInput.value)}</div>
-                </a>
-            </li>
-        `;
-    }).join('');
-
-    searchResultsEl.innerHTML = sanitizeHtml(html);
-
-    if (typeof feather !== 'undefined') {
-        feather.replace();
-    }
-
-    if (searchResultsEl.children.length > 0) {
-        noteSearchSelectedResultIndex = 0;
-        searchResultsEl.children[0].classList.add('selected');
-    }
+    input.addEventListener('input', () => refresh(input.value));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            select(selected + (e.key === 'ArrowDown' ? 1 : -1));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const link = list.children[selected]?.querySelector('a');
+            if (link) window.location.href = link.href;
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+        }
+    });
+    cancel?.addEventListener('click', close);
+    modal.addEventListener('mousedown', (e) => { if (e.target === modal) close(); });
+    return { open, close };
 }
 
-const debouncedNoteSearch = debounce(async (query) => {
-    const searchResultsEl = ui.domRefs.noteSearchModalResults;
-    if (!searchResultsEl) return;
+const pageRow = (name) => ({ text: name, href: pageUrl(name) });
 
-    if (!query.trim()) {
-        searchResultsEl.innerHTML = '';
-        noteSearchSelectedResultIndex = -1;
-        return;
+async function findPages(query) {
+    const names = await pageNames();
+    // Journal pages are reached through the calendar; show them only when a date is typed.
+    const pool = /^\d{4}-/.test(query) ? names : names.filter((n) => !isDateName(n));
+    const rows = matchNames(pool, query, 10).map(pageRow);
+    if (!names.some((n) => n.toLowerCase() === query.toLowerCase())) {
+        rows.push({
+            href: pageUrl(query),
+            html: `Create page: <span>"${escapeHtml(query)}"</span>`,
+            className: 'create-new-option',
+        });
     }
+    return rows;
+}
 
-    try {
-        // For note search, we don't need includeParentProps typically, but the API might handle it.
-        // The main goal is to search note content.
-        const response = await searchAPI.search(query, { includeParentProps: false }); // or true, depending on desired behavior
-        if (response && Array.isArray(response.results)) {
-            renderNoteSearchResults(response.results);
-        } else {
-            console.warn('Note Search API returned unexpected format:', response);
-            renderNoteSearchResults([]);
+async function findNotes(query) {
+    const { results = [] } = await searchAPI.notes(query, { perPage: 30 });
+    if (!results.length) return [{ text: 'No notes found' }];
+    return results.map((r) => ({
+        href: pageUrl(r.page_name, r.note_id),
+        html: `<div class="search-result-title"><span class="search-result-page-name">${escapeHtml(r.page_name)}</span></div>`
+            + `<div class="search-result-snippet">${snippetHtml(r)}</div>`,
+        className: 'page-search-result-item',
+    }));
+}
+
+const typingSomewhere = () => {
+    const el = document.activeElement;
+    return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+};
+
+export function initSearch() {
+    initSidebarSearch();
+
+    const pages = picker({
+        modal: $('page-search-modal'),
+        input: $('page-search-modal-input'),
+        list: $('page-search-modal-results'),
+        cancel: $('page-search-modal-cancel'),
+        results: {
+            immediate: true,
+            find: findPages,
+            initial: async () => (await pageNames()).filter((n) => !isDateName(n)).slice(0, 10).map(pageRow),
+        },
+    });
+    const notes = picker({
+        modal: $('note-search-modal'),
+        input: $('note-search-modal-input'),
+        list: $('note-search-modal-results'),
+        cancel: $('note-search-modal-cancel'),
+        results: { find: findNotes },
+    });
+
+    $('open-page-search-modal-btn')?.addEventListener('click', pages.open);
+    document.addEventListener('keydown', (e) => {
+        if (e.code !== 'Space') return;
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            pages.open();
+        } else if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !typingSomewhere()) {
+            e.preventDefault();
+            notes.open();
         }
-    } catch (error) {
-        console.error('Note search error:', error);
-        searchResultsEl.innerHTML = '<li class="search-result-item error-item">Error performing search</li>';
-    }
-}, 300);
-
-export function initNoteSearchModal() {
-    if (ui.domRefs.noteSearchModal && ui.domRefs.noteSearchModalInput && ui.domRefs.noteSearchModalCancel && ui.domRefs.noteSearchModalResults) {
-        safeAddEventListener(ui.domRefs.noteSearchModalInput, 'input', (e) => {
-            debouncedNoteSearch(e.target.value);
-        }, 'noteSearchModalInput');
-
-        safeAddEventListener(ui.domRefs.noteSearchModalInput, 'keydown', (e) => {
-            const items = ui.domRefs.noteSearchModalResults.children;
-            if (items.length === 0 && e.key !== 'Escape') return;
-
-            switch (e.key) {
-                case 'ArrowDown':
-                    e.preventDefault();
-                    if (noteSearchSelectedResultIndex < items.length - 1) {
-                        items[noteSearchSelectedResultIndex]?.classList.remove('selected');
-                        noteSearchSelectedResultIndex++;
-                        items[noteSearchSelectedResultIndex]?.classList.add('selected');
-                        items[noteSearchSelectedResultIndex]?.scrollIntoView({ block: 'nearest' });
-                    }
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    if (noteSearchSelectedResultIndex > 0) {
-                        items[noteSearchSelectedResultIndex]?.classList.remove('selected');
-                        noteSearchSelectedResultIndex--;
-                        items[noteSearchSelectedResultIndex]?.classList.add('selected');
-                        items[noteSearchSelectedResultIndex]?.scrollIntoView({ block: 'nearest' });
-                    }
-                    break;
-                case 'Enter':
-                    e.preventDefault();
-                    if (noteSearchSelectedResultIndex > -1 && items[noteSearchSelectedResultIndex]) {
-                        const selectedLink = items[noteSearchSelectedResultIndex].querySelector('a');
-                        if (selectedLink && selectedLink.href) {
-                            window.location.href = selectedLink.href; // Navigate to the page
-                            closeNoteSearchModal();
-                        }
-                    }
-                    break;
-                case 'Escape':
-                    closeNoteSearchModal();
-                    break;
-            }
-        });
-
-        safeAddEventListener(ui.domRefs.noteSearchModalCancel, 'click', closeNoteSearchModal, 'noteSearchModalCancel');
-
-        // Global listener for Shift+Space
-        document.addEventListener('keydown', (e) => {
-            if (e.shiftKey && e.code === 'Space') {
-                // Prevent default browser behavior for Shift+Space (e.g., page scroll)
-                // And prevent triggering if an input/textarea is focused
-                if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable)) {
-                    return;
-                }
-                e.preventDefault();
-                openNoteSearchModal();
-            }
-        });
-    } else {
-        console.warn("Note Search Modal elements not fully found in domRefs. Initialization skipped.");
-    }
+    });
 }

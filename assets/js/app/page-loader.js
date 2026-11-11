@@ -1,473 +1,133 @@
-// assets/js/app/page-loader.js
+/**
+ * Loads the page named in the URL into the outline.
+ *
+ * @module app/page-loader
+ */
 
-// Get Alpine store reference
-function getAppStore() {
-    return window.Alpine.store('app');
-}
-
-import { decrypt } from '../utils.js';
-import { notesAPI, pagesAPI, searchAPI, queryAPI, apiRequest } from '../api_client.js';
-import { handleAddRootNote } from './note-actions.js';
-import { ui } from '../ui.js';
-import { parseProperties, parseContent, cleanProperties } from '../utils/content-parser.js';
-import { handleNoteAction } from './note-actions.js';
 import * as outline from './outline.js';
-import { promptForPagePassword } from '../ui.js';
-import { recentHistory } from './recent-history.js';
-import { calendarCache } from './calendar-cache.js';
-import { sanitizeHtml } from '../ui/note-renderer.js';
+import * as view from '../ui/note-elements.js';
+import { page, setPage, pageProperty, config } from './page-state.js';
+import { pagesAPI, notesAPI } from '../api_client.js';
+import { decrypt, encrypt, escapeHtml } from '../utils.js';
+import { renderContent } from '../ui/markdown.js';
+import { askPagePassword, toast } from '../ui/dialogs.js';
 
-// --- Restored Utility Functions ---
-export function getPreviousDayPageName(currentDateStr) {
-    const date = new Date(currentDateStr + 'T12:00:00Z');
-    date.setDate(date.getDate() - 1);
-    return date.toISOString().split('T')[0];
-}
+const container = () => document.getElementById('notes-container');
 
-export function getNextDayPageName(currentDateStr) {
-    const date = new Date(currentDateStr + 'T12:00:00Z');
-    date.setDate(date.getDate() + 1);
-    return date.toISOString().split('T')[0];
-}
-
-
-// --- Feature Implementations (Restored) ---
-
-export async function handleTransclusions() {
-    const placeholders = document.querySelectorAll('.transclusion-placeholder');
-    if (placeholders.length === 0) return;
-
-    for (const placeholder of placeholders) {
-        const blockId = placeholder.dataset.blockRef;
-        if (!blockId) continue;
-        try {
-            // Fetch the note with all its children
-            const noteWithChildren = await notesAPI.getNoteWithChildren(blockId);
-            if (noteWithChildren) {
-                await ui.renderTransclusion(placeholder, noteWithChildren, blockId, 0);
-            } else {
-                placeholder.textContent = 'Block not found.';
-                placeholder.classList.add('error');
-            }
-        } catch (error) {
-            console.error(`Error fetching transclusion for block ID ${blockId}:`, error);
-            placeholder.textContent = 'Error loading block.';
-            placeholder.classList.add('error');
-        }
+function showMessage(text, action = null) {
+    const c = container();
+    if (!c) return;
+    const p = document.createElement('p');
+    p.className = 'page-message';
+    p.textContent = text;
+    c.replaceChildren(p);
+    if (action) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'button';
+        button.textContent = action.label;
+        button.addEventListener('click', action.run);
+        c.appendChild(button);
     }
 }
 
-async function displayBacklinks(pageName) {
-    // Only try to display backlinks if the container exists
-    if (!ui.domRefs.backlinksContainer) {
-        return; // Silently return if container doesn't exist
-    }
+// -------------------------------------------------------------- encryption
+//
+// A locked page carries {encrypt::<verifier>}. The verifier lets the browser
+// tell a wrong password from a right one without the server ever seeing
+// either. Today it is a small encrypted token; pages locked by older versions
+// carry a SHA-256 hash of the password instead, which still unlocks.
 
+const TOKEN = 'notd';
+const LEGACY_HASH = /^[0-9a-f]{64}$/;
+
+export function makeVerifier(password) {
+    return btoa(encrypt(password, TOKEN));
+}
+
+export function passwordMatches(password, verifier) {
+    if (!password || !verifier) return false;
     try {
-        const response = await searchAPI.getBacklinks(pageName);
-        const backlinksData = response.results || [];
-        if (backlinksData.length === 0) {
-            ui.domRefs.backlinksContainer.innerHTML = '<p>No backlinks found.</p>';
+        if (LEGACY_HASH.test(verifier)) {
+            return sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(password)) === verifier;
+        }
+        return decrypt(password, atob(verifier)) === TOKEN;
+    } catch {
+        return false;
+    }
+}
+
+/** Asks for the password of a locked page until it is right. False if the user gives up. */
+async function unlock() {
+    const verifier = pageProperty('encrypt');
+    if (!verifier) return true;
+    for (;;) {
+        const password = await askPagePassword();
+        if (password === null) return false;
+        if (passwordMatches(password, verifier)) {
+            page.password = password;
+            return true;
+        }
+        toast('Wrong password', { error: true });
+    }
+}
+
+// ------------------------------------------------------------------ anchor
+
+/** Scrolls to and highlights the note named in the URL (#note-<id>). */
+export function showAnchoredNote() {
+    const m = /^#note-([A-Za-z0-9_-]+)$/.exec(window.location.hash);
+    if (!m || !outline.model.has(m[1])) return;
+    const id = m[1];
+    // Open what hides it.
+    for (let n = outline.model.get(id); n && n.parent_note_id !== null; n = outline.model.get(n.parent_note_id)) {
+        if (outline.model.get(n.parent_note_id)?.collapsed) outline.setCollapsed(n.parent_note_id, false);
+    }
+    const el = view.getNoteElement(id);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.classList.add('anchor-highlight');
+    setTimeout(() => el.classList.remove('anchor-highlight'), 3000);
+}
+
+// -------------------------------------------------------------------- load
+
+function showPageContent() {
+    const el = document.getElementById('page-content');
+    if (!el) return;
+    // Properties are shown as pills in the header; the rest is free text.
+    const text = page.content.replace(/\{[a-zA-Z0-9_.-]+:{2,}[^}\n]*\}/g, '').trim();
+    el.innerHTML = text ? renderContent(text) : '';
+    el.hidden = !text;
+}
+
+async function loadNotes() {
+    const notes = await notesAPI.forPage(page.id);
+    outline.loadPage(page.id, notes.map((n) => ({ ...n, content: outline.decodeContent(n.content) })));
+    view.renderAll();
+    if (outline.model.children(null).length === 0) {
+        // A new page starts with an empty note to type into.
+        outline.createAtEnd({ focus: window.location.hash ? null : 'start' });
+    }
+    showAnchoredNote();
+}
+
+/** Loads the page this document was opened for. */
+export async function loadCurrentPage() {
+    const name = config.pageName || new URLSearchParams(window.location.search).get('page') || '';
+    try {
+        await outline.settle(); // let edits queued on the previous page reach the server first
+        setPage(await pagesAPI.byName(name));
+        showPageContent();
+        if (!(await unlock())) {
+            showMessage('This page is locked.', { label: 'Unlock', run: () => window.location.reload() });
             return;
         }
-        const html = backlinksData.map(link => `
-            <div class="backlink-item">
-                <a href="page.php?page=${encodeURIComponent(link.page_name)}" class="page-link">${link.page_name}</a>
-                <div class="backlink-snippet">${link.content_snippet || ''}</div>
-            </div>
-        `).join('');
-        ui.domRefs.backlinksContainer.innerHTML = sanitizeHtml(html);
+        await loadNotes();
     } catch (error) {
-        console.error("Error fetching backlinks:", error);
-        if (ui.domRefs.backlinksContainer) {
-            ui.domRefs.backlinksContainer.innerHTML = '<p>Error loading backlinks.</p>';
-        }
+        console.error('[page] could not load', name, error);
+        showMessage(`This page could not be loaded: ${error.message}`, { label: 'Try again', run: () => window.location.reload() });
     }
 }
 
-async function displayChildPages(namespace) {
-    const container = document.getElementById('child-pages-container');
-    if (!container) return;
-
-    try {
-        const childPages = await window.pagesAPI.getChildPages(namespace);
-        container.innerHTML = '';
-        
-        if (childPages && childPages.length > 0) {
-            container.style.display = 'block';
-            container.innerHTML = '<h3>Child Pages</h3>';
-            const list = document.createElement('ul');
-            list.className = 'child-page-list';
-            childPages.forEach(page => {
-                const item = document.createElement('li');
-                const link = document.createElement('a');
-                link.href = `page.php?page=${encodeURIComponent(page.name)}`;
-                const displayName = page.name.includes('/') ? 
-                    page.name.substring(page.name.lastIndexOf('/') + 1) : 
-                    page.name;
-                link.textContent = displayName;
-                link.className = 'child-page-link';
-                item.appendChild(link);
-                list.appendChild(item);
-            });
-            container.appendChild(list);
-        } else {
-            container.style.display = 'none';
-        }
-    } catch (error) {
-        console.error('Error fetching or displaying child pages:', error);
-        container.style.display = 'none';
-    }
-}
-
-export async function handleSqlQueries() {
-    const placeholders = document.querySelectorAll('.sql-query-placeholder');
-    for (const placeholder of placeholders) {
-        const sqlQuery = placeholder.dataset.sqlQuery;
-        if (!sqlQuery) {
-            placeholder.textContent = 'Error: No SQL query provided.';
-            continue;
-        }
-        try {
-            const result = await queryAPI.queryNotes(sqlQuery);
-            const notesArray = result || [];
-            
-            placeholder.innerHTML = '';
-            if (notesArray.length === 0) {
-                placeholder.textContent = 'Query returned no results.';
-            } else {
-                const resultsContainer = document.createElement('div');
-                resultsContainer.className = 'note-children sql-query-results';
-                const parentNestingLevel = ui.getNestingLevel(placeholder.closest('.note-item')) + 1;
-                notesArray.forEach(noteData => {
-                    resultsContainer.appendChild(ui.renderNote(noteData, parentNestingLevel));
-                });
-                placeholder.appendChild(resultsContainer);
-                if (typeof feather !== 'undefined') feather.replace();
-            }
-        } catch (error) {
-            console.error('Error fetching SQL query results:', error);
-            placeholder.textContent = `Error: ${error.message}`;
-        }
-    }
-}
-
-// --- Page Loading and Rendering ---
-
-function handleCreateAndFocusFirstNote() {
-    const appStore = getAppStore();
-    if (!appStore.currentPageId) return;
-    handleAddRootNote();
-}
-
-async function _renderPageContent(pageData, pageProperties, focusFirstNote) {
-
-    const pageContentDiv = ui.domRefs.pageContent;
-    const pageTitleDiv = ui.domRefs.pageTitle;
-
-    if (!pageContentDiv || !pageTitleDiv) {
-        console.error('[DEBUG] Missing required DOM elements:', { 
-            hasPageContent: Boolean(pageContentDiv),
-            hasPageTitle: Boolean(pageTitleDiv)
-        });
-        return;
-    }
-
-    // Page title is now set by PHP, no need to set it here
-
-    // Properties are now rendered server-side in page.php, no need for client-side rendering
-
-    // Render main content - clean properties from content before rendering
-    const contentWithoutProperties = pageData.content ? pageData.content.replace(/\{[^}]+\}/g, '').trim() : '';
-    if (contentWithoutProperties) {
-        pageContentDiv.innerHTML = sanitizeHtml(parseContent(contentWithoutProperties));
-        pageContentDiv.style.display = 'block'; // Show the element when it has content
-    } else {
-        pageContentDiv.style.display = 'none'; // Hide the element when it's empty
-    }
-
-    // Update sidebars - disabled old DOM manipulation that conflicts with Alpine.js
-    // ui.displayFavorites();
-    // ui.displayBacklinksInSidebar(pageData.name);
-    // ui.displayChildPagesInSidebar(pageData.name);
-
-    // Render notes
-    if (pageData.notes && pageData.notes.length > 0) {
-
-        let notesToRender = pageData.notes;
-        const pageEncryptProperty = pageProperties.encrypt && Array.isArray(pageProperties.encrypt) && pageProperties.encrypt.length > 0
-            ? pageProperties.encrypt[0]
-            : null;
-
-        if (pageEncryptProperty) {
-
-            const appStore = getAppStore();
-            let password = appStore.pagePassword;
-            const pageHash = pageEncryptProperty.value;
-
-            if (!password) {
-                try {
-                    password = await promptForPagePassword();
-                    const passwordHash = sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(password));
-
-                    if (passwordHash !== pageHash) {
-                        console.error('[DEBUG] Password hash mismatch:', {
-                            providedHash: passwordHash,
-                            expectedHash: pageHash
-                        });
-                        alert("Wrong password!");
-                        appStore.setPagePassword(null);
-                        pageContentDiv.innerHTML = '<p>Decryption failed: Incorrect password.</p>';
-                        ui.displayNotes([], appStore.currentPageId);
-                        return; // Stop rendering
-                    }
-                    appStore.setPagePassword(password);
-                } catch (error) {
-                    console.error("[DEBUG] Password prompt failed:", error);
-                    pageContentDiv.innerHTML = '<p>Password entry cancelled. Cannot display page.</p>';
-                    ui.displayNotes([], appStore.currentPageId);
-                    return; // Stop rendering
-                }
-            }
-
-            const currentPassword = appStore.pagePassword;
-            const currentPasswordHash = currentPassword ? sjcl.codec.hex.fromBits(sjcl.hash.sha256.hash(currentPassword)) : null;
-
-            if (currentPasswordHash !== pageHash) {
-                console.error('[DEBUG] Stored password hash mismatch:', {
-                    storedHash: currentPasswordHash,
-                    expectedHash: pageHash
-                });
-                appStore.setPagePassword(null);
-                pageContentDiv.innerHTML = '<p>Decryption failed: Stored password is incorrect for this page. Please reload.</p>';
-                ui.displayNotes([], appStore.currentPageId);
-                return;
-            }
-
-            // Decrypt notes
-            const decryptedNotes = [];
-            let decryptionErrorOccurred = false;
-            for (const note of notesToRender) {
-                // Check if content is in encrypted JSON format
-                const isEncryptedContent = typeof note.content === 'string' && 
-                    note.content.startsWith('{') && 
-                    note.content.includes('"iv"') && 
-                    note.content.includes('"ct"');
-
-                if ((note.is_encrypted || isEncryptedContent) && note.content) {
-                    try {
-                        const decryptedContent = decrypt(currentPassword, note.content);
-                        decryptedNotes.push({ ...note, content: decryptedContent, is_encrypted: false });
-                    } catch (e) {
-                        console.error(`[DEBUG] Decryption failed for note ${note.id}:`, e);
-                        decryptedNotes.push({ ...note, content: "[DECRYPTION FAILED]", is_corrupted: true });
-                        decryptionErrorOccurred = true;
-                    }
-                } else {
-                    decryptedNotes.push(note);
-                }
-            }
-            notesToRender = decryptedNotes;
-        }
-        
-        const appStore = getAppStore();
-        ui.displayNotes(notesToRender, appStore.currentPageId);
-        if (focusFirstNote && pageData.notes[0]) {
-            handleNoteAction('focus', pageData.notes[0].id);
-        }
-    } else {
-        const appStore = getAppStore();
-        ui.displayNotes([], appStore.currentPageId); // Clear notes view
-        if (focusFirstNote) {
-            await handleNoteAction('create', null);
-        }
-    }
-
-    // displayBacklinks(pageData.name); // Disabled - conflicts with Alpine.js
-    // displayChildPages(pageData.name); // Disabled - conflicts with Alpine.js
-    handleTransclusions();
-    handleSqlQueries();
-    
-    // Handle URL anchor highlighting after notes are rendered
-    handleUrlAnchor();
-    
-    const appStore = getAppStore();
-    if (outline.model.children(null).length === 0 && pageData.id) {
-        handleCreateAndFocusFirstNote();
-    } else if (focusFirstNote && ui.domRefs.notesContainer) {
-        const firstNoteContent = ui.domRefs.notesContainer.querySelector('.note-content');
-        if (firstNoteContent) ui.switchToEditMode(firstNoteContent);
-    }
-}
-
-async function _processAndRenderPage(pageData, focusFirstNote) {
-    const appStore = getAppStore();
-    appStore.setCurrentPageName(pageData.name);
-    appStore.setCurrentPageId(pageData.id);
-    appStore.setPagePassword(null); // Reset password for new page
-
-    // Add to recent history
-    recentHistory.addPage(pageData.name);
-
-    ui.updatePageTitle(pageData.name);
-    // Calendar current page is handled by Alpine.js component
-    
-    const pageProperties = pageData.properties || {};
-    
-    await _renderPageContent(pageData, pageProperties, focusFirstNote);
-}
-
-async function _fetchPageFromNetwork(pageName) {
-    let pageDetails;
-    try {
-        pageDetails = await pagesAPI.getPageByName(pageName);
-    } catch (error) {
-        if (String(error.message).includes('404')) {
-             console.warn(`Page "${pageName}" not found, creating it.`);
-             pageDetails = await pagesAPI.createPage(pageName);
-             
-             // Add new page to calendar cache if it's a date-based page
-             if (pageDetails && pageDetails.id) {
-                 calendarCache.addPage(pageDetails);
-             }
-        } else {
-            console.error(`Fatal: Failed to GET page "${pageName}":`, error);
-            throw error;
-        }
-    }
-
-    if (!pageDetails || !pageDetails.id) {
-        throw new Error(`Could not resolve page data with a valid ID for "${pageName}".`);
-    }
-
-    const pageDataWithNotes = await notesAPI.getPageData(pageDetails.id);
-
-    // **FIX**: The previous code was incorrectly combining the pageDetails object and the notes array.
-    // The notes array from the API needs to be assigned to the `notes` property of the page data object.
-    const combinedPageData = { ...pageDetails, notes: pageDataWithNotes };
-
-    // This check is now mostly for safety, as `notes` is explicitly assigned above.
-    combinedPageData.notes = Array.isArray(combinedPageData.notes) ? combinedPageData.notes : [];
-    
-    return combinedPageData;
-}
-
-export async function loadPage(pageName, focusFirstNote = false, providedPageData = null) {
-    if (window.blockPageLoad) return;
-    window.blockPageLoad = true;
-    
-    pageName = pageName || getInitialPage();
-
-    try {
-        let pageData = providedPageData;
-        if (!pageData) {
-            // Pages are always read from the server (no stale local cache).
-            // Let queued edits land first so the fetched page includes them.
-            await outline.settle();
-            if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = '<p>Loading page...</p>';
-            pageData = await _fetchPageFromNetwork(pageName);
-        }
-        
-        await _processAndRenderPage(pageData, focusFirstNote);
-    } catch (error) {
-        console.error('[page-loader] Error object received:', error);
-        console.error(`Error loading page ${pageName}:`, error);
-        const appStore = getAppStore();
-        appStore.setCurrentPageName(`Error: ${pageName}`);
-        appStore.setCurrentPageId(null);
-        ui.updatePageTitle(appStore.currentPageName);
-        try {
-            if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = `<p>Error loading page: ${error.message}</p>`;
-        } catch (innerError) {
-            console.error("Failed to display specific error message:", innerError);
-            if (ui.domRefs.notesContainer) ui.domRefs.notesContainer.innerHTML = "<p>An error occurred while loading the page.</p>";
-        }
-    } finally {
-        window.blockPageLoad = false;
-    }
-}
-
-/**
- * Prefetching was removed: it fetched (and auto-created) every linked page on
- * each visit to fill a cache that could serve stale data. Kept as no-ops for
- * callers.
- */
-
-export async function fetchAndDisplayPages(activePageName) {
-    try {
-        const appStore = getAppStore();
-        const { pages } = await pagesAPI.getPages({ per_page: 20, sort_by: 'updated_at', sort_order: 'desc' });
-        ui.updatePageList(pages, activePageName || appStore.currentPageName);
-    } catch (error) {
-        console.error('Error fetching pages for sidebar:', error);
-        if (ui.domRefs.pageListContainer) {
-            ui.domRefs.pageListContainer.innerHTML = '<li>Error loading pages.</li>';
-        }
-    }
-}
-
-export function getInitialPage() {
-    return new Date().toISOString().split('T')[0];
-}
-
-/**
- * Handles URL anchor highlighting for specific notes
- * Parses the URL hash for #note-{id} and highlights the corresponding note
- */
-export function handleUrlAnchor() {
-    const hash = window.location.hash;
-    if (!hash) return;
-    
-    // Parse hash for note anchor (e.g., #note-532)
-    const noteMatch = hash.match(/^#note-([A-Za-z0-9_-]+)$/);
-    if (!noteMatch) return;
-    
-    const noteId = noteMatch[1];
-    
-    // Find the note element in the DOM
-    const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
-    if (!noteElement) {
-        console.warn(`[URL Anchor] Note element with ID ${noteId} not found in DOM`);
-        // Try again after a short delay in case the note is still loading
-        setTimeout(() => {
-            const retryElement = document.querySelector(`[data-note-id="${noteId}"]`);
-            if (retryElement) {
-                highlightNoteElement(retryElement);
-            }
-        }, 500);
-        return;
-    }
-    
-    highlightNoteElement(noteElement);
-}
-
-/**
- * Highlights a note element with animation and scrolling
- * @param {HTMLElement} noteElement - The note element to highlight
- */
-function highlightNoteElement(noteElement) {
-    const noteId = noteElement.dataset.noteId;
-    
-    // Add highlighting class
-    noteElement.classList.add('anchor-highlight');
-    
-    // Scroll to the note with smooth animation and offset
-    const headerHeight = 80; // Approximate header height
-    const elementTop = noteElement.offsetTop;
-    const elementHeight = noteElement.offsetHeight;
-    const windowHeight = window.innerHeight;
-    
-    // Calculate scroll position to center the element with some offset from top
-    const scrollTop = elementTop - headerHeight - (windowHeight / 2) + (elementHeight / 2);
-    
-    window.scrollTo({
-        top: Math.max(0, scrollTop),
-        behavior: 'smooth'
-    });
-    
-    // Remove the highlight class after animation completes
-    setTimeout(() => {
-        noteElement.classList.remove('anchor-highlight');
-    }, 3000); // Keep highlight for 3 seconds
-    
-}
+window.addEventListener('hashchange', showAnchoredNote);

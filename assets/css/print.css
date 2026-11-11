@@ -1,0 +1,86 @@
+/*
+ * Printing a page (or saving it as PDF): just the title and the outline,
+ * black on white, with every note shown.
+ */
+
+#left-sidebar-outer,
+#right-sidebar-outer,
+#splash-screen,
+#save-status-indicator,
+#toggle-splash-btn,
+#add-root-note-btn,
+#note-focus-breadcrumbs-container,
+.mobile-bottom-toolbar,
+.generic-modal,
+.sync-banner,
+.copy-feedback,
+.autocomplete-popup,
+.bullet-context-menu,
+.page-title-gear,
+.favorite-toggle,
+.note-collapse-arrow,
+.attachment-delete-btn,
+.attachment-edit-excalidraw-btn,
+.no-notes-message {
+  display: none !important;
+}
+
+html,
+body,
+.app-container,
+#main-content {
+  display: block !important;
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  background: #fff !important;
+  color: #000 !important;
+}
+
+body {
+  font-size: 11pt;
+}
+
+.page-title,
+.note-content,
+.note-content * {
+  color: #000 !important;
+}
+
+/* Collapsed notes are part of the page: print them. */
+.note-children.collapsed,
+.note-item.collapsed > .note-children {
+  display: block !important;
+}
+
+.note-header-row {
+  break-inside: avoid;
+}
+
+.note-content.edit-mode:focus {
+  box-shadow: none;
+}
+
+a {
+  color: #000 !important;
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100% !important;
+  break-inside: avoid;
+}
+
+pre,
+blockquote,
+table {
+  break-inside: avoid;
+}
+
+@page {
+  margin: 18mm 16mm;
+}

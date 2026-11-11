@@ -79,7 +79,8 @@ try {
 
     // Full notes, in the order the query returned the ids.
     $byId = [];
-    foreach ((new DataManager($pdo))->getNotesByIds($ids, true) as $note) {
+    $dataManager = new DataManager($pdo);
+    foreach ($dataManager->withPageNames($dataManager->getNotesByIds($ids, true)) as $note) {
         if (($input['include_properties'] ?? true) === false) {
             unset($note['properties']);
         }

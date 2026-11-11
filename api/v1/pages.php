@@ -5,6 +5,8 @@
  *   GET ?name=N            the page with that name (created if it does not exist)
  *   GET ?id=N              one page
  *   GET ?date=YYYY-MM-DD   pages with a {date::...} property of that day
+ *   GET ?names=1           the names of all pages (&exclude_journal=1 without journal pages)
+ *   GET ?month=YYYY-MM     the days of that month that have a page
  *   GET                    list, newest first (?page, ?per_page, ?exclude_journal)
  *   POST   {name, content?}          create
  *   PUT    {id, name?, content?}     update; a new name renames the page and rewrites links to it
@@ -34,6 +36,13 @@ try {
             } elseif (isset($_GET['id'])) {
                 $page = $dataManager->getPageById((int)$_GET['id']);
                 $page ? ApiResponse::success($page) : ApiResponse::error('Page not found', 404);
+            } elseif (isset($_GET['names'])) {
+                ApiResponse::success($dataManager->getPageNames(isset($_GET['exclude_journal'])));
+            } elseif (isset($_GET['month'])) {
+                if (!preg_match('/^\d{4}-\d{2}$/', (string)$_GET['month'])) {
+                    ApiResponse::error('month must look like YYYY-MM.', 400);
+                }
+                ApiResponse::success($dataManager->getDatesWithPages($_GET['month']));
             } elseif (isset($_GET['date'])) {
                 ApiResponse::success($dataManager->getPagesByDate((string)$_GET['date']));
             } else {

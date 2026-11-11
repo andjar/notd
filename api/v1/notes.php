@@ -31,7 +31,7 @@ if (isset($_GET['id'])) {
     $note = notd_query_flag('include_children')
         ? $dataManager->getNoteWithChildren($noteId, $includeInternal, notd_query_flag('include_parent_properties'))
         : $dataManager->getNoteById($noteId, $includeInternal, notd_query_flag('include_parent_properties'));
-    $note ? ApiResponse::success($note) : ApiResponse::error('Note not found', 404);
+    $note ? ApiResponse::success($dataManager->withPageNames([$note])[0]) : ApiResponse::error('Note not found', 404);
 } elseif (isset($_GET['page_id'])) {
     ApiResponse::success($dataManager->getNotesByPageId((int)$_GET['page_id'], $includeInternal));
 } else {

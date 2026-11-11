@@ -34,11 +34,25 @@ $favorites = $dataManager->getFavoritePages();
 $childPages = $dataManager->getChildPages($pageName);
 $backlinks = $dataManager->getBacklinks($pageName, 50);
 
-// --- Frontend Configuration ---
-// Pass relevant backend configuration settings to the frontend JavaScript.
-// This uses the PROPERTY_WEIGHTS constant from config.php.
 $renderInternal = PROPERTY_WEIGHTS[3]['visible_in_view_mode'] ?? false;
-$showInternalInEdit = PROPERTY_WEIGHTS[3]['visible_in_edit_mode'] ?? true;
+
+// Extensions shown in the sidebar: the active ones that declare an icon.
+$extensions = [];
+foreach (is_array(ACTIVE_EXTENSIONS) ? ACTIVE_EXTENSIONS : [] as $extensionName) {
+    if (!is_string($extensionName) || !preg_match('/^[A-Za-z0-9_-]+$/', $extensionName)) continue;
+    $extensionConfig = @json_decode((string)@file_get_contents(__DIR__ . "/extensions/$extensionName/config.json"), true);
+    if (is_array($extensionConfig) && isset($extensionConfig['featherIcon']) && is_file(__DIR__ . "/extensions/$extensionName/index.php")) {
+        $extensions[] = ['name' => $extensionName, 'icon' => (string)$extensionConfig['featherIcon']];
+    }
+}
+
+// What the browser needs to know from the server's configuration.
+$frontendConfig = [
+    'pageName' => $pageName,
+    'renderInternalProperties' => (bool)$renderInternal,
+    'taskStates' => array_values(TASK_STATES),
+    'activeExtensions' => array_values(array_filter(is_array(ACTIVE_EXTENSIONS) ? ACTIVE_EXTENSIONS : [], 'is_string')),
+];
 
 // --- Helper Functions for Rendering ---
 function renderPageTitle($pageName) {
@@ -69,33 +83,6 @@ function renderPageTitle($pageName) {
     return $html;
 }
 
-function renderPageProperties($properties, $renderInternal = false) {
-    if (empty($properties)) return '';
-    
-    $html = '<ul class="page-properties-pills">';
-    $hasVisibleProperties = false;
-    
-    foreach ($properties as $key => $instances) {
-        foreach ($instances as $instance) {
-            if ($instance['internal'] && !$renderInternal) continue;
-            
-            $hasVisibleProperties = true;
-            if ($key === 'favorite' && strtolower($instance['value']) === 'true') {
-                $html .= '<li class="pill pill-property"><span class="property-favorite"><i data-feather="star"></i></span></li>';
-            } else {
-                $html .= '<li class="pill pill-property"><span class="property-key">' . htmlspecialchars($key) . '</span><span class="property-separator">:</span><span class="property-value">' . htmlspecialchars($instance['value']) . '</span></li>';
-            }
-        }
-    }
-    
-    if ($hasVisibleProperties) {
-        $html .= '</ul>';
-        return $html;
-    }
-    
-    return '';
-}
-
 function renderRecentPages($pages, $currentPageName) {
     if (empty($pages)) {
         return '<div class="no-pages-message">No recent pages</div>';
@@ -121,22 +108,10 @@ function renderFavorites($favorites, $currentPageName) {
     $html = '<ul class="recent-pages-list">';
     foreach ($favorites as $page) {
         $isActive = ($page['name'] === $currentPageName) ? ' active' : '';
-        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="recent-page-link' . $isActive . '">';
+        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="recent-page-link' . $isActive . '" data-page-name="' . htmlspecialchars($page['name']) . '">';
         $html .= '<i data-feather="star" class="recent-page-icon"></i>';
         $html .= '<span class="recent-page-name">' . htmlspecialchars($page['name']) . '</span>';
         $html .= '</a></li>';
-    }
-    $html .= '</ul>';
-    return $html;
-}
-
-function renderChildPages($childPages) {
-    $html = '<h3>Child Pages</h3><ul class="child-page-list">';
-    foreach ($childPages as $page) {
-        $displayName = strpos($page['name'], '/') !== false ? 
-            substr($page['name'], strrpos($page['name'], '/') + 1) : 
-            $page['name'];
-        $html .= '<li><a href="page.php?page=' . urlencode($page['name']) . '" class="child-page-link">' . htmlspecialchars($displayName) . '</a></li>';
     }
     $html .= '</ul>';
     return $html;
@@ -168,10 +143,7 @@ function renderBacklinks($backlinks) {
     
     $html = '<ul class="recent-pages-list">';
     foreach ($backlinks as $link) {
-        $snippet = substr($link['content'], 0, 100);
-        if (strlen($link['content']) > 100) $snippet .= '...';
-        
-        $html .= '<li><a href="page.php?page=' . urlencode($link['page_name']) . '" class="recent-page-link">';
+        $html .= '<li><a href="page.php?page=' . urlencode($link['page_name']) . '#note-' . urlencode((string)$link['note_id']) . '" class="recent-page-link">';
         $html .= '<i data-feather="link" class="recent-page-icon"></i>';
         $html .= '<span class="recent-page-name">' . htmlspecialchars($link['page_name']) . '</span>';
         $html .= '</a></li>';
@@ -198,24 +170,17 @@ function renderBacklinks($backlinks) {
     <!-- Theme and App Styles -->
     <?php include 'assets/css/theme_loader.php'; ?>
     <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/print.css" media="print">
     
     <!-- Libraries -->
-    <script src="assets/libs/feather.min.js"></script>
-    <script src="assets/libs/marked.min.js"></script>
-    <script src="assets/libs/purify.min.js"></script>
-    <script src="assets/libs/Sortable.min.js"></script>
-    <script src="assets/libs/sjcl.js"></script>
+    <script>window.NOTD_CONFIG = <?php echo json_encode($frontendConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;</script>
+    <script src="assets/libs/feather.min.js" defer></script>
+    <script src="assets/libs/marked.min.js" defer></script>
+    <script src="assets/libs/purify.min.js" defer></script>
+    <script src="assets/libs/Sortable.min.js" defer></script>
+    <script src="assets/libs/sjcl.js" defer></script>
     <script type="module" src="assets/js/app.js"></script>
     <script src="assets/libs/alpine.min.js" defer></script>
-    
-    <script>
-         window.APP_CONFIG = window.APP_CONFIG || {};
-        // Pass server-side configuration to JavaScript
-        window.APP_CONFIG = {
-            RENDER_INTERNAL_PROPERTIES: <?php echo json_encode($renderInternal); ?>,
-            SHOW_INTERNAL_PROPERTIES_IN_EDIT_MODE: <?php echo json_encode($showInternalInEdit); ?>
-        };
-    </script>
 </head>
 <body>
     <div id="splash-screen" 
@@ -223,6 +188,7 @@ function renderBacklinks($backlinks) {
          x-show="show" 
          x-init="init()"
          @click="hideSplash()"
+         @notd-splash.window="show ? hideSplash() : showSplash()"
          x-transition:leave="transition ease-in duration-300" 
          x-transition:leave-start="opacity-100" 
          x-transition:leave-end="opacity-0">
@@ -399,27 +365,27 @@ function renderBacklinks($backlinks) {
                     </span>
                 </h1>
                 <div class="page-header-actions">
-                    <span class="favorite-toggle" id="favorite-toggle" title="Toggle favorite">☆</span>
+                    <button type="button" class="favorite-toggle" id="favorite-toggle" title="Add to favorites" aria-pressed="false">☆</button>
                     <div class="page-properties">
                         <?php
-                        // Render properties except 'favorite'
                         foreach ($pageProperties as $key => $instances) {
-                            if ($key === 'favorite') continue;
+                            if ($key === 'favorite' || $key === 'encrypt') continue;
                             foreach ($instances as $instance) {
                                 if ($instance['internal'] && !$renderInternal) continue;
                                 echo '<span>' . htmlspecialchars($key) . ':' . htmlspecialchars($instance['value']) . '</span> ';
                             }
                         }
+                        if (isset($pageProperties['encrypt'])) {
+                            echo '<span title="The notes on this page are encrypted"><i data-feather="lock"></i></span>';
+                        }
                         ?>
                     </div>
                 </div>
             </div>
-            <div id="page-content" class="page-content" style="display: none;">
-                <!-- Page content will be rendered here by JavaScript -->
-            </div>
-            <div id="note-focus-breadcrumbs-container"></div>
-            <!-- Rendered by assets/js/ui/note-elements.js from the outline model -->
-            <div id="notes-container" class="outliner"></div>
+            <div id="page-content" class="page-content" hidden></div>
+            <div id="note-focus-breadcrumbs-container" hidden></div>
+            <!-- The outline. Drawn by assets/js/ui/note-elements.js; x-ignore keeps Alpine from watching it. -->
+            <div id="notes-container" class="outliner" x-ignore></div>
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
             </button>
@@ -457,7 +423,11 @@ function renderBacklinks($backlinks) {
                             </div>
                         </div>
                         <div class="sidebar-section extensions-section">
-                            <div id="extension-icons-container"></div>
+                            <div id="extension-icons-container">
+                                <?php foreach ($extensions as $extension): ?>
+                                    <a href="extensions/<?php echo $extension['name']; ?>/index.php" title="<?php echo htmlspecialchars(str_replace('_', ' ', $extension['name'])); ?>" target="_blank" rel="noopener"><i data-feather="<?php echo htmlspecialchars($extension['icon']); ?>" class="sidebar-extension-icon"></i></a>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -466,69 +436,33 @@ function renderBacklinks($backlinks) {
         
         <!-- Save Status Indicator -->
         <div id="save-status-indicator" title="All changes saved"></div>
-        <button id="toggle-splash-btn" class="action-button round-button absolute-bottom-right" title="Toggle Splash Screen">
+        <button id="toggle-splash-btn" class="action-button round-button absolute-bottom-right" title="Show the clock" @click="$dispatch('notd-splash')">
             <i data-feather="pause-circle"></i>
         </button>
     </div>
 
-    <!-- Password Modal for Encrypted Pages -->
-    <div id="password-modal" class="generic-modal">
-        <div class="modal-content">
-            <div class="generic-modal-header">
-                <h2 class="generic-modal-title">Encrypted Page</h2>
-                <button id="password-modal-close" class="modal-close-x" aria-label="Close">
-                    <i data-feather="x"></i>
-                </button>
-            </div>
-            <p>This page is encrypted. Please enter the password to view it.</p>
-            <input type="password" id="password-input" placeholder="Password" class="full-width-input">
-            <div class="generic-modal-actions">
-                <button id="password-submit" class="button">Decrypt</button>
-                <button id="password-cancel" class="button button-secondary">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Encryption Password Modal -->
-    <div id="encryption-password-modal" class="generic-modal">
-        <div class="modal-content">
-            <div class="generic-modal-header">
-                <h2 class="generic-modal-title">Set Encryption Password</h2>
-                <button id="encryption-modal-close" class="modal-close-x" aria-label="Close">
-                    <i data-feather="x"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p>Enter a password to encrypt this page:</p>
-                <input type="password" id="new-encryption-password" class="generic-modal-input-field" placeholder="New Password">
-                <p>Confirm your password:</p>
-                <input type="password" id="confirm-encryption-password" class="generic-modal-input-field" placeholder="Confirm Password">
-                <p id="encryption-password-error" class="error-message" style="display: none;"></p>
-            </div>
-            <div class="generic-modal-actions">
-                <button id="confirm-encryption-btn" class="button primary-button">Encrypt</button>
-                <button id="cancel-encryption-btn" class="button secondary-button">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Page Properties Modal -->
+    <!-- Page dialog: name, text and properties, and what can be done with the page -->
     <div id="page-properties-modal" class="generic-modal">
-        <div class="modal-content">
+        <div class="generic-modal-content" role="dialog" aria-modal="true" aria-labelledby="page-properties-modal-title">
             <div class="generic-modal-header">
-                <h2 id="page-properties-modal-title" class="generic-modal-title">Page Properties</h2>
-                <div class="modal-header-icons">
-                    <button id="page-properties-modal-close" class="modal-close-x" aria-label="Close">
-                        <i data-feather="x"></i>
-                    </button>
-                </div>
-            </div>
-            <div id="page-properties-list" class="page-properties-list"></div>
-            <div class="generic-modal-actions">
-                <button id="page-encryption-button" class="button" title="Encrypt Page">
-                    Encrypt
+                <h2 id="page-properties-modal-title" class="generic-modal-title">Page</h2>
+                <button id="page-properties-modal-close" class="modal-close-x" aria-label="Close">
+                    <i data-feather="x"></i>
                 </button>
-                <button id="save-page-content-btn" class="button">Save</button>
+            </div>
+            <label for="page-name-input">Name</label>
+            <input type="text" id="page-name-input" class="generic-modal-input-field" autocomplete="off">
+            <small class="field-hint">Renaming also updates the links to this page.</small>
+            <label for="page-content-input">Text and properties</label>
+            <textarea id="page-content-input" class="generic-modal-input-field page-content-input" rows="6" spellcheck="false"></textarea>
+            <small class="field-hint">Properties are written as <code>{name::value}</code>, for example <code>{type::project}</code>.</small>
+            <div class="generic-modal-actions page-dialog-actions">
+                <a id="page-export-link" class="button button-secondary" href="#" download title="Download this page as Markdown">Export</a>
+                <button type="button" id="page-print-button" class="button button-secondary">Print</button>
+                <button type="button" id="page-encryption-button" class="button button-secondary">Lock with password</button>
+                <button type="button" id="page-delete-button" class="button button-danger">Delete page</button>
+                <span class="spacer"></span>
+                <button type="button" id="save-page-content-btn" class="button primary-button">Save</button>
             </div>
         </div>
     </div>
@@ -554,15 +488,6 @@ function renderBacklinks($backlinks) {
         </div>
     </div>
     
-    <div id="image-viewer-modal" class="generic-modal image-viewer">
-        <div class="generic-modal-content">
-             <button id="image-viewer-modal-close" class="modal-close-x" aria-label="Close">
-                <i data-feather="x"></i>
-            </button>
-            <img id="image-viewer-modal-img" src="" alt="Full size view">
-        </div>
-    </div>
-
     <!-- Backlinks Modal -->
     <div id="backlinks-modal" class="generic-modal">
         <div class="generic-modal-content">
@@ -581,7 +506,7 @@ function renderBacklinks($backlinks) {
 
     <!-- Mobile Bottom Toolbar -->
     <div class="mobile-bottom-toolbar" id="mobile-bottom-toolbar">
-        <button class="mobile-bottom-toolbar__btn" id="mobile-toggle-left-sidebar-btn" title="Open Menu">
+        <button class="mobile-bottom-toolbar__btn" id="mobile-toggle-left-sidebar-btn" onclick="window.dispatchEvent(new CustomEvent('notd-toggle-left'))" title="Open Menu">
             <i data-feather="menu"></i>
             <span class="mobile-bottom-toolbar__btn-label">Menu</span>
         </button>
@@ -589,7 +514,7 @@ function renderBacklinks($backlinks) {
             <i data-feather="plus"></i>
             <span class="mobile-bottom-toolbar__btn-label">Add</span>
         </button>
-        <button class="mobile-bottom-toolbar__btn" id="mobile-toggle-right-sidebar-btn" title="Open Info">
+        <button class="mobile-bottom-toolbar__btn" id="mobile-toggle-right-sidebar-btn" onclick="window.dispatchEvent(new CustomEvent('notd-toggle-right'))" title="Open Info">
             <i data-feather="info"></i>
             <span class="mobile-bottom-toolbar__btn-label">Info</span>
         </button>
