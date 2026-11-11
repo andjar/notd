@@ -68,7 +68,7 @@ def test_encryption_round_trip(ctx):
     stored = [n['content'] for n in api(f'notes.php?page_id={pg["id"]}')]
     check('edits on a locked page are stored encrypted', all('"ct"' in c for c in stored) and not any('edited' in c for c in stored))
     page.reload()
-    page.wait_for_selector('#password-modal.active', timeout=5000)
+    page.wait_for_selector("#password-modal.active", timeout=5000)
     page.fill('#password-input', 'pw123'); page.keyboard.press('Enter')
     page.wait_for_selector('#notes-container .note-item')
     page.wait_for_timeout(500)

@@ -293,3 +293,18 @@ mark {
   color: inherit;
   border-radius: 2px;
 }
+
+.dialog-field {
+  display: block;
+  font-size: var(--ls-font-size-sm);
+  color: var(--ls-secondary-text-color);
+}
+
+.dialog-field input {
+  margin-top: var(--ls-space-1);
+}
+
+.dialog-error {
+  color: var(--ls-button-danger-bg, #dc2626);
+  margin: 0 0 var(--ls-space-3);
+}

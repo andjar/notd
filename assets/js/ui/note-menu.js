@@ -53,15 +53,16 @@ async function copy(text, message) {
 
 function actionsFor(id) {
     const actions = [
-        { label: 'Zoom in', icon: 'maximize-2', run: () => zoomInto(id) },
-        { label: 'Add child note', icon: 'corner-down-right', run: () => outline.createChild(id, { focus: 'start' }) },
-        { label: 'Copy link to note', icon: 'anchor', run: () => copy(new URL(pageUrl(page.name, id), document.baseURI).href, 'Link copied') },
-        { label: 'Copy embed code', icon: 'link', run: () => copy(`!{{${id}}}`, 'Embed code copied') },
-        { label: 'Upload attachment', icon: 'upload', run: () => pickFiles(id) },
+        { action: 'zoom', label: 'Zoom in', icon: 'maximize-2', run: () => zoomInto(id) },
+        { action: 'add-child', label: 'Add child note', icon: 'corner-down-right', run: () => outline.createChild(id, { focus: 'start' }) },
+        { action: 'copy-link', label: 'Copy link to note', icon: 'anchor', run: () => copy(new URL(pageUrl(page.name, id), document.baseURI).href, 'Link copied') },
+        { action: 'copy-embed', label: 'Copy embed code', icon: 'link', run: () => copy(`!{{${id}}}`, 'Embed code copied') },
+        { action: 'upload', label: 'Upload attachment', icon: 'upload', run: () => pickFiles(id) },
     ];
     for (const editor of NOTE_EDITORS) {
         if (!config.activeExtensions.includes(editor.extension)) continue;
         actions.push({
+            action: editor.extension,
             label: editor.label,
             icon: editor.icon,
             run: async () => {
@@ -73,7 +74,7 @@ function actionsFor(id) {
             },
         });
     }
-    actions.push({ label: 'Delete', icon: 'trash-2', danger: true, run: () => deleteWithConfirmation(id) });
+    actions.push({ action: 'delete', label: 'Delete', icon: 'trash-2', danger: true, run: () => deleteWithConfirmation(id) });
     return actions;
 }
 
@@ -107,6 +108,7 @@ export function openNoteMenu(id, x, y) {
         item.type = 'button';
         item.className = 'menu-item' + (action.danger ? ' menu-item-danger' : '');
         item.setAttribute('role', 'menuitem');
+        item.dataset.action = action.action;
         const icon = document.createElement('i');
         icon.dataset.feather = action.icon;
         item.append(icon, document.createTextNode(' ' + action.label));

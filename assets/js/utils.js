@@ -64,32 +64,47 @@ export function renderIcons(root = document) {
 export function insertTextAtCursor(text, cursorOffset = 0) {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return false;
-    const range = selection.getRangeAt(0);
-    range.deleteContents();
-    const textNode = document.createTextNode(text);
-    range.insertNode(textNode);
-    textNode.parentNode?.normalize?.();
-    const node = textNode.isConnected ? textNode : null;
-    if (node) {
-        const caret = document.createRange();
-        caret.setStart(node, text.length - cursorOffset);
-        caret.collapse(true);
+    // The editing command keeps the browser's undo history intact.
+    let inserted = false;
+    try {
+        inserted = document.execCommand('insertText', false, text);
+    } catch { /* not supported */ }
+    if (!inserted) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        const node = document.createTextNode(text);
+        range.insertNode(node);
+        range.setStartAfter(node);
+        range.collapse(true);
         selection.removeAllRanges();
-        selection.addRange(caret);
+        selection.addRange(range);
     }
+    for (let i = 0; i < cursorOffset; i++) selection.modify('move', 'backward', 'character');
     return true;
 }
 
 /** Typing an opening bracket inserts the pair with the caret between. */
 export function handleAutocloseBrackets(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    // Typing the closing bracket that was inserted automatically steps over it.
+    if (e.key === ']' || e.key === '}' || e.key === ')') {
+        const selection = window.getSelection();
+        if (!selection || !selection.isCollapsed || !selection.rangeCount) return false;
+        const { startContainer: node, startOffset: offset } = selection.getRangeAt(0);
+        if (node.nodeType !== Node.TEXT_NODE || node.textContent[offset] !== e.key) return false;
+        e.preventDefault();
+        selection.collapse(node, offset + 1);
+        return true;
+    }
     const pair = { '[': '[]', '{': '{}', '(': '()' }[e.key];
-    if (!pair || e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (!pair) return false;
     e.preventDefault();
     const selection = window.getSelection();
     const selected = selection && !selection.isCollapsed ? selection.toString() : '';
     // With a selection, wrap it; otherwise insert the empty pair.
-    insertTextAtCursor(pair[0] + selected + pair[1], 1);
-    e.target.dispatchEvent(new Event('input', { bubbles: true }));
+    const inserted = insertTextAtCursor(pair[0] + selected + pair[1], 1);
+    // execCommand fires its own input event; the fallback does not.
+    if (inserted) e.target.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
 }
 

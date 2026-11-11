@@ -101,66 +101,72 @@ export function promptDialog(title, { value = '', confirmLabel = 'OK', placehold
     });
 }
 
-/** Wires a modal that is part of page.php. Resolves with `read()` on submit, null on cancel. */
-function useStaticModal(modal, { submit, cancel, inputs, read, validate }) {
-    return new Promise((resolve) => {
-        const done = (value) => {
-            modal.classList.remove('active');
-            controller.abort();
-            resolve(value);
-        };
-        const controller = new AbortController();
-        const on = (el, type, fn) => el?.addEventListener(type, fn, { signal: controller.signal });
-        const trySubmit = () => {
-            const problem = validate ? validate() : null;
-            if (!problem) done(read());
-        };
-        on(submit, 'click', trySubmit);
-        for (const el of cancel) on(el, 'click', () => done(null));
-        for (const input of inputs) {
-            input.value = '';
-            on(input, 'keydown', (e) => {
-                if (e.key === 'Enter') { e.preventDefault(); trySubmit(); }
-                else if (e.key === 'Escape') { e.preventDefault(); done(null); }
-            });
-        }
-        on(modal, 'mousedown', (e) => { if (e.target === modal) done(null); });
-        modal.classList.add('active');
-        inputs[0]?.focus();
-    });
+function passwordField(id, label) {
+    const wrap = document.createElement('label');
+    wrap.className = 'dialog-field';
+    wrap.textContent = label;
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.id = id;
+    input.className = 'generic-modal-input-field';
+    input.autocomplete = 'off';
+    wrap.appendChild(input);
+    return [wrap, input];
 }
 
-/** Asks for the password of an encrypted page. Resolves with it, or null if cancelled. */
+/** Asks for the password of a locked page. Resolves with it, or null if cancelled. */
 export function askPagePassword() {
-    const $ = (id) => document.getElementById(id);
-    const input = $('password-input');
-    return useStaticModal($('password-modal'), {
-        submit: $('password-submit'),
-        cancel: [$('password-cancel'), $('password-modal-close')],
-        inputs: [input],
-        read: () => input.value,
+    return openModal((content, close) => {
+        content.parentElement.id = 'password-modal';
+        const h = document.createElement('h2');
+        h.className = 'generic-modal-title';
+        h.textContent = 'This page is locked';
+        const [field, input] = passwordField('password-input', 'Password');
+        input.setAttribute('autofocus', '');
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); close(input.value); }
+        });
+        const actions = document.createElement('div');
+        actions.className = 'generic-modal-actions';
+        const ok = button('Unlock', 'primary-button', () => close(input.value));
+        ok.id = 'password-submit';
+        actions.append(ok, button('Cancel', 'button-secondary', () => close(null)));
+        content.append(h, field, actions);
+        setTimeout(() => input.focus(), 0);
     });
 }
 
 /** Asks for a new password, twice. Resolves with it, or null if cancelled. */
 export function askNewPassword() {
-    const $ = (id) => document.getElementById(id);
-    const first = $('new-encryption-password');
-    const second = $('confirm-encryption-password');
-    const error = $('encryption-password-error');
-    error.style.display = 'none';
-    return useStaticModal($('encryption-password-modal'), {
-        submit: $('confirm-encryption-btn'),
-        cancel: [$('cancel-encryption-btn'), $('encryption-modal-close')],
-        inputs: [first, second],
-        read: () => first.value,
-        validate: () => {
-            const problem = !first.value.trim() ? 'Password cannot be empty.'
-                : first.value !== second.value ? 'Passwords do not match. Please try again.' : null;
-            error.textContent = problem || '';
-            error.style.display = problem ? 'block' : 'none';
-            return problem;
-        },
+    return openModal((content, close) => {
+        content.parentElement.id = 'encryption-password-modal';
+        const h = document.createElement('h2');
+        h.className = 'generic-modal-title';
+        h.textContent = 'Lock this page';
+        const note = document.createElement('p');
+        note.textContent = 'The notes are encrypted in your browser. Nobody, including you, can read them without the password, and a forgotten password cannot be recovered.';
+        const [f1, first] = passwordField('new-encryption-password', 'Password');
+        const [f2, second] = passwordField('confirm-encryption-password', 'Repeat the password');
+        const error = document.createElement('p');
+        error.className = 'dialog-error';
+        error.hidden = true;
+        const submit = () => {
+            const problem = !first.value.trim() ? 'The password cannot be empty.'
+                : first.value !== second.value ? 'The passwords do not match.' : null;
+            if (!problem) return close(first.value);
+            error.textContent = problem;
+            error.hidden = false;
+        };
+        for (const input of [first, second]) {
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+        }
+        const actions = document.createElement('div');
+        actions.className = 'generic-modal-actions';
+        const ok = button('Lock page', 'primary-button', submit);
+        ok.id = 'confirm-encryption-btn';
+        actions.append(ok, button('Cancel', 'button-secondary', () => close(null)));
+        content.append(h, note, f1, f2, error, actions);
+        setTimeout(() => first.focus(), 0);
     });
 }
 

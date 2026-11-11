@@ -62,6 +62,7 @@ jobs:
           python3 -m playwright install --with-deps chromium
           python3 tests/browser/outline_test.py
           python3 tests/browser/features_test.py
+          python3 tests/browser/editing_test.py
 
       - name: Server log
         if: failure()
