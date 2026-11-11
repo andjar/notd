@@ -308,3 +308,9 @@ mark {
   color: var(--ls-button-danger-bg, #dc2626);
   margin: 0 0 var(--ls-space-3);
 }
+
+/* ---- big pages: the browser skips layout and painting of notes off screen ---- */
+#notes-container > .note-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 2em;
+}

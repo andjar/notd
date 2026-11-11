@@ -84,3 +84,7 @@ table {
 @page {
   margin: 18mm 16mm;
 }
+
+#notes-container > .note-item {
+  content-visibility: visible !important;
+}
