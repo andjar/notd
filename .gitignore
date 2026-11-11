@@ -34,3 +34,5 @@ __pycache__/
 
 # Local settings
 config.local.php
+*.v[0-9]*-backup
+*.sqlite.v*-backup*

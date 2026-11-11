@@ -1,41 +1,20 @@
 <?php
-// api/v1/extensions.php
-
 /**
- * This endpoint retrieves details about the active extensions by dynamically
- * reading their configuration files. It adheres to the new API specification.
+ * GET /api/v1/extensions.php
+ * The extensions listed in ACTIVE_EXTENSIONS, with the icon from each one's config.json.
  */
 
-// db_connect.php includes config.php and sets up global error handlers.
-require_once __DIR__ . '/../db_connect.php'; 
-// property_utils.php contains the logic for finding and parsing extension configs.
-require_once __DIR__ . '/../property_utils.php'; 
+require_once __DIR__ . '/../bootstrap.php';
 
-// Set the response content type to JSON
-header('Content-Type: application/json');
-
-try {
-    // Check if the required utility class exists to prevent a fatal error.
-    if (!class_exists('PropertyUtils') || !method_exists('PropertyUtils', 'getActiveExtensionDetails')) {
-        // Throw a specific exception that can be caught by the global handler.
-        throw new Exception('Server misconfiguration: PropertyUtils class or method is missing.');
+$extensions = [];
+foreach (defined('ACTIVE_EXTENSIONS') && is_array(ACTIVE_EXTENSIONS) ? ACTIVE_EXTENSIONS : [] as $name) {
+    if (!is_string($name) || !preg_match('/^[A-Za-z0-9_-]+$/', $name)) {
+        continue;
     }
-
-    // Get the array of active extensions.
-    $activeExtensions = PropertyUtils::getActiveExtensionDetails();
-    
-    // Respond using the new API specification format for a successful request.
-    echo json_encode([
-        'status' => 'success',
-        'data' => [
-            'extensions' => $activeExtensions
-        ]
-    ]);
-
-} catch (Exception $e) {
-    // Let the global exception handler (set in config.php) catch this.
-    // This will format the JSON error response correctly according to the API spec.
-    throw $e;
+    $configPath = __DIR__ . '/../../extensions/' . $name . '/config.json';
+    $config = is_file($configPath) ? json_decode((string)file_get_contents($configPath), true) : null;
+    if (is_array($config) && isset($config['featherIcon'])) {
+        $extensions[] = ['name' => $name, 'featherIcon' => $config['featherIcon']];
+    }
 }
-
-exit;
+\App\ApiResponse::success(['extensions' => $extensions]);

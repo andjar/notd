@@ -3,6 +3,40 @@ title: "Changelog"
 weight: 70
 ---
 
+### November 2026: version 3.1, schema v4
+
+The database upgrades itself to v4 the first time it is opened.
+
+Writing
+- `Enter` splits a note at the caret and `Backspace` at the start of a note joins it with the one above, as in Logseq.
+- Undo and redo for outline changes (`Ctrl + Z`, `Ctrl + Shift + Z`), including deleted notes.
+- Zoom into a note (click its bullet) with breadcrumbs back out.
+- `[[` page suggestions and `/` templates share one popup with keyboard navigation; typing a closing bracket steps over the automatic one.
+- Rendered notes support `!{{id}}` transclusion and `SQL{...}` queries as read-only embedded outlines.
+
+Pages
+- ☆ star to add and remove favourites; rename (links and child pages follow) and delete from the page dialog.
+- Print (or save as PDF) shows just the outline, collapsed notes included.
+- Markdown export of a page, and `tools/export.php` / `tools/import.php` for whole notebooks in the Logseq layout.
+- Page locks use a salted verifier; pages locked with the older SHA-256 hash still unlock.
+
+Performance
+- A 3000-note page opens in about 0.8 s (was 2.1 s): one render pass without per-note listeners, sanitizer configured once, a plain-text fast path, drag targets prepared in idle time, off-screen notes skipped by layout.
+- 3 API requests per page view (was about 13); the calendar loads one month at a time.
+
+Server
+- One bootstrap and class autoloader for all endpoints; each record type has one write path (`PageStore`, `NoteOps`, `Attachments`).
+- Writes from other web sites are refused (`ALLOW_CROSS_SITE_REQUESTS` to allow them).
+- Templates are plain Markdown files and are never executed (PHP templates could be written through the API and run).
+- Uploads are limited to a list of safe file types; `SQL{...}` can only read the notes and properties tables.
+- Full-text search folds case for all languages and accepts prefixes (`plan*`); task status always reflects the current keyword.
+- New endpoints: `export.php`, `pages.php?names=1`, `pages.php?month=YYYY-MM`.
+- `router.php` for PHP's built-in server.
+
+Code
+- The browser code is a set of small ES modules (`app/` for state and actions, `ui/` for the screen) without globals; about 2,600 lines of the old view code are gone.
+- GPL-3.0 license text included.
+
 ### November 2026: schema v3
 
 **Upgrading needs one command:** `php db/migrate_v3.php` (see [Installation]({{< relref "quick-start.md" >}})).

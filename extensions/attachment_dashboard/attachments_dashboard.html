@@ -66,9 +66,7 @@
 
     <script>
         // Define the attachmentsDashboard function in global scope
-        console.log("=== Script loading, defining attachmentsDashboard function ===");
         function attachmentsDashboard() {
-            console.log("=== attachmentsDashboard function called ===");
             return {
                 attachments: [],
                 currentPage: 1,
@@ -84,9 +82,7 @@
                 uniqueTypes: [],
 
                 init() {
-                    console.log("=== Alpine init() called ===");
                     this.fetchAttachments();
-                    console.log("=== fetchAttachments() called from init ===");
                     // Populate some default common types, API will add more if found
                     this.uniqueTypes = ['image/jpeg', 'image/png', 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
                 },
@@ -112,13 +108,11 @@
                 },
 
                 async fetchAttachments(resetPage = false) {
-                    console.log("=== fetchAttachments START ===");
                     if (resetPage) {
                         this.currentPage = 1;
                     }
                     this.isLoading = true;
                     this.errorMessage = '';
-                    console.log("Set isLoading = true");
 
                     const params = {
                         page: this.currentPage,
@@ -133,63 +127,14 @@
                         params.filter_by_type = this.filterType;
                     }
 
-                    console.log("Fetching with params:", params);
 
                     try {
-                        console.log("Making direct API call...");
-                        
-                        // Build the API URL - try multiple possible paths
-                        const possiblePaths = [
-                            '../../api/v1/attachments.php',  // Relative from extensions directory
-                            '/api/v1/attachments.php',       // Absolute from root
-                            '../api/v1/attachments.php',     // Alternative relative path
-                            'api/v1/attachments.php'         // From current directory
-                        ];
-                        
-                        let response = null;
-                        let lastError = null;
-                        
-                        // Try each possible path until one works
-                        for (let i = 0; i < possiblePaths.length; i++) {
-                            const endpoint = possiblePaths[i];
-                            const url = `${endpoint}?${new URLSearchParams(params).toString()}`;
-                            console.log(`Trying API URL ${i + 1}: ${url}`);
-                            
-                            try {
-                                // Create an AbortController for timeout
-                                const controller = new AbortController();
-                                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout per attempt
-                                
-                                const fetchResponse = await fetch(url, {
-                                    method: 'GET',
-                                    headers: {
-                                        'Accept': 'application/json',
-                                    },
-                                    signal: controller.signal
-                                });
-                                
-                                clearTimeout(timeoutId);
-                                
-                                if (!fetchResponse.ok) {
-                                    throw new Error(`HTTP error! Status: ${fetchResponse.status}`);
-                                }
-                                
-                                response = await fetchResponse.json();
-                                console.log(`Success with URL ${i + 1}:`, response);
-                                break; // Success, exit the loop
-                                
-                            } catch (error) {
-                                console.log(`Failed with URL ${i + 1}:`, error.message);
-                                lastError = error;
-                                // Continue to next URL
-                            }
+                        const url = `../../api/v1/attachments.php?${new URLSearchParams(params).toString()}`;
+                        const fetchResponse = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                        const response = await fetchResponse.json().catch(() => null);
+                        if (!fetchResponse.ok && !response) {
+                            throw new Error(`HTTP error! Status: ${fetchResponse.status}`);
                         }
-                        
-                        if (!response) {
-                            throw lastError || new Error('All API endpoints failed');
-                        }
-                        
-                        console.log("API Response:", response);
 
                         if (!response) {
                             throw new Error('No response received from API client.');
@@ -229,8 +174,6 @@
                             errorMsg = "Request timed out. Please check your connection and try again.";
                         } else if (error.message.includes('Failed to fetch')) {
                             errorMsg = "Could not connect to the server. Please check if the server is running.";
-                        } else if (error.message.includes('All API endpoints failed')) {
-                            errorMsg = "Could not reach the API. Please check the server configuration.";
                         }
                         
                         this.errorMessage = errorMsg;
@@ -238,9 +181,7 @@
                         this.totalPages = 1;
                         this.currentPage = 1;
                     } finally {
-                        console.log("=== fetchAttachments FINALLY ===");
                         this.isLoading = false;
-                        console.log("Set isLoading = false");
                     }
                 },
 

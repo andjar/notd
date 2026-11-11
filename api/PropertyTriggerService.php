@@ -4,9 +4,6 @@ namespace App;
 
 use PDO;
 
-require_once __DIR__ . '/db_connect.php';
-require_once __DIR__ . '/response_utils.php';
-require_once __DIR__ . '/WebhooksManager.php';
 
 class PropertyTriggerService {
     private $pdo;
@@ -56,31 +53,6 @@ class PropertyTriggerService {
         }
     }
 
-    private function handleInternalPropertyForNote($entityId, $propertyName, $propertyValue) {
-        if ($propertyName === 'internal') {
-            $stmt = $this->pdo->prepare("UPDATE Notes SET internal = ? WHERE id = ?");
-            $stmt->execute([(int)$propertyValue, $entityId]);
-        }
-    }
-
-    private function handleAliasPropertyForPage($entityId, $propertyName, $propertyValue) {
-        if ($propertyName === 'alias') {
-            // Check if the alias points to a valid page
-            $stmt = $this->pdo->prepare("SELECT id FROM Pages WHERE LOWER(name) = LOWER(?)");
-            $stmt->execute([$propertyValue]);
-            $targetPage = $stmt->fetch();
-
-            if (!$targetPage) {
-                // If the target page doesn't exist, remove the alias
-                $stmt = $this->pdo->prepare("UPDATE Properties SET value = NULL WHERE page_id = ? AND name = 'alias'");
-                $stmt->execute([$entityId]);
-                error_log("Alias target page '{$propertyValue}' not found. Alias removed.");
-            }
-        }
-    }
-    
-    // Placeholder for other trigger handlers if any, e.g., status changes, etc.
-
     /**
      * Dispatch triggers for a property change
      * @param string $entityType Entity type ('note' or 'page')
@@ -89,13 +61,6 @@ class PropertyTriggerService {
      * @param mixed $propertyValue Property value
      */
     public function dispatch($entityType, $entityId, $propertyName, $propertyValue) {
-        // Handle hardcoded triggers
-        $triggers = $this->getTriggersForEntityType($entityType);
-        if (isset($triggers[$propertyName])) {
-            $handler = $triggers[$propertyName];
-            $this->$handler($entityId, $propertyName, $propertyValue);
-        }
-
         // Handle dynamic webhook triggers
         $this->handleWebhookTrigger($entityType, $entityId, $propertyName, $propertyValue);
     }
@@ -199,23 +164,4 @@ class PropertyTriggerService {
             error_log("Error during entity event webhook dispatch: " . $e->getMessage());
         }
     }
-
-    /**
-     * Get available triggers for an entity type
-     * @param string $entityType Entity type ('note' or 'page')
-     * @return array Map of property names to handler functions
-     */
-    private function getTriggersForEntityType($entityType) {
-        $triggers = [
-            'note' => [
-                'internal' => 'handleInternalPropertyForNote'
-            ],
-            'page' => [
-                'alias' => 'handleAliasPropertyForPage'
-            ]
-        ];
-
-        return $triggers[$entityType] ?? [];
-    }
 }
-

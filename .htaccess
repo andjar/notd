@@ -1,22 +1,26 @@
-RewriteEngine On
+# Apache configuration for notd. Works in the web root and in a sub-folder.
+# (PHP's built-in server ignores this file; use `php -S localhost:8000 router.php`.)
 
-# --- PHP Front Controller ---
-# If the request is not for an existing file or directory,
-# and it's not for the API directory,
-# route it to index.php.
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} !^/api/
-RewriteRule ^(.*)$ index.php?path=$1 [QSA,L]
+Options -Indexes
 
-# --- API endpoint routing ---
-# Route /api/v1/endpoint to /api/v1/endpoint.php if it exists
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{DOCUMENT_ROOT}/api/v1/$1.php -f
-RewriteRule ^api/v1/([a-zA-Z0-9_-]+)$ api/v1/$1.php [L]
+<IfModule mod_rewrite.c>
+    RewriteEngine On
 
-# Fallback for direct .php file access in api directory (optional, but might cover other cases)
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{DOCUMENT_ROOT}/api/$1.php -f
-RewriteRule ^api/([a-zA-Z0-9_-]+)$ api/$1.php [L]
+    # Private: repository internals, local settings, library code, dot files.
+    RewriteRule ^(docs|\.git|\.github|\.cursor)(/|$) - [F,L,NC]
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+    RewriteRule ^(config(\.local)?(\.example)?\.php|router\.php|composer\.(json|lock))$ - [F,L,NC]
+    RewriteRule ^api/[^/]+\.php$ - [F,L,NC]
+    RewriteRule ^assets/template/.*\.php$ - [F,L,NC]
+
+    # Nothing in uploads/ is ever executed.
+    RewriteRule ^uploads/.*\.(php\d?|phtml|phar)$ - [F,L,NC]
+
+    # /api/v1/pages works as well as /api/v1/pages.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^api/v1/([A-Za-z0-9_-]+)$ api/v1/$1.php [L]
+</IfModule>
+
+# db/ and tests/ carry their own .htaccess that denies everything.

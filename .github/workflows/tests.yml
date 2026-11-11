@@ -52,7 +52,9 @@ jobs:
           cat "$RUNNER_TEMP/server.log"; exit 1
 
       - name: API tests
-        run: node tests/js/ops_api.test.mjs
+        run: |
+          node tests/js/ops_api.test.mjs
+          node tests/js/api.test.mjs
 
       - name: Browser tests
         run: |
@@ -60,6 +62,7 @@ jobs:
           python3 -m playwright install --with-deps chromium
           python3 tests/browser/outline_test.py
           python3 tests/browser/features_test.py
+          python3 tests/browser/editing_test.py
 
       - name: Server log
         if: failure()

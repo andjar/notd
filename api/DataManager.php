@@ -1,329 +1,32 @@
 <?php
+/**
+ * Read queries. Everything the API returns about notes and pages is shaped
+ * here, so each kind of record looks the same in every endpoint.
+ *
+ * Before PHP 8.1 the SQLite driver returns integers as strings; the cast*Row
+ * helpers give JSON the same types on every PHP version.
+ */
 
 namespace App;
 
 use PDO;
 
-require_once __DIR__ . '/../config.php';
+class DataManager
+{
+    protected PDO $pdo;
 
-class DataManager {
-    protected $pdo;
+    /** Properties of this weight and above are "internal": hidden unless asked for. */
+    private const INTERNAL_WEIGHT = 3;
 
-    public function __construct(PDO $pdo) {
+    public function __construct(PDO $pdo)
+    {
         $this->pdo = $pdo;
     }
 
-    /**
-     * Formats raw property results into the API structure, grouping by name.
-     */
-    private function _formatProperties(array $propertiesResult): array {
-        $formatted = [];
-        foreach ($propertiesResult as $prop) {
-            $key = $prop['name'];
-            if (!isset($formatted[$key])) {
-                $formatted[$key] = [];
-            }
-            $formatted[$key][] = [
-                'value' => $prop['value'],
-                'internal' => (int)($prop['weight'] ?? 2) > 2 // Simplified check
-            ];
-        }
-        return $formatted;
-    }
+    // ------------------------------------------------------------ row shapes
 
-    /**
-     * Retrieves properties for a single page.
-     */
-    public function getPageProperties(int $pageId, bool $includeInternal = false): array {
-        $sql = "SELECT name, value, weight, created_at FROM Properties WHERE page_id = :pageId AND active = 1";
-        if (!$includeInternal) {
-            // Assuming weight 3+ is internal, consistent with config.php
-            $sql .= " AND weight < 3";
-        }
-        $sql .= " ORDER BY created_at ASC";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':pageId' => $pageId]);
-        return $this->_formatProperties($stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-    
-    /**
-     * Retrieves properties for a single note.
-     */
-    public function getNoteProperties(string $noteId, bool $includeInternal = false): array {
-        $sql = "SELECT name, value, weight, created_at FROM Properties WHERE note_id = :noteId AND active = 1";
-        if (!$includeInternal) {
-            $sql .= " AND weight < 3";
-        }
-        $sql .= " ORDER BY created_at ASC";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':noteId' => $noteId]);
-        return $this->_formatProperties($stmt->fetchAll(PDO::FETCH_ASSOC));
-    }
-    
-    /**
-     * Efficiently fetches properties for multiple note IDs.
-     */
-    public function getPropertiesForNoteIds(array $noteIds, bool $includeInternal = false, bool $includeParentProperties = false): array {
-        if (empty($noteIds)) {
-            return [];
-        }
-        $placeholders = implode(',', array_fill(0, count($noteIds), '?'));
-        $sql = "SELECT note_id, name, value, weight, created_at FROM Properties WHERE note_id IN ($placeholders) AND active = 1";
-        if (!$includeInternal) {
-            $sql .= " AND weight < 3";
-        }
-        $sql .= " ORDER BY note_id, created_at ASC";
-        
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($noteIds);
-        $allProps = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $results = [];
-        foreach ($noteIds as $id) {
-            $results[$id] = ['parent_properties' => []]; // Initialize with parent_properties
-        }
-
-        foreach ($allProps as $prop) {
-            $noteId = $prop['note_id'];
-            $key = $prop['name'];
-            // Ensure the base structure for the note exists, though it should by the loop above
-            if (!isset($results[$noteId])) {
-                $results[$noteId] = ['parent_properties' => []];
-            }
-            if (!isset($results[$noteId][$key])) {
-                $results[$noteId][$key] = [];
-            }
-            $results[$noteId][$key][] = [
-                'value' => $prop['value'],
-                'internal' => (int)($prop['weight'] ?? 2) > 2
-            ];
-        }
-
-        if ($includeParentProperties) {
-            // Fetch parent_note_id for all relevant notes
-            $noteParentMap = [];
-            $notesToFetchParentsFor = $noteIds; // Initially, all notes
-            $currentLevelNotes = $notesToFetchParentsFor;
-
-            // Prepare a statement to get note details (specifically parent_note_id)
-            // This is done outside the loop for efficiency if fetching many notes' parents
-            $parentNoteIdStmt = $this->pdo->prepare("SELECT id, parent_note_id FROM Notes WHERE id = :id AND active = 1");
-
-            foreach ($noteIds as $noteId) {
-                $parentPropertiesData = [];
-                $currentParentId = null;
-
-                // Get the initial parent_note_id for the current noteId
-                // We need to fetch the note itself to find its parent_note_id first
-                $initialParentStmt = $this->pdo->prepare("SELECT parent_note_id FROM Notes WHERE id = :id AND active = 1");
-                $initialParentStmt->execute([':id' => $noteId]);
-                $noteDetails = $initialParentStmt->fetch(PDO::FETCH_ASSOC);
-                $currentParentId = $noteDetails ? $noteDetails['parent_note_id'] : null;
-
-                $visitedParentIds = []; // To prevent infinite loops
-
-                while ($currentParentId !== null && !isset($visitedParentIds[$currentParentId])) {
-                    $visitedParentIds[$currentParentId] = true;
-
-                    // Fetch details of the current parent note
-                    $parentNoteIdStmt->execute([':id' => $currentParentId]);
-                    $parentNode = $parentNoteIdStmt->fetch(PDO::FETCH_ASSOC);
-
-                    if ($parentNode) {
-                        // Fetch properties for this parent node
-                        $properties = $this->getNoteProperties($parentNode['id'], $includeInternal);
-                        foreach ($properties as $name => $valuesArray) {
-                            if (!isset($parentPropertiesData[$name])) {
-                                $parentPropertiesData[$name] = [];
-                            }
-                            foreach ($valuesArray as $propValueItem) {
-                                // Ensure uniqueness of property values directly
-                                if (!in_array($propValueItem['value'], array_column($parentPropertiesData[$name], 'value'))) {
-                                     $parentPropertiesData[$name][] = ['value' => $propValueItem['value']];
-                                }
-                            }
-                        }
-                        $currentParentId = $parentNode['parent_note_id'];
-                    } else {
-                        break;
-                    }
-                }
-                // Assign collected parent properties to the result for the current noteId
-                // The structure should be $parentPropertiesData['prop_name'] = [['value' => 'val1'], ['value' => 'val2']]
-                $results[$noteId]['parent_properties'] = $parentPropertiesData;
-            }
-        }
-        return $results;
-    }
-
-    /**
-     * Retrieves a single note by its ID, including its formatted properties.
-     */
-    public function getNoteById(string $noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array {
-        $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE id = :id AND active = 1");
-        $stmt->execute([':id' => $noteId]);
-        $note = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($note) {
-            $note = self::castNoteRow($note);
-            // Check for attachments
-            $attachmentStmt = $this->pdo->prepare("SELECT EXISTS(SELECT 1 FROM Attachments WHERE note_id = :note_id AND active = 1 LIMIT 1)");
-            $attachmentStmt->execute([':note_id' => $noteId]);
-            $note['has_attachments'] = (bool) $attachmentStmt->fetchColumn();
-
-            $note['properties'] = $this->getNoteProperties($noteId, $includeInternal);
-
-            if ($includeParentProperties) {
-                $parentPropertiesData = [];
-                $currentParentId = $note['parent_note_id'];
-                $visitedParentIds = []; // To prevent infinite loops in case of cyclic parentage
-
-                while ($currentParentId !== null && !isset($visitedParentIds[$currentParentId])) {
-                    $visitedParentIds[$currentParentId] = true; // Mark as visited
-                    $parentStmt = $this->pdo->prepare("SELECT id, parent_note_id FROM Notes WHERE id = :id AND active = 1");
-                    $parentStmt->execute([':id' => $currentParentId]);
-                    $parentNode = $parentStmt->fetch(PDO::FETCH_ASSOC);
-
-                    if ($parentNode) {
-                        $properties = $this->getNoteProperties($parentNode['id'], $includeInternal);
-                        foreach ($properties as $name => $valuesArray) {
-                            if (!isset($parentPropertiesData[$name])) {
-                                $parentPropertiesData[$name] = [];
-                            }
-                            foreach ($valuesArray as $propValueItem) {
-                                // Add value if not already present for this property name
-                                if (!in_array($propValueItem['value'], $parentPropertiesData[$name])) {
-                                    $parentPropertiesData[$name][] = $propValueItem['value'];
-                                }
-                            }
-                        }
-                        $currentParentId = $parentNode['parent_note_id'];
-                    } else {
-                        break; // Parent not found or not active, stop traversal
-                    }
-                }
-
-                // Format $parentPropertiesData into the desired structure
-                $formattedParentProperties = [];
-                foreach ($parentPropertiesData as $name => $values) {
-                    $formattedParentProperties[$name] = array_map(function($value) {
-                        return ['value' => $value];
-                    }, $values);
-                }
-                $note['parent_properties'] = $formattedParentProperties;
-            } else {
-                $note['parent_properties'] = null; // Or [] for an empty array
-            }
-        }
-        return $note ?: null;
-    }
-
-    /**
-     * Retrieves a note with all its children recursively, including properties.
-     * Implements recursion protection to prevent infinite loops.
-     * 
-     * @param string $noteId The ID of the root note to fetch
-     * @param bool $includeInternal Whether to include internal properties
-     * @param bool $includeParentProperties Whether to include parent properties
-     * @param int $maxDepth Maximum recursion depth (default 10)
-     * @param array $visitedIds Internal tracking to prevent circular references
-     * @param int $currentDepth Current recursion depth
-     * @return array|null The note with nested children, or null if not found
-     */
-    public function getNoteWithChildren(
-        string $noteId, 
-        bool $includeInternal = false, 
-        bool $includeParentProperties = false,
-        int $maxDepth = 10,
-        array $visitedIds = [],
-        int $currentDepth = 0
-    ): ?array {
-        // Recursion protection: check depth limit
-        if ($currentDepth >= $maxDepth) {
-            error_log("getNoteWithChildren: Maximum depth ($maxDepth) reached for note $noteId");
-            return null;
-        }
-
-        // Recursion protection: check for circular references
-        if (in_array($noteId, $visitedIds)) {
-            error_log("getNoteWithChildren: Circular reference detected for note $noteId");
-            return null;
-        }
-
-        // Add current note to visited list
-        $visitedIds[] = $noteId;
-
-        // Get the root note
-        $note = $this->getNoteById($noteId, $includeInternal, $includeParentProperties);
-        if (!$note) {
-            return null;
-        }
-
-        // Get all child notes for this note
-        $childrenStmt = $this->pdo->prepare("
-            SELECT id FROM Notes 
-            WHERE parent_note_id = :parent_id AND active = 1 
-            ORDER BY sort_key ASC, id ASC
-        ");
-        $childrenStmt->execute([':parent_id' => $noteId]);
-        $childIds = $childrenStmt->fetchAll(PDO::FETCH_COLUMN);
-
-        // Recursively fetch children (only if we haven't reached the depth limit for children)
-        $children = [];
-        if ($currentDepth < $maxDepth) {
-            foreach ($childIds as $childId) {
-                $child = $this->getNoteWithChildren(
-                    $childId, 
-                    $includeInternal, 
-                    $includeParentProperties,
-                    $maxDepth,
-                    $visitedIds,
-                    $currentDepth + 1
-                );
-                if ($child) {
-                    $children[] = $child;
-                }
-            }
-        }
-
-        // Add children to the note
-        $note['children'] = $children;
-
-        return $note;
-    }
-
-    /**
-     * Retrieves all notes for a page, with properties embedded.
-     */
-    public function getNotesByPageId(int $pageId, bool $includeInternal = false): array {
-        $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE page_id = :pageId AND active = 1 ORDER BY sort_key ASC, id ASC");
-        $stmt->execute([':pageId' => $pageId]);
-        return $this->decorateNotes($stmt->fetchAll(PDO::FETCH_ASSOC), $includeInternal);
-    }
-
-    /**
-     * Retrieves several notes by id (any page), with properties and attachment flags.
-     * Missing ids are simply absent from the result.
-     */
-    public function getNotesByIds(array $noteIds, bool $includeInternal = false): array {
-        $noteIds = array_values(array_unique(array_map('strval', $noteIds)));
-        if (empty($noteIds)) return [];
-        $out = [];
-        foreach (array_chunk($noteIds, 500) as $chunk) {
-            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
-            $stmt = $this->pdo->prepare("SELECT * FROM Notes WHERE id IN ($placeholders) AND active = 1");
-            $stmt->execute($chunk);
-            $out = array_merge($out, $stmt->fetchAll(PDO::FETCH_ASSOC));
-        }
-        return $this->decorateNotes($out, $includeInternal);
-    }
-
-    /**
-     * Gives a raw Notes row the same JSON types on every PHP version: before
-     * PHP 8.1 the SQLite driver returns integers as strings ("0" is truthy in
-     * JavaScript, which showed every note as collapsed).
-     */
-    public static function castNoteRow(array $note): array {
+    public static function castNoteRow(array $note): array
+    {
         unset($note['rid']);
         foreach (['page_id', 'internal', 'collapsed', 'active', 'version'] as $field) {
             if (isset($note[$field])) {
@@ -333,164 +36,397 @@ class DataManager {
         return $note;
     }
 
+    public static function castPageRow(array $page): array
+    {
+        foreach (['id', 'active'] as $field) {
+            if (isset($page[$field])) {
+                $page[$field] = (int)$page[$field];
+            }
+        }
+        return $page;
+    }
+
+    /** Groups property rows by name: name => [{value, internal}, ...] in the order they were written. */
+    private static function groupProperties(array $rows): array
+    {
+        $grouped = [];
+        foreach ($rows as $row) {
+            $grouped[$row['name']][] = [
+                'value' => $row['value'],
+                'internal' => (int)$row['weight'] >= self::INTERNAL_WEIGHT,
+            ];
+        }
+        return $grouped;
+    }
+
+    private static function placeholders(array $values): string
+    {
+        return implode(',', array_fill(0, count($values), '?'));
+    }
+
+    // ------------------------------------------------------------ properties
+
+    public function getPageProperties(int $pageId, bool $includeInternal = false): array
+    {
+        $sql = 'SELECT name, value, weight FROM Properties WHERE page_id = ? AND active = 1'
+            . ($includeInternal ? '' : ' AND weight < ' . self::INTERNAL_WEIGHT) . ' ORDER BY id';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$pageId]);
+        return self::groupProperties($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function getNoteProperties(string $noteId, bool $includeInternal = false): array
+    {
+        return $this->getPropertiesForNoteIds([$noteId], $includeInternal)[$noteId] ?? [];
+    }
+
+    /**
+     * Properties of many notes in one query per 500 ids.
+     *
+     * @return array<string, array> note id => grouped properties (every requested id is present)
+     */
+    public function getPropertiesForNoteIds(array $noteIds, bool $includeInternal = false): array
+    {
+        $result = [];
+        foreach ($noteIds as $id) {
+            $result[(string)$id] = [];
+        }
+        foreach (array_chunk(array_keys($result), 500) as $chunk) {
+            $chunk = array_map('strval', $chunk);
+            $sql = 'SELECT note_id, name, value, weight FROM Properties WHERE note_id IN (' . self::placeholders($chunk) . ') AND active = 1'
+                . ($includeInternal ? '' : ' AND weight < ' . self::INTERNAL_WEIGHT) . ' ORDER BY id';
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($chunk);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $result[(string)$row['note_id']][$row['name']][] = [
+                    'value' => $row['value'],
+                    'internal' => (int)$row['weight'] >= self::INTERNAL_WEIGHT,
+                ];
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Properties inherited from ancestors, nearest ancestor first, each value once.
+     *
+     * @return array<string, array> note id => name => [{value}, ...] (every requested id is present)
+     */
+    public function getParentPropertiesForNoteIds(array $noteIds, bool $includeInternal = false): array
+    {
+        $result = [];
+        foreach ($noteIds as $id) {
+            $result[(string)$id] = [];
+        }
+        foreach (array_chunk(array_keys($result), 500) as $chunk) {
+            $chunk = array_map('strval', $chunk);
+            $sql = 'WITH RECURSIVE anc(note_id, ancestor, depth) AS (
+                        SELECT id, parent_note_id, 1 FROM Notes
+                         WHERE id IN (' . self::placeholders($chunk) . ') AND parent_note_id IS NOT NULL
+                        UNION ALL
+                        SELECT anc.note_id, n.parent_note_id, anc.depth + 1
+                          FROM anc JOIN Notes n ON n.id = anc.ancestor
+                         WHERE n.parent_note_id IS NOT NULL AND anc.depth < 100
+                    )
+                    SELECT anc.note_id, p.name, p.value
+                      FROM anc JOIN Properties p ON p.note_id = anc.ancestor
+                     WHERE p.active = 1' . ($includeInternal ? '' : ' AND p.weight < ' . self::INTERNAL_WEIGHT) . '
+                     ORDER BY anc.depth, p.id';
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($chunk);
+            $seen = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $key = $row['note_id'] . "\0" . $row['name'] . "\0" . $row['value'];
+                if (!isset($seen[$key])) {
+                    $seen[$key] = true;
+                    $result[(string)$row['note_id']][$row['name']][] = ['value' => $row['value']];
+                }
+            }
+        }
+        return $result;
+    }
+
+    // ----------------------------------------------------------------- notes
+
     /** Adds `properties` and `has_attachments` to raw note rows. */
-    private function decorateNotes(array $notes, bool $includeInternal): array {
-        if (empty($notes)) return [];
-        $noteIds = array_column($notes, 'id');
-        $propertiesByNoteId = $this->getPropertiesForNoteIds($noteIds, $includeInternal);
+    private function decorateNotes(array $notes, bool $includeInternal): array
+    {
+        if (!$notes) {
+            return [];
+        }
+        $ids = array_map('strval', array_column($notes, 'id'));
+        $properties = $this->getPropertiesForNoteIds($ids, $includeInternal);
 
         $withAttachments = [];
-        foreach (array_chunk($noteIds, 500) as $chunk) {
-            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
-            $stmt = $this->pdo->prepare("SELECT DISTINCT note_id FROM Attachments WHERE note_id IN ($placeholders) AND active = 1");
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $stmt = $this->pdo->prepare('SELECT DISTINCT note_id FROM Attachments WHERE note_id IN (' . self::placeholders($chunk) . ') AND active = 1');
             $stmt->execute($chunk);
             foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) {
-                $withAttachments[$id] = true;
+                $withAttachments[(string)$id] = true;
             }
         }
 
         foreach ($notes as &$note) {
             $note = self::castNoteRow($note);
-            $note['properties'] = $propertiesByNoteId[$note['id']] ?? [];
-            $note['has_attachments'] = isset($withAttachments[$note['id']]);
+            $note['properties'] = $properties[(string)$note['id']] ?? [];
+            $note['has_attachments'] = isset($withAttachments[(string)$note['id']]);
         }
         unset($note);
         return $notes;
     }
 
-    /**
-     * Retrieves a single page by its ID, with properties.
-     */
-    public function getPageById(int $pageId): ?array {
-        $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE id = :id AND active = 1");
-        $stmt->execute([':id' => $pageId]);
-        $page = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($page) {
-            $page['properties'] = $this->getPageProperties($pageId, true); // Get all properties for page details
-        }
-        return $page ?: null;
+    /** All notes of a page, flat, in outline order within each parent. */
+    public function getNotesByPageId(int $pageId, bool $includeInternal = false): array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM Notes WHERE page_id = ? AND active = 1 ORDER BY sort_key, id');
+        $stmt->execute([$pageId]);
+        return $this->decorateNotes($stmt->fetchAll(PDO::FETCH_ASSOC), $includeInternal);
     }
-    
-    /**
-     * Retrieves page details by name, optionally including notes.
-     */
-    public function getPageDetailsByName(string $name, bool $includeNotes = false): ?array {
-        $page = $this->getPageByName($name);
-        if ($page && $includeNotes) {
-            $page['notes'] = $this->getNotesByPageId($page['id']);
+
+    /** Adds `page_name` to notes (one query for all of them). Used where notes of several pages are shown together. */
+    public function withPageNames(array $notes): array
+    {
+        $pageIds = array_values(array_unique(array_map('intval', array_column($notes, 'page_id'))));
+        $names = [];
+        foreach (array_chunk($pageIds, 500) as $chunk) {
+            $stmt = $this->pdo->prepare('SELECT id, name FROM Pages WHERE id IN (' . self::placeholders($chunk) . ')');
+            $stmt->execute($chunk);
+            $names += $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
         }
+        foreach ($notes as &$note) {
+            $note['page_name'] = $names[$note['page_id']] ?? null;
+        }
+        return $notes;
+    }
+
+    /** Several notes by id (any page). Missing ids are absent from the result. */
+    public function getNotesByIds(array $noteIds, bool $includeInternal = false): array
+    {
+        $noteIds = array_values(array_unique(array_map('strval', $noteIds)));
+        $rows = [];
+        foreach (array_chunk($noteIds, 500) as $chunk) {
+            $stmt = $this->pdo->prepare('SELECT * FROM Notes WHERE id IN (' . self::placeholders($chunk) . ') AND active = 1');
+            $stmt->execute($chunk);
+            $rows = array_merge($rows, $stmt->fetchAll(PDO::FETCH_ASSOC));
+        }
+        return $this->decorateNotes($rows, $includeInternal);
+    }
+
+    public function getNoteById(string $noteId, bool $includeInternal = false, bool $includeParentProperties = false): ?array
+    {
+        $note = $this->getNotesByIds([$noteId], $includeInternal)[0] ?? null;
+        if ($note) {
+            $note['parent_properties'] = $includeParentProperties
+                ? $this->getParentPropertiesForNoteIds([$noteId], $includeInternal)[$noteId]
+                : null;
+        }
+        return $note;
+    }
+
+    /**
+     * A note with its subtree nested under `children` (at most $maxDepth levels below it).
+     */
+    public function getNoteWithChildren(string $noteId, bool $includeInternal = false, bool $includeParentProperties = false, int $maxDepth = 10): ?array
+    {
+        $root = $this->getNoteById($noteId, $includeInternal, $includeParentProperties);
+        if (!$root) {
+            return null;
+        }
+        $stmt = $this->pdo->prepare(
+            'WITH RECURSIVE sub(id, depth) AS (
+                 SELECT id, 1 FROM Notes WHERE parent_note_id = ? AND active = 1
+                 UNION ALL
+                 SELECT n.id, sub.depth + 1 FROM Notes n JOIN sub ON n.parent_note_id = sub.id
+                  WHERE n.active = 1 AND sub.depth < ?
+             )
+             SELECT n.* FROM Notes n JOIN sub ON sub.id = n.id ORDER BY n.sort_key, n.id'
+        );
+        $stmt->execute([$noteId, $maxDepth]);
+        $descendants = $this->decorateNotes($stmt->fetchAll(PDO::FETCH_ASSOC), $includeInternal);
+        $parentProps = $includeParentProperties
+            ? $this->getParentPropertiesForNoteIds(array_column($descendants, 'id'), $includeInternal)
+            : [];
+
+        $byParent = [];
+        foreach ($descendants as $note) {
+            $note['parent_properties'] = $includeParentProperties ? ($parentProps[(string)$note['id']] ?? []) : null;
+            $byParent[(string)$note['parent_note_id']][] = $note;
+        }
+        $attach = static function (array $note) use (&$attach, $byParent): array {
+            $note['children'] = array_map($attach, $byParent[(string)$note['id']] ?? []);
+            return $note;
+        };
+        return $attach($root);
+    }
+
+    // ----------------------------------------------------------------- pages
+
+    private function decoratePage(?array $page): ?array
+    {
+        if (!$page) {
+            return null;
+        }
+        $page = self::castPageRow($page);
+        $page['properties'] = $this->getPageProperties($page['id'], true);
         return $page;
     }
-    
-    /**
-     * Retrieves page details by ID, optionally including notes.
-     */
-    public function getPageDetailsById(int $id, bool $includeNotes = false): ?array {
-        $page = $this->getPageById($id);
-        if ($page && $includeNotes) {
-            $page['notes'] = $this->getNotesByPageId($page['id']);
-        }
-        return $page;
+
+    public function getPageById(int $pageId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM Pages WHERE id = ? AND active = 1');
+        $stmt->execute([$pageId]);
+        return $this->decoratePage($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
     }
 
-    /**
-     * Retrieves a single page by its name, with properties.
-     */
-    public function getPageByName(string $name): ?array {
-        $stmt = $this->pdo->prepare("SELECT * FROM Pages WHERE LOWER(name) = LOWER(:name) AND active = 1");
-        $stmt->execute([':name' => $name]);
-        $page = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($page) {
-            $page['properties'] = $this->getPageProperties($page['id'], true);
-        }
-        return $page ?: null;
+    public function getPageByName(string $name): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM Pages WHERE LOWER(name) = LOWER(?) AND active = 1');
+        $stmt->execute([$name]);
+        return $this->decoratePage($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
     }
 
+    /** SQL condition that is true for journal pages (pages named like a date). */
+    private const IS_JOURNAL = "name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'";
+
     /**
-     * Retrieves a list of pages with pagination.
+     * Pages, most recently changed first.
+     *
+     * @return array{data: array, pagination: array}
      */
-    public function getPages(int $page = 1, int $per_page = 20, array $options = []): array {
-        $offset = ($page - 1) * $per_page;
-        $baseSql = "FROM Pages WHERE active = 1";
-        $params = [];
+    public function getPages(int $page = 1, int $perPage = 20, array $options = []): array
+    {
+        $where = 'active = 1' . (!empty($options['exclude_journal']) ? ' AND NOT ' . self::IS_JOURNAL : '');
+        $total = (int)$this->pdo->query("SELECT COUNT(*) FROM Pages WHERE $where")->fetchColumn();
 
-        if (!empty($options['exclude_journal'])) {
-            // Note: This check relies on a {type::journal} property being in the page content.
-            // A more robust way would be to check the Properties table if available.
-            $baseSql .= " AND (content IS NULL OR content NOT LIKE '%{type::journal}%')";
-        }
-
-        $countSql = "SELECT COUNT(*) " . $baseSql;
-        $countStmt = $this->pdo->prepare($countSql);
-        $countStmt->execute($params);
-        $totalItems = (int)$countStmt->fetchColumn();
-
-        $dataSql = "SELECT id, name, content, alias, updated_at " . $baseSql . " ORDER BY updated_at DESC LIMIT :limit OFFSET :offset";
-        $dataStmt = $this->pdo->prepare($dataSql);
-        $dataStmt->bindValue(':limit', $per_page, PDO::PARAM_INT);
-        $dataStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        foreach ($params as $key => $value) {
-            $dataStmt->bindValue($key + 1, $value);
-        }
-        $dataStmt->execute();
-        $pages = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $this->pdo->prepare("SELECT id, name, content, alias, updated_at FROM Pages WHERE $where ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?");
+        $stmt->bindValue(1, $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(2, ($page - 1) * $perPage, PDO::PARAM_INT);
+        $stmt->execute();
 
         return [
-            'data' => $pages,
+            'data' => array_map([self::class, 'castPageRow'], $stmt->fetchAll(PDO::FETCH_ASSOC)),
             'pagination' => [
-                'total_items' => $totalItems,
-                'per_page' => $per_page,
+                'total_items' => $total,
+                'per_page' => $perPage,
                 'current_page' => $page,
-                'total_pages' => (int)ceil($totalItems / $per_page)
-            ]
+                'total_pages' => (int)ceil($total / max(1, $perPage)),
+            ],
         ];
     }
 
-    /**
-     * Retrieves pages that have a 'date' property matching a given date.
-     * @param string $date The date in 'YYYY-MM-DD' format.
-     * @return array A list of pages found.
-     */
-    public function getPagesByDate(string $date): array {
-        // Find page IDs that have a 'date' property with the specified value
-        $sql = "
-            SELECT p.id, p.name, p.content, p.alias, p.updated_at
-            FROM Pages p
-            JOIN Properties prop ON p.id = prop.page_id
-            WHERE prop.name = 'date' AND prop.value = :date AND p.active = 1 AND prop.active = 1
-            ORDER BY p.name ASC
-        ";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':date' => $date]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    /** Pages that carry a {date::YYYY-MM-DD} property with this value. */
+    public function getPagesByDate(string $date): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT DISTINCT p.id, p.name, p.content, p.alias, p.updated_at
+               FROM Pages p JOIN Properties prop ON p.id = prop.page_id
+              WHERE prop.name = 'date' AND prop.value = ? AND p.active = 1 AND prop.active = 1
+              ORDER BY p.name"
+        );
+        $stmt->execute([$date]);
+        return array_map([self::class, 'castPageRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /** Pages directly below $namespace: "A/B" for "A", but not "A/B/C". */
+    public function getChildPages(string $namespace): array
+    {
+        $prefix = rtrim($namespace, '/') . '/';
+        $stmt = $this->pdo->prepare(
+            "SELECT id, name, updated_at FROM Pages
+              WHERE LOWER(name) LIKE LOWER(?) ESCAPE '\\'
+                AND SUBSTR(name, ?) NOT LIKE '%/%'
+                AND active = 1
+              ORDER BY name"
+        );
+        $stmt->execute([PageStore::likeEscape($prefix) . '%', mb_strlen($prefix) + 1]);
+        return array_map([self::class, 'castPageRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /** The names of all pages, alphabetically. Cheap enough to send whole: it feeds link suggestions and the page finder. */
+    public function getPageNames(bool $excludeJournal = false): array
+    {
+        $where = 'active = 1' . ($excludeJournal ? ' AND NOT ' . self::IS_JOURNAL : '');
+        return $this->pdo->query("SELECT name FROM Pages WHERE $where ORDER BY name COLLATE NOCASE")->fetchAll(PDO::FETCH_COLUMN);
     }
 
     /**
-     * Retrieves pages that are direct children of a given namespace.
-     * @param string $namespace The parent page/namespace name.
-     * @return array A list of child pages found.
+     * The days of a month (YYYY-MM) that have a page: journal pages with at
+     * least one note, and pages carrying a {date::YYYY-MM-DD} property.
+     *
+     * @return array<int, array{date: string, page_name: string}>
      */
-    public function getChildPages(string $namespace): array {
-        // We are looking for pages under the namespace, e.g., "Namespace/Child"
-        $prefix = rtrim($namespace, '/') . '/';
-
-        // This query finds pages that are direct children of the namespace.
-        // It avoids matching deeper descendants (e.g., ns/child/grandchild)
-        // by checking that there are no additional slashes in the name after the prefix.
-        $sql = "
-            SELECT id, name, updated_at
-            FROM Pages
-            WHERE
-                LOWER(name) LIKE LOWER(:prefix) || '%' AND
-                SUBSTR(LOWER(name), LENGTH(LOWER(:prefix)) + 1) NOT LIKE '%/%' AND
-                active = 1
-            ORDER BY name ASC
-        ";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':prefix' => $prefix]);
+    public function getDatesWithPages(string $month): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT p.name AS date, p.name AS page_name FROM Pages p
+              WHERE p.name GLOB ? AND p.active = 1 AND EXISTS (SELECT 1 FROM Notes n WHERE n.page_id = p.id)
+             UNION
+             SELECT prop.value, p.name FROM Properties prop JOIN Pages p ON p.id = prop.page_id
+              WHERE prop.name = 'date' AND prop.value GLOB ? AND p.active = 1
+             ORDER BY 1"
+        );
+        $glob = $month . '-[0-9][0-9]';
+        $stmt->execute([$glob, $glob]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getRecentPages(int $limit = 7): array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, name, updated_at FROM Pages WHERE active = 1 ORDER BY updated_at DESC, id DESC LIMIT ?');
+        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return array_map([self::class, 'castPageRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /** Pages marked {favorite::true}. */
+    public function getFavoritePages(?int $limit = null, int $offset = 0): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT DISTINCT P.id, P.name, P.updated_at FROM Pages P JOIN Properties Prop ON P.id = Prop.page_id
+              WHERE Prop.name = 'favorite' AND LOWER(Prop.value) = 'true' AND P.active = 1
+              ORDER BY P.name COLLATE NOCASE LIMIT ? OFFSET ?"
+        );
+        $stmt->bindValue(1, $limit ?? -1, PDO::PARAM_INT);
+        $stmt->bindValue(2, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return array_map([self::class, 'castPageRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function countFavoritePages(): int
+    {
+        return (int)$this->pdo->query(
+            "SELECT COUNT(DISTINCT page_id) FROM Properties WHERE name = 'favorite' AND LOWER(value) = 'true' AND page_id IS NOT NULL"
+        )->fetchColumn();
+    }
+
+    /**
+     * Notes that link to a page with [[Name]] (page names are case-insensitive).
+     *
+     * @return array<int, array{note_id: string, content: string, page_id: int, page_name: string}>
+     */
+    public function getBacklinks(string $pageName, int $limit = 50, int $offset = 0): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT N.id AS note_id, N.content, N.page_id, P.name AS page_name
+               FROM Notes N JOIN Pages P ON N.page_id = P.id
+              WHERE N.id IN (SELECT note_id FROM Properties WHERE name = 'links_to_page' AND value = ? COLLATE NOCASE)
+              ORDER BY N.updated_at DESC, N.id LIMIT ? OFFSET ?"
+        );
+        $stmt->bindValue(1, $pageName);
+        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['page_id'] = (int)$row['page_id'];
+        }
+        return $rows;
+    }
+
+    public function countBacklinks(string $pageName): int
+    {
+        $stmt = $this->pdo->prepare("SELECT COUNT(DISTINCT note_id) FROM Properties WHERE name = 'links_to_page' AND value = ? COLLATE NOCASE");
+        $stmt->execute([$pageName]);
+        return (int)$stmt->fetchColumn();
     }
 }

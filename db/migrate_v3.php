@@ -1,7 +1,8 @@
 <?php
 /**
  * Migrates a notd database from schema v2 (integer note ids, order_index)
- * to v3 (string note ids, fractional sort keys, version, AppliedOps).
+ * to the current one (string note ids, fractional sort keys, version, AppliedOps).
+ * Later schema changes are applied automatically; only this step is manual.
  *
  *   php db/migrate_v3.php [path/to/database.sqlite]
  *
@@ -18,6 +19,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../api/Ordering.php';
+require_once __DIR__ . '/setup_db.php';
 
 use App\Ordering;
 
@@ -45,7 +47,7 @@ $tmp = $path . '.v3-tmp';
 @unlink($tmp);
 
 $db = new PDO('sqlite:' . $tmp, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
-$db->exec(file_get_contents(__DIR__ . '/schema.sql'));
+$db->exec(notd_portable_schema($db, file_get_contents(__DIR__ . '/schema.sql')));
 $db->exec('PRAGMA foreign_keys = OFF');
 $db->exec("ATTACH DATABASE " . $db->quote($backup) . " AS old");
 $db->beginTransaction();

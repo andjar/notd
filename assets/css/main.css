@@ -18,7 +18,6 @@
 @import url('components/forms.css');
 @import url('components/pills.css');
 @import url('components/modals.css');
-@import url('components/encryption.css');
 @import url('components/transclusion.css');
 @import url('components/properties.css');
 @import url('components/links.css');
@@ -28,3 +27,4 @@
 @import url('components/attachments.css');
 @import url('components/mobile-toolbar.css');
 @import url('components/sync.css');
+@import url('components/app.css');

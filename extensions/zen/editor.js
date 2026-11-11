@@ -22,7 +22,7 @@ window.addEventListener('DOMContentLoaded', async function () {
   }
 
   // --- API CLIENT (direct, not window.notesAPI) ---
-  const API_BASE_URL = (document.querySelector('base[href]')?.href || '/') + 'api/v1/';
+  const API_BASE_URL = new URL('../../api/v1/', window.location.href).href;
   async function apiRequest(endpoint, method = 'GET', body = null) {
     const options = {
       method,

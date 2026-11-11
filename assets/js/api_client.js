@@ -1,246 +1,134 @@
 /**
- * API Client for NotTD application
- * Provides functions for making asynchronous requests to the PHP backend API
+ * The HTTP API, as functions. Every call returns the `data` of the response
+ * or throws an Error whose message is the server's.
+ *
+ * Note writes do not go through here: they are queued by app/outbox.js and
+ * sent to ops.php.
+ *
  * @module api_client
  */
 
-/**
- * Base URL for API requests, derived from <base> tag or defaulting to root
- * @type {string}
- */
-export const API_BASE_URL = (document.querySelector('base[href]')?.href || '/') + 'api/v1/';
+/** Resolved against the page, so notd works from any folder. */
+// Relative to this file, so pages in other folders (extensions) reach the same API.
+export const API_BASE_URL = new URL('../../api/v1/', import.meta.url).href;
 
-/**
- * Generic function to make API requests
- * @param {string} endpoint - API endpoint path
- * @param {string} [method='GET'] - HTTP method
- * @param {Object|FormData|null} [body=null] - Request body
- * @returns {Promise<any>} API response data
- * @throws {Error} If the request fails or returns an error
- */
-async function apiRequest(endpoint, method = 'GET', body = null) {
-    const options = {
-        method,
-        headers: {
-            'Accept': 'application/json'
-        },
-        credentials: 'same-origin'
-    };
-
-    if (body) {
-        if (body instanceof FormData) {
-            options.body = body;
-        } else {
-            options.headers['Content-Type'] = 'application/json';
-            options.body = JSON.stringify(body);
-        }
+export async function apiRequest(endpoint, method = 'GET', body = null, { whole = false } = {}) {
+    const options = { method, headers: { Accept: 'application/json' }, credentials: 'same-origin' };
+    if (body instanceof FormData) {
+        options.body = body;
+    } else if (body !== null) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(body);
     }
 
+    const response = await fetch(API_BASE_URL + endpoint, options);
+    const text = await response.text();
+    let payload = null;
     try {
-        const response = await fetch(API_BASE_URL + endpoint, options);
-        
-        if (response.status === 204) {
-            return undefined;
-        }
-
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status} ${response.statusText}. Response: ${text}`);
-            }
-            throw new Error(`Invalid response format: expected JSON but got ${contentType || 'unknown content type'}. Response: ${text}`);
-        }
-
-        const data = await response.json();
-
-        if (data && data.status === 'error' && data.message && data.message.includes('PHP Error:')) {
-            throw new Error('Server error: PHP error in response');
-        }
-        
-        if (data && data.status === 'error') {
-            let errorMessage = data.message || 'API request failed (status:error)';
-            if (data.details) {
-                errorMessage += ` Details: ${JSON.stringify(data.details)}`;
-            }
-            throw new Error(errorMessage);
-        }
-
-        if (!response.ok) {
-            let errorMessage = data?.message || data?.error?.message || data?.error || response.statusText;
-            if (typeof errorMessage === 'object') {
-                errorMessage = JSON.stringify(errorMessage);
-            }
-            throw new Error(errorMessage);
-        }
-        
-        // Per API Spec, all successful responses have a `data` key.
-        // This function now consistently returns ONLY the content of the `data` key.
-        return data.data;
-
-    } catch (error) {
+        payload = text ? JSON.parse(text) : null;
+    } catch {
+        throw new Error(`The server sent an unexpected answer (${response.status}).`);
+    }
+    if (!response.ok || !payload || payload.status === 'error') {
+        const error = new Error(payload?.message || `Request failed (${response.status}).`);
+        error.status = response.status;
+        error.details = payload?.details;
         throw error;
     }
+    return whole ? payload : payload.data;
 }
 
-/**
- * API functions for managing pages
- * @namespace pagesAPI
- */
-const pagesAPI = {
-    /**
-     * Get all pages
-     * @returns {Promise<{pages: Array, pagination: Object|null}>} Object with pages array and pagination info
-     */
-    getPages: async (options = {}) => {
-        const params = new URLSearchParams();
-        if (options.excludeJournal) params.append('exclude_journal', '1');
-        if (options.followAliases === false) params.append('follow_aliases', '0');
-        if (options.include_details) params.append('include_details', '1');
-        if (options.include_internal) params.append('include_internal', '1');
-        if (options.page) params.append('page', options.page.toString());
-        if (options.per_page) params.append('per_page', options.per_page.toString());
-        if (options.sort_by) params.append('sort_by', options.sort_by);
-        if (options.sort_order) params.append('sort_order', options.sort_order);
-        
-        const queryString = params.toString();
-        try {
-            // apiRequest returns the `data` object, which for this endpoint contains `data` (the array) and `pagination`.
-            const responsePayload = await apiRequest(`pages.php${queryString ? '?' + queryString : ''}`);
-            
-            if (responsePayload && Array.isArray(responsePayload.data) && responsePayload.pagination) {
-                return { pages: responsePayload.data, pagination: responsePayload.pagination };
-            }
-            if (Array.isArray(responsePayload)) { // Fallback for non-paginated
-                 return { pages: responsePayload, pagination: null };
-            }
-            
-            return { pages: [], pagination: null };
+const get = (endpoint) => apiRequest(endpoint);
+const post = (endpoint, body) => apiRequest(endpoint, 'POST', body);
+const query = (params) => {
+    const q = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== false) q.set(key, value === true ? '1' : String(value));
+    }
+    const s = q.toString();
+    return s ? `?${s}` : '';
+};
 
-        } catch (error) {
-            return { pages: [], pagination: null };
+export const pagesAPI = {
+    /** @returns {Promise<{pages: Array, pagination: Object}>} */
+    async list({ page, perPage, excludeJournal } = {}) {
+        const res = await apiRequest('pages.php' + query({ page, per_page: perPage, exclude_journal: excludeJournal }), 'GET', null, { whole: true });
+        return { pages: res.data || [], pagination: res.pagination || null };
+    },
+    /** All page names; cheap, used for suggestions and the page finder. */
+    names: ({ excludeJournal = false } = {}) => get('pages.php' + query({ names: 1, exclude_journal: excludeJournal })),
+    /** Days of a month (YYYY-MM) that have a page: [{date, page_name}]. */
+    datesInMonth: (month) => get('pages.php' + query({ month })),
+    byId: (id) => get('pages.php' + query({ id })),
+    /** Returns the page with this name, creating it if it does not exist. */
+    byName: (name) => get('pages.php' + query({ name })),
+    create: (name, content = null) => post('pages.php', { name, content }),
+    /** `changes` may contain `content` and/or `name` (renaming rewrites links). */
+    update: (id, changes) => post('pages.php', { _method: 'PUT', id, ...changes }),
+    remove: (id) => post('pages.php', { _method: 'DELETE', id }),
+    children: (namespace) => get('child_pages.php' + query({ namespace })),
+    exportUrl: (name, download = true) => API_BASE_URL + 'export.php' + query({ page: name, download }),
+};
+
+export const notesAPI = {
+    forPage: (pageId, { includeInternal = true } = {}) => get('notes.php' + query({ page_id: pageId, include_internal: includeInternal })),
+    byId: (id, { includeInternal = true, children = false, parentProperties = false } = {}) =>
+        get('notes.php' + query({ id, include_internal: includeInternal, include_children: children, include_parent_properties: parentProperties })),
+    /** One batch of operations; see app/outbox.js. */
+    /**
+     * Applies operations (see api/v1/ops.php). Resolves with
+     * {results: [{op_id, status}], notes: [...]}.
+     */
+    applyOps: (ops) => post('ops.php', { ops }),
+    /**
+     * The same, returning the raw Response: the outbox tells "rejected" (4xx)
+     * from "try again later" (network, 5xx) itself.
+     */
+    sendOps: (ops) => fetch(API_BASE_URL + 'ops.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ ops }),
+    }),
+};
+
+export const attachmentsAPI = {
+    forNote: (noteId) => get('attachments.php' + query({ note_id: noteId })),
+    /** @returns {Promise<{attachments: Array, failed: Array}>} */
+    upload: (formData) => post('attachments.php', formData),
+    remove: (attachmentId) => post('attachments.php', { action: 'delete', attachment_id: attachmentId }),
+};
+
+export const searchAPI = {
+    /** @returns {Promise<{results: Array, pagination: Object}>} */
+    notes: (q, { parentProperties = false, perPage } = {}) =>
+        get('search.php' + query({ q, include_parent_properties: parentProperties, per_page: perPage })),
+    backlinks: (pageName, { parentProperties = false, perPage = 100 } = {}) =>
+        get('search.php' + query({ backlinks_for_page_name: pageName, include_parent_properties: parentProperties, per_page: perPage })),
+    /** One page of the notes that are tasks in `status` (TODO, DONE, ... or ALL). */
+    tasks: (status, { parentProperties = false, page = 1, perPage = 100 } = {}) =>
+        get('search.php' + query({ tasks: status, include_parent_properties: parentProperties, page, per_page: perPage })),
+    /** All of them, however many pages that takes. */
+    async allTasks(status, { parentProperties = false } = {}) {
+        const all = [];
+        for (let page = 1; page < 1000; page++) {
+            const { results = [], pagination } = await searchAPI.tasks(status, { parentProperties, page });
+            all.push(...results);
+            if (!pagination || page >= (pagination.total_pages || 1) || !results.length) break;
         }
+        return all;
     },
-    getPageById: (id) => apiRequest(`pages.php?id=${id}`),
-    getPageByName: (name) => apiRequest(`pages.php?name=${encodeURIComponent(name)}`),
-    /**
-     * Get child pages for a namespace
-     * @param {string} namespace - The namespace to get child pages for
-     * @returns {Promise<Array>} Array of child page objects
-     */
-    getChildPages: (namespace) => apiRequest(`child_pages.php?namespace=${encodeURIComponent(namespace)}`),
-    createPage: (pageName, content = null) => {
-        const payload = { name: pageName };
-        if (content !== null) {
-            payload.content = content;
-        }
-        return apiRequest('pages.php', 'POST', payload);
+};
+
+export const queryAPI = {
+    /** @returns {Promise<{data: Array, pagination: Object}>} */
+    async notes(sql, { page = 1, perPage = 50 } = {}) {
+        const res = await apiRequest('query_notes.php', 'POST', { sql_query: sql, page, per_page: perPage }, { whole: true });
+        return { data: res.data || [], pagination: res.pagination || null };
     },
-    updatePage: (id, pageData) => {
-        const body = { _method: 'PUT', id, ...pageData };
-        return apiRequest('pages.php', 'POST', body);
-    },
-    deletePage: (id) => {
-        return apiRequest('pages.php', 'POST', { _method: 'DELETE', id });
-    }
 };
 
-/**
- * API functions for managing notes
- * @namespace notesAPI
- */
-const notesAPI = {
-    getPageData: (pageId) => apiRequest(`notes.php?page_id=${pageId}`),
-    getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
-    getNoteWithChildren: (noteId) => apiRequest(`notes.php?id=${noteId}&include_children=true`),
-    /**
-     * Sends intent operations directly (extensions and scripts). The main app
-     * goes through the outbox in app/outline.js instead, which orders,
-     * persists and retries them.
-     */
-    applyOps: (ops) => apiRequest('ops.php', 'POST', { ops }),
-};
-
-/**
- * API functions for properties
- * @namespace propertiesAPI
- */
-const propertiesAPI = {
-    getProperties: (entityType, entityId) => {
-        const params = new URLSearchParams({ entity_type: entityType, entity_id: entityId.toString() });
-        return apiRequest(`properties.php?${params.toString()}`);
-    }
-};
-
-/**
- * API functions for managing attachments
- * @namespace attachmentsAPI
- */
-const attachmentsAPI = {
-    getNoteAttachments: (noteId) => apiRequest(`attachments.php?note_id=${noteId}`),
-    uploadAttachment: (formData) => apiRequest('attachments.php', 'POST', formData),
-    deleteAttachment: (attachmentId, noteId) => {
-        return apiRequest('attachments.php', 'POST', {
-            action: 'delete',
-            attachment_id: attachmentId,
-            note_id: noteId
-        });
-    }
-};
-
-/**
- * API functions for search operations
- * @namespace searchAPI
- */
-const searchAPI = {
-    search: (query, options = {}) => {
-        const params = new URLSearchParams({ q: query });
-        if (options.page) params.append('page', options.page.toString());
-        if (options.per_page) params.append('per_page', options.per_page.toString());
-        if (options.includeParentProps !== undefined) params.append('include_parent_properties', options.includeParentProps ? '1' : '0');
-        return apiRequest(`search.php?${params.toString()}`);
-    },
-    getBacklinks: (pageName, options = {}) => {
-        const params = new URLSearchParams({ backlinks_for_page_name: pageName });
-        if (options.includeParentProps) params.append('include_parent_properties', '0');
-        return apiRequest(`search.php?${params.toString()}`);
-    },
-    getTasks: (status, options = {}) => {
-        const params = new URLSearchParams({ tasks: status });
-        if (options.includeParentProps) params.append('include_parent_properties', '1');
-        return apiRequest(`search.php?${params.toString()}`);
-    },
-    getFavorites: () => apiRequest('search.php?favorites=1')
-};
-
-/**
- * API functions for managing templates
- * @namespace templatesAPI
- */
-const templatesAPI = {
-    getTemplates: (type) => apiRequest(`templates.php?type=${type}`),
-    createTemplate: (templateData) => apiRequest('templates.php', 'POST', { _method: 'POST', ...templateData }),
-    deleteTemplate: (type, name) => apiRequest('templates.php', 'POST', { _method: 'DELETE', type, name })
-};
-
-/**
- * API functions for custom queries
- * @namespace queryAPI
- */
-const queryAPI = {
-    queryNotes: (sqlQuery, options = {}) => {
-        const body = { sql_query: sqlQuery, page: options.page || 1, per_page: options.per_page || 10 };
-        return apiRequest('query_notes.php', 'POST', body);
-    }
-};
-
-export {
-    pagesAPI,
-    notesAPI,
-    propertiesAPI,
-    attachmentsAPI,
-    searchAPI,
-    templatesAPI,
-    queryAPI,
-    apiRequest
+export const templatesAPI = {
+    /** Templates with date placeholders filled in for the browser's time zone. */
+    list: (type = 'note') => get('templates.php' + query({ type, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })),
 };

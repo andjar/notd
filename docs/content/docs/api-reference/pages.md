@@ -3,190 +3,66 @@ title: "Pages"
 weight: 50
 ---
 
-Manages pages, which now also have a `content` field to drive their properties.
+A page has a unique name (compared case-insensitively) and its own `content`, a piece of text whose `{key::value}` properties become the page's properties.
 
-### `POST /api/v1/pages.php` (Create)
-*   **Description**: Creates a new page.
-*   **Request**: `application/json`
-    ```json
-    {
-      "name": "New Project Page",
-      "content": "{type::Project}\n{lead:::John Doe}"
-    }
-    ```
-*   **Response (201 Created)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "id": 25,
-            "name": "New Project Page",
-            "content": "{type::Project}\n{lead:::John Doe}",
-            "created_at": "2023-10-27 10:35:00",
-            "updated_at": "2023-10-27 10:35:00",
-            "properties": {
-                "type": [{"value": "Project", "weight": 2, "created_at": "2023-10-27 10:35:00"}],
-                "lead": [{"value": "John Doe", "weight": 3, "created_at": "2023-10-27 10:35:00"}]
-            }
-        }
-    }
-    ```
+Update and delete are sent as POST with `_method` in the body, so they work on servers that only allow GET and POST.
 
-### `POST /api/v1/pages.php` (Update)
-*   **Description**: Updates a page's name or content.
-*   **Request**: `application/json`
-    ```json
-    {
-        "_method": "PUT",
-        "id": 25,
-        "content": "{type::Project}\n{lead:::Jane Doe}\n{status::Active}"
-    }
-    ```
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "id": 25,
-            "name": "New Project Page",
-            "content": "{type::Project}\n{lead:::Jane Doe}\n{status::Active}",
-            "...": "...",
-            "properties": { "..." : "..." }
-        }
-    }
-    ```
+### Read
 
-### `POST /api/v1/pages.php` (Delete)
-*   **Description**: Deletes a page and all its associated notes.
-*   **Request**: `application/json`
-    ```json
-    {
-        "_method": "DELETE",
-        "id": 25
-    }
-    ```
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "deleted_page_id": 25
-        }
-    }
-    ```
+| Request | Returns |
+|---|---|
+| `GET pages.php?name=Name` | The page with that name. It is created if it does not exist (date names get `{type::journal}`). |
+| `GET pages.php?id=25` | One page, or 404. |
+| `GET pages.php` | A list, most recently changed first: `?page`, `?per_page` (max 100), `?exclude_journal=1`. The response has `data` and `pagination`. |
+| `GET pages.php?names=1` | The names of all pages, as an array of strings (`&exclude_journal=1` leaves out date pages). Used for link suggestions. |
+| `GET pages.php?month=2026-11` | The days of that month that have a journal page: `[{"date": "2026-11-10", "page_name": "2026-11-10"}]`. Used by the calendar. |
+| `GET pages.php?date=2026-11-10` | Pages with a `{date::2026-11-10}` property. |
+| `GET child_pages.php?namespace=Projects` | The pages directly below `Projects` (`Projects/Alpha`, not `Projects/Alpha/Notes`). |
+| `GET export.php?page=Name` | The page as Markdown (`text/markdown`), in Logseq's layout. `&download=1` sends it as a file; `?page_id=25` works too. |
 
-### `GET /api/v1/pages.php?name={page_name}`
-*   **Description**: Retrieves a page by its exact name. If the page does not exist, it will be created with null content.
-*   **Request example**: `GET /api/v1/pages.php?name=My%20New%20Page`
-*   **Response example for an existing page (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "id": 26,
-            "name": "My New Page",
-            "content": "Some existing content.",
-            "created_at": "2023-10-28 10:00:00",
-            "updated_at": "2023-10-28 10:05:00",
-            "properties": {}
-        }
-    }
-    ```
-*   **Response example for a newly created page (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "id": 27,
-            "name": "My New Page",
-            "content": null,
-            "created_at": "2023-10-28 10:10:00",
-            "updated_at": "2023-10-28 10:10:00",
-            "properties": {}
-        }
-    }
-    ```
+A page looks like this:
 
-### `GET /api/v1/pages.php?id={id}`
-*   **Description**: Retrieves a single page by its ID.
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "id": 25,
-            "name": "New Project Page",
-            "content": "{type::Project}\n{lead:::Jane Doe}\n{status::Active}",
-            "created_at": "2023-10-27 10:35:00",
-            "updated_at": "2023-10-27 10:40:00",
-            "properties": {
-                "type": [{"value": "Project", "weight": 2, "created_at": "2023-10-27 10:35:00"}],
-                "lead": [{"value": "Jane Doe", "weight": 3, "created_at": "2023-10-27 10:40:00"}],
-                "status": [{"value": "Active", "weight": 2, "created_at": "2023-10-27 10:40:00"}]
-            }
-        }
-    }
-    ```
+```json
+{
+  "id": 25,
+  "name": "Projects/Alpha",
+  "content": "{type::project}\n{lead:::Jane}",
+  "created_at": "2026-11-10 10:35:00",
+  "updated_at": "2026-11-10 10:40:00",
+  "properties": {
+    "type": [{"value": "project", "internal": false}],
+    "lead": [{"value": "Jane", "internal": true}]
+  }
+}
+```
 
-### `GET /api/v1/pages.php?date={YYYY-MM-DD}`
-*   **Description**: Retrieves a list of pages that have a property 'date' matching the specified date. The date must be in YYYY-MM-DD format.
-*   **Request example**: `GET /api/v1/pages.php?date=2023-11-15`
-*   **Response example (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": [
-            {
-                "id": 30,
-                "name": "Meeting Notes 2023-11-15",
-                "content": "Discussed project milestones.\n{date::2023-11-15}",
-                "alias": null,
-                "updated_at": "2023-11-15 14:00:00"
-            },
-            {
-                "id": 31,
-                "name": "Daily Log 2023-11-15",
-                "content": "Logged daily activities.\n{date::2023-11-15}",
-                "alias": "today-log",
-                "updated_at": "2023-11-15 16:30:00"
-            }
-        ]
-    }
-    ```
-*   If no pages match the date, an empty array will be returned in the `data` field.
-    ```json
-    {
-        "status": "success",
-        "data": []
-    }
-    ```
+### Create
 
-### `GET /api/v1/pages.php` (List)
-*   **Description**: Retrieves a paginated list of pages.
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": [
-            {
-                "id": 25,
-                "name": "New Project Page",
-                "content": "...",
-                "properties": { "...": "..." }
-            }
-        ],
-        "pagination": { "total_items": 1, "...": "..." }
-    }
-    ```
+```json
+POST pages.php
+{"name": "New Project", "content": "{type::project}"}
+```
 
-### `GET /api/v1/child_pages.php?namespace={page_name}`
-*   **Description**: Lists the pages directly below a page in the namespace hierarchy. For `namespace=Projects` this returns `Projects/Alpha` but not `Projects/Alpha/Notes`.
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": [
-            { "id": 12, "name": "Projects/Alpha", "updated_at": "2026-11-10 18:20:45" }
-        ]
-    }
-    ```
+Answers 201 with the page. Leading and trailing spaces and doubled slashes are removed from the name; an existing name answers 409.
+
+### Update
+
+```json
+POST pages.php
+{"_method": "PUT", "id": 25, "name": "Projects/Beta", "content": "{type::project}"}
+```
+
+Both `name` and `content` are optional. Changing `content` re-indexes the page's properties (removed properties disappear). Changing `name` renames the page in one transaction:
+
+- every `[[Old Name]]` link in notes and page content becomes `[[New Name]]`;
+- child pages follow: `Projects/Alpha/Notes` becomes `Projects/Beta/Notes`;
+- a name already used by another page answers 409 and changes nothing.
+
+### Delete
+
+```json
+POST pages.php
+{"_method": "DELETE", "id": 25}
+```
+
+Deletes the page, its notes and their attachments. Answers `{"deleted_page_id": 25}`.

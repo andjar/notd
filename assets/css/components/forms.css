@@ -174,42 +174,6 @@
   color: var(--ls-search-selected-create-new-text-color) !important;
 }
 
-/* Page Link Suggestion Box */
-#page-link-suggestion-box {
-  display: none;
-  position: absolute;
-  background-color: var(--ls-secondary-background-color);
-  border: 1px solid var(--ls-border-color);
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: var(--ls-z-index-dropdown, 1000);
-  min-width: 200px;
-}
-
-#page-link-suggestion-box ul {
-  list-style-type: none;
-  margin: 0;
-  padding: 0;
-}
-
-#page-link-suggestion-box li {
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 0.9em;
-  color: var(--ls-primary-text-color);
-}
-
-#page-link-suggestion-box li:hover {
-  background-color: var(--ls-tertiary-background-color);
-}
-
-#page-link-suggestion-box li.selected {
-  background-color: var(--ls-accent-10);
-  color: var(--ls-active-nav-item-text-color);
-}
-
 /* Forms and Input Fields */
 .new-page-form {
   display: flex;

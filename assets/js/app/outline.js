@@ -15,8 +15,9 @@
 import { OutlineModel } from './outline-model.js';
 import { Outbox } from './outbox.js';
 import { newId, newOpId } from './ids.js';
-import { encrypt, decrypt } from '../utils.js';
-import { API_BASE_URL, notesAPI } from '../api_client.js';
+import { encrypt, decrypt, looksEncrypted } from '../utils.js';
+import { notesAPI } from '../api_client.js';
+import { page } from './page-state.js';
 import * as view from '../ui/note-elements.js';
 
 export const model = new OutlineModel();
@@ -28,11 +29,7 @@ let bannerEl = null;
 // ------------------------------------------------------------- encryption
 
 function pagePassword() {
-    try { return window.Alpine?.store('app')?.pagePassword || null; } catch { return null; }
-}
-
-function looksEncrypted(content) {
-    return typeof content === 'string' && content.startsWith('{') && content.includes('"iv"') && content.includes('"ct"');
+    return page.password;
 }
 
 /** Content as it should be stored on the server (encrypted on locked pages). */
@@ -53,12 +50,7 @@ export function decodeContent(stored) {
 // ----------------------------------------------------------------- outbox
 
 export const outbox = new Outbox({
-    send: (ops) => fetch(API_BASE_URL + 'ops.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ ops }),
-    }),
+    send: (ops) => notesAPI.sendOps(ops),
     onApplied: handleApplied,
     onRejected: (error) => {
         console.error('[outline] server rejected a batch:', error);
@@ -171,7 +163,7 @@ export async function resync() {
     resyncWanted = false;
     let notes;
     try {
-        notes = await notesAPI.getPageData(model.pageId);
+        notes = await notesAPI.forPage(model.pageId);
     } catch (e) {
         console.warn('[outline] resync failed', e);
         return;
@@ -187,12 +179,132 @@ export async function resync() {
 
 // ---------------------------------------------------------------- actions
 
-function commit(op, plain) {
+function commit(op, plain, { undoable = true } = {}) {
+    const inverse = undoable && !replaying ? invert(op, plain) : null;
     const change = model.apply(plain === undefined ? op : { ...op, plainContent: plain });
     if (!change) return null;
+    if (inverse) record(inverse);
     outbox.enqueue(op);
     view.preserveFocus(() => view.applyChange(change));
     return change;
+}
+
+// -------------------------------------------------------------- undo/redo
+//
+// Each structural action records the actions that reverse it. Everything a
+// single key press or click does is one undo step. Typing inside a note is
+// not recorded here: the browser's own undo handles text while a note is
+// being edited.
+
+const undoStack = [];
+const redoStack = [];
+let recording = null;
+let replaying = false;
+const UNDO_LIMIT = 200;
+
+/** The actions that undo `op`, computed from the model before the op is applied. */
+function invert(op, plain) {
+    const n = model.get(op.id);
+    switch (op.type) {
+        case 'create':
+            return n ? [] : [{ type: 'delete', id: String(op.id) }];
+        case 'delete':
+            return model.subtreeIds(op.id).map((id) => {
+                const x = model.get(id);
+                const prev = model.prevSibling(id);
+                return { type: 'create', id, parent_id: x.parent_note_id, after: prev ? prev.id : null, content: x.content || '', collapsed: x.collapsed ? 1 : 0 };
+            });
+        case 'move': {
+            if (!n) return [];
+            const prev = model.prevSibling(n.id);
+            return [{ type: 'move', id: n.id, parent_id: n.parent_note_id, after: prev ? prev.id : null }];
+        }
+        case 'edit':
+            return n && n.content !== plain ? [{ type: 'edit', id: n.id, content: n.content || '' }] : [];
+        default:
+            return []; // collapsing is not worth an undo step
+    }
+}
+
+function record(inverse) {
+    if (!inverse.length) return;
+    if (!recording) {
+        recording = [];
+        queueMicrotask(() => {
+            undoStack.push(recording);
+            if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+            redoStack.length = 0;
+            recording = null;
+        });
+    }
+    recording.unshift(...inverse);
+}
+
+/** Runs recorded actions and returns the actions that reverse them. */
+function replay(actions) {
+    const inverse = [];
+    let touched = null;
+    replaying = true;
+    try {
+        for (const a of actions) {
+            let op = null;
+            let plain;
+            if (a.type === 'create' && !model.has(a.id)) {
+                const parentId = a.parent_id === null || model.has(a.parent_id) ? a.parent_id : null;
+                const after = a.after !== null && model.get(a.after)?.parent_note_id === parentId ? a.after : null;
+                plain = a.content;
+                op = { op_id: newOpId(), type: 'create', id: a.id, page_id: model.pageId, parent_id: parentId, after,
+                       sort_key: model.keyFor(parentId, after), content: encodeContent(a.content), collapsed: a.collapsed };
+            } else if (a.type === 'delete' && model.has(a.id)) {
+                op = { op_id: newOpId(), type: 'delete', id: a.id };
+            } else if (a.type === 'move' && model.has(a.id)) {
+                const parentId = a.parent_id === null || model.has(a.parent_id) ? a.parent_id : null;
+                if (parentId !== null && model.isInSubtree(a.id, parentId)) continue;
+                const after = a.after !== null && a.after !== a.id && model.get(a.after)?.parent_note_id === parentId ? a.after : null;
+                op = { op_id: newOpId(), type: 'move', id: a.id, parent_id: parentId, after, sort_key: model.keyFor(parentId, after, a.id) };
+            } else if (a.type === 'edit' && model.has(a.id)) {
+                plain = a.content;
+                op = { op_id: newOpId(), type: 'edit', id: a.id, content: encodeContent(a.content) };
+            }
+            if (!op) continue;
+            const back = invert(op, plain);
+            const change = model.apply(plain === undefined ? op : { ...op, plainContent: plain });
+            if (!change) continue;
+            inverse.unshift(...back);
+            outbox.enqueue(op);
+            view.applyChange(change);
+            if (op.type === 'edit') view.setText(op.id, plain);
+            if (op.type !== 'delete') touched = op.id;
+        }
+    } finally {
+        replaying = false;
+    }
+    return { inverse, touched };
+}
+
+function step(from, to) {
+    // Finish the edit in progress first, so its text is in the model.
+    const editing = view.editingNoteId();
+    if (editing) view.finishEditing(editing);
+    const actions = from.pop();
+    if (!actions) return false;
+    const { inverse, touched } = replay(actions);
+    if (inverse.length) to.push(inverse);
+    if (touched && model.has(touched)) view.focusNote(touched, 'end');
+    return true;
+}
+
+/** Undoes the last structural action (create, delete, move, indent, split, merge, task toggle). */
+export function undo() {
+    return step(undoStack, redoStack);
+}
+
+export function redo() {
+    return step(redoStack, undoStack);
+}
+
+export function canUndo() {
+    return undoStack.length > 0;
 }
 
 /** Creates a note under `parentId` right after `afterId` (null = first). Returns its id. */
@@ -281,11 +393,59 @@ export function moveDown(id) {
     return moveNote(id, n.parent_note_id, next.id);
 }
 
-/** Records new content for a note (plain text). Cheap to call on every keystroke. */
-export function editNote(id, plain) {
+/**
+ * Records new content for a note (plain text). Cheap to call on every
+ * keystroke. Typing is not an undo step (the browser undoes text); pass
+ * `undoable` for changes made on the user's behalf, such as ticking a task.
+ */
+export function editNote(id, plain, { undoable = false } = {}) {
     const n = model.get(id);
     if (!n || n.content === plain) return false;
-    return !!commit({ op_id: newOpId(), type: 'edit', id: n.id, content: encodeContent(plain) }, plain);
+    return !!commit({ op_id: newOpId(), type: 'edit', id: n.id, content: encodeContent(plain) }, plain, { undoable });
+}
+
+/**
+ * Enter: splits a note at `offset` of its text. The text after the caret
+ * moves to a new note, which gets the focus. At the very start of a
+ * non-empty note an empty note is inserted above instead.
+ */
+export function splitNote(id, offset) {
+    const n = model.get(id);
+    if (!n) return null;
+    const text = n.content || '';
+    offset = Math.max(0, Math.min(offset ?? text.length, text.length));
+    if (offset === 0 && text !== '') {
+        const prev = model.prevSibling(id);
+        return createNote({ parentId: n.parent_note_id, afterId: prev ? prev.id : null, content: '', focus: null });
+    }
+    const before = text.slice(0, offset);
+    const after = text.slice(offset);
+    if (after !== '') {
+        editNote(id, before, { undoable: true });
+        view.setText(id, before);
+    }
+    // Below an open parent the new note becomes its first child, so it appears right under the caret.
+    if (model.hasChildren(id) && !n.collapsed) {
+        return createNote({ parentId: n.id, afterId: null, content: after, focus: 'start' });
+    }
+    return createNote({ parentId: n.parent_note_id, afterId: n.id, content: after, focus: 'start' });
+}
+
+/**
+ * Backspace at the start of a note: appends its text to `intoId` (the note
+ * above) and removes it. Only notes without children are merged.
+ */
+export function mergeInto(id, intoId) {
+    const n = model.get(id);
+    const target = model.get(intoId);
+    if (!n || !target || n.id === target.id || model.hasChildren(id)) return false;
+    const joinAt = (target.content || '').length;
+    const merged = (target.content || '') + (n.content || '');
+    deleteNote(id);
+    editNote(target.id, merged, { undoable: true });
+    view.setText(target.id, merged);
+    view.focusNote(target.id, joinAt);
+    return true;
 }
 
 export function setCollapsed(id, collapsed) {
@@ -301,12 +461,12 @@ export function deleteNote(id) {
 }
 
 /**
- * Re-encrypts every note on the page with `password` (used when a page is
- * locked). The model keeps plain text; only queued content is encrypted.
+ * Sends every note on the page again, encoded for the page's current lock
+ * state (used when a page is locked or unlocked). The model keeps plain text.
  */
-export function encryptAllNotes(password) {
+export function reencryptAllNotes() {
     for (const n of model.list()) {
-        outbox.enqueue({ op_id: newOpId(), type: 'edit', id: n.id, content: encrypt(password, n.content || '') });
+        outbox.enqueue({ op_id: newOpId(), type: 'edit', id: n.id, content: encodeContent(n.content || '') });
     }
     return outbox.flush();
 }
@@ -331,5 +491,5 @@ function hideBanner() {
 }
 
 if (typeof window !== 'undefined') {
-    window.notdOutline = { model, outbox, resync };
+    window.notdOutline = { model, outbox, resync, undo, redo };
 }

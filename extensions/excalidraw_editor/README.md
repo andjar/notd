@@ -7,7 +7,7 @@ This extension integrates the [Excalidraw](https://excalidraw.com/) visual white
 - **Attachment Integration**: Save your drawing as a PNG image attachment to any note.
 - **Note Linking**: Each drawing is associated with a specific note via its `note_id`.
 - **Modern UI**: Built with React for the Excalidraw component and Alpine.js for UI controls.
-- **Offline Support**: Runs fully offline with phpdesktop.
+- **Needs internet**: Excalidraw and React are loaded from esm.sh when the editor opens, so this extension does not work offline.
 
 ## How It Works
 - Access the Excalidraw editor from the context menu of a note ("Open in Excalidraw").
@@ -18,7 +18,6 @@ This extension integrates the [Excalidraw](https://excalidraw.com/) visual white
 ## File Overview
 - `index.php`: Entry point, serves the Excalidraw HTML UI.
 - `excalidraw.html`: Main UI, loads Excalidraw and handles save/upload logic.
-- `main.js`: (Legacy/alternate) JS logic for initializing and saving drawings.
 - `style.css`: Custom styles for the editor container.
 - `config.json`: Extension icon configuration.
 
@@ -26,7 +25,6 @@ This extension integrates the [Excalidraw](https://excalidraw.com/) visual white
 - Uses [Excalidraw v0.18.0](https://github.com/excalidraw/excalidraw) via CDN.
 - React and ReactDOM are loaded via [esm.sh](https://esm.sh/) import maps.
 - Drawings are exported as PNG using Excalidraw's `exportToBlob` and uploaded via the main app's `attachmentsAPI`.
-- The extension is designed for hybrid use: React for the drawing canvas, Alpine.js for UI controls (see `EXTENSIONS_ALPINEJS_MIGRATION.md`).
 
 ## Requirements
 - The main app must provide a working `attachmentsAPI` for uploads.

@@ -7,8 +7,14 @@
  * @module ui/note-elements
  */
 
-import { renderNote, parseAndRenderContent, switchToEditMode, renderAttachments } from './note-renderer.js';
+import { renderNote, enterEditMode, leaveEditMode, showContent, caretOffset, setCaret } from './note-view.js';
+import { renderAttachments } from './attachments.js';
+import { hydrate } from './embeds.js';
+import { renderIcons } from '../utils.js';
 import * as outline from '../app/outline.js';
+
+/** Set by other modules that need to know when notes were re-rendered, moved or removed. */
+export const hooks = { structureChanged: null };
 
 let blurSuppressed = 0;
 
@@ -39,7 +45,7 @@ function childrenContainerOf(parentId) {
         kids = document.createElement('div');
         kids.className = 'note-children';
         el.appendChild(kids);
-        initializeDragAndDrop(el);
+        initializeDragAndDrop(kids);
     }
     return kids;
 }
@@ -73,24 +79,13 @@ function emptyMessage(show) {
 export function renderAll() {
     const c = container();
     if (!c) return;
-    c.innerHTML = '';
-    for (const node of outline.model.tree(null)) c.appendChild(renderNote(node, 0));
+    const fragment = document.createDocumentFragment();
+    for (const node of outline.model.tree(null)) fragment.appendChild(renderNote(node, 0));
+    c.replaceChildren(fragment);
     emptyMessage(outline.model.children(null).length === 0);
     initializeDragAndDrop(c);
-    if (typeof feather !== 'undefined') {
-        try { feather.replace(); } catch { /* icons are cosmetic */ }
-    }
-}
-
-/**
- * Back-compat entry point used by the page loader: loads `notesData` into
- * the model (when given) and renders it.
- */
-export function displayNotes(notesData, pageId) {
-    if (Array.isArray(notesData)) {
-        outline.loadPage(pageId ?? outline.model.pageId, notesData);
-    }
-    renderAll();
+    hydrate(c);
+    hooks.structureChanged?.();
 }
 
 /** Inserts or moves a note's element to where the model says it belongs. */
@@ -103,6 +98,8 @@ export function placeNote(id) {
     if (!el) {
         el = renderNote({ ...n, children: outline.model.tree(n.id) }, outline.model.depth(n.id));
         initializeDragAndDrop(el);
+        const fresh = el;
+        queueMicrotask(() => hydrate(fresh));
     }
     const next = outline.model.nextSibling(id);
     const ref = next ? getNoteElement(next.id) : null;
@@ -142,9 +139,35 @@ export function removeNoteElement(id) {
 export function refreshNoteContent(id) {
     const el = contentElementOf(id);
     const n = outline.model.get(id);
-    if (!el || !n || el.classList.contains('edit-mode')) return;
-    el.dataset.rawContent = n.content || '';
-    el.innerHTML = n.content && n.content.trim() ? parseAndRenderContent(n.content) : '';
+    if (el && n) showContent(el, n.content || '');
+}
+
+/** Shows `text` as the note's text, also while the note is being edited. */
+export function setText(id, text) {
+    const el = contentElementOf(id);
+    if (!el) return;
+    if (el.classList.contains('edit-mode')) {
+        const caret = document.activeElement === el ? Math.min(caretOffset(el) ?? text.length, text.length) : null;
+        el.textContent = text;
+        el.dataset.rawContent = text;
+        if (caret !== null) setCaret(el, caret);
+    } else {
+        showContent(el, text);
+    }
+}
+
+/** Ends the edit in progress on a note and records its text. */
+export function finishEditing(id) {
+    const el = contentElementOf(id);
+    if (!el || !el.classList.contains('edit-mode')) return;
+    blurSuppressed++;
+    try {
+        const text = leaveEditMode(el);
+        outline.editNote(id, text);
+        if (document.activeElement === el) el.blur();
+    } finally {
+        blurSuppressed--;
+    }
 }
 
 /** Updates server-derived decorations (attachments). */
@@ -152,13 +175,7 @@ export function refreshNoteMeta(id) {
     const n = outline.model.get(id);
     const el = getNoteElement(id);
     if (!n || !el || !n.has_attachments) return;
-    const wrapper = el.querySelector(':scope > .note-header-row .note-content-wrapper');
-    if (wrapper && !wrapper.querySelector('.note-attachments')) {
-        const att = document.createElement('div');
-        att.className = 'note-attachments';
-        wrapper.appendChild(att);
-        renderAttachments(att, n.id, true);
-    }
+    if (!el.querySelector(':scope > .note-header-row .note-attachments')) renderAttachments(n.id);
 }
 
 /** Reflects a local model change (see OutlineModel.apply) in the DOM. */
@@ -170,10 +187,12 @@ export function applyChange(change) {
         case 'move':
             placeNote(change.id);
             refreshParentState(change.oldParent);
+            hooks.structureChanged?.();
             break;
         case 'delete':
             removeNoteElement(change.id);
             refreshParentState(change.oldParent);
+            hooks.structureChanged?.();
             break;
         case 'collapse':
             refreshParentState(change.id);
@@ -200,41 +219,6 @@ export function currentText(id) {
     return el ? (el.dataset.rawContent ?? el.textContent ?? '') : null;
 }
 
-function caretOffset(el) {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) return null;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.setEnd(sel.anchorNode, sel.anchorOffset);
-    return range.toString().length;
-}
-
-function setCaret(el, offset) {
-    const sel = window.getSelection();
-    const range = document.createRange();
-    let remaining = offset;
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let node = walker.nextNode();
-    let placed = false;
-    while (node) {
-        if (remaining <= node.textContent.length) {
-            range.setStart(node, remaining);
-            placed = true;
-            break;
-        }
-        remaining -= node.textContent.length;
-        node = walker.nextNode();
-    }
-    if (!placed) {
-        range.selectNodeContents(el);
-        range.collapse(offset === 0);
-    } else {
-        range.collapse(true);
-    }
-    sel.removeAllRanges();
-    sel.addRange(range);
-}
-
 /**
  * Runs `fn` (which may move or re-create the focused note's element) and
  * puts the caret back where it was.
@@ -253,52 +237,106 @@ export function preserveFocus(fn) {
     }
     const el = contentElementOf(id);
     if (el) {
-        if (!el.classList.contains('edit-mode')) switchToEditMode(el);
+        if (!el.classList.contains('edit-mode')) enterEditMode(el);
         if (document.activeElement !== el) el.focus({ preventScroll: true });
         setCaret(el, offset ?? (el.textContent || '').length);
     }
     return result;
 }
 
-/** Puts a note in edit mode with the caret at 'start' or 'end'. */
+/** Puts a note in edit mode with the caret at 'start', 'end' or a character offset. */
 export function focusNote(id, where = 'end') {
     const el = contentElementOf(id);
     if (!el) return;
-    switchToEditMode(el);
+    enterEditMode(el);
     el.focus({ preventScroll: true });
-    setCaret(el, where === 'start' ? 0 : (el.textContent || '').length);
+    const length = (el.textContent || '').length;
+    setCaret(el, where === 'start' ? 0 : where === 'end' ? length : Math.max(0, Math.min(Number(where) || 0, length)));
     el.scrollIntoView({ block: 'nearest' });
 }
 
 // ----------------------------------------------------------- save status
 
+const STATUS = {
+    saved: ['check-circle', 'All changes saved'],
+    pending: [null, 'Saving...'],
+    error: ['alert-triangle', 'Changes could not be saved yet'],
+};
+
+/** Shows the save state in the corner indicator: 'saved', 'pending' or 'error'. */
 export function setSaveStatus(status, title) {
-    if (window.ui && typeof window.ui.updateSaveStatusIndicator === 'function') {
-        window.ui.updateSaveStatusIndicator(status);
-        const indicator = document.getElementById('save-status-indicator');
-        if (indicator && title) indicator.title = title;
+    const indicator = document.getElementById('save-status-indicator');
+    if (!indicator) return;
+    if (!STATUS[status]) status = 'saved';
+    const [icon, defaultTitle] = STATUS[status];
+    if (indicator.dataset.status !== status) {
+        indicator.dataset.status = status;
+        indicator.className = `save-status-indicator status-${status}`;
+        indicator.innerHTML = icon
+            ? `<i data-feather="${icon}"></i>`
+            : '<div class="dot-spinner"><div class="dot-spinner__dot"></div><div class="dot-spinner__dot"></div><div class="dot-spinner__dot"></div></div>';
+        renderIcons(indicator);
     }
+    indicator.title = title || defaultTitle;
 }
 
 // ------------------------------------------------------------ drag & drop
 
-/** Attaches Sortable to every children container under `root` that lacks one. */
+function makeSortable(c) {
+    if (c.dataset.sortable === '1') return;
+    c.dataset.sortable = '1';
+    Sortable.create(c, {
+        group: 'notes',
+        animation: 150,
+        handle: '.note-bullet',
+        draggable: '.note-item',
+        ghostClass: 'note-ghost',
+        onEnd: handleNoteDrop,
+    });
+}
+
+let pendingSortables = [];
+let sortableTimer = null;
+
+function drainSortables(deadline) {
+    sortableTimer = null;
+    let budget = 200;
+    while (pendingSortables.length && budget-- > 0 && (!deadline || deadline.didTimeout || deadline.timeRemaining() > 2)) {
+        const c = pendingSortables.pop();
+        if (c.isConnected) makeSortable(c);
+    }
+    if (pendingSortables.length) scheduleSortables();
+}
+
+function scheduleSortables() {
+    if (sortableTimer !== null) return;
+    sortableTimer = typeof requestIdleCallback === 'function'
+        ? requestIdleCallback(drainSortables, { timeout: 2000 })
+        : setTimeout(() => drainSortables(null), 50);
+}
+
+/**
+ * Makes every children container under `root` a drop target. Setting up
+ * thousands of containers takes a while, so on big pages it happens in idle
+ * time; a drag that starts earlier finishes the job first (ensureDragReady).
+ */
 export function initializeDragAndDrop(root = container()) {
     if (typeof Sortable === 'undefined' || !root) return;
-    const containers = [];
-    if (root.id === 'notes-container' || root.classList?.contains('note-children')) containers.push(root);
-    root.querySelectorAll?.('.note-children').forEach(c => containers.push(c));
-    for (const c of containers) {
-        if (c.dataset.sortable === '1') continue;
-        c.dataset.sortable = '1';
-        Sortable.create(c, {
-            group: 'notes',
-            animation: 150,
-            handle: '.note-bullet',
-            draggable: '.note-item',
-            ghostClass: 'note-ghost',
-            onEnd: handleNoteDrop,
-        });
+    if (root.id === 'notes-container' || root.classList?.contains('note-children')) makeSortable(root);
+    const containers = root.querySelectorAll?.('.note-children') || [];
+    if (containers.length <= 100) {
+        containers.forEach(makeSortable);
+        return;
+    }
+    pendingSortables.push(...containers);
+    scheduleSortables();
+}
+
+/** Called when a drag is about to start: all drop targets must exist now. */
+export function ensureDragReady() {
+    while (pendingSortables.length) {
+        const c = pendingSortables.pop();
+        if (c.isConnected) makeSortable(c);
     }
 }
 
@@ -319,6 +357,3 @@ export function handleNoteDrop(evt) {
     refreshParentState(oldParent);
 }
 
-if (typeof window !== 'undefined') {
-    window.initializeDragAndDrop = initializeDragAndDrop;
-}

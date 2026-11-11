@@ -74,6 +74,19 @@ paths:
         schema:
           type: string
           pattern: ^\d{4}-\d{2}-\d{2}$
+      - name: names
+        in: query
+        description: With any value, return only the names of all pages (an array of strings)
+        required: false
+        schema:
+          type: string
+      - name: month
+        in: query
+        description: Return the days of this month (YYYY-MM) that have a journal page, as [{date, page_name}]
+        required: false
+        schema:
+          type: string
+          pattern: ^\d{4}-\d{2}$
       - name: page
         in: query
         description: Page number for pagination
@@ -212,6 +225,37 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
+  /export.php:
+    get:
+      summary: Export a page as Markdown
+      description: The page's outline in Logseq's Markdown layout (one "- " bullet per note, nested with tabs).
+      parameters:
+      - name: page
+        in: query
+        description: Page name (or use page_id)
+        required: false
+        schema:
+          type: string
+      - name: page_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: download
+        in: query
+        description: With any value, send the file as an attachment
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The page as Markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+        '404':
+          description: No such page
   /child_pages.php:
     get:
       summary: Get child pages

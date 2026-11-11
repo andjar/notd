@@ -3,40 +3,26 @@ title: "Templates"
 weight: 100
 ---
 
-Manages reusable templates for creating notes and pages.
+Templates are plain Markdown files in `assets/template/note/` and `assets/template/page/`. They are text only: nothing in them is executed.
 
-### `POST /api/v1/templates.php` (Create)
-*   **Description**: Creates a new template.
-*   **Request**: `application/json`
-    ```json
-    {
-        "_method": "POST",
-        "type": "note",
-        "name": "daily-review",
-        "content": "## Daily Review\n\n### What went well?\n\n- \n\n### What could be improved?\n\n- "
-    }
-    ```
-*   **Response (201 Created)**:
-    ```json
-    {
-        "status": "success",
-        "data": {
-            "message": "Template created successfully"
-        }
-    }
-    ```
+### List
 
-### `GET /api/v1/templates.php?type=note`
-*   **Description**: Retrieves all available templates of a given type.
-*   **Response (200 OK)**:
-    ```json
-    {
-        "status": "success",
-        "data": [
-            {
-                "name": "daily-review",
-                "content": "## Daily Review\n\n### What went well?\n\n- \n\n### What could be improved?\n\n- "
-            }
-        ]
-    }
-    ```
+```text
+GET templates.php?type=note&tz=Europe/Oslo
+```
+
+```json
+{"status": "success", "data": [{"name": "meeting", "content": "## Meeting 2026-11-11\n- Attendees: "}]}
+```
+
+Placeholders are filled in when listed, in the time zone given by `tz` (the server's otherwise): `{{date}}`, `{{time}}`, `{{datetime}}`, `{{year}}`, `{{month}}`, `{{day}}`, `{{weekday}}`, `{{timestamp}}`, `{{random}}`, `{{uuid}}`. Date placeholders take a PHP date format: `{{date:d.m.Y}}`.
+
+### Create, update, delete
+
+```json
+POST templates.php  {"type": "note", "name": "daily-review", "content": "## Review\n- "}
+POST templates.php  {"_method": "PUT", "type": "note", "current_name": "daily-review", "new_name": "review", "content": "..."}
+POST templates.php  {"_method": "DELETE", "type": "note", "name": "review"}
+```
+
+Names may contain letters, digits, `-` and `_`. Creating a name that exists answers 409.

@@ -24,7 +24,7 @@ notd is deliberately made of few, well-understood parts:
 - **PHP + SQLite on the server, plain JavaScript modules in the browser.** There is no build step, no package manager and no framework to keep up with. The few libraries it uses are stored in the repository.
 - **Your data is plain text** in a documented SQLite schema (unless you choose to encrypt a page). Any SQLite tool can read it.
 - **Works offline.** Nothing is loaded from the internet. Edits made while the server is unreachable are kept in the browser and sent when it is back.
-- **Runs anywhere PHP runs**: a laptop (`php -S`), a NAS, a shared web host, or packaged as a desktop app with [phpdesktop](https://github.com/cztomczak/phpdesktop).
+- **Runs anywhere PHP runs**: a laptop (`php -S localhost:8000 router.php`), a NAS, a shared web host, or packaged as a desktop app with [phpdesktop](https://github.com/cztomczak/phpdesktop).
 
 ## Where to go next
 
