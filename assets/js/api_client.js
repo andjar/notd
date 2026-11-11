@@ -9,7 +9,8 @@
  */
 
 /** Resolved against the page, so notd works from any folder. */
-export const API_BASE_URL = new URL('api/v1/', document.baseURI).href;
+// Relative to this file, so pages in other folders (extensions) reach the same API.
+export const API_BASE_URL = new URL('../../api/v1/', import.meta.url).href;
 
 export async function apiRequest(endpoint, method = 'GET', body = null, { whole = false } = {}) {
     const options = { method, headers: { Accept: 'application/json' }, credentials: 'same-origin' };
