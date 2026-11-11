@@ -5,7 +5,7 @@
  */
 
 import * as outline from '../app/outline.js';
-import { page, config } from '../app/page-state.js';
+import { page, config, pageProperty } from '../app/page-state.js';
 import { pageUrl, renderIcons } from '../utils.js';
 import { toast, confirmDialog } from './dialogs.js';
 import { uploadFiles } from './attachments.js';
@@ -59,7 +59,9 @@ function actionsFor(id) {
         { action: 'copy-embed', label: 'Copy embed code', icon: 'link', run: () => copy(`!{{${id}}}`, 'Embed code copied') },
         { action: 'upload', label: 'Upload attachment', icon: 'upload', run: () => pickFiles(id) },
     ];
-    for (const editor of NOTE_EDITORS) {
+    // The editors read and write the stored text, which on a locked page is ciphertext.
+    const editors = pageProperty('encrypt') ? [] : NOTE_EDITORS;
+    for (const editor of editors) {
         if (!config.activeExtensions.includes(editor.extension)) continue;
         actions.push({
             action: editor.extension,

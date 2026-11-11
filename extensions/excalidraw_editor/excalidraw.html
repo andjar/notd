@@ -135,7 +135,7 @@
     async function loadExistingAttachment() {
         try {
             // Get all attachments for this note
-            const attachments = await attachmentsAPI.getNoteAttachments(currentNoteId);
+            const attachments = await attachmentsAPI.forNote(currentNoteId);
             
             // Find the specific attachment
             const attachment = attachments.find(att => att.id == currentAttachmentId);
@@ -154,7 +154,7 @@
             }
 
             // Fetch the attachment content
-            const response = await fetch(`../../uploads/${attachment.path}`);
+            const response = await fetch(attachment.url);
             if (!response.ok) {
                 throw new Error(`Failed to fetch attachment: ${response.status}`);
             }
@@ -273,10 +273,10 @@
                     console.log(`FormData: ${key} = ${value}`);
                 }
             }
-            if (!attachmentsAPI || !attachmentsAPI.uploadAttachment) {
+            if (!attachmentsAPI || !attachmentsAPI.upload) {
                 throw new Error('attachmentsAPI or uploadAttachment function is not available.');
             }
-            await attachmentsAPI.uploadAttachment(formData);
+            await attachmentsAPI.upload(formData);
             successMessage.textContent = 'Drawing saved successfully as PNG and editable Excalidraw!';
         } catch (error) {
             errorMessage.textContent = `Error saving drawing: ${error.message}`;

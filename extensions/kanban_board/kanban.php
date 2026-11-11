@@ -80,7 +80,6 @@ require_once '../../config.php';
             notesAPI = module.notesAPI;
             searchAPI = module.searchAPI;
             apiLoaded = true;
-            console.log('API client loaded successfully');
         }).catch(error => {
             console.error('Failed to load API client:', error);
         });
@@ -96,7 +95,6 @@ require_once '../../config.php';
                 errorMessage: '',
 
                 init() {
-                    console.log("Kanban App Initializing...");
                     if (this.config.boards.length > 0) {
                         this.currentBoardId = this.config.boards[0].id;
                     } else {
@@ -117,14 +115,12 @@ require_once '../../config.php';
                 },
 
                 generateColumns() {
-                    console.log('Generating columns with states:', this.configuredKanbanStates);
                     this.columns = this.configuredKanbanStates.map(state => ({
                         id: state.toLowerCase(),
                         title: state.charAt(0).toUpperCase() + state.slice(1).toLowerCase(),
                         statusMatcher: state.toUpperCase(),
                         tasks: []
                     }));
-                    console.log('Generated columns:', this.columns.map(col => ({ id: col.id, statusMatcher: col.statusMatcher })));
                 },
 
                 getBoardConfig(boardId) {
@@ -154,8 +150,8 @@ require_once '../../config.php';
                             }, 1000);
                             return;
                         }
-                        const response = await searchAPI.getTasks('ALL', { includeParentProps: true });
-                        console.log('[FETCH] Raw API response:', response);
+                        const results = await searchAPI.allTasks('ALL', { parentProperties: true });
+                        const response = { results };
                         if (response && response.results) {
                             this.allTasksRaw = response.results.map(result => ({
                                 id: result.note_id,
@@ -168,7 +164,6 @@ require_once '../../config.php';
                                 is_encrypted: (result.properties?.encrypted?.some(p => String(p.value).toLowerCase() === 'true') ||
                                                result.parent_properties?.encrypted?.some(p => String(p.value).toLowerCase() === 'true')) || false
                             }));
-                            console.log('[FETCH] Processed tasks:', this.allTasksRaw);
                             let filteredTasks = this.allTasksRaw.filter(task => {
                                 const taskStatus = this.getNoteStatus(task).toUpperCase();
                                 const statusMatch = statusesForBoard.includes(taskStatus);
@@ -202,7 +197,6 @@ require_once '../../config.php';
                 getNoteStatus(note) {
                     // Check for direct status field first (from API response)
                     if (note.status) {
-                        console.log(`[STATUS] Note ${note.id} has direct status field: ${note.status}`);
                         return note.status.toUpperCase();
                     }
                     // Then check properties
@@ -215,7 +209,6 @@ require_once '../../config.php';
                         } else if (note.properties.status.value && typeof note.properties.status.value === 'string') {
                             rawStatus = note.properties.status.value;
                         }
-                        console.log(`[STATUS] Note ${note.id} status from properties: "${rawStatus}"`);
                         if (rawStatus && this.configuredKanbanStates.includes(rawStatus.toUpperCase())) {
                             return rawStatus.toUpperCase();
                         }
@@ -225,14 +218,11 @@ require_once '../../config.php';
                         const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
                         const statusRegex = new RegExp(`^(${statusKeywords.join('|')})\\s+`, 'i');
                         const match = note.content.match(statusRegex);
-                        console.log(`[STATUS] Note ${note.id} content='${note.content}', regex=${statusRegex}, match=${match ? match[0] : 'none'}`);
                         if (match) {
-                            console.log(`[STATUS] Note ${note.id} status from content: ${match[1].toUpperCase()}`);
                             return match[1].toUpperCase();
                         }
                     }
                     const defaultStatus = this.configuredKanbanStates[0]?.toUpperCase() || 'TODO';
-                    console.log(`[STATUS] Note ${note.id} using default status: ${defaultStatus}`);
                     return defaultStatus;
                 },
 
@@ -255,24 +245,20 @@ require_once '../../config.php';
                     const statusKeywords = this.configuredKanbanStates.map(s => s.toUpperCase());
                     const statusRegex = new RegExp(`^(${statusKeywords.join('|')})\\s+`, 'i');
                     const match = content.match(statusRegex);
-                    console.log(`[SYNC] syncContentWithStatus: content='${content}', newStatus='${newStatus}', regex=${statusRegex}, match=${match ? match[0] : 'none'}`);
                     let result;
                     if (match) {
                         result = newStatus + ' ' + content.substring(match[0].length);
                     } else {
                         result = newStatus + ' ' + content;
                     }
-                    console.log(`[SYNC] Resulting content: '${result}'`);
                     return result;
                 },
 
                 distributeTasksToColumns(tasks) {
-                    console.log(`Distributing ${tasks.length} tasks to columns`);
                     this.columns.forEach(col => col.tasks = []); // Clear existing
                     const seenTaskIds = new Set();
                     tasks.forEach(task => {
                         const taskStatus = this.getNoteStatus(task).toUpperCase();
-                        console.log(`[DISTRIBUTE] Task ${task.id} has status: ${taskStatus}`);
                         // Check for duplication in all columns
                         let alreadyPresent = false;
                         this.columns.forEach(col => {
@@ -287,7 +273,6 @@ require_once '../../config.php';
                         seenTaskIds.add(task.id);
                         const targetColumn = this.columns.find(col => col.statusMatcher === taskStatus);
                         if (targetColumn) {
-                            console.log(`[DISTRIBUTE] Placing task ${task.id} in column: ${targetColumn.statusMatcher}`);
                             targetColumn.tasks.push(task);
                         } else {
                             // Fallback: if status is not recognized, put in the first configured column
@@ -303,7 +288,6 @@ require_once '../../config.php';
                     // Log final distribution
                     this.columns.forEach(col => {
                         const ids = col.tasks.map(t => t.id);
-                        console.log(`[DISTRIBUTE] Column ${col.statusMatcher}: ${col.tasks.length} tasks, IDs: ${ids.join(', ')}`);
                     });
                 },
 
@@ -311,7 +295,6 @@ require_once '../../config.php';
                     // This is automatically handled by $watch on currentBoardId,
                     // which calls fetchTasksForCurrentBoard.
                     // This function is here primarily for the @change binding clarity.
-                    console.log("Board changed to:", this.currentBoardId);
                 },
 
                 moveTaskToCorrectColumn(task, targetStatus) {
@@ -340,25 +323,21 @@ require_once '../../config.php';
                     
                     // If the task is already in the correct column, do nothing
                     if (currentColumn.statusMatcher === targetStatus) {
-                        console.log(`Task ${task.id} is already in the correct column (${targetStatus})`);
                         return;
                     }
                     
                     // Move the task to the target column
-                    console.log(`Moving task ${task.id} from column ${currentColumn.statusMatcher} to ${targetStatus}`);
                     currentColumn.tasks.splice(taskIndex, 1);
                     targetColumn.tasks.push(task);
                 },
 
                 initializeSortable() {
-                    console.log('Initializing Sortable for columns:', this.columns.length);
                     
                     // Destroy existing Sortable instances to prevent duplicates
                     this.columns.forEach(column => {
                         const columnEl = document.getElementById('column-' + column.id);
                         if (columnEl && columnEl.sortable) {
                             columnEl.sortable.destroy();
-                            console.log('Destroyed existing Sortable for column:', column.id);
                         }
                     });
 
@@ -366,7 +345,6 @@ require_once '../../config.php';
                     this.columns.forEach(column => {
                         const columnEl = document.getElementById('column-' + column.id);
                         if (columnEl) {
-                            console.log('Initializing Sortable for column:', column.id, 'with', column.tasks.length, 'tasks');
                             this.initSortable(columnEl, column.statusMatcher);
                         } else {
                             console.error('Column element not found:', 'column-' + column.id);
@@ -375,7 +353,6 @@ require_once '../../config.php';
                 },
 
                 initSortable(el, columnStatusMatcher) {
-                    console.log('Creating Sortable instance for element:', el.id, 'with status:', columnStatusMatcher);
                     const sortableInstance = new Sortable(el, {
                         group: 'kanban-cards',
                         animation: 150,
@@ -415,7 +392,6 @@ require_once '../../config.php';
                             // SortableJS handles visual reordering within same list automatically if not cancelling.
                             // We only care about inter-column moves or status changes.
                             if (sourceColumn.statusMatcher === newStatus && evt.oldIndex === evt.newIndex) {
-                                 console.log("Task moved within the same column, no status change needed.");
                                  // Update task order in Alpine data if necessary (complex, requires knowing exact old/new index in data)
                                  // For now, assume API doesn't care about intra-column order, or it's handled by other means.
                                 return;
@@ -427,7 +403,6 @@ require_once '../../config.php';
                             const originalTask = { ...taskToMove };
 
                             // Optimistic UI update: Move task in Alpine data model immediately
-                            console.log(`Optimistically moving task ${noteId} from ${sourceColumn.statusMatcher} to ${targetColumn.statusMatcher}`);
                             
                             // Remove the task from all columns to prevent duplication
                             this.columns.forEach(col => {
@@ -459,15 +434,11 @@ require_once '../../config.php';
                             // Log all column contents for debugging
                             this.columns.forEach(col => {
                                 const ids = col.tasks.map(t => t.id);
-                                console.log(`[GLOBAL DEDUP] After move/update, column ${col.statusMatcher} has tasks: [${ids.join(', ')}]`);
                             });
 
                             // Update task on backend - ensure content and properties are in sync
                             let newContent = this.syncContentWithStatus(taskToMove.content, newStatus);
 
-                            console.log('Original content:', taskToMove.content);
-                            console.log('New content:', newContent);
-                            console.log('New status:', newStatus);
 
                             try {
                                 if (!apiLoaded || !notesAPI) {
@@ -502,11 +473,8 @@ require_once '../../config.php';
                                     // Log all column contents for debugging
                                     this.columns.forEach(col => {
                                         const ids = col.tasks.map(t => t.id);
-                                        console.log(`[GLOBAL DEDUP] After move/update, column ${col.statusMatcher} has tasks: [${ids.join(', ')}]`);
                                     });
                                     itemEl.dataset.currentStatus = newStatus;
-                                    console.log(`[BATCH] Note ${noteId} updated to status ${newStatus}.`);
-                                    console.log(`[BATCH] Task content after update:`, updateResult.note.content);
                                     return;
                                 } else {
                                     throw new Error('Update failed or no matching result in API response.');
@@ -520,7 +488,6 @@ require_once '../../config.php';
                                 itemEl.dataset.currentStatus = oldStatus;
                                 
                                 // Revert the optimistic update in Alpine data model
-                                console.log(`Reverting optimistic move for task ${noteId} back to ${sourceColumn.statusMatcher}`);
                                 
                                 // Find and remove the task from wherever it currently is
                                 for (let col of this.columns) {
@@ -547,14 +514,12 @@ require_once '../../config.php';
                     
                     // Store the sortable instance on the element for cleanup
                     el.sortable = sortableInstance;
-                    console.log('Sortable instance created and stored for:', el.id);
                 }
             };
         }
         
         // Make it global for Alpine x-data
         window.kanbanApp = kanbanApp;
-        console.log('kanbanApp function defined and exposed globally');
     </script>
 </body>
 </html>

@@ -50,7 +50,7 @@ export function decodeContent(stored) {
 // ----------------------------------------------------------------- outbox
 
 export const outbox = new Outbox({
-    send: (ops) => notesAPI.applyOps(ops),
+    send: (ops) => notesAPI.sendOps(ops),
     onApplied: handleApplied,
     onRejected: (error) => {
         console.error('[outline] server rejected a batch:', error);

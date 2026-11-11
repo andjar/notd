@@ -75,10 +75,15 @@ export const notesAPI = {
         get('notes.php' + query({ id, include_internal: includeInternal, include_children: children, include_parent_properties: parentProperties })),
     /** One batch of operations; see app/outbox.js. */
     /**
-     * Sends operations to the write endpoint. Returns the raw Response: the
-     * outbox tells "rejected" (4xx) from "try again" (network, 5xx) itself.
+     * Applies operations (see api/v1/ops.php). Resolves with
+     * {results: [{op_id, status}], notes: [...]}.
      */
-    applyOps: (ops) => fetch(API_BASE_URL + 'ops.php', {
+    applyOps: (ops) => post('ops.php', { ops }),
+    /**
+     * The same, returning the raw Response: the outbox tells "rejected" (4xx)
+     * from "try again later" (network, 5xx) itself.
+     */
+    sendOps: (ops) => fetch(API_BASE_URL + 'ops.php', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -99,7 +104,19 @@ export const searchAPI = {
         get('search.php' + query({ q, include_parent_properties: parentProperties, per_page: perPage })),
     backlinks: (pageName, { parentProperties = false, perPage = 100 } = {}) =>
         get('search.php' + query({ backlinks_for_page_name: pageName, include_parent_properties: parentProperties, per_page: perPage })),
-    tasks: (status, { perPage } = {}) => get('search.php' + query({ tasks: status, per_page: perPage })),
+    /** One page of the notes that are tasks in `status` (TODO, DONE, ... or ALL). */
+    tasks: (status, { parentProperties = false, page = 1, perPage = 100 } = {}) =>
+        get('search.php' + query({ tasks: status, include_parent_properties: parentProperties, page, per_page: perPage })),
+    /** All of them, however many pages that takes. */
+    async allTasks(status, { parentProperties = false } = {}) {
+        const all = [];
+        for (let page = 1; page < 1000; page++) {
+            const { results = [], pagination } = await searchAPI.tasks(status, { parentProperties, page });
+            all.push(...results);
+            if (!pagination || page >= (pagination.total_pages || 1) || !results.length) break;
+        }
+        return all;
+    },
 };
 
 export const queryAPI = {

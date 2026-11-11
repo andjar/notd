@@ -78,4 +78,4 @@ Contributions are welcome: open an issue or a pull request.
 
 ## License
 
-GPL-3.0-or-later.
+GPL-3.0-or-later; the full text is in [LICENSE](LICENSE). The libraries in `assets/libs` and `extensions` keep their own licenses.
