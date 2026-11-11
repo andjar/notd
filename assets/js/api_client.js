@@ -74,7 +74,16 @@ export const notesAPI = {
     byId: (id, { includeInternal = true, children = false, parentProperties = false } = {}) =>
         get('notes.php' + query({ id, include_internal: includeInternal, include_children: children, include_parent_properties: parentProperties })),
     /** One batch of operations; see app/outbox.js. */
-    applyOps: (ops) => post('ops.php', { ops }),
+    /**
+     * Sends operations to the write endpoint. Returns the raw Response: the
+     * outbox tells "rejected" (4xx) from "try again" (network, 5xx) itself.
+     */
+    applyOps: (ops) => fetch(API_BASE_URL + 'ops.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ ops }),
+    }),
 };
 
 export const attachmentsAPI = {
