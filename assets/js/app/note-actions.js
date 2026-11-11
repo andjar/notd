@@ -14,11 +14,8 @@ const notesContainer = document.querySelector('#notes-container');
 
 // --- Accessors (kept for other modules) ---
 
-export function getNoteDataById(noteId) {
-    return noteId ? outline.model.get(noteId) : null;
-}
 
-export function getNoteElementById(noteId) {
+function getNoteElementById(noteId) {
     if (!notesContainer || !noteId) return null;
     return notesContainer.querySelector(`.note-item[data-note-id="${CSS.escape(String(noteId))}"]`);
 }

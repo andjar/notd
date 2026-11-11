@@ -4,54 +4,53 @@
 
 <div id="main">
   <div id="hero">
-    <img src="{{ "/images/notd.svg" | relURL }}" alt="NOTD Logo" style="width: 150px; height: auto; margin-bottom: 15px;">
+    <img src="{{ "/images/notd.svg" | relURL }}" alt="notd logo" style="width: 150px; height: auto; margin-bottom: 15px;">
     <h1>{{.Title}}</h1>
     <p>{{.Description}}</p>
   </div>
   <div id="action-buttons">
-    <a class="button primary big" href="https://github.com/andjar/notd/releases" onclick="_gaq.push(['_trackEvent', 'notd', 'download']);">Download</a> <a class="button outline big" href="https://github.com/andjar/notd" onclick="_gaq.push(['_trackEvent', 'notd', 'github']);">View on Github</a>
-    <p>Zip-archive</p>
+    <a class="button primary big" href="{{ "/docs/overview/quick-start/" | relURL }}">Get started</a> <a class="button outline big" href="https://github.com/andjar/notd">View on GitHub</a>
+    <p><a href="https://github.com/andjar/notd/archive/refs/heads/main.zip">Download as zip</a></p>
   </div>
   <div id="kube-features">
     <div class="row gutters">
       <div class="col col-4 item">
         <figure>
-          <img alt="Baseline" src="{{ "/images/frontpage.png" | relURL }}">
+          <img alt="The notd outline with a journal page" src="{{ "/images/frontpage.png" | relURL }}">
         </figure>
-        <h3>Minimalistic</h3>
-        <p>notd is designed to be simple and easy to use. Format your notes with markdown.</p>
+        <h3>Minimal</h3>
+        <p>An outline, a journal page for every day, and Markdown. Every bullet can be nested, collapsed, dragged and linked.</p>
       </div>
       <div class="col col-4 item">
         <figure>
-          <img alt="Typography" src="{{ "/images/markdown.png" | relURL }}">
+          <img alt="Markdown, properties and tasks in notes" src="{{ "/images/markdown.png" | relURL }}">
         </figure>
-        <h3>Organized</h3>
-        <p>notd supports tasks, backlinks, transclusions, tags, properties, namespaces, file attachments, simple SQL queries, and encryption.</p>
+        <h3>Organised</h3>
+        <p>Tasks, backlinks, transclusion, properties, namespaces, attachments, SQL queries over your notes, and per-page encryption.</p>
       </div>
       <div class="col col-4 item">
         <figure>
-          <img alt="Minimalism" src="{{ "/images/kanban.png" | relURL }}">
+          <img alt="The kanban board extension" src="{{ "/images/kanban.png" | relURL }}">
         </figure>
         <h3>Extendable</h3>
-        <p>notd is easily extended through the API. Default extensions include kanban board, pomodoro timer, excalidraw, math notepad, and more.</p>
+        <p>Everything the interface does is available over an HTTP API. Included extensions: kanban board, pomodoro timer, attachment dashboard, zen editor and more.</p>
       </div>
     </div>
     <div class="row gutters">
       <div class="col col-4 item">
-        <h4>Mobile-first Design</h4>
-        <p>While notd is not a mobile app, it is designed to be used on mobile devices.</p>
+        <h4>Built to last</h4>
+        <p>PHP, SQLite and plain JavaScript. No build step, no package manager, no framework to keep up with. If PHP runs, notd runs.</p>
       </div>
       <div class="col col-4 item">
-        <h4>Cross-browser</h4>
-        <p>notd utilizes simple and well-supported technologies, such as SQLite, Alpine.js, and PHP. It should work perfectly on all modern browsers, both desktop and mobile.</p>
+        <h4>Yours, offline</h4>
+        <p>Notes are plain text in one SQLite file on your machine. Nothing is loaded from the internet, and edits made offline are sent when the server is back.</p>
       </div>
       <div class="col col-4 item">
-        <h4>License</h4>
-        <p>notd is licensed under <a href="https://opensource.org/licenses/gpl-3-0">GPL</a>.<br>
-      notd is absolutely free for personal or commercial use.</p>
+        <h4>Free</h4>
+        <p>notd is open source under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL&nbsp;3</a>, free for personal and commercial use.</p>
+      </div>
     </div>
   </div>
-</div>
 </div>
 {{ end }}
 {{ define "footer"}} {{ partial "footer" .}} {{end}}

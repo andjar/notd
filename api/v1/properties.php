@@ -67,7 +67,7 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
             
             \App\ApiResponse::success($properties);
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             \App\ApiResponse::error('Server error: ' . $e->getMessage(), 500);
         }
         exit;

@@ -3,6 +3,6 @@ title: "OpenAPI Specification"
 weight: 30
 ---
 
-This page displays the OpenAPI specification for the Notd API.
+The API as an OpenAPI 3 document: [openapi.yaml](/openapi.yaml). The [API reference]({{< relref "../api-reference/_index.md" >}}) describes the same endpoints in prose and is the place to start.
 
 {{< openapi "/openapi.yaml" >}}

@@ -165,7 +165,7 @@ class DataManager {
         $note = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($note) {
-            unset($note['rid']);
+            $note = self::castNoteRow($note);
             // Check for attachments
             $attachmentStmt = $this->pdo->prepare("SELECT EXISTS(SELECT 1 FROM Attachments WHERE note_id = :note_id AND active = 1 LIMIT 1)");
             $attachmentStmt->execute([':note_id' => $noteId]);
@@ -318,6 +318,21 @@ class DataManager {
         return $this->decorateNotes($out, $includeInternal);
     }
 
+    /**
+     * Gives a raw Notes row the same JSON types on every PHP version: before
+     * PHP 8.1 the SQLite driver returns integers as strings ("0" is truthy in
+     * JavaScript, which showed every note as collapsed).
+     */
+    public static function castNoteRow(array $note): array {
+        unset($note['rid']);
+        foreach (['page_id', 'internal', 'collapsed', 'active', 'version'] as $field) {
+            if (isset($note[$field])) {
+                $note[$field] = (int)$note[$field];
+            }
+        }
+        return $note;
+    }
+
     /** Adds `properties` and `has_attachments` to raw note rows. */
     private function decorateNotes(array $notes, bool $includeInternal): array {
         if (empty($notes)) return [];
@@ -335,7 +350,7 @@ class DataManager {
         }
 
         foreach ($notes as &$note) {
-            unset($note['rid']);
+            $note = self::castNoteRow($note);
             $note['properties'] = $propertiesByNoteId[$note['id']] ?? [];
             $note['has_attachments'] = isset($withAttachments[$note['id']]);
         }

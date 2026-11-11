@@ -6,10 +6,6 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../db_connect.php';
 require_once __DIR__ . '/../template_processor.php';
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 // header('Content-Type: application/json'); // Will be handled by ApiResponse
 require_once __DIR__ . '/../response_utils.php'; // Include the new response utility
 
@@ -70,7 +66,7 @@ try {
                         'name' => $template,
                         'content' => $content
                     ];
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     logError("Error processing template", [
                         'template' => $template,
                         'error' => $e->getMessage(),
@@ -86,7 +82,7 @@ try {
             $response = $templateData; // ApiResponse.success will wrap it with 'success' and 'data'
             logError("Final response structure", ['response' => $response]);
             \App\ApiResponse::success($response);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             logError("Error in template processing", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -174,7 +170,7 @@ try {
     else {
         \App\ApiResponse::error('Method not allowed', 405);
     }
-} catch (Exception $e) {
+} catch (\Exception $e) {
     logError("Unhandled exception", [
         'error' => $e->getMessage(),
         'trace' => $e->getTraceAsString()

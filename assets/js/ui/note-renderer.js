@@ -551,7 +551,6 @@ function switchToEditMode(contentEl) {
 
         if (imageFile) {
             event.preventDefault(); 
-            console.log('Pasted image file:', imageFile);
 
             const formData = new FormData();
             const fileName = `pasted_image_${Date.now()}.${imageFile.name.split('.').pop() || 'png'}`;
@@ -561,7 +560,6 @@ function switchToEditMode(contentEl) {
             try {
                 await outline.ensureSynced(); // the note must exist on the server first
                 const result = await attachmentsAPI.uploadAttachment(formData);
-                console.log('Pasted image uploaded successfully:', result);
 
                 if (result && result.url) {
                     const currentRawContent = contentEl.textContent;
@@ -1407,7 +1405,6 @@ async function handleDelegatedAttachmentDelete(targetElement) {
     if (!confirmed) return;
 
     try {
-        console.log("Deleting:", { attachmentId, noteId });
 
         await attachmentsAPI.deleteAttachment(attachmentId, noteId);
         attachmentItem?.remove();
@@ -1731,5 +1728,4 @@ function initializeDelegatedNoteEventListeners(notesContainerEl) {
         }
     });
 
-    console.log("Delegated note event listeners initialized.");
 }

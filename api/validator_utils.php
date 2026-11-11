@@ -57,7 +57,7 @@ if (!class_exists('App\\Validator')) {
                     return false;
                 }
                 return self::isValidPropertyNames($decoded);
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 return false;
             }
         }
@@ -84,7 +84,7 @@ if (!class_exists('App\\Validator')) {
                     return false;
                 }
                 return self::isValidEventTypes($decoded);
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 return false;
             }
         }

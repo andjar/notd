@@ -8,7 +8,7 @@ import { setSaveStatus } from './state.js';
 
 // Module initializers and core functions
 import { sidebarState } from './sidebar.js';
-import { loadPage, prefetchRecentPagesData, getInitialPage, fetchAndDisplayPages } from './page-loader.js';
+import { loadPage, getInitialPage, fetchAndDisplayPages } from './page-loader.js';
 import { initGlobalEventListeners } from './event-handlers.js';
 import { initGlobalSearch, initPageSearchModal } from './search.js';
 import { initSuggestionUI, fetchAllPages } from '../ui/page-link-suggestions.js';
@@ -45,14 +45,7 @@ window.createPageWithContent = async (pageName, initialContent = '') => {
  * This function sets up UI components, event listeners, and loads the initial page.
  */
 export async function initializeApp() {
-    // Remove manual splash screen class manipulation - let Alpine.js handle it
-    // const splashScreen = document.getElementById('splash-screen');
-    // if (splashScreen) splashScreen.classList.remove('hidden'); 
-    
     try {
-        // Sidebar is now handled by Alpine.js component
-        // await sidebarState.init(); // Removed - conflicts with Alpine.js 
-        
         ui.initPagePropertiesModal();
         ui.updateSaveStatusIndicator('saved');
         
@@ -71,28 +64,10 @@ export async function initializeApp() {
         
         await loadPage(initialPageName, false); 
         await fetchAndDisplayPages(initialPageName);
-        await prefetchRecentPagesData(); 
         
-        // Save status indicator is now always visible
-        // const initialSaveIndicator = document.getElementById('save-status-indicator');
-        // if (initialSaveIndicator) {
-        //     initialSaveIndicator.classList.add('status-hidden'); 
-        // }
-        
-        console.log('App initialized successfully');
         
     } catch (error) { 
         console.error('Failed to initialize application:', error);
-        // Remove manual splash screen class manipulation
-        // if (splashScreen) splashScreen.classList.add('hidden');
         document.body.innerHTML = `<div style="padding: 20px; text-align: center;"><h1>App Initialization Failed</h1><p>${error.message}</p><p>Check console for details.</p></div>`;
-    } finally {
-        // Remove manual splash screen class manipulation - let Alpine.js handle it
-        // if (splashScreen) {
-        //     if (window.splashAnimations && typeof window.splashAnimations.stop === 'function') {
-        //         window.splashAnimations.stop();
-        //     }
-        //     splashScreen.classList.add('hidden');
-        // }
     }
 }

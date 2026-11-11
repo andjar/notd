@@ -1,29 +1,17 @@
 {
     "name": "notd/outliner",
-    "description": "A small outliner application in PHP+JS+SQLite for offline use",
+    "description": "A small outliner in PHP, JavaScript and SQLite. No dependencies; this file only provides metadata and script shortcuts.",
     "type": "project",
     "license": "GPL-3.0-or-later",
     "require": {
-        "php": ">=7.4"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^9.5"
-    },
-    "autoload": {
-        "psr-4": {
-            "App\\": "api/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Tests\\": "tests/"
-        }
+        "php": ">=7.4",
+        "ext-pdo_sqlite": "*",
+        "ext-mbstring": "*"
     },
     "scripts": {
         "test": "node tests/js/model.test.mjs && node tests/js/ordering_parity.mjs",
         "test:api": "node tests/js/ops_api.test.mjs",
-        "test:browser": "python3 tests/browser/outline_test.py",
-        "test:unit": "vendor/bin/phpunit tests/",
+        "test:browser": "python3 tests/browser/outline_test.py && python3 tests/browser/features_test.py",
         "migrate": "php db/migrate_v3.php"
     }
 }

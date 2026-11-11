@@ -40,7 +40,6 @@ export function initGlobalEventListeners() {
         const toggleSplashBtn = e.target.closest('#toggle-splash-btn');
         if (toggleSplashBtn) {
             e.preventDefault();
-            console.log('Splash toggle button clicked');
             
             const splashScreen = document.getElementById('splash-screen');
             if (!splashScreen) {
@@ -54,14 +53,8 @@ export function initGlobalEventListeners() {
                                      !splashScreen.classList.contains('hidden') &&
                                      splashScreen.offsetParent !== null;
             
-            console.log('Splash screen currently visible:', isCurrentlyVisible);
-            console.log('Current display style:', splashScreen.style.display);
-            console.log('Current visibility style:', splashScreen.style.visibility);
-            console.log('Has hidden class:', splashScreen.classList.contains('hidden'));
-            console.log('Offset parent:', splashScreen.offsetParent);
             
             if (isCurrentlyVisible) {
-                console.log('Hiding splash screen');
                 
                 // Try Alpine.js first
                 if (window.Alpine && window.Alpine.$data) {
@@ -74,7 +67,6 @@ export function initGlobalEventListeners() {
                             splashComponent.show = false;
                         }
                     } catch (error) {
-                        console.log('Alpine.js access failed:', error);
                     }
                 }
                 
@@ -92,9 +84,7 @@ export function initGlobalEventListeners() {
                     }
                 }
                 
-                console.log('Splash screen hidden');
             } else {
-                console.log('Showing splash screen');
                 
                 // Try Alpine.js first
                 if (window.Alpine && window.Alpine.$data) {
@@ -107,7 +97,6 @@ export function initGlobalEventListeners() {
                             splashComponent.show = true;
                         }
                     } catch (error) {
-                        console.log('Alpine.js access failed:', error);
                     }
                 }
                 
@@ -125,14 +114,12 @@ export function initGlobalEventListeners() {
                     }
                 }
                 
-                console.log('Splash screen shown');
             }
         }
     });
 
     // Handle URL hash changes for note anchoring
     window.addEventListener('hashchange', () => {
-        console.log('[Hash Change] URL hash changed, handling anchor');
         handleUrlAnchor();
     });
 }

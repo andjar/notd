@@ -289,7 +289,7 @@ public function handleRequest() {
                 'size' => $file['size'],
                 'created_at' => date('c'),
             ];
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
@@ -323,7 +323,7 @@ public function handleRequest() {
             }
             \App\ApiResponse::success($attachments);
             ob_end_flush();
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
             ob_end_clean();
             \App\ApiResponse::error('Failed to fetch attachments for note_id: ' . $e->getMessage(), 500);
         }
@@ -407,7 +407,7 @@ public function handleRequest() {
                 ]
             ]);
             ob_end_flush();
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
             ob_end_clean();
             \App\ApiResponse::error('Failed to fetch all attachments: ' . $e->getMessage(), 500);
         }
@@ -480,7 +480,7 @@ private function handleDeleteRequest() {
         \App\ApiResponse::success(['deleted_attachment_id' => $attachment_id]);
         ob_end_flush();
 
-    } catch (RuntimeException | PDOException $e) {
+    } catch (\RuntimeException | \PDOException $e) {
         if ($this->pdo->inTransaction()) {
             $this->pdo->rollBack();
         }

@@ -10,14 +10,11 @@ require_once '../../config.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kanban Task Board - notd</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
-    <!-- Include existing global styles if necessary, or keep it minimal for independence -->
-    <!-- For now, let's include the main style.css and a new kanban.css -->
-    <?php require_once '../../assets/css/theme_loader.php'; // If theme consistency is desired ?>
-    <link rel="stylesheet" href="../../assets/css/style.css">
+    <?php $assetBase = '../../'; require '../../assets/css/theme_loader.php'; ?>
+    <link rel="stylesheet" href="../../assets/css/main.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="../../assets/css/components/icons.css">
-    <!-- Remove old Alpine v2 script and add Alpine v3 -->
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="../../assets/libs/alpine.min.js" defer></script>
 </head>
 <body>
     <div class="app-container kanban-app-container" x-data="kanbanApp()" x-init="init()">

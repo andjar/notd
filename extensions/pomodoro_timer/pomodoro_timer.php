@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <title>Pomodoro Timer</title>
     <!-- Theme and App Styles -->
-    <?php include '../../assets/css/theme_loader.php'; ?>
-    <link rel="stylesheet" type="text/css" href="../../assets/css/style.css">
+    <?php $assetBase = '../../'; include '../../assets/css/theme_loader.php'; ?>
+    <link rel="stylesheet" type="text/css" href="../../assets/css/main.css">
     <link rel="stylesheet" type="text/css" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer></script>
+    <script src="../../assets/libs/alpine.min.js" defer></script>
 </head>
 <body>
     <div id="pomodoro-container" x-data="pomodoroTimer()">

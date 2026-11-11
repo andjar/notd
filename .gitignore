@@ -31,3 +31,6 @@ api/v1/php_error.log
 db/*.lock
 tests/browser/latency.txt
 __pycache__/
+
+# Local settings
+config.local.php

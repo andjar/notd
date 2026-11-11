@@ -19,7 +19,7 @@ class TemplateProcessor {
 
     public function __construct($type = 'note') {
         if (!in_array($type, ['note', 'page'])) {
-            throw new Exception("Invalid template type: $type");
+            throw new \Exception("Invalid template type: $type");
         }
 
         $this->template_dir = __DIR__ . '/../assets/template/' . $type;
@@ -30,13 +30,13 @@ class TemplateProcessor {
         if (!file_exists($this->template_dir)) {
             error_log("Creating template directory: " . $this->template_dir);
             if (!mkdir($this->template_dir, 0777, true)) {
-                throw new Exception("Failed to create template directory: " . $this->template_dir);
+                throw new \Exception("Failed to create template directory: " . $this->template_dir);
             }
         }
         
         // Verify directory is readable
         if (!is_readable($this->template_dir)) {
-            throw new Exception("Template directory is not readable: " . $this->template_dir);
+            throw new \Exception("Template directory is not readable: " . $this->template_dir);
         }
     }
 
@@ -80,12 +80,12 @@ class TemplateProcessor {
         
         if (!file_exists($template_path)) {
             error_log("Template file not found: " . $template_path);
-            throw new Exception("Template not found: $template_name");
+            throw new \Exception("Template not found: $template_name");
         }
         
         if (!is_readable($template_path)) {
             error_log("Template file not readable: " . $template_path);
-            throw new Exception("Template not readable: $template_name");
+            throw new \Exception("Template not readable: $template_name");
         }
 
         try {
@@ -95,7 +95,7 @@ class TemplateProcessor {
             $content = ob_get_clean();
             
             if ($content === false) {
-                throw new Exception("Failed to read template content");
+                throw new \Exception("Failed to read template content");
             }
 
             // Process placeholders
@@ -107,7 +107,7 @@ class TemplateProcessor {
             }
 
             return $content;
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log("Error processing template: " . $e->getMessage());
             throw $e;
         }

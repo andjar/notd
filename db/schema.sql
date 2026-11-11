@@ -9,6 +9,11 @@
 -- Enable Foreign Key support for data integrity
 PRAGMA foreign_keys = ON;
 
+-- Schema version. api/db_connect.php compares it with NOTD_SCHEMA_VERSION and
+-- refuses to run against an older or newer database. Bump both together and
+-- add a migration script in db/ whenever the schema changes.
+PRAGMA user_version = 3;
+
 -- Pages Table
 -- Pages are top-level containers for notes. They now include a `content`
 -- field to store page-level properties and other metadata.

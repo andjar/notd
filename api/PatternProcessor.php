@@ -97,7 +97,7 @@ class PatternProcessor {
                 } else {
                     error_log("[PATTERN_PROCESSOR_DEBUG] Handler {$name} returned no results");
                 }
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 error_log("[PATTERN_PROCESSOR_ERROR] Handler '{$name}' failed: " . $e->getMessage());
                 error_log("[PATTERN_PROCESSOR_ERROR] Stack trace: " . $e->getTraceAsString());
                 throw $e; // Re-throw to be caught by caller
@@ -476,7 +476,7 @@ class PatternProcessor {
                         }
                     }
                 }
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 error_log("[PATTERN_PROCESSOR_ERROR] Error saving property group '$name' for $entityType $entityId: " . $e->getMessage());
                 error_log("[PATTERN_PROCESSOR_ERROR] Stack trace: " . $e->getTraceAsString());
                 throw $e; // Re-throw to allow transaction rollback
