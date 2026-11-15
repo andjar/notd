@@ -4,9 +4,12 @@
 require_once __DIR__ . '/email_parser_utils.php';
 
 // --- 2. Configuration ---
-// Define the base URL for the application's API.
-// In a production environment, this might be dynamically determined or set in a config file.
-define('API_BASE_URL', 'http://localhost/api/v1'); // Adjust if your local setup uses a different URL or port
+// notd's address followed by /api, from "api_url" in config.json next to this
+// script (default http://localhost:8000/api), or from the first argument:
+//     php mail_handler.php http://localhost:8000/api < message.eml
+$mail_config = json_decode((string)@file_get_contents(__DIR__ . '/config.json'), true) ?: [];
+$api_url = $argv[1] ?? $mail_config['api_url'] ?? 'http://localhost:8000/api';
+define('API_BASE_URL', rtrim($api_url, '/') . '/v1');
 
 // --- External Mail Fetching Mechanism ---
 // This script assumes that raw email content is provided to it.
@@ -116,18 +119,23 @@ $note_content .= "**From:** " . (!empty($from_name) ? $from_name . " <" . $from_
 if (!empty($to_email)) {
     $note_content .= "**To:** " . (!empty($to_name) ? $to_name . " <" . $to_email . ">" : $to_email) . "\n";
 }
-$note_content .= "\n--- Email Body ---\n" . $email_body . "\n\n";
-$note_content .= "---\n"; // Separator for properties
-$note_content .= "tag:: mail\n";
-$note_content .= "email_from_name:: " . $from_name . "\n";
-$note_content .= "email_from_address:: " . $from_email . "\n";
-if (!empty($to_email)) {
-    if (!empty($to_name)) {
-        $note_content .= "email_to_name:: " . $to_name . "\n";
-    }
-    $note_content .= "email_to_address:: " . $to_email . "\n";
+$note_content .= "\n" . $email_body . "\n\n";
+// notd properties: {key::value}. A value cannot hold "}" or a line break.
+$prop = static function ($key, $value) {
+    return '{' . $key . '::' . trim(str_replace(['}', "\r", "\n"], [')', ' ', ' '], (string)$value)) . '}';
+};
+$props = [$prop('tag', 'mail'), $prop('email_from_address', $from_email)];
+if (!empty($from_name)) {
+    $props[] = $prop('email_from_name', $from_name);
 }
-$note_content .= "email_subject:: " . $subject . "\n";
+if (!empty($to_email)) {
+    $props[] = $prop('email_to_address', $to_email);
+    if (!empty($to_name)) {
+        $props[] = $prop('email_to_name', $to_name);
+    }
+}
+$props[] = $prop('email_subject', $subject);
+$note_content .= implode(' ', $props);
 
 // --- 8. Create Note via API ---
 // Changed to use append_to_page.php

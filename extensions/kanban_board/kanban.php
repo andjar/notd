@@ -26,7 +26,7 @@ require_once '../../config.php';
                         <option :value="board.id" x-text="board.label"></option>
                     </template>
                 </select>
-                <a href="/" class="action-button">Back to Main App</a>
+                <a href="../../" class="action-button">Back to Main App</a>
             </div>
         </header>
         <main id="kanban-root" class="kanban-root" x-show="!isLoading && !errorMessage">
