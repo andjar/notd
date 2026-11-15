@@ -28,6 +28,12 @@ Extensions
 - The Pomodoro timer reads `pageTemplate`, `noteTemplate` and `cycle` from its `config.json` (they were ignored, so sessions went to the journal page and there were no long breaks), and its work session is 25 minutes again (the shipped setting was 2).
 - The kanban board's **Back to Main App** works when notd is served from a sub-folder.
 
+- Kanban cards show the note's text without `{property}` syntax, its properties as labels, and a link to the note.
+- The attachment dashboard shows the note each file belongs to, lists files whose note was deleted (**Only files without a note**), and deletes files.
+
+Attachments
+- A file the note's text already shows (an image placed in the text, a link to a file) is no longer listed again below the note. Pasted images were shown twice.
+
 Documentation
 - A page for each extension, with screenshots; how to turn extensions on, and which ones appear in the note menu.
 - Section pages (Development, Overview and others) show their text, which the theme used to hide.

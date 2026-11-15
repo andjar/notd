@@ -8,7 +8,9 @@ description: "Every task in your notes as a card, in one column per state. On by
 
 The kanban board shows every [task]({{< relref "../frontend-guide/journal-tasks.md" >}}) in your notes as a card, in one column per task state. Dragging a card to another column rewrites the keyword at the start of the note (for example `TODO` to `DOING`), exactly as if you had edited the note.
 
-Cards come from notes, so there is nothing to keep in sync: write a task anywhere and it is on the board. A card shows the note's text as written, properties included.
+Cards come from notes, so there is nothing to keep in sync: write a task anywhere and it is on the board.
+
+A card shows the first line of the note as plain text, without the task keyword or any `{property}` syntax, and `[[links]]` as the page names. The note's properties are shown as small labels below it (internal ones, with three colons, are left out), and the page the note is on links to the note itself. A card whose note has more lines ends in "…".
 
 It is on by default; open it with the board icon in the right sidebar. **Back to Main App** returns to your notes.
 

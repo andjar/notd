@@ -28,7 +28,7 @@
             </label>
         </div>
         <div class="orphans-actions" x-show="withoutNote && !isLoading && totalItems > 0">
-            <span x-text="`${totalItems} file${totalItems === 1 ? '' : 's'} no longer belong to a note.`"></span>
+            <span x-text="totalItems === 1 ? '1 file no longer belongs to a note.' : `${totalItems} files no longer belong to a note.`"></span>
             <button type="button" class="danger" @click="deleteAllWithoutNote()">Delete them all</button>
         </div>
 
