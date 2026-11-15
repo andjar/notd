@@ -105,6 +105,12 @@ return [
         return ['report' => $report] + snapshot($pdo);
     },
 
+    'options' => function ($run, PDO $pdo) {
+        clear($pdo);
+        $run(['tags' => 'link', 'resolve_aliases' => true]);
+        return snapshot($pdo);
+    },
+
     'rerun' => function ($run, PDO $pdo, string $tmp, string $fixture) {
         $run();
         $before = counts($pdo);

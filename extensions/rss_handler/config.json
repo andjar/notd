@@ -1,6 +1,6 @@
 {
     "featherIcon": "rss",
-    "api_url": "/api/v1",
+    "api_url": "http://localhost:8000/api",
     "default_page_name_for_rss": "Inbox/rss",
     "feeds": [
         "https://www.nrk.no/toppsaker.rss",

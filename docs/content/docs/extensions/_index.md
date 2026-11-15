@@ -1,90 +1,62 @@
 ---
 title: "Extensions"
 weight: 25
-aliases: ["/docs/extensions/excalidraw-editor/", "/docs/extensions/additional-extensions/"]
+description: "Small apps on top of your notes: a kanban board, a Pomodoro timer, an attachment overview, editors for single notes, and scripts that bring in feeds, mail and clipboard text."
 ---
 
-Extensions are small apps in the `extensions/` folder that work on your notes through the [API]({{< relref "../api-reference/_index.md" >}}).
+Extensions are small apps in the `extensions/` folder. They work on your notes through the same [API]({{< relref "../api-reference/_index.md" >}}) as the interface, so whatever they do ends up as ordinary notes and properties: there is nothing extra to keep in sync, and turning an extension off loses nothing.
 
-## Turning extensions on
+## The default extensions
 
-Extensions listed in `ACTIVE_EXTENSIONS` get an icon in the left sidebar. Set the list in `config.local.php` using the folder names:
+A new installation has three extensions turned on. Their icons are in the right sidebar, below the backlinks (open the sidebar with the arrow in the top right corner):
+
+![The extension icons in the right sidebar: attachment dashboard, Pomodoro timer, kanban board](/images/sidebar_extensions.png)
+
+| Extension | What it does |
+|---|---|
+| [Kanban board]({{< relref "kanban-board.md" >}}) | Every task in your notes as a card, one column per state. Drag a card to change its state. |
+| [Pomodoro timer]({{< relref "pomodoro-timer.md" >}}) | A work/break timer that logs each finished session as a note. |
+| [Attachment dashboard]({{< relref "attachment-dashboard.md" >}}) | Every uploaded file in one searchable, sortable list. |
+
+## More extensions included
+
+These come with notd but are off until you turn them on.
+
+| Extension | What it does | Opened from |
+|---|---|---|
+| [Zen writer]({{< relref "zen.md" >}}) | A distraction-free, full-screen editor for one note. | Note menu |
+| [Math notepad]({{< relref "math-notepad.md" >}}) | Calculations line by line, with variables; results beside each line. | Note menu |
+| [Excalidraw]({{< relref "excalidraw.md" >}}) | Hand-drawn diagrams, saved to a note as attachments. Needs an internet connection. | Note menu, sidebar |
+| [RSS handler]({{< relref "rss-handler.md" >}}) | A script that adds new feed items as notes. | Command line, scheduler |
+| [Mail handler]({{< relref "mail-handler.md" >}}) | A script that turns an e-mail, with its attachments, into a note on today's journal page. | Command line, mail server |
+
+The note editors appear in the menu you get by right-clicking a note's bullet, once they are turned on:
+
+![The note menu with Open in Zen Writer, Open in Excalidraw and Open in Math Notepad](/images/note_menu.png)
+
+[Espanso]({{< relref "espanso.md" >}}), a text expander, can send copied text to today's journal page with a small configuration file that comes with notd.
+
+## Turning extensions on and off
+
+`ACTIVE_EXTENSIONS` lists the extensions that are on, by folder name. The default is:
 
 ```php
-define('ACTIVE_EXTENSIONS', ['kanban_board', 'pomodoro_timer', 'attachment_dashboard']);
+define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board']);
 ```
 
-Zen, Excalidraw and the math notepad work on a single note and are opened from the note menu (right-click a bullet), whether or not they are in the list.
-
-## Included extensions
-
-| Extension | Folder | What it does | Opened from |
-|---|---|---|---|
-| [Kanban board]({{< relref "kanban-board.md" >}}) | `kanban_board` | All tasks as cards in columns by state; drag a card to change its state. | Sidebar |
-| Pomodoro timer | `pomodoro_timer` | Work/break timer that logs each finished session as a note. | Sidebar |
-| Attachment dashboard | `attachment_dashboard` | Searchable, filterable list of every uploaded file. | Sidebar |
-| Zen | `zen` | Distraction-free full-screen Markdown editor for one note. | Note menu |
-| Math notepad | `math_notepad` | Calculation pad: write expressions and variables line by line and see results; saved into the note. | Note menu |
-| Excalidraw | `excalidraw_editor` | Whiteboard drawing saved to the note as an image attachment. **Needs an internet connection**: Excalidraw itself is loaded from a CDN. | Note menu |
-| RSS handler | `rss_handler` | Command-line script that appends new feed items as notes. | `php extensions/rss_handler/rss_handler.php` |
-| Mail handler | `mail_handler` | Command-line script that turns an e-mail piped to it into a note. Experimental. | `php extensions/mail_handler/mail_handler.php < mail.eml` |
-
-### Pomodoro timer
-
-Settings are in `extensions/pomodoro_timer/config.json`:
-
-| Key | Meaning |
-|---|---|
-| `workDurationMinutes`, `shortBreakDurationMinutes`, `longBreakDurationMinutes` | Lengths of the three session types. |
-| `pomodorosBeforeLongBreak` | Work sessions before a long break. |
-| `pageTemplate` | Page that receives the session log. `<today>` is replaced with the date, so `<today>/Pomodoro` logs to a child page of the day's journal. |
-| `noteTemplate` | Text of the logged note. Placeholders: `{noteTitle}`, `{date}`, `{duration}`, `{pomodoroType}`, `{customProperties}`. |
-
-Text typed in the field below the timer as `key:value, key2:value2` is added to the logged note as properties.
-
-### RSS handler
-
-Configure feeds in `extensions/rss_handler/config.json`, then run the script from a scheduler (cron, Task Scheduler):
-
-```json
-{
-  "api_url": "http://localhost:8000/api",
-  "default_page_name_for_rss": "Inbox/rss",
-  "feeds": [
-    "https://example.com/feed.xml",
-    { "url": "https://example.org/feed", "page_name": "<today>/rss" }
-  ]
-}
-```
-
-Each new item is appended to its page as a note. Items already imported are recognised and skipped.
-
-### Zen and math notepad themes
-
-Both use the bundled CodeMirror editor. `defaultLightTheme` and `defaultDarkTheme` in each extension's `config.json` name a theme from `extensions/zen/codemirror/themes/`.
-
-## Writing an extension
-
-An extension is a folder in `extensions/` with:
-
-- `config.json` containing at least `{"featherIcon": "<icon name>"}` (an icon from [Feather](https://feathericons.com/)); add your own settings next to it,
-- `index.php`, the page that opens when the sidebar icon is clicked.
-
-Inside, use the HTTP API. The usual calls:
-
-| Need | Call |
-|---|---|
-| Add notes to a page | `POST api/v1/append_to_page.php` |
-| Read a note / a page's notes | `GET api/v1/notes.php?id=...` / `?page_id=...` |
-| Change a note | `POST api/v1/ops.php` with an `edit` operation |
-| Find notes | `GET api/v1/search.php?q=...`, `?tasks=TODO`, or `POST api/v1/query_notes.php` |
-
-To match the look of the app, load the theme and stylesheet and the bundled libraries with relative paths, so the extension also works offline and when notd is served from a sub-folder:
+To change it, put your own list in `config.local.php` (next to `config.php`; see `config.local.example.php`). For example, to also have the Zen writer and the math notepad:
 
 ```php
-<?php $assetBase = '../../'; require '../../assets/css/theme_loader.php'; ?>
-<link rel="stylesheet" href="../../assets/css/main.css">
-<script src="../../assets/libs/alpine.min.js" defer></script>
+<?php
+define('ACTIVE_EXTENSIONS', ['attachment_dashboard', 'pomodoro_timer', 'kanban_board', 'zen', 'math_notepad']);
 ```
 
-The kanban board (`extensions/kanban_board/kanban.php`) is a good example to copy from.
+Reload notd after changing it. Extensions with a page of their own (`index.php`) get a sidebar icon; the Zen writer, math notepad and Excalidraw also appear in the note menu. The note editors are not offered on encrypted pages, because they would see the note's text unencrypted.
+
+The RSS and mail handlers are scripts you run yourself, so they work whether or not they are in the list.
+
+Each extension keeps its settings in `config.json` in its own folder. Those files are part of notd and are replaced when you update it, so keep a copy of any you change.
+
+## Writing your own
+
+An extension is a folder with a `config.json` and a page; see [Writing an extension]({{< relref "writing-extensions.md" >}}).

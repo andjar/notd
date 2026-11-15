@@ -2,6 +2,7 @@
 title: "Installation"
 weight: 20
 aliases: ["/docs/overview/troubleshooting/"]
+description: "Install and run notd, configure it, upgrade it, and move notes in and out (including from Logseq)."
 ---
 
 ## Requirements
@@ -108,11 +109,11 @@ It reads `logseq/config.edn` for the journal and file name formats and converts 
 | `journals/2023_11_14.md`, `[[Nov 14th, 2023]]` | the journal page `2023-11-14`, `[[2023-11-14]]` |
 | `pages/A___B.md`, `title::` | the page `A/B`; a `title::` property names the page |
 | `key:: value` (page or block) | `{key::value}` |
-| `id::` on a block, `((id))`, `{{embed ((id))}}` | the note keeps the id; references become `!{{id}}` |
+| `id::` on a block, `((id))`, `{{embed ((id))}}` | the note keeps the id; `((id))` stays an [inline reference]({{< relref "../frontend-guide/core-features.md#block-references" >}}), the embed becomes `!{{id}}` |
 | `LATER` `NOW` `WAIT` `CANCELED`, `[#A]` | `TODO` `DOING` `WAITING` `CANCELLED`, `{priority::A}` |
 | `SCHEDULED:` / `DEADLINE: <2023-11-14 Tue>` | `{scheduled::2023-11-14}` / `{deadline::...}` |
-| `#tag`, `#[[a tag]]` | `[[tag]]`, `[[a tag]]` (in Logseq a tag is a link) |
-| `[[alias]]` | `[[Page]]`, when the alias has no page of its own |
+| `#tag`, `#[[a tag]]` | `{tag::tag}`, `{tag::a tag}`: a [tag]({{< relref "../frontend-guide/core-features.md#tags" >}}), which links to its page (`--tags-as-links` makes `[[tag]]` instead) |
+| `alias:: A, B` | `{alias::A, B}`: `[[A]]` opens the page |
 | `collapsed:: true`, `heading:: 2`, `#+BEGIN_QUOTE` | collapsed note, `## `, a Markdown quote |
 | `![x](../assets/a.png)`, `[x](../assets/a.pdf)`, `[[draws/x.excalidraw]]` | the file is copied to `uploads/`, attached to the note, and the link points at the copy |
 | `:favorites` in `config.edn` | `{favorite::true}` on those pages |

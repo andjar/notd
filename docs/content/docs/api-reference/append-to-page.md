@@ -1,6 +1,7 @@
 ---
 title: "Append to Page"
 weight: 60
+description: "The simplest way for a script to add notes to a page."
 ---
 
 The simplest way for a script to add notes: no ids, no ordering.

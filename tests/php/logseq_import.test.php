@@ -87,17 +87,17 @@ check(!isset($p['ignored']) && !isset($p['orgpage']), 'logseq/bak and .org files
 check(($p['Project Alpha'] ?? '') === "{alias::Alpha, PA}\n{tags::project, [[Big Topic]]}\n{favorite::true}", 'page properties without title::, favorite from config.edn');
 check(($p['Ola Nordmann'] ?? '') === "{type::person}\n{role::tester}", 'a first block of only properties holds the page properties');
 check(in_array('TODO Write the report {priority::A} {scheduled::2023-11-14 09:00}', $n, true), 'LATER, priority, SCHEDULED; logbook dropped');
-check(in_array('DOING Reviewing [[Project Alpha]] with [[design]] and [[Big Topic]] {deadline::2023-11-20}', $n, true), 'NOW, #tag, #[[tag]], DEADLINE');
+check(in_array('DOING Reviewing [[Project Alpha]] with {tag::design} and {tag::Big Topic} {deadline::2023-11-20}', $n, true), 'NOW, #tag and #[[tag]] as tags, DEADLINE');
 check(in_array('CANCELLED Old idea', $n, true) && in_array('WAITING On hold', $n, true), 'CANCELED and WAIT');
 check(in_array('Link to yesterday [[2023-11-13]] and a page with brackets [[Weird (x) name]]', $n, true), 'journal title links and renamed pages');
-check(in_array('Yesterday entry referencing !{{6553a1b2-0000-4000-8000-000000000001}}', $n, true), '((block ref)) becomes an embed');
+check(in_array('Yesterday entry referencing ((6553a1b2-0000-4000-8000-000000000001))', $n, true), '((block ref)) stays an inline reference');
 check(in_array('!{{6553a1b2-0000-4000-8000-000000000001}}', $n, true), '{{embed ((id))}}');
 check(($r['ids']['6553a1b2-0000-4000-8000-000000000001'] ?? '') === 'TODO Write the report {priority::A} {scheduled::2023-11-14 09:00}', 'Logseq id:: becomes the note id');
 check(in_array('ref to unknown ((6553a1b2-0000-4000-8000-00000000dead))', $n, true), 'unknown refs stay as text');
 check(in_array("Code sample:\n```python\n- this is not a bullet\n# neither is this #notatag\n```\nafter the fence", $n, true), 'code blocks are kept exactly, dashes inside are not bullets');
 check(in_array('> Quoted text', $n, true), '#+BEGIN_QUOTE');
 check(in_array('## Overview with heading', $n, true), 'heading:: 2');
-check(in_array('links to [[Project Alpha]] alias', $n, true), 'alias links go to the page');
+check(in_array('links to [[PA]] alias', $n, true), 'alias links are kept (notd resolves aliases)');
 check(in_array('URL with hash https://example.com/page#section and colour #fff', $n, true), 'URL fragments and colours are not tags');
 check(in_array('Body line with key-looking text: not:: a property {status::active} {owner::[[Ola Nordmann]]}', $n, true), 'block properties, mid-line :: is text');
 check(!in_array('', $n, true), 'empty placeholder blocks are skipped');
@@ -117,6 +117,11 @@ check(in_array("Screenshot ![image.png]($img)", $n, true), 'image link points at
 check(in_array("Same image again ![again]($img)", $n, true), 'a second link to the same file reuses the copy');
 check(in_array('Not allowed type ![logo](../assets/logo.svg) and missing ![x](../assets/nope.png)', $n, true), 'links to skipped files are left alone');
 check(count(array_filter($r['report']['warnings'] ?? [], fn($w) => strpos($w, 'used twice') !== false)) === 1, 'duplicate block ids are reported');
+
+echo "options\n";
+$r = scenario('options');
+check(in_array('DOING Reviewing [[Project Alpha]] with [[design]] and [[Big Topic]] {deadline::2023-11-20}', $r['notes'] ?? [], true), 'tags => link makes #tags links');
+check(in_array('links to [[Project Alpha]] alias', $r['notes'] ?? [], true), 'resolve_aliases rewrites alias links');
 
 echo "re-run (merge)\n";
 $r = scenario('rerun');

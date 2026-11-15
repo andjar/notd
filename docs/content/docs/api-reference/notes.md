@@ -1,6 +1,7 @@
 ---
 title: "Notes (read)"
 weight: 40
+description: "Read notes, by id or by page."
 ---
 
 `notes.php` is **read-only**. Every change to notes goes through [`ops.php`]({{< relref "ops.md" >}}).
