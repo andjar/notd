@@ -45,6 +45,7 @@ jobs:
         run: |
           php tests/php/logseq_import.test.php
           php tests/php/migration_v5.test.php
+          php tests/php/mail_handler.test.php
 
       - name: Start server on a throw-away database
         run: |

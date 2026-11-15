@@ -28,7 +28,7 @@ These come with notd but are off until you turn them on.
 | [Math notepad]({{< relref "math-notepad.md" >}}) | Calculations line by line, with variables; results beside each line. | Note menu |
 | [Excalidraw]({{< relref "excalidraw.md" >}}) | Hand-drawn diagrams, saved to a note as attachments. Needs an internet connection. | Note menu, sidebar |
 | [RSS handler]({{< relref "rss-handler.md" >}}) | A script that adds new feed items as notes. | Command line, scheduler |
-| [Mail handler]({{< relref "mail-handler.md" >}}) | A script that turns an e-mail into a note on today's journal page. | Command line, mail server |
+| [Mail handler]({{< relref "mail-handler.md" >}}) | A script that turns an e-mail, with its attachments, into a note on today's journal page. | Command line, mail server |
 
 The note editors appear in the menu you get by right-clicking a note's bullet, once they are turned on:
 
