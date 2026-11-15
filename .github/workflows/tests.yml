@@ -41,6 +41,9 @@ jobs:
           node tests/js/model.test.mjs
           node tests/js/ordering_parity.mjs
 
+      - name: Logseq import tests
+        run: php tests/php/logseq_import.test.php
+
       - name: Start server on a throw-away database
         run: |
           NOTD_DB_PATH="$RUNNER_TEMP/notd-test.sqlite" PHP_CLI_SERVER_WORKERS=4 \

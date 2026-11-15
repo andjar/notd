@@ -1,0 +1,2 @@
+# Test data: keep every byte as it is (BOM, CRLF line endings).
+* -text

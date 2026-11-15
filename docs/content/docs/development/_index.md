@@ -31,6 +31,7 @@ api/
   Ordering.php           fractional sort keys and id generation
   DataManager.php        read queries
   Markdown.php           Markdown export and import (Logseq layout)
+  LogseqImport.php       Logseq graph import (tools/import_logseq.php)
   Templates.php          template files and placeholders
   PropertyTriggerService.php, WebhooksManager.php   reactions to property changes
   db_connect.php         connection, first-run setup, migrations, notd_write() transactions

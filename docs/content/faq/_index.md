@@ -26,7 +26,7 @@ Copy the folder, or copy `db/database.sqlite`, `uploads/` and `config.local.php`
 Yes, in three ways: `php tools/export.php <folder>` writes every page as a Markdown file (Logseq's layout, attachments included); the ⚙ next to a page title has **Export** for a single page; and the database is ordinary SQLite with a documented schema (`db/schema.sql`). The [API]({{< relref "../docs/api-reference/_index.md" >}}) returns everything as JSON too.
 
 ## Can I bring my notes from Logseq?
-Yes: `php tools/import.php ~/logseq/pages ~/logseq/journals`. Pages, journals, nesting and `key:: value` properties come across. Logseq-only features (block references by UUID, `#tags`, queries in Logseq's syntax) are kept as text.
+Yes: `php tools/import_logseq.php ~/logseq-graph` imports a Logseq graph (its Markdown files) with journals, pages, properties, tasks, block references and attachments. Run it with `--dry-run` first to see what it will do, and run it again whenever you like: it only adds what is new. Queries in Logseq's syntax are kept as text. See [Importing a Logseq graph]({{< relref "../docs/overview/quick-start.md#importing-a-logseq-graph" >}}).
 
 ## How is notd different from Logseq?
 notd keeps the outliner, the daily journal, links, backlinks, tasks and properties, and leaves out the rest. In exchange it has no build step, no desktop runtime and no sync service: it is PHP and SQLite, runs on any web host or a laptop, opens large pages quickly, and its whole code base can be read in an afternoon.

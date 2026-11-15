@@ -90,7 +90,40 @@ php tools/export.php ~/notd-export        # journals/, pages/ and assets/
 php tools/import.php ~/logseq/pages       # a folder of .md files, or single files
 ```
 
-Export writes one file per page: journal pages go to `journals/2026_11_10.md`, other pages to `pages/Name.md` (a `/` in a name becomes `___`), attachments are copied to `assets/`. Import reads the same layout, including folders written by Logseq, and appends to pages that already exist. A single page can also be downloaded from the gear menu (**Export**) or from `api/v1/export.php?page=Name`.
+Export writes one file per page: journal pages go to `journals/2026_11_10.md`, other pages to `pages/Name.md` (a `/` in a name becomes `___`), attachments are copied to `assets/`. Import reads the same layout and appends to pages that already exist. A single page can also be downloaded from the gear menu (**Export**) or from `api/v1/export.php?page=Name`.
+
+### Importing a Logseq graph
+
+For a Logseq graph (Logseq's Markdown files, not its newer database version) use the Logseq importer and point it at the graph folder, the one with `journals/`, `pages/`, `assets/` and `logseq/`:
+
+```bash
+php tools/import_logseq.php --dry-run ~/logseq-graph   # see what would happen; changes nothing
+php tools/import_logseq.php ~/logseq-graph
+```
+
+It reads `logseq/config.edn` for the journal and file name formats and converts what notd has an equivalent for:
+
+| Logseq | notd |
+|---|---|
+| `journals/2023_11_14.md`, `[[Nov 14th, 2023]]` | the journal page `2023-11-14`, `[[2023-11-14]]` |
+| `pages/A___B.md`, `title::` | the page `A/B`; a `title::` property names the page |
+| `key:: value` (page or block) | `{key::value}` |
+| `id::` on a block, `((id))`, `{{embed ((id))}}` | the note keeps the id; references become `!{{id}}` |
+| `LATER` `NOW` `WAIT` `CANCELED`, `[#A]` | `TODO` `DOING` `WAITING` `CANCELLED`, `{priority::A}` |
+| `SCHEDULED:` / `DEADLINE: <2023-11-14 Tue>` | `{scheduled::2023-11-14}` / `{deadline::...}` |
+| `#tag`, `#[[a tag]]` | `[[tag]]`, `[[a tag]]` (in Logseq a tag is a link) |
+| `[[alias]]` | `[[Page]]`, when the alias has no page of its own |
+| `collapsed:: true`, `heading:: 2`, `#+BEGIN_QUOTE` | collapsed note, `## `, a Markdown quote |
+| `![x](../assets/a.png)`, `[x](../assets/a.pdf)`, `[[draws/x.excalidraw]]` | the file is copied to `uploads/`, attached to the note, and the link points at the copy |
+| `:favorites` in `config.edn` | `{favorite::true}` on those pages |
+
+Logbooks (`:LOGBOOK:`) are dropped. Queries (`{{query ...}}`), page embeds and other Logseq-only syntax are kept as text. Org-mode files and whiteboards are not imported, and attachments only of the types notd accepts (no `.svg`, for instance) and up to 10 MB (`--max-file-size=MB` to change).
+
+Running the import again is safe: notes that are already there are skipped and only new ones are added, and files already stored are not copied again. With `--replace` each imported page is made an exact copy of its file instead (notes added to it in notd are removed). Each page is imported completely or not at all; a page that fails is reported and the others go in. `--strict` rolls the whole import back if any page fails, and `--help` lists the other options. To try it out first, point `NOTD_DB_PATH` at a scratch database:
+
+```bash
+NOTD_DB_PATH=/tmp/try.sqlite php tools/import_logseq.php ~/logseq-graph
+```
 
 ## Troubleshooting
 
