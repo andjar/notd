@@ -391,6 +391,10 @@ function renderBacklinks($backlinks) {
             <button id="add-root-note-btn" class="action-button round-button" title="Add new note to page">
                 <i data-feather="plus"></i>
             </button>
+            <section id="agenda" class="agenda" hidden aria-labelledby="agenda-title">
+                <h2 id="agenda-title" class="agenda-title">Scheduled and due</h2>
+                <ul class="agenda-list"></ul>
+            </section>
         </div>
 
         <!-- Right Sidebar -->

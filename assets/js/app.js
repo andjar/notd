@@ -19,6 +19,7 @@ import { loadCurrentPage } from './app/page-loader.js';
 import { initPageActions, pageLoaded } from './app/page-actions.js';
 import { initSearch } from './app/search.js';
 import { initBacklinks } from './app/backlinks.js';
+import { initAgenda, loadAgenda } from './app/agenda.js';
 import { initShortcuts } from './app/shortcuts.js';
 import { addRootNote } from './app/note-actions.js';
 import { initNoteEvents } from './ui/note-events.js';
@@ -45,10 +46,11 @@ function start() {
     initPageActions();
     initSearch();
     initBacklinks();
+    initAgenda();
     initShortcuts();
     document.getElementById('add-root-note-btn')?.addEventListener('click', addRootNote);
     document.getElementById('mobile-add-root-note-btn')?.addEventListener('click', addRootNote);
-    loadCurrentPage().then(pageLoaded);
+    loadCurrentPage().then(() => { pageLoaded(); loadAgenda(); });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
