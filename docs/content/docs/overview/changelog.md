@@ -1,6 +1,7 @@
 ---
 title: "Changelog"
 weight: 70
+description: "What changed in each version."
 ---
 
 ### November 2026: version 3.1, schema v4
@@ -19,6 +20,23 @@ Pages
 - Print (or save as PDF) shows just the outline, collapsed notes included.
 - Markdown export of a page, and `tools/export.php` / `tools/import.php` for whole notebooks in the Logseq layout.
 - `tools/import_logseq.php` imports a Logseq graph: journals, pages, properties, tasks, block references and attachments. Safe to run again; `--dry-run` and `--replace`.
+- An Espanso configuration (`tools/espanso/`) sends copied text to today's journal page.
+
+Extensions
+- The RSS handler imports items again: its duplicate check used columns that do not exist, so every item was skipped. Items are now stored with `{key::value}` properties, and `config.json` is read from the script's folder wherever it is run from.
+- The mail handler writes `{key::value}` properties (it wrote Logseq's `key:: value`) and reads notd's address from `api_url` in its `config.json` or its first argument.
+- The Pomodoro timer reads `pageTemplate`, `noteTemplate` and `cycle` from its `config.json` (they were ignored, so sessions went to the journal page and there were no long breaks), and its work session is 25 minutes again (the shipped setting was 2).
+- The kanban board's **Back to Main App** works when notd is served from a sub-folder.
+
+- Kanban cards show the note's text without `{property}` syntax, its properties as labels, and a link to the note.
+- The attachment dashboard shows the note each file belongs to, lists files whose note was deleted (**Only files without a note**), and deletes files.
+
+Attachments
+- A file the note's text already shows (an image placed in the text, a link to a file) is no longer listed again below the note. Pasted images were shown twice.
+
+Documentation
+- A page for each extension, with screenshots; how to turn extensions on, and which ones appear in the note menu.
+- Section pages (Development, Overview and others) show their text, which the theme used to hide.
 - Page locks use a salted verifier; pages locked with the older SHA-256 hash still unlock.
 
 Performance

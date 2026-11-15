@@ -1,6 +1,7 @@
 ---
 title: "Attachments"
 weight: 30
+description: "Upload, list and delete files attached to notes."
 ---
 
 Files attached to notes. Files are stored under `UPLOADS_DIR` in `year/month/` folders with a random prefix; the `url` field of each attachment is where the browser can fetch it.
@@ -55,6 +56,7 @@ Uploads are checked against a list of allowed types by extension: jpg, jpeg, png
 ### `GET /api/v1/attachments.php`
 *   **Description**: Retrieves a list of attachments, either for a specific note or for all notes with pagination and filtering.
 *   **Example (By Note ID)**: `GET /api/v1/attachments.php?note_id=42`
+*   **All attachments**: `GET /api/v1/attachments.php?page=1&per_page=10`. Parameters: `sort_by` (`name`, `size`, `type`, `created_at`, `page_name`), `sort_order` (`asc`, `desc`), `filter_by_name`, `filter_by_type`, and `without_note=1` for files whose note was deleted. The answer is `{"data": [...], "pagination": {...}}`; each file also has `note_id`, `page_id` and `page_name` (all `null` when its note is gone).
 *   **Response (200 OK)**:
     ```json
     {

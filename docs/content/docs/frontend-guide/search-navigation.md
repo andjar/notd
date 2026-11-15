@@ -1,6 +1,7 @@
 ---
 title: "Search & Navigation"
 weight: 40
+description: "Find notes and pages, and get around quickly."
 ---
 
 ## Search

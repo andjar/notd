@@ -78,42 +78,54 @@ class Attachments
     }
 
     /**
-     * All attachments, filtered, sorted and paged.
+     * All attachments, filtered, sorted and paged. Each carries the page of
+     * its note (`page_id`, `page_name`), or nulls when the note is gone.
      *
-     * @param array $q sort_by, sort_order, page, per_page, filter_by_name, filter_by_type
+     * @param array $q sort_by, sort_order, page, per_page, filter_by_name, filter_by_type,
+     *                 without_note (1: only files whose note was deleted)
      * @return array{data: array, pagination: array}
      */
     public function all(array $q): array
     {
-        $sortBy = in_array($q['sort_by'] ?? '', ['id', 'name', 'path', 'type', 'size', 'created_at'], true) ? $q['sort_by'] : 'created_at';
+        $sortBy = in_array($q['sort_by'] ?? '', ['id', 'name', 'path', 'type', 'size', 'created_at', 'page_name'], true) ? $q['sort_by'] : 'created_at';
+        $sortColumn = $sortBy === 'page_name' ? 'P.name COLLATE NOCASE' : 'A.' . $sortBy;
         $sortOrder = strtolower((string)($q['sort_order'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
         $page = max(1, (int)($q['page'] ?? 1));
         $perPage = max(1, min(100, (int)($q['per_page'] ?? 10)));
 
-        $where = ['active = 1'];
+        $where = ['A.active = 1'];
         $params = [];
         if (!empty($q['filter_by_name'])) {
-            $where[] = "name LIKE ? ESCAPE '\\'";
+            $where[] = "A.name LIKE ? ESCAPE '\\'";
             $params[] = '%' . PageStore::likeEscape((string)$q['filter_by_name']) . '%';
         }
         if (!empty($q['filter_by_type'])) {
-            $where[] = 'type = ?';
+            $where[] = 'A.type = ?';
             $params[] = (string)$q['filter_by_type'];
         }
+        if (!empty($q['without_note'])) {
+            $where[] = 'N.id IS NULL';
+        }
         $where = implode(' AND ', $where);
+        $from = 'Attachments A LEFT JOIN Notes N ON N.id = A.note_id LEFT JOIN Pages P ON P.id = N.page_id';
 
-        $count = $this->pdo->prepare("SELECT COUNT(*) FROM Attachments WHERE $where");
+        $count = $this->pdo->prepare("SELECT COUNT(*) FROM $from WHERE $where");
         $count->execute($params);
         $total = (int)$count->fetchColumn();
 
         $stmt = $this->pdo->prepare(
-            "SELECT id, note_id, name, path, type, size, created_at FROM Attachments WHERE $where
-             ORDER BY $sortBy $sortOrder, id $sortOrder LIMIT $perPage OFFSET " . (($page - 1) * $perPage)
+            "SELECT A.id, N.id AS note_id, A.name, A.path, A.type, A.size, A.created_at, P.id AS page_id, P.name AS page_name
+               FROM $from WHERE $where
+              ORDER BY $sortColumn $sortOrder, A.id $sortOrder LIMIT $perPage OFFSET " . (($page - 1) * $perPage)
         );
         $stmt->execute($params);
 
         return [
-            'data' => array_map([self::class, 'shape'], $stmt->fetchAll(PDO::FETCH_ASSOC)),
+            'data' => array_map(static function (array $row): array {
+                $row = self::shape($row);
+                $row['page_id'] = $row['page_id'] === null ? null : (int)$row['page_id'];
+                return $row;
+            }, $stmt->fetchAll(PDO::FETCH_ASSOC)),
             'pagination' => [
                 'total_items' => $total,
                 'per_page' => $perPage,

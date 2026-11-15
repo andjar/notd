@@ -291,6 +291,14 @@
                         this.config.shortBreakDurationMinutes = fetchedConfig.shortBreakDurationMinutes || 5;
                         this.config.longBreakDurationMinutes = fetchedConfig.longBreakDurationMinutes || 15;
                         this.config.pomodorosBeforeLongBreak = fetchedConfig.pomodorosBeforeLongBreak || 4;
+                        if (typeof fetchedConfig.pageTemplate === 'string') this.config.pageTemplate = fetchedConfig.pageTemplate;
+                        if (typeof fetchedConfig.noteTemplate === 'string') this.config.noteTemplate = fetchedConfig.noteTemplate;
+                        // config.json writes session types as work / short_break / long_break.
+                        const sessionTypes = { work: 'work', short_break: 'shortBreak', shortBreak: 'shortBreak', long_break: 'longBreak', longBreak: 'longBreak' };
+                        if (Array.isArray(fetchedConfig.cycle)) {
+                            const cycle = fetchedConfig.cycle.map(t => sessionTypes[t]).filter(Boolean);
+                            if (cycle.length) this.config.cycle = cycle;
+                        }
 
                         this.config.workDurationSeconds = this.config.workDurationMinutes * 60;
                         this.config.shortBreakDurationSeconds = this.config.shortBreakDurationMinutes * 60;

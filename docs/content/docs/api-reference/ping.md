@@ -1,6 +1,7 @@
 ---
 title: "Ping"
 weight: 10
+description: "Check that notd is running."
 ---
 
 A simple utility endpoint to check if the API is running.

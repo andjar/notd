@@ -1,6 +1,7 @@
 ---
 title: "Operations (write)"
 weight: 35
+description: "The one way to create, edit, move and delete notes."
 ---
 
 `POST /api/v1/ops.php` is the only way to create, change, move or delete notes. The notd frontend uses exactly this endpoint, so anything the UI can do to the outline, a script can do too.

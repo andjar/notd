@@ -1,6 +1,7 @@
 ---
 title: "Writing Notes"
 weight: 10
+description: "Markdown, links, properties, queries, transclusion, attachments, templates and encryption."
 ---
 
 ## Markdown
@@ -80,7 +81,9 @@ Right-click the bullet of the note you want to embed and choose **Copy embed cod
 
 Drag a file onto a note, paste an image into it, or right-click its bullet and choose **Upload attachment**. A pasted image is also inserted into the text, so it shows inline. The limit is 10 MB per file.
 
-Allowed types: images (jpg, png, gif, webp), pdf, text (txt, md, csv, json), office documents (docx, xlsx, pptx, odt, ods, odp), zip, audio (mp3, m4a, ogg, wav) and video (mp4, webm). Other types, such as HTML or SVG, are refused because a browser could run code in them. The Attachment Dashboard extension lists all files.
+A note's files are listed below its text, except the ones the text already shows: an image in the text (`![photo](uploads/...)`) or a link to a file is not listed a second time. Remove it from the text and it is listed again.
+
+Allowed types: images (jpg, png, gif, webp), pdf, text (txt, md, csv, json), office documents (docx, xlsx, pptx, odt, ods, odp), zip, audio (mp3, m4a, ogg, wav) and video (mp4, webm). Other types, such as HTML or SVG, are refused because a browser could run code in them. The [attachment dashboard]({{< relref "../extensions/attachment-dashboard.md" >}}) lists all files, with the note each belongs to.
 
 ## Templates
 
