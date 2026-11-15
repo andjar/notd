@@ -108,6 +108,9 @@ export const searchAPI = {
     /** One page of the notes that are tasks in `status` (TODO, DONE, ... or ALL). */
     tasks: (status, { parentProperties = false, page = 1, perPage = 100 } = {}) =>
         get('search.php' + query({ tasks: status, include_parent_properties: parentProperties, page, per_page: perPage })),
+    /** Notes scheduled or due on `day` (YYYY-MM-DD); with `overdue`, also open tasks dated earlier. */
+    agenda: (day, { overdue = false, perPage = 100 } = {}) =>
+        get('search.php' + query({ agenda: day, overdue: overdue ? 1 : undefined, per_page: perPage })),
     /** All of them, however many pages that takes. */
     async allTasks(status, { parentProperties = false } = {}) {
         const all = [];

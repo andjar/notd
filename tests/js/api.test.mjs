@@ -190,6 +190,42 @@ await test('search: tasks are found by their current state only', async () => {
   eq((await raw('search.php?tasks=BOGUS')).status, 400, 'unknown state');
 });
 
+await test('search: agenda lists what is scheduled or due, overdue open tasks, not finished ones', async () => {
+  // A day far away from what other tests write.
+  const y = 2100 + Math.floor(Math.random() * 800);
+  const day = `${y}-06-15`, before = `${y}-06-13`, earlier = `${y}-06-12`, after = `${y}-06-16`;
+  const tag = uniq('agenda');
+  const notes = (await append(uniq('Agenda'), [
+    `TODO on the day ${tag} {scheduled::${day}}`,
+    `TODO with a time ${tag} {scheduled::${day} 09:30}`,
+    `DOING late ${tag} {deadline::${before}}`,
+    `DONE finished ${tag} {scheduled::${before}}`,
+    `CANCELLED dropped ${tag} {deadline::${day}}`,
+    `Meeting notes ${tag} {scheduled::${day}}`,
+    `Old meeting ${tag} {scheduled::${earlier}}`,
+    `TODO tomorrow ${tag} {scheduled::${after}}`,
+  ])).appended_notes;
+  const ids = Object.fromEntries(notes.map(n => [n.content.split(` ${tag}`)[0], n.id]));
+  const names = (results) => results.filter(r => r.content.includes(tag)).map(r => r.content.split(` ${tag}`)[0]);
+
+  const onDay = (await get(`search.php?agenda=${day}`)).data.results;
+  eq(names(onDay).sort(), ['Meeting notes', 'TODO on the day', 'TODO with a time'], 'that day only, finished tasks left out');
+  const timed = onDay.find(r => r.note_id === ids['TODO with a time']);
+  eq([timed.scheduled, timed.deadline, timed.status, timed.overdue], [`${day} 09:30`, null, 'TODO', false], 'item fields');
+
+  const withOverdue = (await get(`search.php?agenda=${day}&overdue=1`)).data.results;
+  eq(names(withOverdue)[0], 'DOING late', 'overdue tasks come first');
+  eq(names(withOverdue).sort(), ['DOING late', 'Meeting notes', 'TODO on the day', 'TODO with a time'], 'open tasks from earlier days, not notes from earlier days');
+  ok(withOverdue.find(r => r.note_id === ids['DOING late']).overdue, 'marked overdue');
+
+  await edit(ids['DOING late'], `DONE late ${tag} {deadline::${before}}`);
+  ok(!names((await get(`search.php?agenda=${day}&overdue=1`)).data.results).includes('DOING late'), 'gone once done');
+
+  for (const bad of ['tomorrow', `${y}-02-30`, '']) {
+    eq((await raw(`search.php?agenda=${encodeURIComponent(bad)}`)).status, 400, `rejects ${JSON.stringify(bad)}`);
+  }
+});
+
 await test('properties: unchanged content writes nothing; done_at is kept; logs do not grow', async () => {
   const data = await append(uniq('Idx'), ['TODO task {priority::high}']);
   const id = data.appended_notes[0].id;

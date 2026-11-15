@@ -59,6 +59,7 @@ Right-click a bullet for actions on that note:
 | `/` | Insert a template |
 | `[[` | Suggest pages to link |
 | `:t` `:k` `:d` `:r` + space | Insert `{tag::}`, `{keyword::}`, today's date, the current time |
+| `:s` `:u` + space | Insert `{scheduled::}` or `{deadline::}` with today's date |
 
 ## Themes
 

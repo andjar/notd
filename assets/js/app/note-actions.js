@@ -114,6 +114,8 @@ function expandShortcut(event, content) {
     if (code === ':t') { insert = '{tag::}'; back = 1; }
     else if (code === ':k') { insert = '{keyword::}'; back = 1; }
     else if (code === ':d') insert = `{date::${localDate()}}`;
+    else if (code === ':s') insert = `{scheduled::${localDate()}}`;
+    else if (code === ':u') insert = `{deadline::${localDate()}}`;
     else if (code === ':r') insert = `{timestamp::${new Date().toISOString()}}`;
     else return false;
     event.preventDefault();
