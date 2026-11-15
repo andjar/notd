@@ -161,3 +161,38 @@ body.kanban-page-body {
 
 /* Ensure app-container on kanban.php takes full height if not already default */
 /* html, body { height: 100%; margin: 0; } /* Might be too global, check style.css */
+
+/* Card contents: plain text, properties as labels, the page it lives on. */
+.kanban-card-title {
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.kanban-card-props {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+.kanban-card-prop {
+    font-size: 0.75em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--ls-secondary-background-color, #f1f3f5);
+    border: 1px solid var(--ls-border-color, #e1e4e8);
+    color: var(--ls-secondary-text-color, #555);
+}
+.kanban-card-prop-key {
+    color: var(--ls-link-text-color, #2a5db0);
+    margin-right: 0.35em;
+}
+.kanban-card-source {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.75em;
+    color: var(--ls-secondary-text-color, #6c757d);
+    text-decoration: none;
+}
+.kanban-card-source:hover {
+    text-decoration: underline;
+    color: var(--ls-link-text-color, #2a5db0);
+}

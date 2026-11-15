@@ -278,6 +278,26 @@ await test('attachments: upload, list, fetch, delete; only safe file types', asy
   eq((await raw('attachments.php?file=' + encodeURIComponent('../config.php'))).status, 404, 'no path traversal');
 });
 
+await test('attachments: the list names each file\'s page; files of deleted notes can be found', async () => {
+  const pageName = uniq('Files of');
+  const [keep, gone] = (await append(pageName, ['keeps its file', 'loses its note'])).appended_notes;
+  const name = uniq('doc') + '.txt';
+  const a = (await upload(keep.id, name, 'kept', 'text/plain')).json.data.attachments[0];
+  const b = (await upload(gone.id, name, 'orphaned', 'text/plain')).json.data.attachments[0];
+  const listed = async (q) => (await get(`attachments.php?per_page=100&filter_by_name=${encodeURIComponent(name)}${q}`)).data.data;
+  const both = await listed('');
+  eq(both.map(x => [x.id, x.page_name, x.note_id]).sort(), [[a.id, pageName, keep.id], [b.id, pageName, gone.id]].sort(), 'page and note of each file');
+  eq((await listed('&without_note=1')).length, 0, 'none without a note yet');
+
+  await raw('ops.php', { ops: [{ op_id: uniq('op'), type: 'delete', id: gone.id }] });
+  const orphans = await listed('&without_note=1');
+  eq(orphans.map(x => [x.id, x.page_name, x.note_id]), [[b.id, null, null]], 'the file of the deleted note is kept, without a note');
+  eq((await fetch(new URL(b.url, ROOT))).status, 200, 'and still on disk');
+  eq((await listed('&sort_by=page_name&sort_order=asc')).length, 2, 'sorting by page works');
+  eq((await raw('attachments.php', { action: 'delete', attachment_id: b.id })).status, 200, 'it can be deleted');
+  eq((await listed('&without_note=1')).length, 0, 'gone');
+});
+
 // --------------------------------------------------------------- templates
 
 await test('templates: plain text, never executed; names cannot escape the folder', async () => {

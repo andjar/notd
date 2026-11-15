@@ -10,7 +10,10 @@
 </head>
 <body>
     <div class="container" x-data="attachmentsDashboard()">
-        <h1>Attachments Dashboard</h1>
+        <div class="dashboard-header">
+            <h1>Attachments Dashboard</h1>
+            <a href="../../" class="back-link">Back to notd</a>
+        </div>
 
         <div class="controls">
             <input type="text" id="search-bar" placeholder="Search by name..." x-model.debounce.300ms="searchTerm" @input="fetchAttachments(true)">
@@ -20,6 +23,13 @@
                     <option :value="type" x-text="type"></option>
                 </template>
             </select>
+            <label class="orphans-filter" title="Files whose note was deleted. They stay until you delete them here.">
+                <input type="checkbox" x-model="withoutNote" @change="fetchAttachments(true)"> Only files without a note
+            </label>
+        </div>
+        <div class="orphans-actions" x-show="withoutNote && !isLoading && totalItems > 0">
+            <span x-text="`${totalItems} file${totalItems === 1 ? '' : 's'} no longer belong to a note.`"></span>
+            <button type="button" class="danger" @click="deleteAllWithoutNote()">Delete them all</button>
         </div>
 
         <div x-show="isLoading" class="loading-indicator">Loading attachments...</div>
@@ -32,7 +42,9 @@
                     <th @click="updateSort('size')" :class="{ 'sort-asc': sortBy === 'size' && sortOrder === 'asc', 'sort-desc': sortBy === 'size' && sortOrder === 'desc' }">Size</th>
                     <th @click="updateSort('type')" :class="{ 'sort-asc': sortBy === 'type' && sortOrder === 'asc', 'sort-desc': sortBy === 'type' && sortOrder === 'desc' }">Type</th>
                     <th @click="updateSort('created_at')" :class="{ 'sort-asc': sortBy === 'created_at' && sortOrder === 'asc', 'sort-desc': sortBy === 'created_at' && sortOrder === 'desc' }">Date Uploaded</th>
+                    <th @click="updateSort('page_name')" :class="{ 'sort-asc': sortBy === 'page_name' && sortOrder === 'asc', 'sort-desc': sortBy === 'page_name' && sortOrder === 'desc' }">Note</th>
                     <th>Preview/Link</th>
+                    <th><span class="visually-hidden">Delete</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -42,11 +54,22 @@
                         <td data-label="Size" x-text="formatFileSize(att.size)"></td>
                         <td data-label="Type" x-text="att.type"></td>
                         <td data-label="Date Uploaded" x-text="formatDate(att.created_at)"></td>
+                        <td data-label="Note">
+                            <template x-if="att.page_name">
+                                <a :href="noteUrl(att)" x-text="att.page_name"></a>
+                            </template>
+                            <template x-if="!att.page_name">
+                                <em class="no-note">No note (deleted)</em>
+                            </template>
+                        </td>
                         <td data-label="Preview/Link">
                             <a :href="att.url" target="_blank">View/Download</a>
                             <template x-if="att.type && att.type.startsWith('image/')">
                                 <img :src="att.url" :alt="att.name + ' preview'" class="attachment-preview-image">
                             </template>
+                        </td>
+                        <td data-label="Delete">
+                            <button type="button" class="delete-btn" :title="`Delete ${att.name}`" @click="deleteAttachment(att)">Delete</button>
                         </td>
                     </tr>
                 </template>
@@ -74,6 +97,8 @@
                 sortOrder: 'desc',
                 searchTerm: '',
                 filterType: '',
+                withoutNote: false,
+                totalItems: 0,
                 perPage: 10,
                 totalPages: 1,
                 isLoading: true,
@@ -126,6 +151,9 @@
                     if (this.filterType) {
                         params.filter_by_type = this.filterType;
                     }
+                    if (this.withoutNote) {
+                        params.without_note = 1;
+                    }
 
 
                     try {
@@ -150,6 +178,7 @@
                         const pagination = response.data.pagination;
                         this.currentPage = pagination.current_page;
                         this.totalPages = pagination.total_pages || 1;
+                        this.totalItems = pagination.total_items || 0;
 
                         // Update unique types for filter dropdown
                         if (this.attachments.length > 0) {
@@ -193,6 +222,51 @@
                         this.sortOrder = 'desc';
                     }
                     this.fetchAttachments(true); // Reset to page 1 on sort
+                },
+
+                noteUrl(att) {
+                    return `../../page.php?page=${encodeURIComponent(att.page_name)}#note-${encodeURIComponent(att.note_id)}`;
+                },
+
+                async remove(att) {
+                    const response = await fetch('../../api/v1/attachments.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'delete', attachment_id: att.id }),
+                    });
+                    const json = await response.json().catch(() => null);
+                    if (!response.ok || !json || json.status !== 'success') {
+                        throw new Error((json && json.message) || `HTTP ${response.status}`);
+                    }
+                },
+
+                async deleteAttachment(att) {
+                    const where = att.page_name ? ` It is attached to a note on "${att.page_name}".` : '';
+                    if (!window.confirm(`Delete ${att.name}? This cannot be undone.${where}`)) return;
+                    try {
+                        await this.remove(att);
+                        await this.fetchAttachments();
+                    } catch (error) {
+                        this.errorMessage = `Could not delete ${att.name}: ${error.message}`;
+                    }
+                },
+
+                async deleteAllWithoutNote() {
+                    if (!window.confirm(`Delete all ${this.totalItems} files that no longer belong to a note? This cannot be undone.`)) return;
+                    this.isLoading = true;
+                    try {
+                        // Always the first page: each round deletes what it lists.
+                        for (let round = 0; round < 1000; round++) {
+                            const url = `../../api/v1/attachments.php?${new URLSearchParams({ without_note: 1, per_page: 100, page: 1 })}`;
+                            const json = await (await fetch(url)).json();
+                            const batch = (json.data && json.data.data) || [];
+                            if (!batch.length) break;
+                            for (const att of batch) await this.remove(att);
+                        }
+                    } catch (error) {
+                        this.errorMessage = `Could not delete every file: ${error.message}`;
+                    }
+                    await this.fetchAttachments(true);
                 },
 
                 changePage(newPage) {

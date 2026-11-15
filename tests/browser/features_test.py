@@ -94,6 +94,62 @@ def test_template_insert_saves(ctx):
     check('typing then leaving the note saves', server_tree(pg['id']) == ['A typed'], str(server_tree(pg['id'])))
 
 
+def _upload(note_id, name, data, ctype):
+    boundary = '----notd' + uuid.uuid4().hex
+    body = (f'--{boundary}\r\nContent-Disposition: form-data; name="note_id"\r\n\r\n{note_id}\r\n'
+            f'--{boundary}\r\nContent-Disposition: form-data; name="attachmentFile"; filename="{name}"\r\n'
+            f'Content-Type: {ctype}\r\n\r\n').encode() + data + f'\r\n--{boundary}--\r\n'.encode()
+    req = urllib.request.Request(BASE + 'api/v1/attachments.php', data=body,
+                                 headers={'Content-Type': 'multipart/form-data; boundary=' + boundary})
+    import json
+    with urllib.request.urlopen(req) as r:
+        return json.load(r)['data']['attachments'][0]
+
+
+PNG_1PX = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010806000000'
+                        '1f15c4890000000d49444154789c6360f8cf00000301010018dd8db00000000049454e44ae426082')
+
+
+def test_attachment_shown_in_text_is_not_repeated(ctx):
+    pg, ids = seed(f'F-inline-{RUN}', ['picture placeholder', 'just attached'])
+    placed = _upload(ids['picture placeholder'], 'placed.png', PNG_1PX, 'image/png')
+    _upload(ids['just attached'], 'listed.png', PNG_1PX, 'image/png')
+    path = '/'.join(urllib.parse.quote(part) for part in placed['path'].split('/'))
+    api('ops.php', {'ops': [{'op_id': 'inline-' + RUN, 'type': 'edit', 'id': ids['picture placeholder'],
+                              'content': f'picture ![the picture](uploads/{path})'}]})
+    page = ctx.open(pg['name'])
+    page.wait_for_selector(f'.note-item[data-note-id="{ids["just attached"]}"] .note-attachment-item', timeout=8000)
+    page.wait_for_timeout(500)
+    inline_list = page.locator(f'.note-item[data-note-id="{ids["picture placeholder"]}"] .note-attachment-item').count()
+    check('an image placed in the text is not listed again below it', inline_list == 0, str(inline_list))
+    listed = page.locator(f'.note-item[data-note-id="{ids["just attached"]}"] .note-attachment-item').count()
+    check('an attachment the text does not show is listed', listed == 1, str(listed))
+    focus(page, 'picture'); page.keyboard.press('Control+a'); page.keyboard.type('picture removed from the text')
+    page.locator('body').click(position={'x': 5, 'y': 5})
+    wait_synced(page)
+    back = page.locator(f'.note-item[data-note-id="{ids["picture placeholder"]}"] .note-attachment-item')
+    try:
+        back.first.wait_for(timeout=8000)
+    except Exception:
+        pass
+    check('once the text no longer shows it, the file is listed again', back.count() == 1, str(back.count()))
+
+
+def test_kanban_cards_show_text_not_syntax(ctx):
+    seed(f'F-kanban-{RUN}', [f'TODO Plan the **launch** for [[Project {RUN}]] {{type::work}} {{secret:::hidden}}'])
+    page = ctx.context.new_page()
+    page.goto(BASE + 'extensions/kanban_board/index.php')
+    card = page.locator('.kanban-card', has_text=f'Project {RUN}')
+    card.wait_for(timeout=8000)
+    title = card.locator('.kanban-card-title').inner_text()
+    check('card title is plain text', title == f'Plan the launch for Project {RUN}', title)
+    props = card.locator('.kanban-card-prop').all_inner_texts()
+    check('public properties are labels, internal ones are hidden', props == ['typework'], str(props))
+    href = card.locator('.kanban-card-source').get_attribute('href') or ''
+    check('the card links to its note', f'F-kanban-{RUN}' in urllib.parse.unquote(href) and '#note-' in href, href)
+    page.close()
+
+
 def main():
     only = sys.argv[1] if len(sys.argv) > 1 else ''
     tests = [(n, f) for n, f in globals().items() if n.startswith('test_') and only in n]
