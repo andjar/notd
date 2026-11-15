@@ -126,6 +126,31 @@ async function hydrateQuery(placeholder, depth, seen) {
     await hydrate(box, depth + 1, seen);
 }
 
+const PROPERTY_SYNTAX = /\s*\{[a-zA-Z0-9_.-]+:{2,}[^}\n]*\}/g;
+
+/** ((id)): the first line of the note, as plain text, linked to the note. */
+async function hydrateInlineRef(placeholder) {
+    const id = placeholder.dataset.inlineRef;
+    placeholder.removeAttribute('data-inline-ref');
+    let note;
+    try {
+        note = await notesAPI.byId(id);
+    } catch (error) {
+        placeholder.classList.add('error');
+        placeholder.title = error.status === 404 ? 'The referenced note no longer exists.' : 'The referenced note could not be loaded.';
+        return;
+    }
+    const line = displayText(note.content).split('\n')[0].replace(PROPERTY_SYNTAX, '').trim();
+    const scratch = document.createElement('div');
+    scratch.innerHTML = renderContent(line);
+    const link = document.createElement('a');
+    link.className = 'block-ref';
+    link.href = pageUrl(note.page_name, note.id);
+    link.title = `${note.page_name}: go to the note`;
+    link.textContent = scratch.textContent.replace(/\s+/g, ' ').trim() || '(empty note)';
+    placeholder.replaceWith(link);
+}
+
 /**
  * Fills in every transclusion and query placeholder under `root`.
  * Safe to call repeatedly: a placeholder is processed once.
@@ -138,6 +163,9 @@ export async function hydrate(root = document.getElementById('notes-container'),
     }
     for (const el of root.querySelectorAll('.sql-query-placeholder[data-sql-query]')) {
         jobs.push(hydrateQuery(el, depth, seen));
+    }
+    for (const el of root.querySelectorAll('.block-ref[data-inline-ref]')) {
+        jobs.push(hydrateInlineRef(el));
     }
     await Promise.all(jobs);
 }

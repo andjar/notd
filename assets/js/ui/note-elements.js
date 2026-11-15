@@ -175,7 +175,8 @@ export function refreshNoteMeta(id) {
     const n = outline.model.get(id);
     const el = getNoteElement(id);
     if (!n || !el || !n.has_attachments) return;
-    if (!el.querySelector(':scope > .note-header-row .note-attachments')) renderAttachments(n.id);
+    // Re-checked on every save: a file the text now shows leaves the list, one it no longer shows comes back.
+    renderAttachments(n.id, { cached: true });
 }
 
 /** Reflects a local model change (see OutlineModel.apply) in the DOM. */

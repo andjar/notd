@@ -1,6 +1,7 @@
 ---
 title: "Pages"
 weight: 50
+description: "Create, read, rename, update and delete pages; export a page as Markdown."
 ---
 
 A page has a unique name (compared case-insensitively) and its own `content`, a piece of text whose `{key::value}` properties become the page's properties.
@@ -11,7 +12,7 @@ Update and delete are sent as POST with `_method` in the body, so they work on s
 
 | Request | Returns |
 |---|---|
-| `GET pages.php?name=Name` | The page with that name. It is created if it does not exist (date names get `{type::journal}`). |
+| `GET pages.php?name=Name` | The page with that name. It is created if it does not exist (date names get `{type::journal}`). If no page has the name but a page has it as an alias (`{alias::Name}`), that page is returned, with `"alias": "Name"`, and nothing is created. |
 | `GET pages.php?id=25` | One page, or 404. |
 | `GET pages.php` | A list, most recently changed first: `?page`, `?per_page` (max 100), `?exclude_journal=1`. The response has `data` and `pagination`. |
 | `GET pages.php?names=1` | The names of all pages, as an array of strings (`&exclude_journal=1` leaves out date pages). Used for link suggestions. |

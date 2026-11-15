@@ -18,6 +18,9 @@ const NOTE_EDITORS = [
     { extension: 'math_notepad', label: 'Open in Math Notepad', icon: 'hash', path: 'extensions/math_notepad/index.html' },
 ];
 
+/** Inline references ((id)) work for ids in UUID form, which every new note has. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 let menu = null;
 
 function close() {
@@ -57,6 +60,7 @@ function actionsFor(id) {
         { action: 'add-child', label: 'Add child note', icon: 'corner-down-right', run: () => outline.createChild(id, { focus: 'start' }) },
         { action: 'copy-link', label: 'Copy link to note', icon: 'anchor', run: () => copy(new URL(pageUrl(page.name, id), document.baseURI).href, 'Link copied') },
         { action: 'copy-embed', label: 'Copy embed code', icon: 'link', run: () => copy(`!{{${id}}}`, 'Embed code copied') },
+        ...(UUID.test(id) ? [{ action: 'copy-ref', label: 'Copy reference', icon: 'corner-up-right', run: () => copy(`((${id}))`, 'Reference copied') }] : []),
         { action: 'upload', label: 'Upload attachment', icon: 'upload', run: () => pickFiles(id) },
     ];
     // The editors read and write the stored text, which on a locked page is ciphertext.

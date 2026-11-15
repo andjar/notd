@@ -6,9 +6,11 @@
  * the Properties table from it:
  *
  *   {key::value}            a property; its weight is the number of colons
+ *   {tag::a} {tags::a, b}   one tag property per value, each also a links_to_page
+ *   {alias::A, B}           one alias property per value (page aliases)
  *   [[Page Name]]           links_to_page
  *   TODO text (line start)  status (a log property) and, for DONE, done_at
- *   !{{note-id}}            references_block
+ *   !{{note-id}}, ((uuid))  references_block
  *   SQL{...}                sql_query
  *   http(s)://...           external_url
  *
@@ -23,6 +25,29 @@ use PDO;
 
 class PropertyIndex
 {
+    /** Properties whose value is a comma-separated list, indexed one row per item. */
+    public const LIST_PROPERTIES = ['tag', 'tags', 'alias'];
+
+    /** A note id in UUID form, as in an inline reference ((id)). */
+    public const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+
+    /** "a, [[b c]], #d" => ['a', 'b c', 'd'] */
+    public static function splitList(string $value): array
+    {
+        $out = [];
+        foreach (explode(',', $value) as $item) {
+            $item = trim($item);
+            if (preg_match('/^#?\[\[(.*)\]\]$/s', $item, $m)) {
+                $item = trim($m[1]);
+            }
+            $item = trim(ltrim($item, '#'));
+            if ($item !== '') {
+                $out[] = $item;
+            }
+        }
+        return $out;
+    }
+
     private PDO $pdo;
     private PropertyTriggerService $triggers;
 
@@ -56,16 +81,36 @@ class PropertyIndex
             }
         }
 
+        $links = [];
         if (preg_match_all('/\{([a-zA-Z0-9_\.-]+)(:{2,})([^}]+)\}/', $content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $m) {
-                $props[] = ['name' => trim($m[1]), 'value' => trim($m[3]), 'weight' => strlen($m[2])];
+                $name = trim($m[1]);
+                $weight = strlen($m[2]);
+                $lower = strtolower($name);
+                if (in_array($lower, self::LIST_PROPERTIES, true)) {
+                    // Tags and aliases: one row per value, so each can be found on its own.
+                    foreach (self::splitList($m[3]) as $value) {
+                        $props[] = ['name' => $name, 'value' => $value, 'weight' => $weight];
+                        if ($lower !== 'alias') {
+                            $links[] = $value; // a tag is a link to the page of that name
+                        }
+                    }
+                    continue;
+                }
+                $props[] = ['name' => $name, 'value' => trim($m[3]), 'weight' => $weight];
             }
         }
 
         if (preg_match_all('/\[\[([^\]]+)\]\]/', $content, $matches)) {
-            foreach (array_unique(array_filter(array_map('trim', $matches[1]), 'strlen')) as $page) {
-                $props[] = ['name' => 'links_to_page', 'value' => $page, 'weight' => (int)($special['LINK'] ?? 3)];
+            $links = array_merge(array_map('trim', $matches[1]), $links);
+        }
+        $seenLinks = [];
+        foreach (array_filter($links, 'strlen') as $page) {
+            if (isset($seenLinks[mb_strtolower($page)])) {
+                continue;
             }
+            $seenLinks[mb_strtolower($page)] = true;
+            $props[] = ['name' => 'links_to_page', 'value' => $page, 'weight' => (int)($special['LINK'] ?? 3)];
         }
 
         if (preg_match_all('/(https?:\/\/[^\s<>"]+|www\.[^\s<>"]+)/', $content, $matches)) {
@@ -75,10 +120,15 @@ class PropertyIndex
             }
         }
 
+        $refs = [];
         if (preg_match_all('/!\{\{([^}]+)\}\}/', $content, $matches)) {
-            foreach (array_filter(array_map('trim', $matches[1]), 'strlen') as $ref) {
-                $props[] = ['name' => 'references_block', 'value' => $ref, 'weight' => (int)($special['TRANSCLUSION'] ?? 3)];
-            }
+            $refs = array_filter(array_map('trim', $matches[1]), 'strlen');
+        }
+        if (preg_match_all('/\(\((' . self::UUID . ')\)\)/i', $content, $matches)) {
+            $refs = array_merge($refs, array_map('strtolower', $matches[1]));
+        }
+        foreach (array_values(array_unique($refs)) as $ref) {
+            $props[] = ['name' => 'references_block', 'value' => $ref, 'weight' => (int)($special['TRANSCLUSION'] ?? 3)];
         }
 
         if (preg_match_all('/SQL\{([^}]+)\}/', $content, $matches)) {

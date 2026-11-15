@@ -27,6 +27,10 @@ if (\App\PageStore::isJournalName($pageName)) {
 $pageData = $dataManager->getPageByName($pageName);
 if ($pageData) {
     $pageName = $pageData['name']; // the stored spelling
+} elseif (($canonical = $dataManager->resolveAlias($pageName)) !== null) {
+    // [[Alias]] opens the page that has it as {alias::...}. The browser keeps any #note- anchor.
+    header('Location: page.php?page=' . rawurlencode($canonical), true, 302);
+    exit;
 }
 $pageProperties = $pageData['properties'] ?? [];
 $recentPages = $dataManager->getRecentPages(7);

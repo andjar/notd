@@ -54,21 +54,48 @@ export async function uploadFiles(noteId, files) {
     }
 }
 
-/** Fetches and shows the attachments of a note below its text. */
-export async function renderAttachments(noteId) {
+/** The attachments of each note, as last fetched, so a changed text can be re-checked without a request. */
+const fetched = new Map();
+
+/** True if the note's text already shows or links to the file (as ![x](uploads/...) or a link to it). */
+function shownInText(content, attachment) {
+    if (!content || !attachment.path) return false;
+    const path = String(attachment.path);
+    const encoded = path.split('/').map(encodeURIComponent).join('/');
+    return content.includes(encoded) || content.includes(path) || content.includes(encodeURIComponent(path));
+}
+
+/**
+ * Shows the attachments of a note below its text, except those the text
+ * itself already shows (an image placed in the text is not repeated).
+ *
+ * @param {string} noteId
+ * @param {{cached?: boolean}} options cached: re-check the last fetched list instead of asking the server
+ */
+export async function renderAttachments(noteId, { cached = false } = {}) {
+    let attachments = cached ? fetched.get(noteId) : undefined;
+    if (!attachments) {
+        if (!listElement(noteId, false) && !getNoteElement(noteId)) return;
+        try {
+            attachments = await attachmentsAPI.forNote(noteId);
+        } catch {
+            const failed = listElement(noteId, true);
+            if (failed) failed.innerHTML = '<small>Could not load attachments.</small>';
+            return;
+        }
+        fetched.set(noteId, attachments);
+    }
+    const content = outline.model.get(noteId)?.content || '';
+    attachments = attachments.filter((a) => !shownInText(content, a));
+    if (!attachments.length) {
+        listElement(noteId, false)?.remove();
+        return;
+    }
     const list = listElement(noteId, true);
     if (!list) return;
-    let attachments;
-    try {
-        attachments = await attachmentsAPI.forNote(noteId);
-    } catch {
-        list.innerHTML = '<small>Could not load attachments.</small>';
-        return;
-    }
-    if (!attachments.length) {
-        list.remove();
-        return;
-    }
+    const ids = attachments.map((a) => a.id).join(',');
+    if (cached && list.dataset.ids === ids) return; // nothing changed
+    list.dataset.ids = ids;
     list.innerHTML = attachments.map((a) => {
         const name = escapeHtml(a.name);
         const url = escapeHtml(a.url);
@@ -113,10 +140,12 @@ export function handleAttachmentClick(event) {
             try {
                 await attachmentsAPI.remove(del.dataset.attachmentId);
                 item.remove();
+                const left = (fetched.get(noteId) || []).filter((a) => String(a.id) !== String(del.dataset.attachmentId));
+                fetched.set(noteId, left);
                 if (!list.querySelector('.note-attachment-item')) {
                     list.remove();
                     const note = outline.model.get(noteId);
-                    if (note) note.has_attachments = false;
+                    if (note && !left.length) note.has_attachments = false;
                 }
             } catch (error) {
                 toast(`Could not delete "${name}": ${error.message}`, { error: true });

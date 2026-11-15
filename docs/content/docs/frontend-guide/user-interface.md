@@ -1,6 +1,7 @@
 ---
 title: "Interface & Shortcuts"
 weight: 50
+description: "The parts of the screen and every keyboard shortcut."
 ---
 
 ## Layout

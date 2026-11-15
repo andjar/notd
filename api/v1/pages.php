@@ -2,7 +2,8 @@
 /**
  * /api/v1/pages.php
  *
- *   GET ?name=N            the page with that name (created if it does not exist)
+ *   GET ?name=N            the page with that name (created if it does not exist); when N is
+ *                          another page's alias ({alias::N}), that page, with "alias": N
  *   GET ?id=N              one page
  *   GET ?date=YYYY-MM-DD   pages with a {date::...} property of that day
  *   GET ?names=1           the names of all pages (&exclude_journal=1 without journal pages)
@@ -31,8 +32,14 @@ try {
     switch (notd_request_method()) {
         case 'GET':
             if (isset($_GET['name'])) {
-                $id = $pages->ensure((string)$_GET['name']);
-                ApiResponse::success($dataManager->getPageById($id));
+                $name = (string)$_GET['name'];
+                $canonical = $pages->findByName(PageStore::normalizeName($name)) ? null : $dataManager->resolveAlias($name);
+                $id = $pages->ensure($canonical ?? $name);
+                $page = $dataManager->getPageById($id);
+                if ($canonical !== null) {
+                    $page['alias'] = trim($name); // opened by one of its aliases
+                }
+                ApiResponse::success($page);
             } elseif (isset($_GET['id'])) {
                 $page = $dataManager->getPageById((int)$_GET['id']);
                 $page ? ApiResponse::success($page) : ApiResponse::error('Page not found', 404);

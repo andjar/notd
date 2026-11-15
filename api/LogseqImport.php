@@ -12,16 +12,16 @@
  *   pages/A___B.md, title::      the page "A/B"; a title:: property wins over the file name
  *   page properties              page content {key::value}; title:: is dropped
  *   key:: value (block)          {key::value} at the end of the note's first line
- *   id:: <uuid>                  the note's id, so ((uuid)) and {{embed ((uuid))}} become !{{uuid}}
+ *   id:: <uuid>                  the note's id, so ((uuid)) keeps working and {{embed ((uuid))}} becomes !{{uuid}}
  *   collapsed:: true             the note is collapsed
  *   heading:: 2                  "## " in front of the text
  *   LATER/NOW/WAIT/CANCELED ...  TODO/DOING/WAITING/CANCELLED
  *   [#A]                         {priority::A}
  *   SCHEDULED/DEADLINE: <...>    {scheduled::2023-11-14 09:00} / {deadline::...}
  *   :LOGBOOK: ... :END:          dropped
- *   #tag, #[[a tag]]             [[tag]], [[a tag]] (Logseq tags are page links)
+ *   #tag, #[[a tag]]             {tag::tag}, {tag::a tag} (a notd tag links to its page)
  *   [[Nov 14th, 2023]]           [[2023-11-14]] (journal title format from config.edn)
- *   [[alias]]                    [[Page]] when the alias has no page of its own
+ *   alias:: A, B                 {alias::A, B}, so [[A]] opens the page
  *   {{embed [[Page]]}}           [[Page]]
  *   #+BEGIN_QUOTE / _SRC / ...   Markdown quote / fenced code
  *   ![x](../assets/a.png)        the file is copied to uploads/, attached to the note,
@@ -107,8 +107,8 @@ class LogseqImport
      *   mode            'merge' (default) adds what is not there yet; 'replace' replaces the notes of each imported page
      *   dry_run         bool: report what would happen, change nothing
      *   strict          bool: stop and roll everything back at the first page that fails
-     *   tags            'link' (default) turns #tag into [[tag]]; 'keep' leaves it as written
-     *   resolve_aliases bool (default true): [[alias]] becomes [[Page]] when the alias has no page of its own
+     *   tags            'tag' (default) turns #tag into {tag::tag}; 'link' into [[tag]]; 'keep' leaves it as written
+     *   resolve_aliases bool (default false): rewrite [[alias]] to [[Page]] (notd resolves aliases itself)
      *   max_file_size   bytes; larger attachments are skipped (default Attachments::MAX_FILE_SIZE, 0 = no limit)
      *   filename_format 'triple-lowbar' or 'legacy'; default: from config.edn
      *   webhooks        bool: send the webhooks the import triggers (default false)
@@ -121,8 +121,8 @@ class LogseqImport
             'mode' => 'merge',
             'dry_run' => false,
             'strict' => false,
-            'tags' => 'link',
-            'resolve_aliases' => true,
+            'tags' => 'tag',
+            'resolve_aliases' => false,
             'max_file_size' => Attachments::MAX_FILE_SIZE,
             'filename_format' => null,
             'webhooks' => false,
@@ -1154,11 +1154,12 @@ class LogseqImport
 
     private function convertSegment(string $s, string $where, ?array $assets, bool $tags): string
     {
-        // {{embed ((uuid))}} and ((uuid)): notd embeds notes with !{{id}}.
+        // {{embed ((uuid))}} embeds the note: !{{id}} in notd. ((uuid)) is an inline reference in both.
         $s = preg_replace_callback('/\{\{embed\s+\(\(([0-9a-fA-F-]{36})\)\)\s*\}\}|\(\(([0-9a-fA-F-]{36})\)\)/', function ($m) use ($where) {
-            $id = strtolower($m[1] !== '' ? $m[1] : $m[2]);
+            $embed = $m[1] !== '';
+            $id = strtolower($embed ? $m[1] : $m[2]);
             if ($this->noteIdKnown($id)) {
-                return '!{{' . $id . '}}';
+                return $embed ? '!{{' . $id . '}}' : '((' . $id . '))';
             }
             $this->warn($where, "reference to block $id, which is not in the graph; kept as text");
             return $m[0];
@@ -1192,20 +1193,30 @@ class LogseqImport
         return $s;
     }
 
-    /** #tag and #[[a tag]] become [[tag]] and [[a tag]]: in Logseq a tag is a page link. */
+    /**
+     * #tag and #[[a tag]] (page links in Logseq) become {tag::tag}, which in
+     * notd is a tag that links to its page; or [[tag]] with tags => 'link'.
+     */
     private function rewriteTags(string $s, bool $tags): string
     {
-        if ($tags && $this->options['tags'] === 'link') {
-            $s = preg_replace_callback('/(^|(?<=\s))#(?!\[\[)([^\s#,!?;:"\'()\[\]{}<>`]*[^\s#,.!?;:"\'()\[\]{}<>`])/u', function ($m) {
-                if (preg_match('/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$|^\d+$/', $m[2]) && !isset($this->pageNames[mb_strtolower($m[2])])) {
-                    return $m[0]; // #fff, #12: colours and numbers rather than tags
-                }
-                return $m[1] . '[[' . $this->linkTarget($m[2]) . ']]';
-            }, $s);
-            $s = preg_replace('/(^|(?<=\s))#(\[\[)/', '$2', $s);
+        $mode = $this->options['tags'];
+        if (!$tags || $mode === 'keep') {
+            return $s;
         }
-
-        return $s;
+        $as = function (string $name) use ($mode): string {
+            // A tag value cannot hold a comma (it would be two tags) or a closing brace.
+            return $mode === 'tag' && strpbrk($name, ',}') === false ? '{tag::' . $name . '}' : '[[' . $name . ']]';
+        };
+        $s = preg_replace_callback('/(^|(?<=\s))#(?!\[\[)([^\s#,!?;:"\'()\[\]{}<>`]*[^\s#,.!?;:"\'()\[\]{}<>`])/u', function ($m) use ($as) {
+            if (preg_match('/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$|^\d+$/', $m[2]) && !isset($this->pageNames[mb_strtolower($m[2])])) {
+                return $m[0]; // #fff, #12: colours and numbers rather than tags
+            }
+            return $m[1] . $as($this->linkTarget($m[2]));
+        }, $s);
+        // #[[a tag]]: the link inside was already rewritten by rewriteLinks().
+        return preg_replace_callback('/(^|(?<=\s))#\[\[([^\]\n]+)\]\]/u', function ($m) use ($as) {
+            return $m[1] . $as(trim($m[2]));
+        }, $s);
     }
 
     /** [[Target]] rewriting: journal titles, aliases, renamed pages, Excalidraw drawings. */

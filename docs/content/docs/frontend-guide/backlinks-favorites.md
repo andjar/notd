@@ -1,11 +1,12 @@
 ---
 title: "Backlinks & Favorites"
 weight: 30
+description: "See what links to a page, and keep the pages you use most at hand."
 ---
 
 ## Backlinks
 
-When a note contains `[[Page Name]]`, the page "Page Name" lists that note as a backlink. You never maintain backlinks; they follow from the links you write.
+When a note contains `[[Page Name]]` or the tag `{tag::Page Name}`, the page "Page Name" lists that note as a backlink. Links to one of the page's [aliases]({{< relref "core-features.md#aliases" >}}) count too. You never maintain backlinks; they follow from the links you write.
 
 Backlinks appear:
 
