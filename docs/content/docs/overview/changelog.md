@@ -18,6 +18,7 @@ Pages
 - ☆ star to add and remove favourites; rename (links and child pages follow) and delete from the page dialog.
 - Print (or save as PDF) shows just the outline, collapsed notes included.
 - Markdown export of a page, and `tools/export.php` / `tools/import.php` for whole notebooks in the Logseq layout.
+- `tools/import_logseq.php` imports a Logseq graph: journals, pages, properties, tasks, block references and attachments. Safe to run again; `--dry-run` and `--replace`.
 - Page locks use a salted verifier; pages locked with the older SHA-256 hash still unlock.
 
 Performance

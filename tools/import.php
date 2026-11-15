@@ -10,6 +10,9 @@
  * folders) or the output of tools/export.php can be imported as it is.
  *
  * Notes are appended: importing into an existing page keeps what is there.
+ *
+ * For a Logseq graph, tools/import_logseq.php converts much more (journal
+ * links, block references, tasks, attachments) and is safe to run again.
  */
 
 if (PHP_SAPI !== 'cli') {
