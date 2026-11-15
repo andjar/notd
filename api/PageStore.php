@@ -175,9 +175,25 @@ class PageStore
             $lower[mb_strtolower($from)] = $to;
         }
         $rewrite = static function (string $content) use ($lower): string {
-            return preg_replace_callback('/\[\[([^\]]+)\]\]/', static function ($m) use ($lower) {
+            $content = preg_replace_callback('/\[\[([^\]]+)\]\]/', static function ($m) use ($lower) {
                 $target = $lower[mb_strtolower(trim($m[1]))] ?? null;
                 return $target === null ? $m[0] : '[[' . $target . ']]';
+            }, $content);
+            // Tags link to their page too: {tag::Old} and {tags::a, Old}.
+            return preg_replace_callback('/\{(tags?)(:{2,})([^}\n]*)\}/i', static function ($m) use ($lower) {
+                $changed = false;
+                $items = array_map(static function ($item) use ($lower, &$changed) {
+                    if (!preg_match('/^(\s*)(#?\[\[|#)?(.*?)(\]\])?(\s*)$/s', $item, $p)) {
+                        return $item;
+                    }
+                    $target = $lower[mb_strtolower(trim($p[3]))] ?? null;
+                    if ($target === null) {
+                        return $item;
+                    }
+                    $changed = true;
+                    return $p[1] . ($p[2] ?? '') . $target . ($p[4] ?? '') . ($p[5] ?? '');
+                }, explode(',', $m[3]));
+                return $changed ? '{' . $m[1] . $m[2] . implode(',', $items) . '}' : $m[0];
             }, $content);
         };
 

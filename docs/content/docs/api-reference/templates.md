@@ -1,6 +1,7 @@
 ---
 title: "Templates"
 weight: 100
+description: "List and fill note and page templates."
 ---
 
 Templates are plain Markdown files in `assets/template/note/` and `assets/template/page/`. They are text only: nothing in them is executed.

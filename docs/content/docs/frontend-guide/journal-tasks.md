@@ -1,6 +1,7 @@
 ---
 title: "Journal & Tasks"
 weight: 20
+description: "A page for every day, and tasks with states and checkboxes."
 ---
 
 ## Journal

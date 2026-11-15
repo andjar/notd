@@ -1573,6 +1573,10 @@ components:
         content:
           type: string
           description: 'create (optional), edit (required): the note text'
+        base_version:
+          type: integer
+          description: 'edit (optional): the note''s version when it was read; if it has changed since, the edit
+            is skipped with the warning "conflict"'
         collapsed:
           type: boolean
           description: create (optional), collapse (required)

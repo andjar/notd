@@ -34,4 +34,23 @@ return [
                      WHERE name GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
                        AND NOT EXISTS (SELECT 1 FROM Properties p WHERE p.page_id = Pages.id AND p.name = 'type' AND p.value = 'journal')");
     },
+
+    5 => static function (PDO $pdo): void {
+        // Tags now link to their page, tags and aliases are indexed one value
+        // per row, and ((uuid)) is a block reference: re-derive the index of
+        // the notes and pages that use them. Content does not change.
+        require_once __DIR__ . '/../api/bootstrap.php';
+        $index = new \App\PropertyIndex($pdo);
+        $notes = $pdo->query("SELECT id, content FROM Notes
+                               WHERE content LIKE '%{tag%' OR content LIKE '%{alias%' OR content LIKE '%((%'")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($notes as $note) {
+            $index->reindex('note', $note['id'], $note['content']);
+        }
+        $pages = $pdo->query("SELECT id, content FROM Pages WHERE content LIKE '%{tag%' OR content LIKE '%{alias%'")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($pages as $page) {
+            $index->reindex('page', (int)$page['id'], $page['content']);
+        }
+        // The values did not really change, so nothing should be announced.
+        \App\PropertyTriggerService::discardPendingWebhooks();
+    },
 ];
