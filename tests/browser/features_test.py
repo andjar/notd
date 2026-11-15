@@ -186,6 +186,60 @@ def test_query_template_for_this_page(ctx):
     check('the query lists the open task of this page only', 'first open task' in text and 'finished' not in text, text[:200])
 
 
+def test_zen_writer_saves_safely_and_tabs_follow(ctx):
+    pg, ids = seed(f'F-zen-{RUN}', ['original text'])
+    nid = ids['original text']
+    notd = ctx.open(pg['name'])
+    zen = ctx.context.new_page()
+    zen.goto(BASE + f'extensions/zen/index.html?note_id={nid}')
+    zen.wait_for_function("() => document.querySelector('.CodeMirror')?.CodeMirror.getValue() === 'original text'", timeout=8000)
+    value = lambda: zen.evaluate("() => document.querySelector('.CodeMirror').CodeMirror.getValue()")
+
+    # Saving in Zen shows up in the open notd tab without a reload.
+    zen.evaluate("() => { const cm = document.querySelector('.CodeMirror').CodeMirror; cm.setValue('written in zen'); }")
+    zen.keyboard.press('Control+s')
+    notd.wait_for_function(f"() => document.querySelector('.note-item[data-note-id=\"{nid}\"] .note-content')?.textContent.includes('written in zen')", timeout=8000)
+    check('a save in the Zen writer appears in the notd tab', api(f'notes.php?id={nid}')['content'] == 'written in zen')
+
+    # Edited in notd while nothing is unsaved in Zen: Zen takes the new text.
+    focus(notd, 'written in zen'); notd.keyboard.press('End'); notd.keyboard.type(' and notd')
+    notd.locator('body').click(position={'x': 5, 'y': 5})
+    wait_synced(notd)
+    zen.wait_for_function("() => document.querySelector('.CodeMirror').CodeMirror.getValue() === 'written in zen and notd'", timeout=8000)
+    check('Zen follows a change made in notd', value() == 'written in zen and notd', value())
+
+    # Changed elsewhere (not announced) while Zen has unsaved text: saving asks first.
+    api('ops.php', {'ops': [{'op_id': 'zen-' + RUN, 'type': 'edit', 'id': nid, 'content': 'changed by a script'}]})
+    zen.evaluate("() => document.querySelector('.CodeMirror').CodeMirror.setValue('my unsaved zen text')")
+    answers = []
+    def answer(dialog):
+        answers.append(dialog.message)
+        dialog.dismiss() if len(answers) == 1 else dialog.accept()
+    zen.on('dialog', answer)
+    zen.keyboard.press('Control+s'); zen.wait_for_timeout(1500)
+    check('saving over a newer version asks first', len(answers) == 1 and 'changed in notd' in answers[0], str(answers))
+    check('Cancel saves nothing', api(f'notes.php?id={nid}')['content'] == 'changed by a script')
+    check('and keeps the text in the editor', value() == 'my unsaved zen text', value())
+    zen.keyboard.press('Control+s'); zen.wait_for_timeout(1500)
+    check('OK replaces the other version', api(f'notes.php?id={nid}')['content'] == 'my unsaved zen text', api(f'notes.php?id={nid}')['content'])
+    zen.close()
+
+
+def test_math_notepad_loads_calculates_saves(ctx):
+    pg, ids = seed(f'F-math-{RUN}', ['a = 3'])
+    nid = ids['a = 3']
+    math = ctx.context.new_page()
+    math.goto(BASE + f'extensions/math_notepad/index.html?note_id={nid}')
+    math.wait_for_function("() => document.querySelector('.CodeMirror')?.CodeMirror.getValue() === 'a = 3'", timeout=8000)
+    math.evaluate("() => document.querySelector('.CodeMirror').CodeMirror.setValue('a = 3\\nb = a * 4\\nb + 1')")
+    math.wait_for_timeout(300)
+    results = math.locator('#math-results').inner_text()
+    check('the math notepad calculates line by line', 'b = 12' in results and '= 13' in results, results)
+    math.keyboard.press('Control+s'); math.wait_for_timeout(1000)
+    check('and saves into the note', api(f'notes.php?id={nid}')['content'] == 'a = 3\nb = a * 4\nb + 1', api(f'notes.php?id={nid}')['content'])
+    math.close()
+
+
 def main():
     only = sys.argv[1] if len(sys.argv) > 1 else ''
     tests = [(n, f) for n, f in globals().items() if n.startswith('test_') and only in n]

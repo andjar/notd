@@ -34,6 +34,7 @@ Extensions
 - The mail handler writes `{key::value}` properties (it wrote Logseq's `key:: value`) and reads notd's address from `api_url` in its `config.json` or its first argument.
 - The Pomodoro timer reads `pageTemplate`, `noteTemplate` and `cycle` from its `config.json` (they were ignored, so sessions went to the journal page and there were no long breaks), and its work session is 25 minutes again (the shipped setting was 2).
 - The kanban board's **Back to Main App** works when notd is served from a sub-folder.
+- The Zen writer and the math notepad no longer overwrite changes made elsewhere: saving over a newer version asks first, a change made in notd is taken over when nothing is unsaved, and open notd tabs show a save at once. Closing with unsaved text asks. API: `edit` accepts `base_version` and answers `conflict`.
 
 - Kanban cards show the note's text without `{property}` syntax, its properties as labels, and a link to the note.
 - The attachment dashboard shows the note each file belongs to, lists files whose note was deleted (**Only files without a note**), and deletes files.

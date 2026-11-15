@@ -20,7 +20,13 @@ Add `zen` to `ACTIVE_EXTENSIONS` in `config.local.php` (see [Turning extensions 
 
 The moon/sun button switches between a light and a dark theme; the choice is remembered in the browser.
 
-Saving replaces the note's text, the same way an edit in the outline does. Reload the notd tab to see the change there, and avoid editing the same note in both places at once: the last save wins.
+Saving replaces the note's text, the same way an edit in the outline does, and notd tabs that show the note update by themselves.
+
+Editing the same note in two places is safe:
+
+- If the note is changed in notd while you have nothing unsaved in the Zen writer, the Zen writer takes the new text.
+- If it was changed elsewhere since you opened or last saved it, saving asks first. **OK** replaces that change with your text; **Cancel** saves nothing and keeps your text in the editor, so you can copy what you need.
+- Closing the tab with unsaved text asks for confirmation.
 
 Opened without a note (`extensions/zen/index.html`), the editor works as a scratch pad that is saved in the browser only.
 
