@@ -9,7 +9,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/setup_db.php';
 
 /** Must equal `PRAGMA user_version` in db/schema.sql. */
-const NOTD_SCHEMA_VERSION = 4;
+const NOTD_SCHEMA_VERSION = 5;
 
 class SchemaVersionException extends RuntimeException {}
 

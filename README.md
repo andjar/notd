@@ -67,6 +67,7 @@ The [development guide](https://andjar.github.io/notd/docs/development/) explain
 node tests/js/model.test.mjs          # outline model and outbox
 node tests/js/ordering_parity.mjs     # JavaScript and PHP sort keys agree
 php tests/php/logseq_import.test.php  # Logseq importer, on throw-away databases
+php tests/php/migration_v5.test.php   # schema upgrade from v4
 
 # with a server on a throw-away database:
 NOTD_DB_PATH=/tmp/notd-test.sqlite PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:8765 tests/browser/router.php

@@ -190,6 +190,57 @@ await test('search: tasks are found by their current state only', async () => {
   eq((await raw('search.php?tasks=BOGUS')).status, 400, 'unknown state');
 });
 
+await test('links: tags link to their page; aliases open the page and count as links to it', async () => {
+  const target = uniq('Tagged Page');
+  const alias = uniq('TP');
+  const page = (await raw('pages.php', { name: target, content: `{alias::${alias}, ${alias}-2}` })).json.data;
+  eq(page.properties.alias.map(a => a.value), [alias, `${alias}-2`], 'aliases are indexed one by one');
+
+  const notes = (await append(uniq('Linking'), [
+    `tagged {tag::${target}}`,
+    `two tags {tags::other, [[${target}]]}`,
+    `by alias [[${alias}]]`,
+    `by the second alias [[${alias.toUpperCase()}-2]]`,
+    'unrelated',
+  ])).appended_notes;
+  const backlinks = (await get(`search.php?backlinks_for_page_name=${encodeURIComponent(target)}&per_page=50`)).data;
+  eq(backlinks.results.map(r => r.content.split(' {')[0].split(' [[')[0]).sort(), ['by alias', 'by the second alias', 'tagged', 'two tags'], 'tags and aliases are backlinks');
+  eq(backlinks.pagination.total_items, 4, 'counted the same way');
+  eq((await get(`notes.php?id=${notes[1].id}`)).data.properties.tags.map(t => t.value), ['other', target], 'tags split into values');
+
+  const opened = (await get(`pages.php?name=${encodeURIComponent(alias.toLowerCase())}`)).data;
+  eq([opened.id, opened.alias], [page.id, alias.toLowerCase()], 'an alias opens its page');
+  const names = (await get('pages.php?names=1')).data;
+  ok(!names.some(n => n.toLowerCase() === alias.toLowerCase()), 'no page was created for the alias');
+  const redirect = await fetch(ROOT + 'page.php?page=' + encodeURIComponent(alias), { redirect: 'manual' });
+  eq([redirect.status, decodeURIComponent(redirect.headers.get('location') || '')], [302, 'page.php?page=' + target], 'page.php redirects an alias');
+
+  const renamed = uniq('Renamed Page');
+  await raw('pages.php', { _method: 'PUT', id: page.id, name: renamed });
+  eq((await get(`notes.php?id=${notes[0].id}`)).data.content, `tagged {tag::${renamed}}`, 'renaming rewrites {tag::}');
+  eq((await get(`notes.php?id=${notes[1].id}`)).data.content, `two tags {tags::other, [[${renamed}]]}`, 'and {tags::}');
+  eq((await get(`notes.php?id=${notes[2].id}`)).data.content, `by alias [[${alias}]]`, 'alias links stay as written');
+});
+
+await test('links: ((uuid)) is a block reference', async () => {
+  const [target] = (await append(uniq('Ref target'), ['the referenced note'])).appended_notes;
+  const [ref] = (await append(uniq('Ref source'), [`see ((${target.id.toUpperCase()})) and ((not-a-uuid))`])).appended_notes;
+  eq((await get(`notes.php?id=${ref.id}&include_internal=1`)).data.properties.references_block.map(r => r.value), [target.id], 'indexed, lower-case, UUIDs only');
+});
+
+await test('templates: the ready-made queries are valid queries', async () => {
+  const list = (await get('templates.php?type=note')).data.filter(t => t.name.startsWith('Query'));
+  ok(list.length >= 8, `query templates are listed (${list.length})`);
+  const page = (await get(`pages.php?name=${encodeURIComponent(uniq("O'Brien"))}`)).data;
+  for (const t of list) {
+    const sql = /SQL\{(.*)\}\s*$/s.exec(t.content)?.[1]
+      ?.replace(/\{\{page_id\}\}/g, String(page.id)).replace(/\{\{page\}\}/g, page.name.replace(/'/g, "''"));
+    ok(sql, `${t.name}: one SQL{...}`);
+    const r = await raw('query_notes.php', { sql_query: sql });
+    eq([r.status, r.json?.status], [200, 'success'], `${t.name}: accepted (${r.json?.message || ''})`);
+  }
+});
+
 await test('properties: unchanged content writes nothing; done_at is kept; logs do not grow', async () => {
   const data = await append(uniq('Idx'), ['TODO task {priority::high}']);
   const id = data.appended_notes[0].id;

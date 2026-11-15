@@ -400,21 +400,61 @@ class DataManager
     }
 
     /**
-     * Notes that link to a page with [[Name]] (page names are case-insensitive).
+     * The page an alias stands for: the name of the page whose properties
+     * include {alias::...} with this value, or null. A page that has the name
+     * itself is not an alias, so callers look for the page first.
+     */
+    public function resolveAlias(string $name): ?string
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT P.name FROM Properties Pr JOIN Pages P ON P.id = Pr.page_id
+              WHERE Pr.name = 'alias' AND Pr.value = ? COLLATE NOCASE AND P.active = 1
+              ORDER BY P.id LIMIT 1"
+        );
+        $stmt->execute([trim($name)]);
+        $page = $stmt->fetchColumn();
+        return $page === false ? null : (string)$page;
+    }
+
+    /** The aliases of a page ({alias::A, B} in its properties). */
+    public function getAliases(string $pageName): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT Pr.value FROM Properties Pr JOIN Pages P ON P.id = Pr.page_id
+              WHERE Pr.name = 'alias' AND LOWER(P.name) = LOWER(?) AND P.active = 1 ORDER BY Pr.id"
+        );
+        $stmt->execute([$pageName]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    /** The page's name and its aliases: the names a link to it can use. */
+    private function linkNames(string $pageName): array
+    {
+        return array_values(array_unique(array_merge([$pageName], $this->getAliases($pageName))));
+    }
+
+    /**
+     * Notes that link to a page with [[Name]], [[Alias]] or {tag::Name}
+     * (page names are case-insensitive).
      *
      * @return array<int, array{note_id: string, content: string, page_id: int, page_name: string}>
      */
     public function getBacklinks(string $pageName, int $limit = 50, int $offset = 0): array
     {
+        $names = $this->linkNames($pageName);
+        $in = implode(',', array_fill(0, count($names), '?'));
         $stmt = $this->pdo->prepare(
             "SELECT N.id AS note_id, N.content, N.page_id, P.name AS page_name
                FROM Notes N JOIN Pages P ON N.page_id = P.id
-              WHERE N.id IN (SELECT note_id FROM Properties WHERE name = 'links_to_page' AND value = ? COLLATE NOCASE)
+              WHERE N.id IN (SELECT note_id FROM Properties WHERE name = 'links_to_page' AND value COLLATE NOCASE IN ($in))
               ORDER BY N.updated_at DESC, N.id LIMIT ? OFFSET ?"
         );
-        $stmt->bindValue(1, $pageName);
-        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
-        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $i = 1;
+        foreach ($names as $name) {
+            $stmt->bindValue($i++, $name);
+        }
+        $stmt->bindValue($i++, $limit, PDO::PARAM_INT);
+        $stmt->bindValue($i, $offset, PDO::PARAM_INT);
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$row) {
@@ -425,8 +465,10 @@ class DataManager
 
     public function countBacklinks(string $pageName): int
     {
-        $stmt = $this->pdo->prepare("SELECT COUNT(DISTINCT note_id) FROM Properties WHERE name = 'links_to_page' AND value = ? COLLATE NOCASE");
-        $stmt->execute([$pageName]);
+        $names = $this->linkNames($pageName);
+        $in = implode(',', array_fill(0, count($names), '?'));
+        $stmt = $this->pdo->prepare("SELECT COUNT(DISTINCT note_id) FROM Properties WHERE name = 'links_to_page' AND value COLLATE NOCASE IN ($in)");
+        $stmt->execute($names);
         return (int)$stmt->fetchColumn();
     }
 }

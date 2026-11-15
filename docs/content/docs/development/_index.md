@@ -129,6 +129,7 @@ No test needs a build step or a PHP package.
 node tests/js/model.test.mjs          # outline model and outbox (no server)
 node tests/js/ordering_parity.mjs     # JavaScript and PHP sort keys agree (needs php on PATH)
 php tests/php/logseq_import.test.php  # Logseq importer, on throw-away databases (no server)
+php tests/php/migration_v5.test.php   # schema upgrade from v4 (no server)
 
 # the remaining suites talk to a running server, on a throw-away database:
 NOTD_DB_PATH=/tmp/notd-test.sqlite PHP_CLI_SERVER_WORKERS=4 \

@@ -150,6 +150,42 @@ def test_kanban_cards_show_text_not_syntax(ctx):
     page.close()
 
 
+def test_inline_reference_and_tag_links(ctx):
+    # Inline references need ids in UUID form, which the server gives notes it creates.
+    target_name = f'F-ref-target-{RUN}'
+    ref_id = api('append_to_page.php', {'page_name': target_name, 'notes': ['TODO the **referenced** note {x::1}', 'line two']})['appended_notes'][0]['id']
+    target_page = {'name': target_name}
+    pg, ids = seed(f'F-ref-{RUN}', [f'see (({ref_id})) here {{tag::F-tag-{RUN}}}'])
+    page = ctx.open(pg['name'])
+    link = page.locator('#notes-container a.block-ref')
+    link.wait_for(timeout=8000)
+    check('((id)) shows the referenced note inline, as plain text', link.inner_text() == 'TODO the referenced note', link.inner_text())
+    check('the reference links to the note', f'#note-{ref_id}' in (link.get_attribute('href') or ''), link.get_attribute('href') or '')
+    tag = page.locator('#notes-container a.property-tag-link')
+    check('a tag links to its page', urllib.parse.unquote(tag.get_attribute('href') or '').endswith(f'page=F-tag-{RUN}'), tag.get_attribute('href') or '')
+    menu_page = ctx.open(target_page['name'])
+    menu_page.locator(f'.note-bullet[data-note-id="{ref_id}"]').click(button='right')
+    check('the note menu offers Copy reference', menu_page.locator('.menu-item[data-action="copy-ref"]').count() == 1)
+
+
+def test_query_template_for_this_page(ctx):
+    pg, ids = seed(f'F-query-{RUN}', ['TODO first open task', 'DONE finished', 'here'])
+    page = ctx.open(pg['name'])
+    focus(page, 'here'); page.keyboard.press('Enter')
+    page.keyboard.type('/query open tasks on')
+    page.wait_for_selector('.autocomplete-popup:not([hidden]) li', timeout=5000)
+    page.keyboard.press('Enter')
+    page.locator('body').click(position={'x': 5, 'y': 5})
+    wait_synced(page)
+    saved = server_tree(pg['id'])[-1]
+    check('the template is inserted with this page\'s id', f'page_id = {pg["id"]} AND' in saved, saved)
+    page.reload()
+    results = page.locator('.sql-query-results')
+    results.wait_for(timeout=8000)
+    text = results.inner_text()
+    check('the query lists the open task of this page only', 'first open task' in text and 'finished' not in text, text[:200])
+
+
 def main():
     only = sys.argv[1] if len(sys.argv) > 1 else ''
     tests = [(n, f) for n, f in globals().items() if n.startswith('test_') and only in n]

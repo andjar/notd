@@ -4,9 +4,9 @@ weight: 70
 description: "What changed in each version."
 ---
 
-### November 2026: version 3.1, schema v4
+### November 2026: version 3.1, schema v5
 
-The database upgrades itself to v4 the first time it is opened.
+The database upgrades itself to v5 the first time it is opened (a copy is kept next to it).
 
 Writing
 - `Enter` splits a note at the caret and `Backspace` at the start of a note joins it with the one above, as in Logseq.
@@ -14,6 +14,13 @@ Writing
 - Zoom into a note (click its bullet) with breadcrumbs back out.
 - `[[` page suggestions and `/` templates share one popup with keyboard navigation; typing a closing bracket steps over the automatic one.
 - Rendered notes support `!{{id}}` transclusion and `SQL{...}` queries as read-only embedded outlines.
+
+Links
+- **Tags link to their page.** `{tag::bug}` and `{tags::a, b}` make the note a backlink of the page "bug" (or "a" and "b"), like `[[bug]]`; renaming the page rewrites the tags. Each tag is indexed on its own.
+- **Aliases.** `{alias::JS, ECMAScript}` in a page's properties makes `[[JS]]` open the page, and links to an alias are backlinks of the page.
+- **Inline block references.** `((note-uuid))` shows the first line of that note in the sentence, linked to it. **Copy reference** in the note menu.
+- **Ready-made queries.** Type `/query` for queries such as open tasks on this page, due within a week, done this week, tagged. Templates can use `{{page}}` and `{{page_id}}`; `/` suggestions accept several words.
+- The Logseq importer keeps `((id))` references and alias links as they are, and turns `#tag` into `{tag::tag}`.
 
 Pages
 - ☆ star to add and remove favourites; rename (links and child pages follow) and delete from the page dialog.

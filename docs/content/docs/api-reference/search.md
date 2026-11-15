@@ -37,7 +37,7 @@ Provides powerful search capabilities. It can search by term, find backlinks, li
 The Search endpoint also supports other modes:
 
 ### `GET /api/v1/search.php?backlinks_for_page_name={page_name}`
-*   **Description**: Finds all notes that link to the specified `page_name`. Supports pagination and `include_parent_properties`.
+*   **Description**: Finds all notes that link to the specified `page_name`: with `[[Name]]`, with a tag (`{tag::Name}`, `{tags::...}`), or with one of the page's aliases. Supports pagination and `include_parent_properties`.
 *   **(Response structure similar to `q` search but `content_snippet` will highlight the link)**
 
 ### `GET /api/v1/search.php?tasks={status}`
