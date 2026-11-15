@@ -1,6 +1,7 @@
 ---
 title: "Writing Notes"
 weight: 10
+description: "Markdown, links, properties, queries, transclusion, attachments, templates and encryption."
 ---
 
 ## Markdown

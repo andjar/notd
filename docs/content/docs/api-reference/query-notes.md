@@ -1,6 +1,7 @@
 ---
 title: "Query Notes"
 weight: 90
+description: "Run a read-only SQL query that returns notes."
 ---
 
 Runs a SQL query that selects note ids and returns the matching notes. This is what `SQL{...}` blocks in notes use.

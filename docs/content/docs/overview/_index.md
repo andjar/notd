@@ -1,6 +1,7 @@
 ---
 title: "Overview"
 weight: 10
+description: "What notd is, what it does, and why it is built the way it is."
 ---
 
 **notd** is a small outliner for notes, journals and tasks, inspired by [Logseq](https://logseq.com/). It runs on anything that runs PHP and keeps everything in one SQLite file that you own.
@@ -15,7 +16,7 @@ weight: 10
 - **Queries and transclusion.** List notes with `SQL{...}`; embed a note elsewhere with `!{{note-id}}`.
 - **Attachments, templates, namespaces, favorites, password-locked pages.**
 - **Print and export.** Print a page or save it as PDF; export a page or the whole notebook as Markdown files, and import Markdown, including folders written by Logseq.
-- **Extensions.** Kanban board, pomodoro timer, attachment dashboard, distraction-free editor and more.
+- **[Extensions]({{< relref "../extensions/_index.md" >}}).** Kanban board, Pomodoro timer, attachment dashboard, distraction-free editor, math notepad, feed and mail import, and more.
 - **An HTTP API** that can do everything the interface can.
 
 ## Built to last

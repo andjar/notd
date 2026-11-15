@@ -1,0 +1,35 @@
+# Espanso match for notd (Windows): sends the clipboard to today's journal page.
+#
+# Copy some text, then type ;notd anywhere. The text becomes a new note at the
+# end of today's page in notd, tagged {source::espanso}. Nothing is typed
+# unless something goes wrong, in which case a short [notd: ...] message is.
+#
+# Install: put this file in Espanso's match folder (run `espanso path` to see
+# where it is, then ...\match\notd-windows.yml) and set $notd below to your
+# notd address. Uses Windows PowerShell, which every Windows has.
+
+matches:
+  - trigger: ";notd"
+    replace: "{{result}}"
+    vars:
+      - name: clip
+        type: clipboard
+      - name: result
+        type: shell
+        params:
+          shell: powershell
+          cmd: |
+            $notd = "http://localhost:8000"
+
+            # The clipboard arrives as $env:ESPANSO_CLIP; it is never pasted into the command.
+            $text = ([string]$env:ESPANSO_CLIP).Replace("`r", "").TrimEnd()
+            if ([string]::IsNullOrWhiteSpace($text)) { "[notd: the clipboard is empty]"; exit }
+            # The property goes on the same line for one-line notes, on its own line otherwise.
+            if ($text.Contains("`n")) { $note = "$text`n{source::espanso}" } else { $note = "$text {source::espanso}" }
+            $body = @{ page_name = (Get-Date -Format "yyyy-MM-dd"); notes = $note } | ConvertTo-Json -Compress
+            try {
+              Invoke-RestMethod -Method Post -Uri "$notd/api/v1/append_to_page.php" -TimeoutSec 10 `
+                -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body)) | Out-Null
+            } catch {
+              "[notd: could not save to $notd]"
+            }

@@ -1,6 +1,7 @@
 ---
 title: "API Reference"
 weight: 20
+description: "The HTTP API that the interface, the extensions and your scripts use."
 ---
 
 Everything the notd frontend does goes through this HTTP API, so scripts and extensions have the same abilities as the UI.
