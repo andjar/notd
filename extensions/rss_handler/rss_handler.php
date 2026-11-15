@@ -1,8 +1,8 @@
 <?php
 
 // --- Configuration & Setup ---
-define('DEFAULT_CONFIG_PATH', 'config.json');
-define('DEFAULT_API_URL', 'http://localhost:8080/api'); // Replace with your notes app API
+define('DEFAULT_CONFIG_PATH', __DIR__ . '/config.json'); // next to this script, wherever it is run from
+define('DEFAULT_API_URL', 'http://localhost:8000/api'); // notd's address followed by /api
 
 // --- Logging ---
 $verbose = false;
@@ -96,17 +96,13 @@ function make_api_request($url, $method = 'GET', $data = null, $headers = []) {
     return ['http_code' => $http_code, 'body' => $response_body, 'error' => null];
 }
 
+/** @return bool|null true if the item was imported before, null if that could not be checked */
 function check_duplicate($api_url, $item_hash) {
     $query_endpoint = rtrim($api_url, '/') . '/v1/query_notes.php';
     
-    // Construct the SQL query.
-    // IMPORTANT: Ensure $item_hash is safe. Hashes are generally safe, but for other values, parameter binding would be essential.
-    // The Query Notes API itself should have strong validation against SQL injection.
-    // Assuming 'rss_item_hash' is stored as an internal property.
-    // Note: The specific table and column names (N.id, P.entity_id, P.entity_type, P.name, P.value, P.internal)
-    // are based on common assumptions about the DB schema for notes and properties.
-    // These might need adjustment if the actual schema differs.
-    $sql_query = "SELECT N.id FROM Notes N JOIN Properties P ON N.id = P.entity_id WHERE P.entity_type = 'note' AND P.name = 'rss_item_hash' AND P.value = '" . SQLite3::escapeString($item_hash) . "' AND P.internal = 1 LIMIT 1";
+    // Items are recognised by their rss_item_hash property (a hex hash, so safe to quote).
+    $sql_query = "SELECT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'rss_item_hash' AND P.value = '"
+        . preg_replace('/[^0-9a-f]/', '', $item_hash) . "' LIMIT 1";
 
     $payload = ['sql_query' => $sql_query];
     
@@ -115,13 +111,13 @@ function check_duplicate($api_url, $item_hash) {
 
     if ($response['error'] || $response['http_code'] >= 300) { // Consider 2xx as success
         log_message('ERROR', "API request failed during duplicate check for hash $item_hash. HTTP Code: {$response['http_code']}. Body: {$response['body']}. Error: {$response['error']}");
-        return true; // Assume duplicate to be safe on error
+        return null; // could not tell
     }
 
     $result_data = json_decode($response['body'], true);
     if (json_last_error() !== JSON_ERROR_NONE) {
         log_message('ERROR', "Failed to decode JSON response from duplicate check for hash $item_hash: " . json_last_error_msg() . " - Response: {$response['body']}");
-        return true; // Assume duplicate
+        return null; // could not tell
     }
 
     // Based on API_SPECIFICATION.md for query_notes.php:
@@ -132,14 +128,14 @@ function check_duplicate($api_url, $item_hash) {
             return !empty($result_data['data']); // True if 'data' array is not empty (duplicate found)
         } else {
             log_message('WARNING', "Duplicate check for hash $item_hash succeeded but 'data' field is missing or not an array. Response: {$response['body']}");
-            return true; // Assume duplicate to be safe
+            return null; // could not tell
         }
     } elseif (isset($result_data['status']) && $result_data['status'] === 'error') {
         log_message('ERROR', "Duplicate check API returned an error for hash $item_hash. Message: " . ($result_data['message'] ?? 'Unknown error') . ". Response: {$response['body']}");
-        return true; // Assume duplicate
+        return null; // could not tell
     } else {
         log_message('WARNING', "Duplicate check response for hash $item_hash has unknown structure. Response: {$response['body']}");
-        return true; // Assume duplicate
+        return null; // could not tell
     }
 }
 
@@ -150,12 +146,17 @@ function create_note($api_url, $page_name, $title, $content_markdown, $feed_url,
     // Append internal properties to content_markdown
     // Note: $content_markdown might already contain the title and basic structure.
     // This function will now append the machine-readable properties.
-    $properties_markdown = "\n\n---\n"; // Start of properties block
-    $properties_markdown .= "rss:: true\n";
-    $properties_markdown .= "rss_item_hash:: " . $item_hash . "\n";
-    $properties_markdown .= "rss_feed_url:: " . $feed_url . "\n";
-    $properties_markdown .= "rss_item_link:: " . $item_link . "\n";
-    $properties_markdown .= "published_date:: " . $item_date . "\n";
+    // notd properties: {key::value}; three colons make one internal (hidden while reading).
+    $prop = static function ($key, $value, $colons = '::') {
+        return '{' . $key . $colons . str_replace(['}', "\n"], [')', ' '], (string)$value) . '}';
+    };
+    $properties_markdown = "\n\n" . implode(' ', [
+        $prop('rss', 'true'),
+        $prop('published_date', $item_date),
+        $prop('rss_item_link', $item_link, ':::'),
+        $prop('rss_feed_url', $feed_url, ':::'),
+        $prop('rss_item_hash', $item_hash, ':::'),
+    ]);
 
     $final_content = $content_markdown . $properties_markdown;
 
@@ -227,7 +228,12 @@ function fetch_and_process_feed($api_url, $feed_url, $page_name_for_feed) { // C
 
         $item_hash = generate_item_hash($item_id, $item_link, $item_title);
 
-        if (check_duplicate($api_url, $item_hash)) {
+        $duplicate = check_duplicate($api_url, $item_hash);
+        if ($duplicate === null) {
+            $errors++; // not imported: better to try again next run than to import it twice
+            continue;
+        }
+        if ($duplicate) {
             log_message('DEBUG', "Skipping duplicate item: $item_title (hash: $item_hash)");
             continue;
         }

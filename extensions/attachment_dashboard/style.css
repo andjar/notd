@@ -311,3 +311,56 @@ h1 {
 /* #attachments-table th[data-sort].sort-asc::after { content: ' ▲'; } */
 /* #attachments-table th[data-sort].sort-desc::after { content: ' ▼'; } */
 
+
+/* Header with a way back, the "without a note" filter, deleting. */
+.dashboard-header {
+    position: relative;
+}
+.back-link {
+    position: absolute;
+    right: 0;
+    top: 0.4em;
+    font-size: var(--ls-font-size-sm, 0.875rem);
+}
+.orphans-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    white-space: nowrap;
+    font-size: var(--ls-font-size-sm, 0.875rem);
+}
+.orphans-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    margin-bottom: var(--ls-space-4, 16px);
+    padding: 0.6em 0.9em;
+    border-radius: var(--ls-border-radius-medium, 4px);
+    background: var(--ls-primary-background-color, #f6f6f6);
+}
+.no-note {
+    color: var(--ls-secondary-text-color, #777);
+}
+.delete-btn,
+.orphans-actions .danger {
+    padding: 0.3em 0.7em;
+    border: 1px solid var(--ls-button-danger-border-color, #d9534f);
+    border-radius: var(--ls-border-radius-low, 4px);
+    background: transparent;
+    color: var(--ls-button-danger-bg, #d9534f);
+    cursor: pointer;
+    font-size: var(--ls-font-size-sm, 0.875rem);
+}
+.delete-btn:hover,
+.orphans-actions .danger:hover {
+    background: var(--ls-button-danger-bg, #d9534f);
+    color: #fff;
+}
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+}

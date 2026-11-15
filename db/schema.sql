@@ -12,7 +12,7 @@ PRAGMA foreign_keys = ON;
 -- Schema version. api/db_connect.php compares it with NOTD_SCHEMA_VERSION and
 -- upgrades an older database with the steps in db/migrations.php. Raise both
 -- together and add a step there whenever the schema changes.
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;
 
 -- Pages Table
 -- Pages are top-level containers for notes. They now include a `content`

@@ -1,6 +1,7 @@
 ---
 title: "Extensions"
 weight: 20
+description: "List the active extensions."
 ---
 
 Retrieves details about currently active extensions.

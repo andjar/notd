@@ -14,8 +14,9 @@
  *                        (default: merge, i.e. keep them and add what is new;
  *                        running the import twice adds nothing the second time)
  *   --strict             roll everything back if any page fails
- *   --keep-tags          leave #tags as they are (default: #tag becomes [[tag]])
- *   --keep-alias-links   leave [[alias]] links as they are (default: link to the page)
+ *   --tags-as-links      #tag becomes [[tag]] (default: {tag::tag}, a tag that links to its page)
+ *   --keep-tags          leave #tags as they are
+ *   --rewrite-alias-links  [[alias]] becomes [[Page]] (default: kept; notd resolves aliases)
  *   --max-file-size=MB   skip attachments larger than this (default 10, 0 = no limit)
  *   --filename-format=F  triple-lowbar or legacy (default: from logseq/config.edn)
  *   --webhooks           send the webhooks the imported properties trigger
@@ -46,8 +47,10 @@ foreach (array_slice($argv, 1) as $arg) {
         $options['strict'] = true;
     } elseif ($arg === '--keep-tags') {
         $options['tags'] = 'keep';
-    } elseif ($arg === '--keep-alias-links') {
-        $options['resolve_aliases'] = false;
+    } elseif ($arg === '--tags-as-links') {
+        $options['tags'] = 'link';
+    } elseif ($arg === '--rewrite-alias-links') {
+        $options['resolve_aliases'] = true;
     } elseif (preg_match('/^--max-file-size=(\d+(?:\.\d+)?)$/', $arg, $m)) {
         $options['max_file_size'] = (int)round((float)$m[1] * 1024 * 1024);
     } elseif (preg_match('/^--filename-format=(triple-lowbar|legacy)$/', $arg, $m)) {

@@ -227,10 +227,6 @@ window.addEventListener('DOMContentLoaded', async function () {
         return data.data;
     }
 
-    const notesAPI = {
-        getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
-        applyOps: (ops) => apiRequest('ops.php', 'POST', { ops })
-    };
     const pagesAPI = {
         getPage: (pageId) => apiRequest(`pages.php?id=${pageId}`),
         updatePage: (id, pageData) => apiRequest('pages.php', 'POST', { _method: 'PUT', id, ...pageData })
@@ -245,13 +241,17 @@ window.addEventListener('DOMContentLoaded', async function () {
         };
     }
 
+    let noteSession = null;
+
     async function loadInitialContent() {
         const { note_id, page_id } = getNoteOrPageIdFromUrl();
         let contentToLoad = '';
         try {
             if (note_id) {
-                const note = await notesAPI.getNote(note_id);
-                contentToLoad = (note && note.content !== undefined && note.content !== null) ? note.content : '';
+                // Loading, saving with a conflict check, following changes made in notd: ../zen/note-sync.js.
+                noteSession = await window.notdNoteSync.attach(editor, note_id);
+                processAndDisplayResults();
+                return;
             } else if (page_id) {
                 const page = await pagesAPI.getPage(page_id);
                 contentToLoad = (page && page.content !== undefined && page.content !== null) ? page.content : '';
@@ -260,7 +260,7 @@ window.addEventListener('DOMContentLoaded', async function () {
             }
         } catch (err) {
             console.error('Failed to load content:', err);
-            alert('Failed to load content: ' + (err.message || err));
+            window.notdNoteSync.toast('Could not load: ' + (err.message || err), { error: true });
             contentToLoad = `# Error loading content.\n${err.message}`;
         }
         editor.setValue(contentToLoad);
@@ -289,18 +289,17 @@ window.addEventListener('DOMContentLoaded', async function () {
         const { note_id, page_id } = getNoteOrPageIdFromUrl();
         try {
             if (note_id) {
-                await notesAPI.applyOps([{ op_id: 'ext-' + Date.now().toString(36) + Math.random().toString(36).slice(2), type: 'edit', id: String(note_id), content: value }]);
-                alert('Note saved!');
+                if (noteSession) await noteSession.save();
             } else if (page_id) {
                 await pagesAPI.updatePage(page_id, { content: value });
-                alert('Page saved!');
+                window.notdNoteSync.toast('Page saved');
             } else {
                 localStorage.setItem('math-notepad-content', value);
-                alert('Saved to local storage!');
+                window.notdNoteSync.toast('Saved in this browser');
             }
         } catch (err) {
             console.error('Failed to save content:', err);
-            alert('Failed to save content: ' + (err.message || err));
+            window.notdNoteSync.toast('Could not save: ' + (err.message || err), { error: true });
         }
     }
 

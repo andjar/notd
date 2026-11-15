@@ -2,6 +2,7 @@
 title: "Core Concepts"
 weight: 30
 aliases: ["/docs/overview/advanced-features/", "/docs/overview/best-practices/"]
+description: "Pages, notes, properties, tasks, links and how saving works."
 ---
 
 ## Pages

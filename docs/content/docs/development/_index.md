@@ -1,14 +1,15 @@
 ---
 title: "Development"
 weight: 35
+description: "How notd is put together, how saving works, and how to change it safely."
 ---
-
-How notd is put together, and the rules that keep it small and long-lived.
 
 ## Principles
 
+The rules that keep notd small and long-lived:
+
 1. **No build step.** The repository is the application. PHP files are served as they are; the browser loads plain ES modules. Nothing is compiled, bundled or installed.
-2. **No runtime dependencies to fetch.** The handful of libraries (Alpine.js, marked, DOMPurify, Sortable, SJCL, Feather) are stored in `assets/libs/`. Nothing is loaded from the internet.
+2. **No runtime dependencies to fetch.** The handful of libraries (Alpine.js, marked, DOMPurify, Sortable, SJCL, Feather, and Excalidraw for its extension) are stored in `assets/libs/`. Nothing is loaded from the internet. Excalidraw is the one library that is a bundle; `assets/libs/excalidraw/README.md` says how it is made.
 3. **Boring technology.** PHP, SQLite, HTML, CSS and JavaScript as browsers and PHP ship them.
 4. **Content is the source of truth.** Properties, links and task states are parsed from note text. Derived tables can always be rebuilt from it.
 5. **GET and POST only**, so the app runs under minimal web servers such as phpdesktop.
@@ -39,7 +40,11 @@ db/
   schema.sql             the whole schema
   migrations.php         automatic upgrades (v3 to v4, ...)
   migrate_v3.php         manual migration from schema v2
-tools/                   command-line export and import
+tools/
+  export.php             the whole notebook as Markdown files
+  import.php             Markdown files back into pages
+  import_logseq.php      Logseq graph import (journals, pages, references, attachments)
+  espanso/               Espanso configuration: clipboard to today's journal
 assets/
   js/api_client.js       the HTTP API, for the app and for extensions
   js/app/                state and actions: outline, outbox, page, search, keys
@@ -47,8 +52,8 @@ assets/
   css/                   one file per component, themes as custom properties
   libs/                  bundled third-party libraries
   template/              note and page templates
-extensions/              optional apps built on the API
-tests/                   model, API and browser tests
+extensions/              optional apps built on the API (see Extensions)
+tests/                   model, API, import and browser tests
 docs/                    this site (Hugo)
 ```
 
@@ -123,6 +128,9 @@ No test needs a build step or a PHP package.
 ```bash
 node tests/js/model.test.mjs          # outline model and outbox (no server)
 node tests/js/ordering_parity.mjs     # JavaScript and PHP sort keys agree (needs php on PATH)
+php tests/php/logseq_import.test.php  # Logseq importer, on throw-away databases (no server)
+php tests/php/migration_v5.test.php   # schema upgrade from v4 (no server)
+php tests/php/mail_handler.test.php   # e-mail parsing, and the mail handler against its own server
 
 # the remaining suites talk to a running server, on a throw-away database:
 NOTD_DB_PATH=/tmp/notd-test.sqlite PHP_CLI_SERVER_WORKERS=4 \
@@ -147,9 +155,22 @@ The browser suites need `pip install playwright && playwright install chromium`.
 - **Settings** get a default in `config.php` via `notd_default()` and a line in `config.local.example.php`.
 - **Paths are relative**, so notd works from a sub-folder.
 
+## Extensions
+
+Extensions are separate apps in `extensions/` that use only the HTTP API; nothing in the core depends on them. How to write one is described in [Writing an extension]({{< relref "../extensions/writing-extensions.md" >}}). The three note editors (Zen, math notepad, Excalidraw) are the exception that needs core code: their note-menu entries are listed in `assets/js/ui/note-menu.js`.
+
+## Contributing
+
+Open an issue or a pull request on [GitHub](https://github.com/andjar/notd). A change is ready when:
+
+- the tests pass (they run on every pull request, on PHP 7.4 and 8.3),
+- new behaviour has a test in the suite that fits it,
+- it follows the principles and conventions above (no build step, nothing loaded from the internet, writes through the write paths),
+- user-visible changes are in the documentation and the changelog.
+
 ## Documentation site
 
-This site is built with [Hugo](https://gohugo.io/) from `docs/` and published to GitHub Pages by `.github/workflows/pages.yml` when `docs/` changes on `main`. To preview it:
+This site is built with [Hugo](https://gohugo.io/) from `docs/` and published to GitHub Pages by `.github/workflows/pages.yml` when `docs/` changes on `main`. Pages are Markdown files in `docs/content/`, images go in `docs/static/images/`, and a short `description` in a page's front matter is shown under its title and on its section's page. `docs/layouts/` overrides the theme's templates where needed. To preview it:
 
 ```bash
 git submodule update --init   # the theme

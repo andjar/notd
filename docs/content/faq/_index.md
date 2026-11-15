@@ -8,7 +8,7 @@ description = "Frequently Asked Questions"
 In one SQLite file, `db/database.sqlite`, plus the `uploads/` folder for attachments. Notes are stored as the plain text you typed. Back up those two and you have everything.
 
 ## Does it need an internet connection?
-No. Nothing is loaded from the internet, and edits made while the server is unreachable are kept in the browser and sent later. The only exception is the optional Excalidraw extension.
+No. Nothing is loaded from the internet (Excalidraw included), and edits made while the server is unreachable are kept in the browser and sent later.
 
 ## Can I undo a mistake?
 Yes. `Ctrl + Z` undoes typing first and then outline changes (new, moved, indented and deleted notes), up to 200 steps while the page is open. `Ctrl + Shift + Z` redoes.

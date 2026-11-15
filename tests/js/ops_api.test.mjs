@@ -240,5 +240,22 @@ await test('webhooks: managed at webhooks.php, delivered after the batch commits
   eq((await raw('webhooks.php')).json.data.filter(w => w.id === hookId), [], 'webhook deleted');
 });
 
+await test('edit with base_version: applied when current, skipped as a conflict when not', async () => {
+  const pid = await page('BaseVersion');
+  const nid = id();
+  await ops([{ op_id: opId(), type: 'create', id: nid, page_id: pid, content: 'v1' }]);
+  const v1 = (await raw(`notes.php?id=${nid}`)).json.data.version;
+  let r = await ops([{ op_id: opId(), type: 'edit', id: nid, content: 'v2 from the editor', base_version: v1 }]);
+  eq([r.results[0].status, r.warnings], ['applied', []], 'current version: applied');
+  const v2 = r.notes[0].version;
+  ok(v2 > v1, 'version went up');
+  await ops([{ op_id: opId(), type: 'edit', id: nid, content: 'v3 from the outline' }]);
+  r = await ops([{ op_id: opId(), type: 'edit', id: nid, content: 'stale editor text', base_version: v2 }]);
+  eq([r.results[0].status, r.warnings[0]?.code], ['skipped', 'conflict'], 'stale version: conflict');
+  eq(r.notes.map(x => x.content), ['v3 from the outline'], 'the answer carries the current note');
+  eq((await raw(`notes.php?id=${nid}`)).json.data.content, 'v3 from the outline', 'nothing overwritten');
+  eq((await raw('ops.php', { ops: [{ op_id: opId(), type: 'edit', id: nid, content: 'x', base_version: 'one' }] })).status, 400, 'base_version must be a number');
+});
+
 console.log(`\n${passes} assertions passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

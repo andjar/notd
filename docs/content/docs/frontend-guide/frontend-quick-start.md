@@ -1,6 +1,7 @@
 ---
 title: "Quick Start"
 weight: 5
+description: "The first five minutes: your first notes, links and tasks."
 ---
 
 ## The screen

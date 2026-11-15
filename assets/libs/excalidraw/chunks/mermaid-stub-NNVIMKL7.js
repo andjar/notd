@@ -1,0 +1,1 @@
+import"./chunk-2RUN43TJ.js";async function r(){throw new Error("Mermaid diagrams cannot be converted in notd's offline copy of Excalidraw.")}var a={parseMermaidToExcalidraw:r};export{a as default,r as parseMermaidToExcalidraw};
