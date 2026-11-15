@@ -1,6 +1,7 @@
 ---
 title: "Webhooks"
 weight: 110
+description: "Get an HTTP call when a property changes."
 ---
 
 Manages webhook subscriptions. A webhook is an HTTP POST that notd sends to a URL of your choice when a property changes.

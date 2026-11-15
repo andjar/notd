@@ -1,6 +1,7 @@
 ---
 title: "Backlinks & Favorites"
 weight: 30
+description: "See what links to a page, and keep the pages you use most at hand."
 ---
 
 ## Backlinks

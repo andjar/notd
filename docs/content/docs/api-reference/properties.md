@@ -1,6 +1,7 @@
 ---
 title: "Properties"
 weight: 70
+description: "Read the properties index of a note or page."
 ---
 
 This endpoint is now **read-only**. It provides a way to query the `Properties` table index directly, which can be useful for advanced filtering or finding all entities with a specific property value, without needing to perform a full-text search.

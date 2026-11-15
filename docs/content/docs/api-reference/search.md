@@ -1,6 +1,7 @@
 ---
 title: "Search"
 weight: 80
+description: "Full-text search, tasks by state, and backlinks."
 ---
 
 Provides powerful search capabilities. It can search by term, find backlinks, list tasks, or list favorited pages.

@@ -1,6 +1,7 @@
 ---
 title: "Attachments"
 weight: 30
+description: "Upload, list and delete files attached to notes."
 ---
 
 Files attached to notes. Files are stored under `UPLOADS_DIR` in `year/month/` folders with a random prefix; the `url` field of each attachment is where the browser can fetch it.

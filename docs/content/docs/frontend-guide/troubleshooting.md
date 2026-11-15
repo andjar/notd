@@ -1,6 +1,7 @@
 ---
 title: "Troubleshooting"
 weight: 60
+description: "What to check when something does not work as expected."
 ---
 
 | Problem | What to check |
