@@ -26,7 +26,7 @@ These come with notd but are off until you turn them on.
 |---|---|---|
 | [Zen writer]({{< relref "zen.md" >}}) | A distraction-free, full-screen editor for one note. | Note menu |
 | [Math notepad]({{< relref "math-notepad.md" >}}) | Calculations line by line, with variables; results beside each line. | Note menu |
-| [Excalidraw]({{< relref "excalidraw.md" >}}) | Hand-drawn diagrams, saved to a note as attachments. Needs an internet connection. | Note menu, sidebar |
+| [Excalidraw]({{< relref "excalidraw.md" >}}) | Hand-drawn diagrams, saved to a note as attachments. | Note menu, sidebar |
 | [RSS handler]({{< relref "rss-handler.md" >}}) | A script that adds new feed items as notes. | Command line, scheduler |
 | [Mail handler]({{< relref "mail-handler.md" >}}) | A script that turns an e-mail, with its attachments, into a note on today's journal page. | Command line, mail server |
 

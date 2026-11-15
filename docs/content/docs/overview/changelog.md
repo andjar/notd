@@ -35,6 +35,7 @@ Extensions
 - The mail handler reads real-world mail: MIME multipart, `quoted-printable` and `base64`, any character set, encoded subjects and names, HTML-only messages (turned into Markdown), several recipients and `Cc`. Attachments are stored on the note; a message already added (same `Message-ID`) is skipped; exit status 75 makes the mail server retry when notd is down.
 - The Pomodoro timer reads `pageTemplate`, `noteTemplate` and `cycle` from its `config.json` (they were ignored, so sessions went to the journal page and there were no long breaks), and its work session is 25 minutes again (the shipped setting was 2).
 - The kanban board's **Back to Main App** works when notd is served from a sub-folder.
+- **Excalidraw works offline.** It is bundled in `assets/libs/excalidraw/` (about 5.6 MB, without the Mermaid converter and the CJK handwriting font) instead of loaded from a CDN. Saving now stores the PNG as well as the `.excalidraw` file (only the latter arrived before).
 - The Zen writer and the math notepad no longer overwrite changes made elsewhere: saving over a newer version asks first, a change made in notd is taken over when nothing is unsaved, and open notd tabs show a save at once. Closing with unsaved text asks. API: `edit` accepts `base_version` and answers `conflict`.
 
 - Kanban cards show the note's text without `{property}` syntax, its properties as labels, and a link to the note.

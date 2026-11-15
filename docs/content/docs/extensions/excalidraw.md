@@ -1,13 +1,15 @@
 ---
 title: "Excalidraw"
 weight: 60
-description: "Hand-drawn diagrams and sketches, saved to a note. Needs an internet connection. Turn it on with ACTIVE_EXTENSIONS."
+description: "Hand-drawn diagrams and sketches, saved to a note. Works offline. Turn it on with ACTIVE_EXTENSIONS."
 aliases: ["/docs/extensions/excalidraw-editor/"]
 ---
 
+![Excalidraw in notd: three hand-drawn boxes, Browser, PHP API and SQLite, joined by arrows](/images/excalidraw.png)
+
 [Excalidraw](https://excalidraw.com/) is a whiteboard for quick, hand-drawn-looking diagrams. This extension opens it for a note and saves the drawing to that note.
 
-**It needs an internet connection.** Unlike the rest of notd, Excalidraw is not bundled: it is loaded from a CDN (esm.sh) when the editor opens.
+Excalidraw comes with notd (`assets/libs/excalidraw/`), so it works offline like the rest of notd. Two parts of it are left out to keep the size down: the "Mermaid to Excalidraw" converter, and the handwriting font for Chinese and Japanese, which falls back to a system font.
 
 ## Turning it on
 

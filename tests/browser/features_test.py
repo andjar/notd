@@ -240,6 +240,34 @@ def test_math_notepad_loads_calculates_saves(ctx):
     math.close()
 
 
+def test_excalidraw_works_offline(ctx):
+    nid = api('append_to_page.php', {'page_name': f'F-draw-{RUN}', 'notes': ['a drawing']})['appended_notes'][0]['id']
+    context = ctx.browser.new_context(viewport={'width': 1280, 'height': 800})
+    outside = []
+    def route(r):
+        if r.request.url.startswith(BASE):
+            r.continue_()
+        else:
+            outside.append(r.request.url)
+            r.abort()
+    context.route('**/*', route)  # as if there were no internet
+    page = context.new_page()
+    page.goto(BASE + f'extensions/excalidraw_editor/excalidraw.html?note_id={nid}')
+    page.wait_for_selector('#save-to-note-btn:not([disabled])', timeout=20000)
+    page.mouse.click(640, 600)
+    page.keyboard.press('2')  # rectangle
+    page.mouse.move(420, 300); page.mouse.down(); page.mouse.move(680, 460, steps=8); page.mouse.up()
+    page.keyboard.press('8')  # text
+    page.mouse.click(720, 250); page.keyboard.type('Offline!'); page.keyboard.press('Escape')
+    page.wait_for_timeout(300)
+    page.click('#save-to-note-btn')
+    page.wait_for_function("() => document.getElementById('success-message').textContent || document.getElementById('error-message').textContent", timeout=15000)
+    names = sorted(a['name'].rsplit('.', 1)[1] for a in api(f'attachments.php?note_id={nid}'))
+    check('Excalidraw loads, draws and saves without the internet', names == ['excalidraw', 'png'], str(names))
+    check('nothing is fetched from outside notd', outside == [], str(outside[:5]))
+    context.close()
+
+
 def main():
     only = sys.argv[1] if len(sys.argv) > 1 else ''
     tests = [(n, f) for n, f in globals().items() if n.startswith('test_') and only in n]

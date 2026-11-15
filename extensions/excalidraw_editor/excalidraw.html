@@ -3,7 +3,7 @@
 <head>
   <title>Excalidraw Editor</title>
   <meta charset="UTF-8" />
-  <link rel="stylesheet" href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css" />
+  <link rel="stylesheet" href="../../assets/libs/excalidraw/excalidraw.css" />
   <style>
     body, html {
       margin: 0;
@@ -52,15 +52,9 @@
       min-height: 0; /* Important for flex children that might overflow */
     }
   </style>
-  <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18",
-        "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
-        "react-dom": "https://esm.sh/react-dom@18",
-        "react-dom/client": "https://esm.sh/react-dom@18/client"
-      }
-    }
+  <script>
+    // Excalidraw's fonts come from notd's own copy (assets/libs/excalidraw/fonts), not from a CDN.
+    window.EXCALIDRAW_ASSET_PATH = new URL('../../assets/libs/excalidraw/', window.location.href).href;
   </script>
   <script src="../../assets/js/api_client.js" type="module"></script>
 </head>
@@ -74,9 +68,9 @@
   <div id="excalidraw-container"></div>
 
   <script type="module">
-    import * as ExcalidrawLib from 'https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.js?external=react,react-dom';
-    import React from "react";
-    import { createRoot } from "react-dom/client";
+    // Excalidraw and React, bundled in notd (assets/libs/excalidraw/README.md): no internet needed.
+    import * as ExcalidrawLib from '../../assets/libs/excalidraw/excalidraw.js';
+    const { React, createRoot } = ExcalidrawLib;
     import { attachmentsAPI } from '../../assets/js/api_client.js';
 
     const excalidrawContainer = document.getElementById('excalidraw-container');
@@ -263,8 +257,8 @@
             const filenameJson = `excalidraw_${timestamp}.excalidraw`;
             const formData = new FormData();
             formData.append('note_id', currentNoteId);
-            formData.append('attachmentFile', blob, filenamePng);
-            formData.append('attachmentFile', jsonBlob, filenameJson);
+            formData.append('attachmentFile[]', blob, filenamePng);
+            formData.append('attachmentFile[]', jsonBlob, filenameJson);
             // Debug: log all files in FormData
             for (let [key, value] of formData.entries()) {
                 if (value instanceof File || value instanceof Blob) {
