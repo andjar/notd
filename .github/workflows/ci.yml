@@ -1,5 +1,8 @@
 name: CI
 
+# The checks every pull request must pass. A suite that does not exist yet
+# passes with a note, so each job can be required from the first day.
+
 on:
   push:
     branches: [next, main]
@@ -33,3 +36,90 @@ jobs:
           while IFS= read -r -d '' f; do node --check "$f" || status=1; done \
             < <(find . \( -name '*.js' -o -name '*.mjs' \) -not -path './docs/*' -not -path './.git/*' -not -path '*/vendor/*' -not -path '*/node_modules/*' -print0)
           exit $status
+
+  php-unit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', 'latest']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, mbstring, intl
+          coverage: none
+      - name: Unit tests
+        run: |
+          if [ ! -f tests/php/run.php ]; then echo "No PHP test runner yet."; exit 0; fi
+          php tests/php/run.php
+
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, mbstring, intl
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Protocol tests
+        run: |
+          if ! ls tests/conformance/*.test.mjs > /dev/null 2>&1; then echo "No conformance tests yet."; exit 0; fi
+          node --test --test-reporter=spec tests/conformance/
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Look for browser tests
+        id: find
+        run: |
+          if ls tests/browser/*_test.py > /dev/null 2>&1; then echo "found=true" >> "$GITHUB_OUTPUT"; else echo "No browser tests yet."; fi
+      - uses: shivammathur/setup-php@v2
+        if: steps.find.outputs.found == 'true'
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, mbstring, intl
+          coverage: none
+      - name: Browser tests
+        if: steps.find.outputs.found == 'true'
+        run: |
+          pip install playwright
+          python3 -m playwright install --with-deps chromium
+          for t in tests/browser/*_test.py; do python3 "$t"; done
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: peaceiris/actions-hugo@v2
+        with:
+          hugo-version: '0.169.0'
+          extended: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the site
+        working-directory: ./docs
+        run: hugo --minify
+      - name: Check links
+        run: node tools/check_links.mjs docs/public /notd/
+
+  budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Core size budget
+        run: |
+          if [ ! -f tools/budget.mjs ]; then echo "No budget script yet."; exit 0; fi
+          node tools/budget.mjs
