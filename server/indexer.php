@@ -99,9 +99,9 @@ final class Indexer
             return;
         }
         $parsed = parse_text($text);
-        $field = $pdo->prepare('INSERT INTO fields (node_id, key, value, num) VALUES (?, ?, ?, ?)');
+        $field = $pdo->prepare('INSERT INTO fields (node_id, key, value, value_key, num) VALUES (?, ?, ?, ?, ?)');
         foreach ($parsed['fields'] as [$key, $value]) {
-            $field->execute([$id, $key, $value, is_numeric($value) ? (float) $value : null]);
+            $field->execute([$id, $key, $value, title_key($value), is_numeric($value) ? (float) $value : null]);
         }
         $link = $pdo->prepare('INSERT INTO links (from_id, kind, target) VALUES (?, ?, ?)');
         foreach ($parsed['links'] as [$kind, $target]) {
