@@ -124,6 +124,7 @@ The schema is `server/schema.sql`:
 | `fields` | Index of `{key::value}` fields, with the value as a number when it is one. |
 | `links` | Index of links, tags, block references and embeds, by source and target. |
 | `changes` | The change feed: one row per change, numbered. |
+| `search` | The FTS5 full-text index of titles and text (diacritics kept). |
 | `applied_ops` | Operation ids already applied, so a retried batch is not applied twice. |
 | `meta` | The schema version, the last clock, and other facts about the notebook. |
 
@@ -131,4 +132,4 @@ The database runs in WAL mode, so reading never waits for writing. All writes go
 
 All changes to notes go through `Ops::apply()` (`server/ops.php`), the code behind [`POST /api/v1/ops`](../protocol/operations/). It stamps each changed node with the next hybrid logical clock and appends to the change feed; other parts (the indexer, later plugins' actions) hook in through `Ops::$listeners`, wired in `server/core.php`.
 
-The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables from the text of every node.
+The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables, and the search index, from the text of every node.

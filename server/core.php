@@ -11,5 +11,7 @@ require_once __DIR__ . '/sortkeys.php';
 require_once __DIR__ . '/ops.php';
 require_once __DIR__ . '/indexer.php';
 require_once __DIR__ . '/read.php';
+require_once __DIR__ . '/search.php';
 
 Ops::$listeners['index'] = [Indexer::class, 'onChange'];
+Ops::$listeners['search'] = [Search::class, 'onChange'];

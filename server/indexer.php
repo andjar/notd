@@ -119,6 +119,7 @@ final class Indexer
             foreach ($ids as $id) {
                 self::node($pdo, $id);
             }
+            Search::rebuild($pdo);
             return (int) $pdo->query('SELECT COUNT(*) FROM nodes')->fetchColumn();
         });
     }
