@@ -61,6 +61,15 @@ export class Editor {
     setCaret(content, Math.min(caret, n.text.length));
   }
 
+  /** Replaces the whole text of the block being edited (a command did it), caret at the end. */
+  replaceText(id, text) {
+    const content = this.view.contentOf(id);
+    if (this.editing !== id || !content) return this.outline.edit(id, text, { undoable: true });
+    content.textContent = text;
+    setCaret(content, text.length);
+    this.outline.edit(id, text, { undoable: true });
+  }
+
   /** Stops editing and draws the block's text again. */
   finish() {
     const id = this.editing;

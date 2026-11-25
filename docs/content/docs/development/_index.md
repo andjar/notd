@@ -162,6 +162,9 @@ client/
   lib/markdown.js note text to HTML: marked plus notd's syntax as marked extensions (no DOM)
   lib/links.js    what is being typed after [[ or #, suggestions, rewriting links on rename (no DOM)
   lib/feed.js     live updates: polls the change feed every 10 s and when the tab is shown again
+  lib/commands.js the command registry, keys, and the one click listener for data-command
+  core-commands.js  the commands the core comes with
+  ui/menus.js     the command palette, the slash menu and a block's menu
   lib/plugins.js  loads plugins' browser code and calls activate(notd); safe mode
   lib/route.js    addresses: #/page/<title>[/<block id>], today's journal when empty
   lib/model.js    the blocks of the page on screen, in memory (no DOM)

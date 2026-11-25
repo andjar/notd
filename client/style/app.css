@@ -237,3 +237,33 @@ body.has-toolbar .main { padding-bottom: 50vh; }
 .plugins li { display: grid; padding: 0.1rem 0; }
 .plugin-problem { color: var(--danger); font-size: 0.8rem; }
 .status .warn, .status a.warn { color: var(--danger); text-decoration: none; }
+
+/* Menus: command palette, slash menu, block menu. */
+.menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 15rem;
+  max-width: min(28rem, 95vw);
+  max-height: 60vh;
+  overflow: auto;
+  padding: 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.menu ul { list-style: none; margin: 0; padding: 0; }
+.menu li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer; }
+.menu li.active { background: var(--accent-soft); }
+.menu kbd { font: 0.8rem var(--font-mono); color: var(--fg-faint); }
+.menu.palette { top: 15vh !important; left: 50% !important; transform: translateX(-50%); width: min(32rem, 95vw); }
+.menu.palette input {
+  width: 100%;
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  color: var(--fg);
+}

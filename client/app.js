@@ -10,6 +10,9 @@ import { PageScreen, liveScreens } from './ui/page.js';
 import { Feed } from './lib/feed.js';
 import { Toolbar } from './ui/toolbar.js';
 import { loadPlugins } from './lib/plugins.js';
+import { commands, installKeys } from './lib/commands.js';
+import { Palette, BlockMenu } from './ui/menus.js';
+import { registerCoreCommands } from './core-commands.js';
 import { pluginsPanel, safeModePanel } from './panels/plugins.js';
 import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
@@ -27,6 +30,10 @@ export const notd = {
       api,
       panels: { register: (p) => panels.register({ ...p, id: `${name}:${p.id}` }), refresh: (slot) => panels.refresh(panels.context, slot) },
       go: (title, block) => notd.go(title, block),
+      commands: {
+        register: (c) => commands.register({ ...c, id: c.id.startsWith(name + '.') ? c.id : `${name}.${c.id}` }),
+        run: (id, extra) => commands.run(id, extra),
+      },
       on: (event, fn) => document.addEventListener('notd:' + event, (e) => fn(e.detail)),
     });
   },
@@ -95,6 +102,15 @@ async function start() {
   } });
   notd.feed.start();
   notd.toolbar = new Toolbar();
+  notd.commands = commands;
+  commands.setContext((id) => {
+    const screens = liveScreens();
+    const s = (id ? screens.find((x) => x.outline.model.has(id)) : screens.find((x) => x.editor?.editing)) ?? screens.find((x) => x.announce) ?? screens[0];
+    return { id: id ?? s?.editor?.editing ?? null, outline: s?.outline, editor: s?.editor, page: s?.page };
+  });
+  registerCoreCommands({ palette: new Palette(), go });
+  new BlockMenu();
+  installKeys();
   await loadPlugins(notd);
   panels.refresh(panels.context, 'app.left');
   addEventListener('hashchange', show);
