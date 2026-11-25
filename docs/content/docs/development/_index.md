@@ -133,4 +133,4 @@ The database runs in WAL mode, so reading never waits for writing. All writes go
 
 All changes to notes go through `Ops::apply()` (`server/ops.php`), the code behind [`POST /api/v1/ops`](../protocol/operations/). It stamps each changed node with the next hybrid logical clock and appends to the change feed; other parts (the indexer, later plugins' actions) hook in through `Ops::$listeners`, wired in `server/core.php`.
 
-The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables, and the search index, from the text of every node.
+The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables, and the search index, from the text of every node. `php tools/export.php` and `php tools/import.php <folder>` write and read [Markdown](../protocol/export/); the import is tested against a sample Logseq graph in `tests/fixtures/logseq-graph/`.
