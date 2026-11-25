@@ -32,6 +32,12 @@ final class PluginApi
         Query::$filters[strtolower($key)] = $fn;
     }
 
+    /** A job handler: fn(array $payload): string, run after the change by the job queue. */
+    public function jobHandler(string $kind, callable $fn): void
+    {
+        Jobs::$handlers[$kind] = $fn;
+    }
+
     /** Called after every change: fn(PDO $pdo, string $op, string $nodeId). */
     public function onChange(callable $fn): void
     {

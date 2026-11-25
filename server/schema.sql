@@ -71,3 +71,17 @@ CREATE TABLE IF NOT EXISTS files (
   mime    TEXT NOT NULL,
   path    TEXT NOT NULL                        -- relative to the data folder: files/YYYY/MM/<sha256>.<ext>
 );
+
+CREATE TABLE IF NOT EXISTS jobs (
+  id       INTEGER PRIMARY KEY,
+  key      TEXT,                               -- a waiting job with the same key is replaced, not doubled
+  kind     TEXT NOT NULL,                      -- 'run' (a program) or the name of a plugin's job handler
+  payload  TEXT NOT NULL,                      -- JSON
+  status   TEXT NOT NULL DEFAULT 'waiting',    -- waiting, running, done, failed
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created  INTEGER NOT NULL,
+  started  INTEGER,
+  finished INTEGER,
+  output   TEXT NOT NULL DEFAULT ''            -- the end of what it printed, or why it failed
+);
+CREATE UNIQUE INDEX IF NOT EXISTS jobs_waiting_key ON jobs (key) WHERE status = 'waiting' AND key IS NOT NULL;

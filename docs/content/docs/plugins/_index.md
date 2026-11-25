@@ -112,8 +112,28 @@ return [
 | `edit($id, $text)` | Replaces a block's text. |
 | `create($parentId, $text)` | Adds a block; returns its id. |
 | `query('...')`, `node($id)` | Reads, like the query endpoint. |
+| `run(['program', 'arg', ...], key, timeout, cwd)` | Runs a program **after** the change is saved, as a job (see below). Arguments are passed as they are, never through a shell. |
+| `queue('kind', $payload, key)` | Queues a job for a plugin's job handler. |
 
 Changes an action makes can set off actions again, at most three deep; a loop is stopped there and reported, and the change itself still goes in. An action that throws is reported (in the server's log) and skipped. No action runs in safe mode. Point `actions_dir` in `config.local.php` elsewhere to keep your actions with your notes.
+
+## Jobs: effects outside notd
+
+Running a program, committing to git or posting to a website must not happen inside a change: the change could still fail, and a slow program would hold everything up. So `run()` and `queue()` only add a **job** to a queue, in the same transaction as the change; a job exists exactly when its change does. notd runs waiting jobs right after it has answered the request (or `php tools/jobs.php`, from cron, if your web server cannot work after answering).
+
+- A job has a time limit (30 s unless you give another); a program that runs longer is stopped.
+- What it printed is kept; `GET /api/v1/jobs` lists the last 200 jobs with their status (`waiting`, `running`, `done`, `failed`) and output.
+- A failed job is tried again, up to three times in all.
+- A **key** makes jobs coalesce: queuing a job while another with the same key is still waiting replaces it, so ten quick edits give one git commit, not ten.
+
+```php
+<?php
+// actions/done-tasks-ping.php: when a task is ticked, run a script of your own
+return ['on' => 'edited', 'match' => 'task:done',
+        'do' => fn(array $node, Actions $notd) => $notd->run(['/home/me/bin/task-done', $node['text']])];
+```
+
+A plugin handles its own kinds of job with `$notd->jobHandler('git.commit', fn(array $payload): string => ...)`; the returned string is logged.
 
 ## Safe mode
 

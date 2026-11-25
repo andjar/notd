@@ -49,3 +49,11 @@ The protocol is `/api/v1/<name>`, GET for reads and POST with a JSON body for wr
 ## 11. Pages addressed in the fragment, and a strict Content-Security-Policy (2026-11-25)
 
 The browser app addresses pages as `#/page/<title>`. Unlike paths, fragments never reach the server, so notd runs from any folder of any web server (Apache, phpdesktop, `php -S`) without rewrite rules, and every relative URL keeps working. The app page allows scripts only from notd itself; the import map, the one inline script, is allowed by its hash, which the server computes when it sends the page.
+
+## 12. Import is a tool, not part of the core (2026-11-25)
+
+Reading a Logseq graph or a notd 3 export is done once, from the command line, so the importer lives in `tools/lib/import.php` and does not count towards the core's size budget. It still goes through the operations pipeline, so imported notes are indexed exactly like typed ones. This kept the core within 2,500 lines of PHP once actions and jobs were added.
+
+## 13. Outside effects run as jobs after the change (2026-11-25)
+
+Actions may run programs, but only through a job queue written in the same transaction as the change and run after the answer, with a time limit, a log, retries and keys that coalesce repeated jobs. A program never runs inside a change, never through a shell, and never for a change that did not happen.

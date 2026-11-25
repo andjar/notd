@@ -155,4 +155,16 @@ final class Actions
     {
         return Nodes::get($this->pdo, $id);
     }
+
+    /** Runs a program after the change is saved: an argument list, no shell. See Jobs. */
+    public function run(array $argv, ?string $key = null, int $timeout = 30, ?string $cwd = null): void
+    {
+        Jobs::run($this->pdo, $argv, $key, $timeout, $cwd);
+    }
+
+    /** Queues a job for a plugin's handler, after the change is saved. */
+    public function queue(string $kind, array $payload = [], ?string $key = null): void
+    {
+        Jobs::queue($this->pdo, $kind, $payload, $key);
+    }
 }

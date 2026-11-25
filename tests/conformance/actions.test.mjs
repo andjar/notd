@@ -26,3 +26,15 @@ test('in safe mode actions do not run', async () => {
   const node = (await server.get('/api/v1/node?id=' + res.body.results[0].id)).body.node;
   assert.equal(node.text, 'Heat {type::movie}');
 });
+
+test('a program an action runs is a job that runs after the answer, and is logged', async () => {
+  const { existsSync, readFileSync } = await import('node:fs');
+  const res = await server.post('/api/v1/ops', { ops: [{ op: 'create', parent: P, text: 'please #touch' }] });
+  assert.equal(res.status, 200);
+  for (let i = 0; i < 50 && !existsSync(server.dataDir + '/touched'); i++) await new Promise((r) => setTimeout(r, 100));
+  assert.equal(readFileSync(server.dataDir + '/touched', 'utf8'), 'please #touch');
+  const jobs = (await server.get('/api/v1/jobs')).body;
+  assert.equal(jobs[0].kind, 'run');
+  assert.equal(jobs[0].status, 'done');
+  assert.equal(jobs[0].key, 'touch');
+});
