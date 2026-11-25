@@ -1,0 +1,26 @@
+name: Nightly
+
+# Slow checks that would hold up every pull request: the 183,000-node benchmark.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: next
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, mbstring, intl
+          coverage: none
+      - name: Benchmark
+        run: php tools/benchmark.php 183000

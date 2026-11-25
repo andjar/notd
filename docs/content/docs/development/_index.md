@@ -55,6 +55,19 @@ All work happens on the `next` branch through pull requests, one step of the pla
 | docs | This site builds with Hugo, and every internal link points at a page or file that exists (`tools/check_links.mjs`). |
 | budget | The core stays within its line budget, and never imports a plugin (`tools/budget.mjs`, with a table in the job summary). |
 
+`.github/workflows/nightly.yml` runs every night (and on demand from the Actions tab) the slow check: `php tools/benchmark.php 183000`, which builds a synthetic notebook of 183,000 nodes, imports it, and times the things that must stay fast. It fails when a target is missed, and writes the times to the job summary.
+
+| Benchmark | Target |
+| --- | ---: |
+| Import 183,000 nodes | 2 min |
+| Open a page of 3,000 nodes, open a journal page, backlinks | 50 ms each |
+| Search for words that are in a third of all notes | 300 ms |
+| A field query with sorting | 200 ms |
+| All page names | 100 ms |
+| Export everything / export again with nothing changed | 60 s / 30 s |
+
+`NOTD_BENCH_DIR=/tmp/nb php tools/benchmark.php` keeps the generated notebook, so a second run skips the import, which helps when hunting a slow query.
+
 ## Unit tests
 
 Server unit tests are PHP files named `*_test.php` under `tests/php/` (and, for a plugin, under `plugins/<name>/tests/`). They need nothing but PHP:
