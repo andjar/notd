@@ -27,7 +27,8 @@ Everything is a **node** in one `nodes` table. A node's `kind` is `block`, `page
 
 - **Text is the truth.** Fields are written inline as `{key::value}`, links as `[[Page]]`, tags as `#tag`. The `fields` and `links` tables are indexes built from the text and can always be rebuilt.
 - **User types are fields.** A movie review is a page with `{type::movie}`; no schema change is needed for new kinds of notes.
-- **Titles compare without case in any language.** A `title_key` (Unicode NFC, lower case, done in PHP because SQLite's `LOWER()` only knows ASCII) makes `Østfold` and `østfold` the same page.
+- **Titles compare without case in any language.** A `title_key` (Unicode NFC, case-folded, spaces collapsed, done in PHP because SQLite's `LOWER()` only knows ASCII) makes `Østfold` and `østfold` the same page, while `Ålesund` and `Alesund` stay different. A title is at most 255 characters, cannot contain control characters or square brackets, and is unique among pages.
+- **Ids are UUIDv7**, made by whoever creates the node (the server or a client), so they sort by creation time and a client can refer to a node before the server has seen it.
 - **System nodes** under `notd/` hold settings, templates and the like, so they are searchable, exportable and versioned like any other note.
 - **Files** live in `data/files/YYYY/MM/`, named by their SHA-256, with a `file` node describing each.
 
