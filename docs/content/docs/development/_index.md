@@ -39,3 +39,16 @@ All work happens on the `next` branch through pull requests, one step of the pla
 3. **GET and POST only**, so notd runs under minimal web servers such as phpdesktop.
 4. **The core never imports a plugin.** Plugins use the public API only.
 5. **One write path.** Every change to notes goes through the operations endpoint, whoever makes it.
+
+## Checks
+
+`.github/workflows/ci.yml` runs on every pull request and on every push to `next` and `main`. All jobs are required; a suite that does not exist yet passes with a note.
+
+| Job | What it checks |
+| --- | --- |
+| lint | Every PHP file parses (`php -l`) and every JavaScript module parses (`node --check`). |
+| php-unit | The server's unit tests, on PHP 8.1 (the oldest supported) and the newest PHP. |
+| conformance | The protocol tests, and the request examples in the protocol docs, against a real server on a throw-away database. |
+| browser | End-to-end tests in Chromium with Playwright. |
+| docs | This site builds with Hugo, and every internal link points at a page or file that exists (`tools/check_links.mjs`). |
+| budget | The core stays within its line budget. |
