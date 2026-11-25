@@ -16,6 +16,7 @@ require_once __DIR__ . '/query.php';
 require_once __DIR__ . '/files.php';
 require_once __DIR__ . '/feed.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/markdown.php';
 
 Ops::$listeners['index'] = [Indexer::class, 'onChange'];
 Ops::$listeners['search'] = [Search::class, 'onChange'];
