@@ -1,0 +1,9 @@
+{
+  "name": "git",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Version history: the Markdown export committed to a git repository after you stop typing, a history panel under each page, and restoring an old version.",
+  "browser": "main.js",
+  "server": "server.php",
+  "styles": ["git.css"]
+}

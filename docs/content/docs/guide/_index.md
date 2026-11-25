@@ -66,6 +66,10 @@ A block that starts with `TODO`, `DOING`, `WAITING`, `DONE` or `CANCELLED` is a 
 
 Everything is in the text, so with the plugin switched off a task simply reads `TODO buy milk`. Ticking is undone with Ctrl+Z like any other change.
 
+## Version history
+
+notd keeps every version of your notes (the git plugin, on by default). A minute after you stop typing, the whole notebook is saved as Markdown files and committed to a git repository in the data folder (`history/`). Under every page, **History** lists the saved versions: click one to read it, and **Restore this version** to bring it back. Restoring is itself a change, so it can be undone the same way. The repository is ordinary git: you can push it anywhere as a backup, or read your notes with any tool.
+
 ## Links
 
 Type `[[` or `#` and notd suggests pages as you type (their aliases count too). Arrow keys choose, Enter or Tab picks, Escape closes the list. The last entry, “New page: …”, links to a page that does not exist yet; it is created when you open it.

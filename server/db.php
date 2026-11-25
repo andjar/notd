@@ -33,7 +33,7 @@ final class Config
 
 final class Db
 {
-    private static ?PDO $shared = null;
+    public static ?PDO $shared = null;     // the connection for this request (tests may set it)
     private static array $depth = [];
 
     /** Retries of a write that finds the database locked, and the first pause in milliseconds (doubled each time). */
