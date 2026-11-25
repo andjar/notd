@@ -107,3 +107,19 @@ php -S 127.0.0.1:8080 index.php    # data goes to data/, or to $NOTD_DATA_DIR
 | CSS | `client/` | 2,000 |
 
 It also fails when core code imports or requires anything from `plugins/` directly. Going over a limit is a signal to move something into a plugin or simplify it, not to raise the limit; raising one needs an entry on the decisions page.
+
+## Storage
+
+Everything notd keeps is in the data folder: `$NOTD_DATA_DIR` if set, else `data_dir` in `config.local.php` (copy `config.local.example.php`), else `data/` next to `index.php`. It holds `notd.sqlite` and, later, the `files/` folder.
+
+The schema is `server/schema.sql`:
+
+| Table | Holds |
+| --- | --- |
+| `nodes` | Every page, block, document and file: kind, parent, sort key, title, `title_key`, text, clock, times. |
+| `fields` | Index of `{key::value}` fields, with the value as a number when it is one. |
+| `links` | Index of links, tags, block references and embeds, by source and target. |
+| `changes` | The change feed: one row per change, numbered. |
+| `meta` | The schema version and other facts about the notebook. |
+
+The database runs in WAL mode, so reading never waits for writing. All writes go through `Db::write()`, which takes the write lock up front (`BEGIN IMMEDIATE`), retries with a growing pause when another writer holds it, and rolls everything back on an exception. There are no migrations: a database with a different schema version is refused, and moves over through Markdown export and import.
