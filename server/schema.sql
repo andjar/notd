@@ -54,3 +54,10 @@ CREATE TABLE IF NOT EXISTS applied_ops (
   op_id TEXT PRIMARY KEY,                      -- a client's operation id, so a retried batch is not applied twice
   at    INTEGER NOT NULL
 );
+
+CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
+  node_id UNINDEXED,
+  title,
+  text,
+  tokenize = "unicode61 remove_diacritics 0"     -- case-insensitive, but å and a stay different
+);

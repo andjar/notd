@@ -6,8 +6,8 @@ test('a new database gets the schema, WAL and a schema version', function () {
     eq('wal', $pdo->query('PRAGMA journal_mode')->fetchColumn());
     eq(1, (int) $pdo->query('PRAGMA foreign_keys')->fetchColumn());
     eq((string) NOTD_SCHEMA_VERSION, $pdo->query("SELECT value FROM meta WHERE key = 'schema_version'")->fetchColumn());
-    $tables = $pdo->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
-    eq(['applied_ops', 'changes', 'fields', 'links', 'meta', 'nodes'], $tables);
+    $tables = $pdo->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'search_%' ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
+    eq(['applied_ops', 'changes', 'fields', 'links', 'meta', 'nodes', 'search'], $tables);
 });
 
 test('opening an existing database keeps its data', function () {
