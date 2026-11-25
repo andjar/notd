@@ -1,7 +1,7 @@
 // The git plugin in the browser: a History section under each page, with every
 // saved version, a look at any of them, and a way back to it.
 
-import { html, render } from 'lit-html';
+import { html, render } from '../../client/lib/html.js';
 
 export function activate(notd) {
   notd.panels.register({

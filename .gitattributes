@@ -1,0 +1,14 @@
+# Text files are checked out with LF line endings everywhere, Windows included,
+# whatever core.autocrlf says: the app serves its files byte for byte, and tests
+# compare them. (tests/fixtures/logseq-graph keeps its CRLF test data on purpose.)
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.sqlite binary

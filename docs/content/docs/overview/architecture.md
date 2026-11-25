@@ -48,7 +48,7 @@ Raw SQL is a plugin *(later)* over stable read-only views (`v_nodes`, `v_fields`
 
 ## The browser app
 
-Plain ES modules with an import map; no build. The outliner is notd's own code, with a fixed row geometry checked by an automated test at four screen widths. lit-html (3 KB compressed) renders panels, dialogs and menus. The frame has named **slots** (`app.left`, `app.right`, `page.before`, `page.after`, `app.status`, menus, the command palette); search, calendar, backlinks and the rest are **panels** registered into slots, by the core and by plugins alike.
+Plain ES modules, imported by relative path (no import map, no build). The outliner is notd's own code, with a fixed row geometry checked by an automated test at four screen widths. lit-html (3 KB compressed) renders panels, dialogs and menus. The frame has named **slots** (`app.left`, `app.right`, `page.before`, `page.after`, `app.status`, menus, the command palette); search, calendar, backlinks and the rest are **panels** registered into slots, by the core and by plugins alike.
 
 ## Extending notd
 

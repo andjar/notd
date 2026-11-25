@@ -101,15 +101,11 @@ final class Http
         if ($method === 'GET' && ($path === '/' || $path === '')) {
             header('Content-Type: text/html; charset=utf-8');
             header('Cache-Control: no-cache');
-            $html = (string) file_get_contents(dirname(__DIR__) . '/client/index.html');
-            $hashes = '';                                   // the inline import map is allowed by its hash
-            preg_match_all('#<script type="importmap">(.*?)</script>#s', $html, $m);
-            foreach ($m[1] as $js) {
-                $hashes .= " 'sha256-" . base64_encode(hash('sha256', $js, true)) . "'";
-            }
-            header("Content-Security-Policy: default-src 'self'; script-src 'self'$hashes; img-src 'self' data: blob:; "
+            // No inline script at all, so the policy needs no hashes: a hash would break as soon
+            // as the file's bytes change on the way (a Windows checkout with CRLF line endings).
+            header("Content-Security-Policy: default-src 'self'; script-src 'self'; img-src 'self' data: blob:; "
                 . "style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
-            echo $html;
+            readfile(dirname(__DIR__) . '/client/index.html');
             return;
         }
         try {

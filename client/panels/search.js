@@ -1,10 +1,10 @@
 // Search in the top bar: results as you type, Enter opens the first, and a page
 // that does not exist yet can be created from here.
 
-import { html, render } from 'lit-html';
+import { html, render } from '../lib/html.js';
 import { api } from '../lib/api.js';
 import { newId } from '../lib/keys.js';
-import { unsafeHTML } from 'lit-html/directives/unsafe-html.js';
+import { unsafeHTML } from '../lib/html.js';
 
 export function searchPanel({ go }) {
   let results = [];
