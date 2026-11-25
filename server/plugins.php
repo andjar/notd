@@ -161,8 +161,8 @@ final class Plugins
                 }
                 $setup(new PluginApi($name));
             } catch (Throwable $e) {
-                self::$failed[$name] = $e->getMessage();
-                error_log("notd: plugin $name: $e");
+                self::$failed[$name] = $e->getMessage();     // shown in the Plugins panel
+                error_log("notd: plugin $name failed: {$e->getMessage()} ({$e->getFile()}:{$e->getLine()})");
             }
         }
         Actions::load(array_filter($actionDirs, 'is_dir'));

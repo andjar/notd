@@ -18,6 +18,7 @@ import { pluginsPanel, safeModePanel } from './panels/plugins.js';
 import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
+import { forgetCached } from './lib/cache.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
 
 export const notd = {
@@ -92,8 +93,9 @@ async function start() {
     notd.screen.show(e.detail.title, e.detail.block);
   });
   document.addEventListener('notd:page', (e) => panels.refresh({ ...panels.context, page: e.detail.page }));
-  document.addEventListener('notd:renamed', (e) => { forgetPages(); go(e.detail.to); });
+  document.addEventListener('notd:renamed', (e) => { forgetPages(); forgetCached(); go(e.detail.to); });
   notd.feed = new Feed({ onChanges: (changes) => {
+    forgetCached();                         // cached reads (favourites, calendar days) may be stale now
     for (const screen of liveScreens()) {
       const event = screen.fromFeed(changes);
       if (event?.renamed && screen.announce) go(event.renamed);
@@ -122,5 +124,9 @@ async function start() {
 
 start().catch((e) => {
   console.error(e);
-  document.body.textContent = 'notd could not start: ' + e.message;
+  // A 404 that is not notd's own (which has a code) means the web server never passed the request to notd.
+  const hint = e.code === 'http_404' ? ' The web server must send every request that is not a file to index.php;'
+    + ' in phpdesktop, set "404_handler": "/index.php" under "web_server" in settings.json.' : '';
+  const message = /[.!?]$/.test(e.message) ? e.message : `${e.message}.`;
+  document.body.textContent = `notd could not start: ${message}${hint}`;
 });

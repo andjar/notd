@@ -4,6 +4,7 @@
 
 import { html, render } from '../lib/html.js';
 import { api } from '../lib/api.js';
+import { cached, forgetCached } from '../lib/cache.js';
 import { newId } from '../lib/keys.js';
 import { pageLink, today } from '../lib/route.js';
 import { rewriteLinks } from '../lib/links.js';
@@ -15,24 +16,30 @@ const store = {
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* not kept; fine */ } },
 };
 
-/** Titles linked from notd/favourites, in order, with the block that holds each. */
-export async function favourites() {
-  const { nodes } = await api.query(`page:"${FAVOURITES}" sort:created limit:1000`);
-  return { items: nodes.filter((b) => b.parent === b.page).sort((a, b) => (a.sort < b.sort ? -1 : 1))
-    .flatMap((b) => [...b.text.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => ({ title: m[1], block: b.id }))) };
+/** Titles linked from notd/favourites, in order, with the block that holds each (read once until the notebook changes). */
+export function favourites() {
+  return cached('favourites', async () => {
+    const { nodes } = await api.query(`page:"${FAVOURITES}" sort:created limit:1000`);
+    return { items: nodes.filter((b) => b.parent === b.page).sort((a, b) => (a.sort < b.sort ? -1 : 1))
+      .flatMap((b) => [...b.text.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => ({ title: m[1], block: b.id }))) };
+  });
 }
 
 /** Adds or removes a page from the favourites. */
 export async function toggleFavourite(title) {
   const { items } = await favourites();
   const found = items.find((i) => i.title.toLowerCase() === title.toLowerCase());
-  if (found) return api.ops([{ op: 'delete', id: found.block }]);
-  let pageId = (await api.pages()).find((p) => p.title.toLowerCase() === FAVOURITES)?.id;
-  if (!pageId) {
-    pageId = newId();
-    await api.ops([{ op: 'create', kind: 'page', id: pageId, title: FAVOURITES }]);
+  try {
+    if (found) return await api.ops([{ op: 'delete', id: found.block }]);
+    let pageId = (await api.pages()).find((p) => p.title.toLowerCase() === FAVOURITES)?.id;
+    if (!pageId) {
+      pageId = newId();
+      await api.ops([{ op: 'create', kind: 'page', id: pageId, title: FAVOURITES }]);
+    }
+    return await api.ops([{ op: 'create', id: newId(), parent: pageId, text: `[[${title}]]` }]);
+  } finally {
+    forgetCached();                         // the sidebar shows the change now, not at the next feed
   }
-  return api.ops([{ op: 'create', id: newId(), parent: pageId, text: `[[${title}]]` }]);
 }
 
 export function favouritesPanel() {
@@ -66,10 +73,15 @@ export function calendarPanel() {
   let dots = new Set();
   let host = null;
   let selected = '';
+  let routeTitle = null;
+  const monthOf = (d) => today(d).slice(0, 7);
 
   async function load() {
-    const month = `${shown.getFullYear()}-${String(shown.getMonth() + 1).padStart(2, '0')}`;
-    try { dots = new Set(await api.journalDays(month)); } catch { dots = new Set(); }
+    const month = monthOf(shown);
+    let days = [];
+    try { days = await cached(`journal-days:${month}`, () => api.journalDays(month)); } catch { /* no dots, then */ }
+    if (month !== monthOf(shown)) return;   // moved to another month meanwhile
+    dots = new Set(days);
     draw();
   }
 
@@ -101,10 +113,13 @@ export function calendarPanel() {
     render(el, ctx) {
       host = el;
       const t = ctx.route?.title ?? '';
-      selected = /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : '';
-      const base = selected ? new Date(selected + 'T00:00') : new Date();
-      const month = new Date(base.getFullYear(), base.getMonth(), 1);
-      if (!shown || shown.getTime() !== month.getTime()) { shown = month; load(); } else { load(); }
+      if (t !== routeTitle) {                 // a new page: show its month; otherwise keep the month browsed to
+        routeTitle = t;
+        selected = /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : '';
+        const base = selected ? new Date(selected + 'T00:00') : new Date();
+        shown = new Date(base.getFullYear(), base.getMonth(), 1);
+      }
+      load();
     },
   };
 }

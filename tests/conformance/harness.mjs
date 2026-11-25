@@ -3,9 +3,10 @@
 //
 //   const server = await startServer();
 //   const res = await server.get('/api/v1/ping');   // { status, body }
-//   await server.stop();
+//   await server.stop();     // throws if PHP logged a warning, notice or error
 //
-// NOTD_PHP picks the PHP binary (default: php).
+// NOTD_PHP picks the PHP binary (default: php); phpArgs go before -S (for example ['-n']).
+export const PHP = process.env.NOTD_PHP || 'php';
 
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
@@ -16,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-function freePort() {
+export function freePort() {
   return new Promise((ok, fail) => {
     const s = createServer();
     s.once('error', fail);
@@ -27,12 +28,12 @@ function freePort() {
   });
 }
 
-export async function startServer({ env = {} } = {}) {
+export async function startServer({ env = {}, phpArgs = [] } = {}) {
   const dataDir = mkdtempSync(join(tmpdir(), 'notd-conformance-'));
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const log = [];
-  const child = spawn(process.env.NOTD_PHP || 'php', ['-S', `127.0.0.1:${port}`, 'index.php'], {
+  const child = spawn(PHP, [...phpArgs, '-S', `127.0.0.1:${port}`, 'index.php'], {
     cwd: ROOT,
     env: { ...process.env, NOTD_DATA_DIR: dataDir, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -68,14 +69,17 @@ export async function startServer({ env = {} } = {}) {
       child.kill();
       await new Promise((ok) => (child.exitCode !== null ? ok() : child.once('exit', ok)));
       rmSync(dataDir, { recursive: true, force: true });
+      // notd keeps PHP's messages out of its answers and logs them, so this is where they show.
+      const problems = log.join('').split('\n').filter((l) => /PHP (Warning|Notice|Deprecated|Fatal error|Parse error)/.test(l));
+      if (problems.length) throw new Error(`PHP reported problems:\n${problems.join('\n')}`);
     },
   };
 
   for (let i = 0; i < 100; i++) {
     if (child.exitCode !== null) break;
     try {
-      const res = await request('GET', '/api/v1/ping');
-      if (res.status === 200) return server;
+      await request('GET', '/api/v1/ping');   // any answer: the server is listening
+      return server;
     } catch { /* not listening yet */ }
     await new Promise((ok) => setTimeout(ok, 50));
   }

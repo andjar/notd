@@ -10,7 +10,7 @@ The browser app, plugins and scripts all talk to the notd server over this proto
 
 - Every endpoint lives under `/api/v1/`.
 - Reads are `GET` with parameters in the query string. Writes are `POST` with a JSON object as the body. No other methods are used, so notd runs under minimal web servers.
-- A successful response is status 200 with a JSON body.
+- A successful response is status 200 with a JSON body. Every JSON response has a `Content-Length`, so a client is done reading as soon as the body has arrived, even when the server goes on with jobs after answering.
 - An error has a 4xx or 5xx status and a body of the form `{"error": {"code": "...", "message": "..."}}`. `code` is stable and meant for programs; `message` is for people.
 
 | Code | Status | Meaning |
@@ -20,6 +20,7 @@ The browser app, plugins and scripts all talk to the notd server over this proto
 | `password_required`, `cross_origin` | 403 | Another device before a password is set, or a POST from another site. |
 | `not_found` | 404 | No such endpoint, or no such thing. |
 | `method_not_allowed` | 405 | The endpoint exists but not with this method. |
+| `php_extensions` | 500 | PHP lacks extensions notd needs; the message names them and the `php.ini` lines that add them. |
 | `internal` | 500 | A bug or a broken installation; details are in the server log. |
 
 ## Examples as tests

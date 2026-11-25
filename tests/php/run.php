@@ -8,6 +8,7 @@
 // Exit code 0 when every test passes, 1 otherwise.
 
 declare(strict_types=1);
+PHP_SAPI === 'cli' || exit("Run this from the command line.\n");   // not over the web (phpdesktop serves every .php)
 
 error_reporting(E_ALL);
 set_error_handler(function (int $no, string $message, string $file, int $line): bool {

@@ -5,6 +5,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/http.php';
+if (PHP_SAPI === 'cli') {                   // tools and tests; requests are checked in Http::dispatch
+    try { Http::requireExtensions(); } catch (HttpError $e) { fwrite(STDERR, "notd: {$e->getMessage()}\n"); exit(1); }
+}
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/nodes.php';
 require_once __DIR__ . '/sortkeys.php';
