@@ -10,6 +10,7 @@ import { pageLink, isJournal } from '../lib/route.js';
 import { OutlineView } from './outline-view.js';
 import { Editor } from './editor.js';
 import { renderText, forgetNodes } from './text.js';
+import { Autocomplete } from './autocomplete.js';
 
 export const outbox = new Outbox({
   send: (ops) => api.ops(ops),
@@ -60,6 +61,9 @@ export class PageScreen {
     this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id), renderText });
     this.view.render();
     this.editor = new Editor(this.view, this.outline);
+    this.autocomplete?.close();
+    this.autocomplete?.box.remove();
+    this.autocomplete = new Autocomplete(this.editor);
     const add = document.createElement('button');
     add.className = 'add-block';
     add.textContent = blocks.length ? '' : 'Click here to write';

@@ -7,6 +7,8 @@ import { gate } from './ui/gate.js';
 import { route, pageLink } from './lib/route.js';
 import { searchPanel } from './panels/search.js';
 import { PageScreen } from './ui/page.js';
+import { backlinksPanel } from './panels/backlinks.js';
+import { forgetPages } from './ui/autocomplete.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
 
 export const notd = { api, panels };
@@ -37,7 +39,7 @@ async function show() {
   const r = route();
   app.classList.remove('show-left', 'show-right');
   document.title = `${r.title} · notd`;
-  panels.refresh({ ...panels.context, route: r });
+  panels.refresh({ ...panels.context, route: r, page: null });
   document.dispatchEvent(new CustomEvent('notd:route', { detail: r }));
 }
 
@@ -52,9 +54,11 @@ async function start() {
   if (!status.authenticated) await gate(status);
   setupFrame();
   app.hidden = false;
-  for (const p of [searchPanel({ go }), headerPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel()]) panels.register(p);
+  for (const p of [searchPanel({ go }), headerPanel(), backlinksPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel()]) panels.register(p);
   notd.page = new PageScreen(document.getElementById('page'));
-  document.addEventListener('notd:route', (e) => notd.page.show(e.detail.title));
+  document.addEventListener('notd:route', (e) => { forgetPages(); notd.page.show(e.detail.title); });
+  document.addEventListener('notd:page', (e) => panels.refresh({ ...panels.context, page: e.detail.page }));
+  document.addEventListener('notd:renamed', (e) => { forgetPages(); go(e.detail.to); });
   addEventListener('hashchange', show);
   document.addEventListener('notd:favourites', () => panels.refresh(panels.context, 'app.left'));
   await show();
