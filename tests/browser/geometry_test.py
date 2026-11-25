@@ -13,9 +13,11 @@ MEASURE = """() => [...document.querySelectorAll('.block')].map((b) => {
   const bullet = row.querySelector('.bullet').getBoundingClientRect();
   const dot = getComputedStyle(row.querySelector('.bullet'), '::before');
   const toggle = row.querySelector('.toggle').getBoundingClientRect();
+  const text = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, { acceptNode: (t) => t.data.trim() ? 1 : 3 }).nextNode();
   const range = document.createRange();
-  range.selectNodeContents(content);
-  const first = range.getClientRects()[0];
+  range.setStart(text, 0);
+  range.setEnd(text, 1);
+  const first = range.getClientRects()[0];   // the first character, so the first line
   const guide = b.querySelector(':scope > .children');
   return {
     text: content.textContent.slice(0, 20),

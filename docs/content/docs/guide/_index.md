@@ -29,6 +29,19 @@ Click a block's text to edit it; you then see and edit its raw text (a heading s
 | Escape | Stops editing. |
 | Ctrl+Z / Ctrl+Shift+Z (Cmd on a Mac) | Undoes / redoes the last action: a split, an indent, a move, a join. Text you typed in the block you are editing is undone first. |
 
+## What you can write
+
+Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`, lists, quotes, tables and fenced code. A block starting with `# `, `## ` or `### ` is a heading. On top of that:
+
+| Write | Shows |
+| --- | --- |
+| `[[Page]]` | A link to a page (it need not exist yet). |
+| `#tag`, `#[[two words]]` | A tag: a link that says what the block is about. |
+| `((block id))` | The text of another block, linked to it. |
+| `{{embed ((block id))}}`, `{{embed [[Page]]}}` | A block with its children, or a whole page, shown in place. |
+| `{rating:: 5}` | A field, shown as a small label; fields can be queried. |
+| `![name](file:id)` | A stored image (or `[name](file:id)` for a link to a file). |
+
 ## Around the page
 
 - **Search** sits in the top bar. Type a few letters of any words, in any order; titles come first, then notes, with the matching words marked. Arrow keys move, Enter opens. If no page has that exact title, the last entry creates it and opens it. Quotes search for a phrase and `-word` leaves out notes with that word.

@@ -159,6 +159,7 @@ client/
   lib/api.js      one function per endpoint; errors as ApiError(status, code, message)
   lib/panels.js   the panel registry: panels.register({ id, slot, order, render(el, ctx), when(ctx) })
   lib/keys.js     sort keys and ids
+  lib/markdown.js note text to HTML: marked plus notd's syntax as marked extensions (no DOM)
   lib/route.js    addresses: #/page/<title>[/<block id>], today's journal when empty
   lib/model.js    the blocks of the page on screen, in memory (no DOM)
   lib/outbox.js   operations waiting for the server: in order, kept in localStorage, retried
@@ -168,6 +169,7 @@ client/
   ui/gate.js      the login screen
   ui/page.js      the page on screen: loads it, draws its outline, one outbox for the app
   ui/outline-view.js  draws the outline from the model and redraws only what a change touched
+  ui/text.js      draws a block's text: Markdown through DOMPurify, then references and embeds filled in
   ui/editor.js    editing: one block at a time as plain text (contenteditable="plaintext-only"), the keys
   style/tokens.css  colours, sizes and fonts, light and dark
   style/app.css     the frame
@@ -180,6 +182,12 @@ The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.b
 ### The outline's geometry
 
 Every block is a row of three boxes: the fold toggle, the bullet and the text. The toggle and bullet boxes are exactly as tall as the first line of the text (taller for a `#`, `##` or `###` heading), so the bullet sits on the middle of the first line whatever the text is; this fixes the notd 3 bullets that sat low beside headings. A child is indented one toggle width, so its bullet sits under its parent's text, and the guide line runs down the middle of the parent's bullet. `tests/browser/geometry_test.py` measures all of this at 375, 768, 1100 and 1440 px wide, and checks that a page of 3,000 blocks is drawn in under 0.8 s.
+
+### Drawing text
+
+A block's text is drawn in three steps. Text with no Markdown or syntax characters at all is set as plain text, which keeps big pages fast. Anything else goes through `client/lib/markdown.js`: marked, with notd's syntax (`[[links]]`, `#tags`, `((references))`, `{{embed}}`, `{key::value}` fields, `file:` links) as marked inline extensions, so nothing inside code counts. The HTML then goes through DOMPurify, which removes scripts, event handlers, forms and unsafe URLs, before it reaches the page. Last, references and embeds are filled in from the server, each block fetched once per page load.
+
+marked and DOMPurify are vendored by `tools/vendor.sh` like lit-html; `markdown.js` imports marked by relative path so the Node tests can load it too.
 
 ### How an edit travels
 

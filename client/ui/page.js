@@ -9,6 +9,7 @@ import { newId } from '../lib/keys.js';
 import { pageLink, isJournal } from '../lib/route.js';
 import { OutlineView } from './outline-view.js';
 import { Editor } from './editor.js';
+import { renderText, forgetNodes } from './text.js';
 
 export const outbox = new Outbox({
   send: (ops) => api.ops(ops),
@@ -55,7 +56,8 @@ export class PageScreen {
     this.root.replaceChildren();
     const host = document.createElement('div');
     this.root.append(host);
-    this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id) });
+    forgetNodes();
+    this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id), renderText });
     this.view.render();
     this.editor = new Editor(this.view, this.outline);
     const add = document.createElement('button');
