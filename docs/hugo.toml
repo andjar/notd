@@ -13,6 +13,11 @@ relativeURLs = false
     weight = 10
 
 [[menu.main]]
+    name = "Protocol"
+    url = "/docs/protocol/"
+    weight = 20
+
+[[menu.main]]
     name = "Development"
     url = "/docs/development/"
     weight = 30

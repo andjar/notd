@@ -79,3 +79,19 @@ cases('sort keys', [
 ```
 
 A failure prints the test, the message and the line in the test file; the runner exits with 1 if anything failed.
+
+## Protocol tests
+
+The conformance tests in `tests/conformance/` start notd under PHP's built-in server on a free port, with a throw-away data folder, and talk HTTP to it. They need PHP and Node 22, nothing else:
+
+```sh
+node --test tests/conformance/*.test.mjs
+```
+
+`harness.mjs` provides `startServer()` (with `get`, `post` and `stop`), `mismatch()` for comparing a response with what is expected, and the extractor that turns the examples on the [protocol pages](../protocol/) into tests (`docs_examples.test.mjs`). A change to the protocol therefore starts with its example in the docs.
+
+To run notd yourself:
+
+```sh
+php -S 127.0.0.1:8080 index.php    # data goes to data/, or to $NOTD_DATA_DIR
+```
