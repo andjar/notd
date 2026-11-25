@@ -1,0 +1,45 @@
+# Espanso match for notd: sends the clipboard to today's journal page.
+#
+# Copy some text, then type ;notd anywhere. The text becomes a new note at the
+# end of today's page in notd, tagged {source::espanso}. Nothing is typed
+# unless something goes wrong, in which case a short [notd: ...] message is.
+#
+# Install: put this file in Espanso's match folder (run `espanso path` to see
+# where it is, then .../match/notd.yml) and set NOTD below to your notd address.
+# For macOS and Linux (needs bash and curl). On Windows, use notd-windows.yml.
+
+matches:
+  - trigger: ";notd"
+    replace: "{{result}}"
+    vars:
+      - name: clip
+        type: clipboard
+      - name: result
+        type: shell
+        params:
+          shell: bash
+          cmd: |
+            NOTD="http://localhost:8000"
+
+            # The clipboard arrives as $ESPANSO_CLIP; it is never pasted into the command.
+            text=$(printf '%s' "$ESPANSO_CLIP" | tr -d '\r')
+            if [ -z "$(printf '%s' "$text" | tr -d '[:space:]')" ]; then
+              echo "[notd: the clipboard is empty]"; exit 0
+            fi
+            # The property goes on the same line for one-line notes, on its own line otherwise.
+            case "$text" in
+              *$'\n'*) note="$text"$'\n''{source::espanso}' ;;
+              *)       note="$text {source::espanso}" ;;
+            esac
+            # JSON string escaping with standard tools: \ " tab, line breaks; other control characters dropped.
+            tab=$(printf '\t')
+            json=$(printf '%s' "$note" \
+              | tr -d '\000-\010\013\014\016-\037' \
+              | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e "s/$tab/\\\\t/g" \
+              | awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }')
+            body="{\"page_name\":\"$(date +%Y-%m-%d)\",\"notes\":\"$json\"}"
+
+            if ! curl -sf -m 10 -H 'Content-Type: application/json' --data-binary "$body" \
+                 "$NOTD/api/v1/append_to_page.php" > /dev/null; then
+              echo "[notd: could not save to $NOTD]"
+            fi

@@ -2,6 +2,7 @@
 title: "User Guide"
 weight: 15
 aliases: ["/docs/frontend-guide/best-practices/"]
+description: "How to use notd day to day."
 ---
 
 How to use notd day to day.

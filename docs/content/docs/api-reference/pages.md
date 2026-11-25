@@ -1,6 +1,7 @@
 ---
 title: "Pages"
 weight: 50
+description: "Create, read, rename, update and delete pages; export a page as Markdown."
 ---
 
 A page has a unique name (compared case-insensitively) and its own `content`, a piece of text whose `{key::value}` properties become the page's properties.

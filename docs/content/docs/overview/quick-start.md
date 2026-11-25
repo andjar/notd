@@ -2,6 +2,7 @@
 title: "Installation"
 weight: 20
 aliases: ["/docs/overview/troubleshooting/"]
+description: "Install and run notd, configure it, upgrade it, and move notes in and out (including from Logseq)."
 ---
 
 ## Requirements
