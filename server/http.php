@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 const NOTD_VERSION = '4.0.0-dev';
 const NOTD_PROTOCOL = 1;
+const NOTD_EXTENSIONS = ['pdo_sqlite', 'mbstring', 'intl', 'fileinfo'];   // PHP extensions the core needs
 
 final class HttpError extends Exception
 {
@@ -92,11 +93,16 @@ final class Http
 {
     public static function handle(string $method, string $uri): void
     {
+        ini_set('display_errors', '0');     // PHP's warnings go to the log, never into a JSON answer
+        ini_set('log_errors', '1');
         $path = (string) parse_url($uri, PHP_URL_PATH);
         $script = (string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php');
         $base = str_ends_with($script, '/index.php') ? rtrim(str_replace('\\', '/', dirname($script)), '/') : '';
         if ($base !== '' && str_starts_with($path, $base . '/')) {
             $path = substr($path, strlen($base));       // notd installed in a sub-folder
+        }
+        if (str_starts_with($path, '/index.php/')) {
+            $path = substr($path, 10);                  // a server that hands over "/index.php/api/v1/…" (a 404 handler)
         }
         if ($method === 'GET' && ($path === '/' || $path === '')) {
             header('Content-Type: text/html; charset=utf-8');
@@ -133,6 +139,7 @@ final class Http
         if (!preg_match('#^/api/v1/([a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)?)$#', $path, $m)) {
             throw new HttpError(404, 'not_found', "No such path: $path");
         }
+        self::requireExtensions();
         require_once __DIR__ . '/core.php';
         Auth::check($method, $m[1]);
         Plugins::load(Db::get());
@@ -145,6 +152,16 @@ final class Http
             throw new HttpError(405, 'method_not_allowed', "$method is not allowed here; use " . implode(' or ', array_keys($handlers)) . '.');
         }
         return $handlers[$method]($request);
+    }
+
+    /** Throws, naming them, when PHP lacks extensions notd needs (phpdesktop's php.ini, for one, leaves some out). */
+    public static function requireExtensions(array $needed = NOTD_EXTENSIONS): void
+    {
+        $missing = array_values(array_filter($needed, fn(string $e) => !extension_loaded($e)));
+        if ($missing !== []) {
+            throw new HttpError(500, 'php_extensions', 'PHP lacks extensions notd needs: ' . implode(', ', $missing) . '. Add '
+                . implode(', ', array_map(fn(string $e) => "extension=$e", $missing)) . ' to php.ini and start notd again.');
+        }
     }
 
     /** Lets the client go before slow work: closes the connection where the server allows it. */
@@ -165,6 +182,8 @@ final class Http
         http_response_code($status);
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
-        echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $body = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        header('Content-Length: ' . strlen($body));   // the client is done here, even if jobs keep PHP running after
+        echo $body;
     }
 }

@@ -4,6 +4,7 @@
 // Usage: php tools/jobs.php [seconds=50]
 
 declare(strict_types=1);
+PHP_SAPI === 'cli' || exit("Run this from the command line.\n");   // not over the web (phpdesktop serves every .php)
 
 require dirname(__DIR__) . '/server/core.php';
 Plugins::load(Db::get());

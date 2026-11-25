@@ -27,7 +27,7 @@ notd 4 is ready to replace notd 3 when it does what you need every day. Try it f
 
 ## 2. Serve it
 
-notd 4 needs PHP 8.1 or newer with the `pdo_sqlite`, `mbstring` and `intl` extensions, and `git` for version history.
+notd 4 needs PHP 8.1 or newer with the `pdo_sqlite`, `mbstring`, `intl` and `fileinfo` extensions, and `git` for version history. If one is missing, notd says which, both in the browser and from the tools.
 
 - **Apache**: point the site (or a folder of it) at the notd 4 folder. The included `.htaccess` sends everything through `index.php` and never serves the data, the server code or `config.local.php`.
 - **nginx** with PHP-FPM:
@@ -40,7 +40,23 @@ notd 4 needs PHP 8.1 or newer with the `pdo_sqlite`, `mbstring` and `intl` exten
   ```
 
 - **Just this computer**: `php -S 127.0.0.1:8080 index.php`.
-- **phpdesktop** (a Windows app around this computer's notd): make the notd 4 folder phpdesktop's `www` folder (or point `web_server` › `www_directory` in its `settings.json` at it), and in the same section set `"404_handler": "/index.php"`. The protocol's addresses (`/api/v1/…`) are not files, and without the handler phpdesktop answers them with 404, so notd cannot load or save anything. phpdesktop's web server hands out any file in that folder as it is and ignores `.htaccess`, so keep your notes outside it: set `data_dir` in `config.local.php` to a folder elsewhere, such as `C:/Users/you/notd-data`.
+- **phpdesktop**: see below.
+
+### phpdesktop
+
+[phpdesktop](https://github.com/cztomczak/phpdesktop) turns notd into a Windows program for this computer. Three things differ from a normal web server:
+
+1. **Requests that are not files.** The protocol's addresses (`/api/v1/…`) are not files, and phpdesktop answers them with 404 unless they go to notd. In `settings.json`, under `web_server`, set `"www_directory": "www"`, with the notd 4 folder's contents in phpdesktop's `www` folder, and set `"404_handler": "/index.php"`. Without the handler, notd stops at start-up and says so.
+2. **PHP extensions.** phpdesktop's `php/php.ini` loads only some extensions. Add these lines below the other `extension=` lines:
+
+   ```ini
+   extension=php_mbstring.dll
+   extension=php_intl.dll
+   extension=php_fileinfo.dll
+   ```
+
+   `php_pdo_sqlite.dll` is already there. Lines for extensions that PHP 8 no longer has (`php_gd2.dll`, `php_mysql.dll`) can go.
+3. **Your notes.** phpdesktop's web server hands out any file in `www` as it is and ignores `.htaccess`, so keep the data folder outside it. Copy `config.local.example.php` to `config.local.php` and set `'data_dir' => 'C:/Users/you/notd-data'`.
 
 Reach it from your other devices over Tailscale, or a VPS with HTTPS; without a password notd answers only the computer it runs on.
 

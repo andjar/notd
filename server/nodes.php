@@ -11,9 +11,7 @@ const TITLE_MAX = 255;
 function title_key(string $title): string
 {
     $t = trim(preg_replace('/\s+/u', ' ', $title) ?? $title);
-    if (class_exists(Normalizer::class)) {
-        $t = Normalizer::normalize($t, Normalizer::FORM_C) ?: $t;
-    }
+    $t = Normalizer::normalize($t, Normalizer::FORM_C) ?: $t;
     return mb_convert_case($t, MB_CASE_FOLD_SIMPLE, 'UTF-8');
 }
 
@@ -24,9 +22,7 @@ function clean_title(string $title): string
         throw new HttpError(400, 'bad_title', 'A title must be valid UTF-8.');
     }
     $t = trim(preg_replace('/\s+/u', ' ', $title) ?? '');
-    if (class_exists(Normalizer::class)) {
-        $t = Normalizer::normalize($t, Normalizer::FORM_C) ?: $t;
-    }
+    $t = Normalizer::normalize($t, Normalizer::FORM_C) ?: $t;
     if ($t === '') {
         throw new HttpError(400, 'bad_title', 'A title cannot be empty.');
     }

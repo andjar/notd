@@ -3,6 +3,7 @@
 // Usage: php tools/reindex.php   (uses the data folder notd uses)
 
 declare(strict_types=1);
+PHP_SAPI === 'cli' || exit("Run this from the command line.\n");   // not over the web (phpdesktop serves every .php)
 
 require dirname(__DIR__) . '/server/core.php';
 Plugins::load(Db::get());   // plugins' indexers and actions take part

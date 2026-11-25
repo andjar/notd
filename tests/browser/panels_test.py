@@ -2,6 +2,7 @@
 from support import Server, browser, open_page, test, run
 
 P = '01900000-0000-7000-8000-0000000000a1'
+D = '01900000-0000-7000-8000-0000000000a2'
 
 
 def setup(s):
@@ -87,11 +88,43 @@ def recent_pages_and_the_calendar():
             page.wait_for_function("document.title === '2026-11-10 · notd'")
             page.click('[aria-label="Previous month"]')
             page.wait_for_selector('.calendar-head h2:has-text("October 2026")')
+            s.ops({'op': 'create', 'kind': 'page', 'id': D, 'title': '2026-10-05'},   # another device writes a day
+                  {'op': 'create', 'parent': D, 'text': 'from the phone'})
+            page.evaluate('notd.feed.poll()')
+            page.wait_for_selector('.calendar a.dot[data-day="2026-10-05"]')    # the feed brings it ...
+            assert 'October 2026' in page.text_content('.calendar-head h2')     # ... and the month browsed to stays
             page.evaluate("location.hash = '#/page/Kitchen%20renovation'")
             page.wait_for_selector('[data-panel=recent] li:first-child a:text("Kitchen renovation")')
             recent = page.locator('[data-panel=recent] a').all_inner_texts()
             assert recent[:3] == ['Kitchen renovation', '2026-11-10', '2026-11-03'], recent
             assert page.inner_text('[data-panel=status]') == 'Saved'
+            assert errors == [], errors
+    finally:
+        s.stop()
+
+
+@test
+def each_read_reaches_the_server_once():
+    """Panels are drawn again on every route, page and feed event; what they read
+    (favourites, the calendar's days) is asked for once until the notebook changes.
+    Every request counts on a server that starts PHP for each one (phpdesktop)."""
+    s = Server()
+    setup(s)
+    try:
+        with browser() as b:
+            errors, asked = [], []
+            page = b.new_page(viewport={'width': 1280, 'height': 900}, bypass_csp=True)
+            page.on('console', lambda m: m.type == 'error' and errors.append(m.text))
+            page.on('request', lambda r: '/api/v1/' in r.url and asked.append(r.method + ' ' + r.url.split('/api/v1/', 1)[1]))
+            page.goto(s.url)
+            ready(page)
+            page.wait_for_selector('.calendar a')
+            page.evaluate("location.hash = '#/page/Kitchen%20renovation'")
+            page.wait_for_selector('.page-title h1:text("Kitchen renovation")')
+            page.wait_for_selector('[data-panel=favourites] .hint')
+            page.wait_for_timeout(300)
+            again = sorted({a for a in asked if asked.count(a) > 1})
+            assert again == [], f'asked more than once: {again}\nall: {asked}'
             assert errors == [], errors
     finally:
         s.stop()

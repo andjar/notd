@@ -63,6 +63,20 @@ test('server files and the data folder are never served as files', async () => {
   }
 });
 
+test('a path handed over after the script name reaches the same endpoint', async () => {
+  const res = await server.get('/index.php/api/v1/ping');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.name, 'notd');
+});
+
+test('a JSON answer says how long it is, so a client is done before jobs that run after it', async () => {
+  const res = await fetch(server.url + '/api/v1/ping');
+  const text = await res.text();
+  assert.equal(Number(res.headers.get('content-length')), Buffer.byteLength(text));
+  const missing = await fetch(server.url + '/api/v1/no-such-endpoint');
+  assert.equal(Number(missing.headers.get('content-length')), Buffer.byteLength(await missing.text()));
+});
+
 test('the app page is sent as it is, with a CSP that allows only scripts from notd itself', async () => {
   const { readFileSync } = await import('node:fs');
   const res = await fetch(server.url + '/');

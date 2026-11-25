@@ -106,7 +106,9 @@ The conformance tests in `tests/conformance/` start notd under PHP's built-in se
 node --test tests/conformance/*.test.mjs
 ```
 
-`harness.mjs` provides `startServer()` (with `get`, `post` and `stop`), `mismatch()` for comparing a response with what is expected, and the extractor that turns the examples on the [protocol pages](../protocol/) into tests (`docs_examples.test.mjs`). A change to the protocol therefore starts with its example in the docs.
+`harness.mjs` provides `startServer()` (with `get`, `post` and `stop`; `phpArgs` such as `['-n']` start PHP without its `php.ini`), `mismatch()` for comparing a response with what is expected, and the extractor that turns the examples on the [protocol pages](../protocol/) into tests (`docs_examples.test.mjs`). A change to the protocol therefore starts with its example in the docs.
+
+notd turns off PHP's `display_errors` for every request, so a warning can never end up inside a JSON answer; warnings go to the server log instead. `stop()` fails the test file if that log has a PHP warning, notice or error in it. `requirements.test.mjs` checks what a PHP without the needed extensions gets (the list is `NOTD_EXTENSIONS` in `server/http.php`), and that every tool, and the PHP test runner, refuses to run when a web server runs it: phpdesktop runs any `.php` file it is asked for.
 
 To run notd yourself:
 
@@ -161,6 +163,7 @@ client/
   lib/html.js     lit-html (and its directives) for the core and for plugins
   lib/api.js      one function per endpoint; errors as ApiError(status, code, message)
   lib/panels.js   the panel registry: panels.register({ id, slot, order, render(el, ctx), when(ctx) })
+  lib/cache.js    cached(key, read): reads that panels repeat, kept until the change feed brings changes
   lib/keys.js     sort keys and ids
   lib/markdown.js note text to HTML: marked plus notd's syntax as marked extensions (no DOM)
   lib/links.js    what is being typed after [[ or #, suggestions, rewriting links on rename (no DOM)

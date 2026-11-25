@@ -4,6 +4,7 @@
 // Usage: php tools/benchmark.php [nodes=183000]
 
 declare(strict_types=1);
+PHP_SAPI === 'cli' || exit("Run this from the command line.\n");   // not over the web (phpdesktop serves every .php)
 
 $nodes = (int) ($argv[1] ?? 183000);
 $work = getenv("NOTD_BENCH_DIR") ?: sys_get_temp_dir() . "/notd-bench-" . getmypid();

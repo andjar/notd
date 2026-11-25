@@ -168,5 +168,36 @@ def the_gate_asks_for_the_password():
         s.stop()
 
 
+@test
+def start_up_problems_are_explained():
+    """What a misconfigured server answers reaches the screen as a sentence that says
+    what to change: a 404 from the web server itself (phpdesktop without its 404
+    handler), or notd's own answer about missing PHP extensions."""
+    s = Server()
+    try:
+        with browser() as b:
+            answers = {
+                'web server 404': (404, 'text/html', '<h1>Not Found</h1>', '"404_handler": "/index.php"'),
+                'missing extensions': (500, 'application/json',
+                                       '{"error": {"code": "php_extensions", "message": "PHP lacks extensions notd needs: intl. Add extension=intl to php.ini and start notd again."}}',
+                                       'notd could not start: PHP lacks extensions notd needs: intl. Add extension=intl'),
+            }
+            for name, (status, kind, body, expected) in answers.items():
+                errors = []
+                page = b.new_page(bypass_csp=True)
+                page.on('pageerror', lambda e: errors.append(str(e)))
+                answer = dict(status=status, content_type=kind, body=body)
+                page.route('**/api/v1/ping', lambda route, request, answer=answer: route.fulfill(**answer))
+                page.goto(s.url)
+                page.wait_for_function('document.body.textContent.startsWith("notd could not start")')
+                text = page.text_content('body')
+                assert expected in text, (name, text)
+                assert '..' not in text, (name, text)
+                assert errors == [], (name, errors)
+                page.close()
+    finally:
+        s.stop()
+
+
 if __name__ == '__main__':
     run()
