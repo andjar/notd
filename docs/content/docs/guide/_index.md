@@ -10,7 +10,9 @@ Any other page has an address of its own, `#/page/<title>`, shown in the address
 
 ## Pages and blocks
 
-A page is an outline of **blocks**: each bullet is one block, and blocks nest under each other. The small triangle left of a bullet that has children folds them away; a bullet with a ring around it has hidden children. Clicking a bullet opens just that block (zooming arrives in a later step).
+A page is an outline of **blocks**: each bullet is one block, and blocks nest under each other. The small triangle left of a bullet that has children folds them away; a bullet with a ring around it has hidden children. **Zooming:** click a bullet to show just that block and what is under it. Breadcrumbs above it lead back to the page and to the blocks around it. Enter in the zoomed block adds a child, so new blocks stay in view.
+
+**Moving with the mouse or a finger:** drag a block by its bullet. A line shows where it will go: above or below the block under the pointer, or, further to the right, as its first child. Its children move with it.
 
 A link to a page that does not exist yet shows “There is no page called … yet” with a button to create it. Journal pages (titles like `2026-11-25`) are created the moment you open them.
 

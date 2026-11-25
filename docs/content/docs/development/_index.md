@@ -174,6 +174,7 @@ client/
   ui/text.js      draws a block's text: Markdown through DOMPurify, then references and embeds filled in
   ui/autocomplete.js  link suggestions at the caret
   panels/backlinks.js linked references under the page
+  ui/drag.js      moving blocks by dragging their bullet (pointer events, so touch works too)
   ui/editor.js    editing: one block at a time as plain text (contenteditable="plaintext-only"), the keys
   style/tokens.css  colours, sizes and fonts, light and dark
   style/app.css     the frame
