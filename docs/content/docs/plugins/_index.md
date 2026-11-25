@@ -52,10 +52,12 @@ export function activate(notd) {
 | `api` | One function per endpoint of the [protocol](../protocol/), for example `api.query('tag:idea')` or `api.ops([...])`. |
 | `panels.register({ id, slot, order, render(el, ctx), when(ctx) })` | Puts a panel in a slot: `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after`, `app.status`. Ids are prefixed with the plugin's name. `ctx` has `route` (`title`, `block`, `journal`) and `page` (the page on screen, once loaded). |
 | `panels.refresh(slot)` | Draws the panels again. |
+| `commands.register({ id, title, run(ctx), key, slash, menu, when(ctx) })` | Adds a command (the id is prefixed with the plugin's name unless it already is). `key` like `"Mod+Enter"` (Ctrl, or Cmd on a Mac); `slash: true` puts it in the slash menu; `menu: 'block'` in a block's menu. `ctx` has `id` (the block), `outline`, `editor`, `page`, and in the slash menu `insert(text)`. |
+| `commands.run(id, extra)` | Runs a command. Any element with `data-command="id"` runs it when clicked, with `ctx.id` set to the block it is in. |
 | `go(title, block)` | Opens a page. |
 | `on(event, fn)` | Listens for `route`, `page`, `saving` and `renamed`. |
 
-Commands, syntax and actions join the API in the next steps.
+Syntax and actions join the API in the next steps.
 
 ## Server code
 

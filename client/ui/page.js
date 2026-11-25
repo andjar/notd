@@ -12,6 +12,7 @@ import { Editor } from './editor.js';
 import { renderText, forgetNodes } from './text.js';
 import { Autocomplete } from './autocomplete.js';
 import { Drag } from './drag.js';
+import { SlashMenu } from './menus.js';
 
 export const outbox = new Outbox({
   send: (ops) => api.ops(ops),
@@ -44,6 +45,7 @@ export class PageScreen {
     if (this.editor?.editing) this.editor.finish();
     this.autocomplete?.close();
     this.autocomplete?.box.remove();
+    this.slash?.list.el.remove();
     live.delete(this);
     this.title = null;
   }
@@ -100,6 +102,8 @@ export class PageScreen {
     this.autocomplete?.box.remove();
     this.autocomplete = new Autocomplete(this.editor);
     new Drag(this.view, this.outline);
+    this.slash?.list.el.remove();
+    this.slash = new SlashMenu(this.editor);
     const add = document.createElement('button');
     add.className = 'add-block';
     add.textContent = blocks.length ? '' : 'Click here to write';

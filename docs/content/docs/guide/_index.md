@@ -46,6 +46,13 @@ Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`,
 | `{rating:: 5}` | A field, shown as a small label; fields can be queried. |
 | `![name](file:id)` | A stored image (or `[name](file:id)` for a link to a file). |
 
+## Commands
+
+- **Ctrl+K** (Cmd+K on a Mac) opens the command palette: type a few letters of what you want, Enter runs it. Every command, including those plugins add, is there, with its key if it has one.
+- **/** in a block opens the slash menu: headings, today's date, a link, a code block, and whatever plugins add. Keep typing to narrow it, Enter or Tab picks.
+- **Right-click a bullet** (or long-press it on a phone) for the block's menu: copy a reference to it, zoom in, fold or unfold everything under it, delete it.
+- **Ctrl+/** goes to search.
+
 ## Links
 
 Type `[[` or `#` and notd suggests pages as you type (their aliases count too). Arrow keys choose, Enter or Tab picks, Escape closes the list. The last entry, “New page: …”, links to a page that does not exist yet; it is created when you open it.
