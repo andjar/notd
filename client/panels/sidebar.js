@@ -131,7 +131,7 @@ export function headerPanel() {
     async render(el, ctx) {
       const title = ctx.page?.title ?? ctx.route?.title ?? '';
       const page = ctx.page;
-      const draw = () => render(html`<div class="page-title">
+      const draw = () => el.querySelector('h1[contenteditable]') ? null : render(html`<div class="page-title">
           <h1 title=${page ? 'Click to rename' : ''} @click=${(e) => page && startRename(e.target)}
             @keydown=${keys} @blur=${(e) => finishRename(e.target)}>${title}</h1>
           <button class="icon star ${fav ? 'on' : ''}" aria-pressed=${fav} title=${fav ? 'Remove from favourites' : 'Add to favourites'}
