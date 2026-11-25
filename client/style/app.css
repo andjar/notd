@@ -171,3 +171,28 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .page-title h1 { margin: 0; font-size: 1.75rem; line-height: 1.25; overflow-wrap: anywhere; }
 .star.on { color: #e0a100; }
 .status .warn { color: var(--danger); }
+
+/* Link suggestions and linked references. */
+.suggest {
+  position: fixed;
+  z-index: 30;
+  min-width: 14rem;
+  max-width: 24rem;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.suggest li { padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest li.active { background: var(--accent-soft); }
+[data-slot="page.after"] { margin-top: 2.5rem; }
+.ref-group { margin-bottom: 1rem; }
+.ref-page { font-weight: 600; color: var(--fg); text-decoration: none; display: block; margin-bottom: 0.25rem; }
+.ref-block { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); align-items: start; padding: 0.1rem 0.25rem; border-radius: 4px; }
+.ref-block:hover { background: var(--bg-soft); }
+.ref-block .bullet { height: var(--row); }
+.page-title h1[contenteditable] { outline: 2px solid var(--accent-soft); border-radius: 4px; }
+.page-title + .error { color: var(--danger); margin: 0.25rem 0 0; font-size: 0.9rem; }

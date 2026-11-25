@@ -42,6 +42,14 @@ Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`,
 | `{rating:: 5}` | A field, shown as a small label; fields can be queried. |
 | `![name](file:id)` | A stored image (or `[name](file:id)` for a link to a file). |
 
+## Links
+
+Type `[[` or `#` and notd suggests pages as you type (their aliases count too). Arrow keys choose, Enter or Tab picks, Escape closes the list. The last entry, “New page: …”, links to a page that does not exist yet; it is created when you open it.
+
+Under every page, **linked references** list the blocks on other pages that link to it or tag it, also through its aliases, grouped by page. Click a block's bullet to go to it.
+
+**Renaming:** click a page's title, type the new name and press Enter (Escape cancels). Every `[[link]]` and `#tag` that pointed at the old name is changed to the new one, in one go. Links that use one of the page's aliases are left as they are; they still work.
+
 ## Around the page
 
 - **Search** sits in the top bar. Type a few letters of any words, in any order; titles come first, then notes, with the matching words marked. Arrow keys move, Enter opens. If no page has that exact title, the last entry creates it and opens it. Quotes search for a phrase and `-word` leaves out notes with that word.

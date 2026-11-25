@@ -160,6 +160,7 @@ client/
   lib/panels.js   the panel registry: panels.register({ id, slot, order, render(el, ctx), when(ctx) })
   lib/keys.js     sort keys and ids
   lib/markdown.js note text to HTML: marked plus notd's syntax as marked extensions (no DOM)
+  lib/links.js    what is being typed after [[ or #, suggestions, rewriting links on rename (no DOM)
   lib/route.js    addresses: #/page/<title>[/<block id>], today's journal when empty
   lib/model.js    the blocks of the page on screen, in memory (no DOM)
   lib/outbox.js   operations waiting for the server: in order, kept in localStorage, retried
@@ -170,6 +171,8 @@ client/
   ui/page.js      the page on screen: loads it, draws its outline, one outbox for the app
   ui/outline-view.js  draws the outline from the model and redraws only what a change touched
   ui/text.js      draws a block's text: Markdown through DOMPurify, then references and embeds filled in
+  ui/autocomplete.js  link suggestions at the caret
+  panels/backlinks.js linked references under the page
   ui/editor.js    editing: one block at a time as plain text (contenteditable="plaintext-only"), the keys
   style/tokens.css  colours, sizes and fonts, light and dark
   style/app.css     the frame

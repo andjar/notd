@@ -6,6 +6,7 @@ import { html, render } from 'lit-html';
 import { api } from '../lib/api.js';
 import { newId } from '../lib/keys.js';
 import { pageLink, today } from '../lib/route.js';
+import { rewriteLinks } from '../lib/links.js';
 
 export const FAVOURITES = 'notd/favourites';
 
@@ -121,22 +122,63 @@ export function statusPanel() {
   return { id: 'status', slot: 'app.status', order: 10, render(el) { host = el; draw(); } };
 }
 
-/** The page title, with a star that adds it to or removes it from the favourites. */
+/** The page title, with a star for the favourites. Clicking the title renames the page. */
 export function headerPanel() {
   let fav = false;
+  let error = '';
   return {
     id: 'title', slot: 'page.header', order: 10,
     async render(el, ctx) {
-      const title = ctx.route?.title ?? '';
+      const title = ctx.page?.title ?? ctx.route?.title ?? '';
+      const page = ctx.page;
       const draw = () => render(html`<div class="page-title">
-          <h1>${title}</h1>
+          <h1 title=${page ? 'Click to rename' : ''} @click=${(e) => page && startRename(e.target)}
+            @keydown=${keys} @blur=${(e) => finishRename(e.target)}>${title}</h1>
           <button class="icon star ${fav ? 'on' : ''}" aria-pressed=${fav} title=${fav ? 'Remove from favourites' : 'Add to favourites'}
             @click=${async () => { await toggleFavourite(title); fav = !fav; draw(); document.dispatchEvent(new CustomEvent('notd:favourites')); }}>${fav ? '★' : '☆'}</button>
-        </div>`, el);
+        </div>${error ? html`<p class="error" role="alert">${error}</p>` : ''}`, el);
+      const startRename = (h) => {
+        if (h.isContentEditable) return;
+        error = '';
+        h.contentEditable = 'plaintext-only';
+        h.focus();
+        getSelection().selectAllChildren(h);
+      };
+      const keys = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+        if (e.key === 'Escape') { e.target.textContent = title; e.target.blur(); }
+      };
+      const finishRename = async (h) => {
+        if (!h.isContentEditable) return;
+        h.removeAttribute('contenteditable');
+        const next = h.textContent.trim().replace(/\s+/g, ' ');
+        if (!next || next === title) { h.textContent = title; return; }
+        try {
+          await renamePage(page, next);
+          document.dispatchEvent(new CustomEvent('notd:renamed', { detail: { from: title, to: next } }));
+        } catch (e) {
+          error = e.code === 'title_taken' ? `There is already a page called “${next}”.` : e.message;
+          h.textContent = title;
+          draw();
+        }
+      };
       draw();
       const { items } = await favourites().catch(() => ({ items: [] }));
       fav = items.some((i) => i.title.toLowerCase() === title.toLowerCase());
       draw();
     },
   };
+}
+
+/** Renames a page and rewrites every link to it, in one batch: all or nothing. */
+export async function renamePage(page, title) {
+  const groups = await api.backlinks(page.id);
+  const ops = [{ op: 'edit', id: page.id, title }];
+  for (const g of groups) {
+    for (const b of g.blocks) {
+      const text = rewriteLinks(b.text, page.title, title);
+      if (text !== b.text) ops.push({ op: 'edit', id: b.id, text });
+    }
+  }
+  return api.ops(ops);
 }
