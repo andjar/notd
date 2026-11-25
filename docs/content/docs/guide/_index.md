@@ -53,6 +53,19 @@ Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`,
 - **Right-click a bullet** (or long-press it on a phone) for the block's menu: copy a reference to it, zoom in, fold or unfold everything under it, delete it.
 - **Ctrl+/** goes to search.
 
+## Tasks
+
+A block that starts with `TODO`, `DOING`, `WAITING`, `DONE` or `CANCELLED` is a task (the tasks plugin, on by default).
+
+- The **checkbox** ticks it: an open task becomes `DONE` and gets `{done:: …}` with the date and time; ticking a done task makes it `TODO` again.
+- The **word** after the checkbox steps through `TODO` → `DOING` → `WAITING`. The first time a task becomes `DOING` it gets `{start:: …}`.
+- **Ctrl+Enter** (Cmd+Enter) in a block makes it a task, ticks it, and makes it a plain block again.
+- In the slash menu: `/todo`, `/doing`, `/waiting`, `/done`, `/cancelled`, and `/scheduled` or `/deadline`, which add `{scheduled:: today}` or `{deadline:: today}`; change the date as you like.
+- On a **journal page**, the agenda above the page lists open tasks scheduled for that day or before, deadlines on or before it (overdue in red), and what is in progress.
+- In queries: `task:open`, `task:todo`, `task:doing`, `task:waiting`, `task:done`, `task:cancelled`, `task:any`, together with any other filter, for example `{{query task:open deadline<=2026-12-01}}`.
+
+Everything is in the text, so with the plugin switched off a task simply reads `TODO buy milk`. Ticking is undone with Ctrl+Z like any other change.
+
 ## Links
 
 Type `[[` or `#` and notd suggests pages as you type (their aliases count too). Arrow keys choose, Enter or Tab picks, Escape closes the list. The last entry, “New page: …”, links to a page that does not exist yet; it is created when you open it.

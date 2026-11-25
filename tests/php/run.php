@@ -46,6 +46,11 @@ $failed = [];
 $started = microtime(true);
 foreach ($files as $file) {
     TestRegistry::$tests = [];
+    if (class_exists(Indexer::class, false)) {   // what one file's plugins registered does not leak into the next
+        Indexer::$extra = [];
+        Query::$filters = [];
+        Ops::$listeners = array_intersect_key(Ops::$listeners, ['index' => 1, 'search' => 1]);
+    }
     require $file;
     $short = substr($file, strlen($root) + 1);
     foreach (TestRegistry::$tests as $t) {

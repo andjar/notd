@@ -16,7 +16,7 @@ GET /api/v1/plugins
 
 ```response
 200
-{"safe": false, "api": 1, "plugins": []}
+{"safe": false, "api": 1, "plugins": [{"name": "tasks", "enabled": true, "problem": null, "browser": "plugins/tasks/main.js"}]}
 ```
 
 ```request

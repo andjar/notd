@@ -66,7 +66,7 @@ def the_slash_menu_in_a_block():
             page.wait_for_selector('.menu.slash li:has-text("Heading 2")')
             page.keyboard.press('ArrowDown')
             page.keyboard.press('Enter')
-            page.keyboard.type('/hel')
+            page.keyboard.type(' /hel')
             page.wait_for_selector('.menu.slash li:has-text("Say hello")')
             page.keyboard.press('Tab')
             page.keyboard.press('Escape')

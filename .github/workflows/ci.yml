@@ -67,10 +67,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Client unit tests
+      - name: Client and plugin unit tests
         run: |
-          if ! ls tests/js/*.test.mjs > /dev/null 2>&1; then echo "No client unit tests yet."; exit 0; fi
-          node --test --test-reporter=spec tests/js/*.test.mjs
+          node --test --test-reporter=spec tests/js/*.test.mjs plugins/*/tests/*.test.mjs
       - name: Protocol tests
         run: |
           if ! ls tests/conformance/*.test.mjs > /dev/null 2>&1; then echo "No conformance tests yet."; exit 0; fi

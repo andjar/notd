@@ -33,7 +33,7 @@ export class JournalScreen {
 
   /** Loads the next few earlier days. */
   async more() {
-    if (this.loading || this.done) return;
+    if (this.loading || this.done || this.disposed) return;
     this.loading = true;
     try {
       const days = await api.journalDays({ before: this.oldest, limit: BATCH });
@@ -50,6 +50,7 @@ export class JournalScreen {
   }
 
   async #day(title, isToday) {
+    if (this.disposed) return; // the journal was left while days were loading
     const section = document.createElement('section');
     section.className = 'journal-day' + (isToday ? ' today' : '');
     section.dataset.day = title;
@@ -63,13 +64,14 @@ export class JournalScreen {
     }
     const body = document.createElement('div');
     section.append(body);
-    if (this.sentinel) this.root.insertBefore(section, this.sentinel); else this.root.append(section);
+    if (this.sentinel?.parentNode === this.root) this.root.insertBefore(section, this.sentinel); else this.root.append(section);
     const screen = new PageScreen(body, { announce: isToday });
     this.days.push(screen);
     await screen.show(title);
   }
 
   dispose() {
+    this.disposed = true;
     this.observer?.disconnect();
     for (const d of this.days) d.dispose();
     this.days = [];

@@ -6,6 +6,12 @@ description: "How a plugin is made, what it can use (plugin API 1), and safe mod
 
 Everything beyond notes, links, search, queries, files and export is a plugin, including the ones that ship with notd. A plugin uses only the API on this page, the same one the core's own panels use, so it can be switched off without breaking anything: your notes stay as they are, as plain text.
 
+## Plugins that come with notd
+
+| Plugin | Does |
+| --- | --- |
+| `tasks` | TODO/DOING/WAITING/DONE/CANCELLED with a checkbox, start, scheduled, deadline and done times, the `task:` query filter and an agenda on journal pages. Read `plugins/tasks/` as an example: it uses syntax, commands, a panel, an indexer and a filter. |
+
 ## A plugin is a folder
 
 ```text
