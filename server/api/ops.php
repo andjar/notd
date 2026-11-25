@@ -3,8 +3,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../ops.php';
+require_once __DIR__ . '/../core.php';
 
 return [
     'POST' => function (Request $r): array {
