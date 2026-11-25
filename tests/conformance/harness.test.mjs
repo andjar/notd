@@ -62,3 +62,16 @@ test('server files and the data folder are never served as files', async () => {
     assert.equal(res.body?.error?.code, 'not_found', path);
   }
 });
+
+test('the app page is sent with a CSP that allows exactly its import map', async () => {
+  const { createHash } = await import('node:crypto');
+  const res = await fetch(server.url + '/');
+  const html = await res.text();
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/html/);
+  const map = html.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1];
+  const hash = createHash('sha256').update(map).digest('base64');
+  const csp = res.headers.get('content-security-policy');
+  assert.match(csp, new RegExp(`script-src 'self' 'sha256-${hash.replace(/[+/=]/g, '\\$&')}';`));
+  assert.match(csp, /frame-ancestors 'none'/);
+});

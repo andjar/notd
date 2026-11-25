@@ -159,6 +159,9 @@ client/
   lib/api.js      one function per endpoint; errors as ApiError(status, code, message)
   lib/panels.js   the panel registry: panels.register({ id, slot, order, render(el, ctx), when(ctx) })
   lib/keys.js     sort keys and ids
+  lib/route.js    addresses: #/page/<title>[/<block id>], today's journal when empty
+  panels/         the core panels: search (top bar), page title with the favourite star,
+                  favourites, recent pages and calendar (left), save status (status line)
   ui/gate.js      the login screen
   style/tokens.css  colours, sizes and fonts, light and dark
   style/app.css     the frame
@@ -176,4 +179,4 @@ pip install playwright && python3 -m playwright install chromium
 python3 tests/browser/frame_test.py
 ```
 
-`support.py` provides `Server` (with `ops()` to set up notes through the API), `browser()`, `open_page()` (which collects console errors so a test can require none) and the `@test` runner.
+Test pages are opened with Playwright's `bypass_csp`, because its string predicates need `eval`; that the CSP is sent, and allows exactly the import map, is checked by a conformance test instead. `support.py` provides `Server` (with `ops()` to set up notes through the API), `browser()`, `open_page()` (which collects console errors so a test can require none) and the `@test` runner.

@@ -109,3 +109,65 @@ a { color: var(--accent); }
 }
 .gate .error { color: var(--danger); margin: 0; }
 .gate code { font-family: var(--font-mono); background: var(--bg-soft); padding: 0 0.25em; border-radius: 3px; }
+
+/* Core panels. */
+.search { position: relative; width: min(100%, 28rem); }
+.search input {
+  width: 100%;
+  font: inherit;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+.search-results {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 70vh;
+  overflow: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.search-results li { padding: 0.35rem 0.5rem; border-radius: 4px; cursor: pointer; display: grid; }
+.search-results li.active { background: var(--accent-soft); }
+.search-results .snippet { color: var(--fg-soft); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+mark { background: var(--mark); color: inherit; border-radius: 2px; }
+
+.links { list-style: none; margin: 0; padding: 0; }
+.links a { display: block; padding: 0.1rem 0.25rem; border-radius: 4px; color: var(--fg); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.links a:hover { background: var(--bg-hover); }
+.hint { color: var(--fg-faint); font-size: 0.85rem; margin: 0; }
+
+.calendar-head { display: flex; align-items: center; justify-content: space-between; }
+.calendar-head h2 { margin: 0; }
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 0.8rem; }
+.calendar .dow { color: var(--fg-faint); }
+.calendar a { position: relative; padding: 0.2rem 0; border-radius: 4px; color: var(--fg); text-decoration: none; }
+.calendar a:hover { background: var(--bg-hover); }
+.calendar a.today { font-weight: 700; color: var(--accent); }
+.calendar a.selected { background: var(--accent-soft); }
+.calendar a.dot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.page-title { display: flex; align-items: center; gap: 0.25rem; }
+.page-title h1 { margin: 0; font-size: 1.75rem; line-height: 1.25; overflow-wrap: anywhere; }
+.star.on { color: #e0a100; }
+.status .warn { color: var(--danger); }
