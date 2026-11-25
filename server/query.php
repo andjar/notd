@@ -82,7 +82,7 @@ final class Query
         if (!$conds) {
             throw new HttpError(400, 'bad_query', 'A query needs at least one filter or word.');
         }
-        $order[] = 'n.updated DESC';
+        $order[] = 'n.updated DESC, n.id';
         return [
             'where' => implode(' AND ', array_map(fn($c) => $c[0], $conds)),
             'params' => array_merge(...array_map(fn($c) => $c[1], $conds)),

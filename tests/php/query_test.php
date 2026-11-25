@@ -42,7 +42,7 @@ test('numbers compare as numbers, dates as text', function () {
 test('negation, has, and !=', function () {
     $pdo = library();
     eq(['Arrival', 'Heat'], q($pdo, 'type:movie -tag:scifi sort:title'));
-    eq(['Østfold', 'plain'], q($pdo, 'kind:block -has:rating sort:created'));
+    eq(['plain', 'Østfold'], q($pdo, 'kind:block -has:rating sort:text'));
     eq(['Østfold'], q($pdo, 'has:type type!=movie type!=book'));
 });
 
