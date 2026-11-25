@@ -139,6 +139,7 @@ The schema is `server/schema.sql`:
 | `links` | Index of links, tags, block references and embeds, by source and target. |
 | `changes` | The change feed: one row per change, numbered. |
 | `search` | The FTS5 full-text index of titles and text (diacritics kept). |
+| `jobs` | The job queue and log: programs and plugin jobs to run after changes. |
 | `files` | For each file node: SHA-256, size, content type and where the content is stored. |
 | `applied_ops` | Operation ids already applied, so a retried batch is not applied twice. |
 | `meta` | The schema version, the last clock, and other facts about the notebook. |
@@ -147,7 +148,7 @@ The database runs in WAL mode, so reading never waits for writing. All writes go
 
 All changes to notes go through `Ops::apply()` (`server/ops.php`), the code behind [`POST /api/v1/ops`](../protocol/operations/). It stamps each changed node with the next hybrid logical clock and appends to the change feed; other parts (the indexer, later plugins' actions) hook in through `Ops::$listeners`, wired in `server/core.php`.
 
-The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables, and the search index, from the text of every node. `php tools/export.php` and `php tools/import.php <folder>` write and read [Markdown](../protocol/export/); the import is tested against a sample Logseq graph in `tests/fixtures/logseq-graph/`.
+The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables, and the search index, from the text of every node. `php tools/export.php` and `php tools/import.php <folder>` (the importer is `tools/lib/import.php`, a tool rather than core) write and read [Markdown](../protocol/export/); the import is tested against a sample Logseq graph in `tests/fixtures/logseq-graph/`.
 
 ## The browser app
 

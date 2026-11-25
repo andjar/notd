@@ -1,5 +1,5 @@
 <?php
-// Import: reads a folder of Markdown (a notd export, a Logseq graph, or plain
+// Import (a tool, not part of the core; see decision 12): reads a folder of Markdown (a notd export, a Logseq graph, or plain
 // notes) and creates its pages through the operations pipeline, so imported
 // notes are indexed and searchable like any other.
 //

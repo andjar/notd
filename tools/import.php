@@ -6,6 +6,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/server/core.php';
+require_once __DIR__ . '/lib/import.php';
 Plugins::load(Db::get());   // plugins' indexers and actions take part
 
 if (!isset($argv[1]) || !is_dir($argv[1])) {

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/support/server.php';
+require_once dirname(__DIR__, 2) . '/tools/lib/import.php';
 
 const GRAPH = __DIR__ . '/../fixtures/logseq-graph';
 

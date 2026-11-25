@@ -120,6 +120,10 @@ final class Http
             }
             $data = self::dispatch($method, $path, new Request($method, $_GET, (string) file_get_contents('php://input'), $_FILES, $_POST));
             $data instanceof FileResponse ? $data->send() : self::send(200, $data);
+            if (class_exists(Jobs::class, false) && Jobs::queuedNow()) {
+                self::finishResponse();
+                Jobs::work(Db::get());                  // outside effects run once the answer is out
+            }
         } catch (HttpError $e) {
             self::send($e->status, ['error' => ['code' => $e->codeName, 'message' => $e->getMessage()]]);
         } catch (Throwable $e) {
@@ -145,6 +149,19 @@ final class Http
             throw new HttpError(405, 'method_not_allowed', "$method is not allowed here; use " . implode(' or ', array_keys($handlers)) . '.');
         }
         return $handlers[$method]($request);
+    }
+
+    /** Lets the client go before slow work: closes the connection where the server allows it. */
+    private static function finishResponse(): void
+    {
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } elseif (function_exists('litespeed_finish_request')) {
+            litespeed_finish_request();
+        } else {
+            flush();
+        }
+        ignore_user_abort(true);
     }
 
     private static function send(int $status, mixed $data): void

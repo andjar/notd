@@ -9,6 +9,7 @@ $nodes = (int) ($argv[1] ?? 183000);
 $work = getenv("NOTD_BENCH_DIR") ?: sys_get_temp_dir() . "/notd-bench-" . getmypid();
 putenv("NOTD_DATA_DIR=$work/data");
 require dirname(__DIR__) . '/server/core.php';
+require_once __DIR__ . '/lib/import.php';
 
 mt_srand(42);
 $words = explode(' ', 'kitchen tiles report meeting idea garden budget travel book film music code server note plan review draft letter call friend family health');
