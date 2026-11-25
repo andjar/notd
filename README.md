@@ -2,7 +2,7 @@
 
 notd is a personal outliner and journal: one page per day, notes nested as deep as you like, links and backlinks, and small plugins for everything else. It is made of plain PHP, plain JavaScript and one SQLite file, with no build step, so it can be read, run and changed for decades.
 
-> **This is the `next` branch: notd 4, a clean rewrite in progress.** The working version, notd 3, is on [`main`](https://github.com/andjar/notd/tree/main). The plan, the steps and the reasons are in the [documentation](docs/content/docs/overview/_index.md).
+> **This is the `next` branch: notd 4, a clean rewrite in progress.** The working version, notd 3, is on [`main`](https://github.com/andjar/notd/tree/main). The [overview](docs/content/docs/overview/_index.md), [architecture](docs/content/docs/overview/architecture.md) and [decisions](docs/content/docs/overview/decisions.md) say what notd 4 is and why.
 
 ## What is where
 
