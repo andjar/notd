@@ -47,11 +47,6 @@ window.addEventListener('DOMContentLoaded', async function () {
     if (data.status === 'error') throw new Error(data.message || 'API error');
     return data.data;
   }
-  // Notes API
-  const notesAPI = {
-    getNote: (noteId) => apiRequest(`notes.php?id=${noteId}`),
-    applyOps: (ops) => apiRequest('ops.php', 'POST', { ops })
-  };
   // Pages API (optional, for page editing)
   const pagesAPI = {
     getPage: (pageId) => apiRequest(`pages.php?id=${pageId}`),
@@ -76,6 +71,7 @@ window.addEventListener('DOMContentLoaded', async function () {
           ? `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2"></path><path d="M12 21v2"></path><path d="M4.22 4.22l1.42 1.42"></path><path d="M18.36 18.36l1.42 1.42"></path><path d="M1 12h2"></path><path d="M21 12h2"></path><path d="M4.22 19.78l1.42-1.42"></path><path d="M18.36 5.64l1.42-1.42"></path></svg>`
           : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"></path></svg>`;
       }
+      let noteSession = null;
       const editor = CodeMirror.fromTextArea(textarea, {
         mode: 'markdown',
         theme: cmTheme,
@@ -91,17 +87,8 @@ window.addEventListener('DOMContentLoaded', async function () {
       // --- NOTE/PAGE LOADING LOGIC ---
       const { note_id, page_id } = getNoteOrPageIdFromUrl();
       if (note_id) {
-        try {
-          const note = await notesAPI.getNote(note_id);
-          if (note && note.content !== undefined && note.content !== null) {
-            editor.setValue(note.content);
-          } else {
-            editor.setValue('');
-          }
-        } catch (err) {
-          editor.setValue('');
-          alert('Failed to load note: ' + (err.message || err));
-        }
+        // Loading, saving with a conflict check, following changes made in notd: note-sync.js.
+        noteSession = await window.notdNoteSync.attach(editor, note_id);
       } else if (page_id) {
         try {
           const page = await pagesAPI.getPage(page_id);
@@ -144,22 +131,17 @@ window.addEventListener('DOMContentLoaded', async function () {
         const value = cm.getValue();
         const { note_id, page_id } = getNoteOrPageIdFromUrl();
         if (note_id) {
-          try {
-            await notesAPI.applyOps([{ op_id: 'ext-' + Date.now().toString(36) + Math.random().toString(36).slice(2), type: 'edit', id: String(note_id), content: value }]);
-            alert('Note saved!');
-          } catch (err) {
-            alert('Failed to save note: ' + (err.message || err));
-          }
+          if (noteSession) await noteSession.save();
         } else if (page_id) {
           try {
             await pagesAPI.updatePage(page_id, { content: value });
-            alert('Page saved!');
+            window.notdNoteSync.toast('Page saved');
           } catch (err) {
-            alert('Failed to save page: ' + (err.message || err));
+            window.notdNoteSync.toast('Could not save the page: ' + (err.message || err), { error: true });
           }
         } else {
           localStorage.setItem('zen-md-content', value);
-          alert('Saved to local storage!');
+          window.notdNoteSync.toast('Saved in this browser');
         }
       }
     });

@@ -26,7 +26,7 @@ Every operation has an `op_id` (unique string, at most 64 characters), a `type` 
 | `type` | Other fields | Effect |
 |---|---|---|
 | `create` | `page_id`, `parent_id`, `after`, `content`?, `collapsed`?, `sort_key`? | Creates the note. **The caller chooses the id.** |
-| `edit` | `content` | Replaces the content and re-indexes its properties. |
+| `edit` | `content`, optionally `base_version` | Replaces the content and re-indexes its properties. With `base_version` (the note's `version` when you read it), the edit is only applied if the note has not changed since; otherwise it is skipped with the warning `conflict`. |
 | `move` | `parent_id`, `after`, `sort_key`? | Moves the note (with its subtree) under `parent_id`, right after sibling `after`. |
 | `collapse` | `collapsed` | Sets the collapsed flag. |
 | `delete` | | Deletes the note and its whole subtree. |
@@ -88,6 +88,7 @@ An operation whose target has disappeared, for example because the note was dele
 | `parent_missing` | The parent does not exist on this page. | `create`: places the note at the top level. `move`: skips. |
 | `after_missing` | The `after` sibling is not a child of the parent. | Places the note last. |
 | `cycle` | `move` under the note itself or a descendant. | Skips the operation. |
+| `conflict` | `edit` with a `base_version` that is no longer the note's `version`. | Skips the operation; `notes` in the answer has the current note, so the caller can show it or save again without `base_version`. |
 
 ## Errors
 

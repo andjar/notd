@@ -12,6 +12,7 @@
 
 import { templatesAPI } from '../api_client.js';
 import { pageNames, matchNames } from '../app/page-names.js';
+import { page } from '../app/page-state.js';
 import { readText, caretOffset, replaceRange } from './note-view.js';
 
 let popup = null;
@@ -49,7 +50,8 @@ function contextAt(element) {
         }
     }
 
-    const slash = /(^|\s)\/([\w-]*)$/.exec(before);
+    // "/query open" narrows by several words; the popup closes when no template matches.
+    const slash = /(^|\s)\/([\w-]*(?: [\w-]*){0,5})$/.exec(before);
     if (slash) {
         return { kind: 'template', query: slash[2], start: caret - slash[2].length - 1, end: caret };
     }
@@ -72,7 +74,14 @@ async function suggestionsFor(context) {
     return all
         .filter((t) => t.name.toLowerCase().includes(q))
         .slice(0, 8)
-        .map((t) => ({ label: t.name, hint: 'template', text: t.content || '' }));
+        .map((t) => ({ label: t.name, hint: 'template', text: fillPagePlaceholders(t.content || '') }));
+}
+
+/** {{page}} and {{page_id}} in a template become the open page's name and id (for queries about "this page"). */
+function fillPagePlaceholders(text) {
+    return text
+        .replace(/\{\{page_id\}\}/g, String(page.id ?? ''))
+        .replace(/\{\{page\}\}/g, String(page.name ?? '').replace(/'/g, "''"));
 }
 
 function ensurePopup() {

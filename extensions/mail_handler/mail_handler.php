@@ -1,197 +1,180 @@
 <?php
+/**
+ * Adds an e-mail message to today's journal page in notd, with its
+ * attachments.
+ *
+ *     php mail_handler.php [api-url] < message.eml
+ *
+ * notd's address followed by /api comes from the argument, or "api_url" in
+ * config.json next to this script (default http://localhost:8000/api).
+ *
+ * The message is read from standard input in its raw form (.eml), as mail
+ * servers and clients hand it to a program. A message that was added before
+ * (same Message-ID) is not added again.
+ *
+ * Exit status, as mail servers expect from a delivery program:
+ *   0   added (or already there)
+ *   65  the input is not a message (EX_DATAERR)
+ *   75  notd could not be reached or was busy: try again later (EX_TEMPFAIL)
+ *   1   notd refused the note
+ */
 
-// --- 1. Include Utilities ---
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit("Run this from the command line.\n");
+}
 require_once __DIR__ . '/email_parser_utils.php';
 
-// --- 2. Configuration ---
-// notd's address followed by /api, from "api_url" in config.json next to this
-// script (default http://localhost:8000/api), or from the first argument:
-//     php mail_handler.php http://localhost:8000/api < message.eml
-$mail_config = json_decode((string)@file_get_contents(__DIR__ . '/config.json'), true) ?: [];
-$api_url = $argv[1] ?? $mail_config['api_url'] ?? 'http://localhost:8000/api';
-define('API_BASE_URL', rtrim($api_url, '/') . '/v1');
+const EX_DATAERR = 65;
+const EX_TEMPFAIL = 75;
 
-// --- External Mail Fetching Mechanism ---
-// This script assumes that raw email content is provided to it.
-// The actual mechanism for fetching emails (e.g., via IMAP, POP3, or a mail server pipe)
-// is external to this script.
+$config = json_decode((string)@file_get_contents(__DIR__ . '/config.json'), true) ?: [];
+$api = rtrim($argv[1] ?? $config['api_url'] ?? 'http://localhost:8000/api', '/') . '/v1';
 
-// --- 3. Email Input ---
-error_log("Email handler script started.");
+/** One HTTP request. @return array{0: int, 1: ?array}|null status and decoded JSON; null if notd cannot be reached */
+function notd_mail_http(string $url, ?string $body = null, string $contentType = 'application/json'): ?array
+{
+    $context = stream_context_create(['http' => [
+        'method' => $body === null ? 'GET' : 'POST',
+        'header' => $body === null ? "Accept: application/json\r\n" : "Content-Type: $contentType\r\nAccept: application/json\r\n",
+        'content' => $body ?? '',
+        'ignore_errors' => true,
+        'timeout' => 30,
+    ]]);
+    $response = @file_get_contents($url, false, $context);
+    if ($response === false || empty($http_response_header)) {
+        return null;
+    }
+    preg_match('{HTTP/\S*\s(\d{3})}', $http_response_header[0], $m);
+    return [(int)($m[1] ?? 0), json_decode($response, true)];
+}
 
-$raw_email_content = '';
-$input_source = '';
+/** {key::value}: a value cannot hold "}" or a line break. */
+function notd_mail_property(string $key, string $value, string $colons = '::'): string
+{
+    return '{' . $key . $colons . trim(str_replace(['}', "\r", "\n"], [')', ' ', ' '], $value)) . '}';
+}
 
-// Try reading from php://stdin first
-$stdin_content = file_get_contents('php://stdin');
-if (!empty($stdin_content)) {
-    $raw_email_content = $stdin_content;
-    $input_source = 'php://stdin';
-    error_log("Reading email content from php://stdin.");
-} else {
-    // Fallback to a test file if stdin is empty
-    $test_email_file = __DIR__ . '/../sample_email.txt'; // Assumes sample_email.txt is in the parent directory
-    if (file_exists($test_email_file)) {
-        $raw_email_content = file_get_contents($test_email_file);
-        $input_source = $test_email_file;
-        error_log("php://stdin was empty. Reading email content from test file: " . $test_email_file);
+function notd_mail_person(?array $address): string
+{
+    if (!$address) {
+        return '';
+    }
+    return $address['name'] !== '' ? $address['name'] . ' <' . $address['email'] . '>' : $address['email'];
+}
+
+function notd_mail_fail(string $message, int $status): void
+{
+    fwrite(STDERR, "mail handler: $message\n");
+    exit($status);
+}
+
+// ------------------------------------------------------------------ read
+
+$raw = stream_get_contents(STDIN);
+if ($raw === false || trim($raw) === '') {
+    notd_mail_fail('no message on standard input. Usage: php mail_handler.php [api-url] < message.eml', EX_DATAERR);
+}
+$mail = notd_parse_email($raw);
+if (!$mail['from'] && $mail['subject'] === '' && $mail['text'] === '') {
+    notd_mail_fail('the input does not look like an e-mail message', EX_DATAERR);
+}
+
+// Added before? Recognised by the Message-ID.
+if ($mail['message_id'] !== '') {
+    $sql = "SELECT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'email_message_id' AND P.value = '"
+        . str_replace("'", "''", str_replace(['}', "\n"], [')', ' '], $mail['message_id'])) . "' LIMIT 1";
+    $found = notd_mail_http("$api/query_notes.php", json_encode(['sql_query' => $sql]));
+    if ($found === null || $found[0] >= 500) {
+        notd_mail_fail("notd cannot be reached at $api", EX_TEMPFAIL);
+    }
+    if ($found[0] === 200 && !empty($found[1]['data'])) {
+        echo "Already in notd: {$mail['message_id']}\n";
+        exit(0);
+    }
+}
+
+// ------------------------------------------------------------------ note
+
+$subject = $mail['subject'] !== '' ? $mail['subject'] : '(no subject)';
+$lines = ['## Email: ' . $subject, ''];
+if ($mail['from']) {
+    $lines[] = '**From:** ' . notd_mail_person($mail['from']);
+}
+if ($mail['to']) {
+    $lines[] = '**To:** ' . implode(', ', array_map('notd_mail_person', $mail['to']));
+}
+if ($mail['cc']) {
+    $lines[] = '**Cc:** ' . implode(', ', array_map('notd_mail_person', $mail['cc']));
+}
+// The time as the sender's clock showed it (the Date header carries its own offset).
+$when = '';
+if ($mail['date'] !== '') {
+    try {
+        $when = (new DateTime(preg_replace('/\s*\([^)]*\)\s*$/', '', $mail['date'])))->format('Y-m-d H:i');
+    } catch (\Exception $e) {
+        $when = '';
+    }
+}
+if ($when !== '') {
+    $lines[] = '**Date:** ' . $when;
+}
+if ($mail['text'] !== '') {
+    $lines[] = '';
+    $lines[] = $mail['text'];
+}
+
+$props = [notd_mail_property('tag', 'mail')];
+if ($mail['from']) {
+    $props[] = notd_mail_property('email_from_address', $mail['from']['email']);
+    if ($mail['from']['name'] !== '') {
+        $props[] = notd_mail_property('email_from_name', $mail['from']['name']);
+    }
+}
+if ($mail['to']) {
+    $props[] = notd_mail_property('email_to_address', $mail['to'][0]['email']);
+    if ($mail['to'][0]['name'] !== '') {
+        $props[] = notd_mail_property('email_to_name', $mail['to'][0]['name']);
+    }
+}
+$props[] = notd_mail_property('email_subject', $subject);
+if ($when !== '') {
+    $props[] = notd_mail_property('email_date', $when);
+}
+if ($mail['message_id'] !== '') {
+    $props[] = notd_mail_property('email_message_id', $mail['message_id'], ':::');
+}
+$lines[] = '';
+$lines[] = implode(' ', $props);
+
+$result = notd_mail_http("$api/append_to_page.php", json_encode(['page_name' => date('Y-m-d'), 'notes' => implode("\n", $lines)]));
+if ($result === null || $result[0] >= 500) {
+    notd_mail_fail("notd cannot be reached at $api" . ($result ? " (HTTP {$result[0]})" : ''), EX_TEMPFAIL);
+}
+$noteId = $result[1]['data']['appended_notes'][0]['id'] ?? null;
+if ($result[0] !== 200 || $noteId === null) {
+    notd_mail_fail('notd refused the note: ' . ($result[1]['message'] ?? "HTTP {$result[0]}"), 1);
+}
+
+// ----------------------------------------------------------- attachments
+
+$stored = 0;
+foreach ($mail['attachments'] as $attachment) {
+    $name = preg_replace('/["\r\n\\\\]/', '_', $attachment['name']);
+    if (strpos($name, '.') === false) {
+        continue; // unnamed parts (signatures, calendar data) cannot be stored without a known file type
+    }
+    $boundary = '----notd-mail-' . bin2hex(random_bytes(8));
+    $body = "--$boundary\r\nContent-Disposition: form-data; name=\"note_id\"\r\n\r\n$noteId\r\n"
+        . "--$boundary\r\nContent-Disposition: form-data; name=\"attachmentFile\"; filename=\"$name\"\r\n"
+        . "Content-Type: {$attachment['type']}\r\n\r\n" . $attachment['data'] . "\r\n--$boundary--\r\n";
+    $upload = notd_mail_http("$api/attachments.php", $body, "multipart/form-data; boundary=$boundary");
+    if ($upload !== null && $upload[0] === 200) {
+        $stored++;
     } else {
-        error_log("Error: php://stdin is empty and test file '{$test_email_file}' not found. Exiting.");
-        exit(1); // Exit if no email content can be obtained
+        fwrite(STDERR, "mail handler: attachment $name not stored: " . ($upload[1]['message'] ?? 'notd cannot be reached') . "\n");
     }
 }
 
-if (empty($raw_email_content)) {
-    error_log("Error: No email content could be read from '{$input_source}'. Exiting.");
-    exit(1);
-}
-
-// --- 4. Parse Email Headers ---
-$from_name = '';
-$from_email = '';
-$to_name = '';
-$to_email = '';
-$subject = '';
-
-// Split headers from the body for easier header parsing
-// Normalize line endings to LF first
-$normalized_content_for_headers = str_replace("\r\n", "\n", $raw_email_content);
-$header_end_pos = strpos($normalized_content_for_headers, "\n\n");
-$header_block = ($header_end_pos !== false) ? substr($normalized_content_for_headers, 0, $header_end_pos) : $normalized_content_for_headers;
-$header_lines = explode("\n", $header_block);
-
-foreach ($header_lines as $line) {
-    if (stripos($line, 'From:') === 0) {
-        $parsed_from = parse_email_address($line);
-        if ($parsed_from && $parsed_from['email']) {
-            $from_name = $parsed_from['name'] ?? '';
-            $from_email = $parsed_from['email'];
-        } else {
-            error_log("Warning: Could not parse 'From' header: " . $line);
-        }
-    } elseif (stripos($line, 'To:') === 0) {
-        // Note: Emails can have multiple "To" recipients. This simple parser takes the first one.
-        // A more robust solution would handle multiple recipients.
-        $parsed_to = parse_email_address($line);
-        if ($parsed_to && $parsed_to['email']) {
-            $to_name = $parsed_to['name'] ?? '';
-            $to_email = $parsed_to['email'];
-        } else {
-            error_log("Warning: Could not parse 'To' header: " . $line);
-        }
-    } elseif (stripos($line, 'Subject:') === 0) {
-        $parsed_subj = parse_subject($line);
-        if ($parsed_subj !== null) {
-            $subject = $parsed_subj;
-        } else {
-            error_log("Warning: Could not parse 'Subject' header: " . $line);
-        }
-    }
-}
-
-if (empty($from_email)) {
-    error_log("Error: 'From' email address is mandatory and could not be parsed. Exiting.");
-    // In a real scenario, might quarantine the email or send a bounce.
-    exit(1);
-}
-if (empty($subject)) {
-    $subject = "(No Subject)"; // Default subject if none is found
-    error_log("Warning: Email subject is empty. Using default '(No Subject)'.");
-}
-
-
-// --- 5. Parse Email Body ---
-$email_body = parse_email_body($raw_email_content);
-if (empty($email_body)) {
-    error_log("Warning: Email body is empty or could not be parsed.");
-    // $email_body will be an empty string, which is acceptable for note creation
-}
-
-// --- 6. Determine Target Page Name (Today's Date) ---
-$todays_date_string = date('Y-m-d');
-// $page_id logic removed. $todays_date_string will be used as page_name.
-error_log("Target page name for note: " . $todays_date_string);
-
-// --- 7. Prepare Note Content ---
-$note_title = "Email: " . $subject;
-$note_content = "## " . $note_title . "\n\n";
-$note_content .= "**From:** " . (!empty($from_name) ? $from_name . " <" . $from_email . ">" : $from_email) . "\n";
-if (!empty($to_email)) {
-    $note_content .= "**To:** " . (!empty($to_name) ? $to_name . " <" . $to_email . ">" : $to_email) . "\n";
-}
-$note_content .= "\n" . $email_body . "\n\n";
-// notd properties: {key::value}. A value cannot hold "}" or a line break.
-$prop = static function ($key, $value) {
-    return '{' . $key . '::' . trim(str_replace(['}', "\r", "\n"], [')', ' ', ' '], (string)$value)) . '}';
-};
-$props = [$prop('tag', 'mail'), $prop('email_from_address', $from_email)];
-if (!empty($from_name)) {
-    $props[] = $prop('email_from_name', $from_name);
-}
-if (!empty($to_email)) {
-    $props[] = $prop('email_to_address', $to_email);
-    if (!empty($to_name)) {
-        $props[] = $prop('email_to_name', $to_name);
-    }
-}
-$props[] = $prop('email_subject', $subject);
-$note_content .= implode(' ', $props);
-
-// --- 8. Create Note via API ---
-// Changed to use append_to_page.php
-$notes_api_url = API_BASE_URL . '/append_to_page.php'; 
-$post_data = [
-    'page_name' => $todays_date_string, // Use the date string as the page name
-    'notes'     => $note_content      // The 'notes' key should contain the actual content
-];
-
-error_log("Attempting to append note to page: " . $todays_date_string . " via URL: " . $notes_api_url);
-
-try {
-    $options = [
-        'http' => [
-            'header' => "Content-Type: application/json\r\n",
-            'method' => 'POST',
-            'content' => json_encode($post_data),
-            'ignore_errors' => true // To get error response body
-        ]
-    ];
-    $context = stream_context_create($options);
-    $note_response_json = file_get_contents($notes_api_url, false, $context);
-
-    // Check HTTP response code from $http_response_header (available magically)
-    $status_line = $http_response_header[0]; // e.g., "HTTP/1.1 201 Created"
-    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
-    $status_code = $match[1] ?? null;
-
-    if ($status_code >= 200 && $status_code < 300) { // Success codes (200, 201, etc.)
-        $note_response_data = json_decode($note_response_json, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception("Failed to decode JSON response from append_to_page API. Error: " . json_last_error_msg() . ". Response: " . $note_response_json);
-        }
-        // Updated success check for append_to_page.php response structure
-        if (isset($note_response_data['status']) && $note_response_data['status'] === 'success') {
-            $appended_note_id = 'N/A';
-            if (!empty($note_response_data['data']['appended_notes']) && isset($note_response_data['data']['appended_notes'][0]['id'])) {
-                $appended_note_id = $note_response_data['data']['appended_notes'][0]['id'];
-            }
-            error_log("Successfully appended note. Appended Note ID: " . $appended_note_id . ". Subject: '" . $subject . "'");
-            echo "Email processed and note created successfully. Appended Note ID: " . $appended_note_id . "\n";
-        } else {
-            $api_message = $note_response_data['message'] ?? ($note_response_data['data']['message'] ?? 'No specific message');
-            throw new Exception("Append_to_page API returned status not 'success' or unexpected response. Status: " . ($note_response_data['status'] ?? 'N/A') . ". Message: " . $api_message . ". Response: " . $note_response_json);
-        }
-    } else {
-         throw new Exception("Append_to_page API request failed with HTTP status: {$status_code}. Response: " . $note_response_json);
-    }
-
-} catch (Exception $e) {
-    error_log("Error appending note: " . $e->getMessage());
-    // In a real system, might attempt to retry or save the email to a failed queue
-    exit(1); // Exit with error
-}
-
-error_log("Email handler script finished.");
-exit(0); // Success
-
-?>
+echo "Added to " . date('Y-m-d') . ": $subject" . ($stored ? " ($stored attachment" . ($stored > 1 ? 's' : '') . ')' : '') . "\n";
+exit(0);

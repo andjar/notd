@@ -39,8 +39,13 @@ require_once '../../config.php';
                         <div class="kanban-column-cards" :id="'column-' + column.id">
                             <template x-for="task in column.tasks" :key="task.id">
                                 <div class="kanban-card" :data-note-id="task.id" :data-current-status="getNoteStatus(task)" draggable="true">
-                                    <span x-text="getCardDisplayContent(task.content, column.statusMatcher)"></span>
-                                    <!-- Add more task details here if needed -->
+                                    <div class="kanban-card-title" x-text="cardView(task).title"></div>
+                                    <div class="kanban-card-props" x-show="cardView(task).props.length">
+                                        <template x-for="prop in cardView(task).props" :key="prop.key + prop.value">
+                                            <span class="kanban-card-prop"><span class="kanban-card-prop-key" x-text="prop.key"></span><span x-text="prop.value"></span></span>
+                                        </template>
+                                    </div>
+                                    <a class="kanban-card-source" :href="noteUrl(task)" x-text="task.page_name" title="Open the note" draggable="false"></a>
                                 </div>
                             </template>
                             <div x-show="column.tasks.length === 0" class="empty-column-message">
@@ -224,6 +229,35 @@ require_once '../../config.php';
                     }
                     const defaultStatus = this.configuredKanbanStates[0]?.toUpperCase() || 'TODO';
                     return defaultStatus;
+                },
+
+                /**
+                 * What a card shows: the note's first line as plain text (no task
+                 * keyword, no property syntax, [[links]] as their names) and its
+                 * public properties as small labels.
+                 */
+                cardView(task) {
+                    if (task.is_encrypted) return { title: 'Encrypted note', props: [] };
+                    const content = String(task.content || '');
+                    const props = [];
+                    for (const m of content.matchAll(/\{([A-Za-z0-9_.-]+)::([^}\n:][^}\n]*)\}/g)) {
+                        props.push({ key: m[1], value: m[2].trim() });
+                    }
+                    let title = this.getCardDisplayContent(content.split('\n')[0], null)
+                        .replace(/\{[A-Za-z0-9_.-]+:{2,}[^}\n]*\}/g, '')
+                        .replace(/!\{\{[^}]*\}\}/g, '')
+                        .replace(/\[\[([^\]]+)\]\]/g, '$1')
+                        .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+                        .replace(/(\*\*|__|`)/g, '')
+                        .replace(/^#{1,6}\s+/, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    if (content.includes('\n')) title += ' …';
+                    return { title: title || '(no text)', props };
+                },
+
+                noteUrl(task) {
+                    return `../../page.php?page=${encodeURIComponent(task.page_name)}#note-${encodeURIComponent(task.id)}`;
                 },
 
                 getCardDisplayContent(noteContent, columnStatusMatcher) {

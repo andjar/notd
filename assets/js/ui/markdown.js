@@ -7,6 +7,8 @@
  *   {key::value}         a property; three or more colons make it internal
  *   [[Page Name]]        a link to a page
  *   !{{note-id}}         the note with that id, embedded
+ *   ((note-uuid))        the first line of that note, inline, linked to it
+ *   {tag::x}, {tags::x, y}  tags, each a link to its page
  *   SQL{select ...}      the notes a query selects, listed
  *
  * The result is always sanitized: note text can come from anywhere (pasted
@@ -44,10 +46,19 @@ const MARK_RE = /(\d+)/g;
 // Code spans and fenced blocks are left exactly as written.
 const CODE_RE = /(^|\n)(```|~~~)[^\n]*\n[\s\S]*?\n\2(?=\n|$)|(`+)[^`\n][\s\S]*?\3(?!`)/g;
 
-const SYNTAX_RE = /!\{\{([^}\n]*)\}\}|SQL\{([^}]+)\}|\[\[([^\]\n]+)\]\]|\{([a-zA-Z0-9_.-]+)(:{2,})([^}\n]+)\}/g;
+const SYNTAX_RE = /!\{\{([^}\n]*)\}\}|SQL\{([^}]+)\}|\[\[([^\]\n]+)\]\]|\{([a-zA-Z0-9_.-]+)(:{2,})([^}\n]+)\}|\(\(([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\)\)/g;
+
+/** "a, [[b c]], #d" => ['a', 'b c', 'd'] (as api/PropertyIndex.php splits tags). */
+function splitList(value) {
+    return value.split(',').map((item) => item.trim().replace(/^#?\[\[([\s\S]*)\]\]$/, '$1').trim().replace(/^#+/, '').trim()).filter(Boolean);
+}
 
 function syntaxHtml(m) {
-    const [, blockRef, sql, pageName, key, colons, value] = m;
+    const [, blockRef, sql, pageName, key, colons, value, inlineRef] = m;
+    if (inlineRef !== undefined) {
+        const id = inlineRef.toLowerCase();
+        return `<span class="block-ref" data-inline-ref="${escapeHtml(id)}">((${escapeHtml(id.slice(0, 8))}…))</span>`;
+    }
     if (blockRef !== undefined) {
         const ref = blockRef.trim();
         return NOTE_ID_PATTERN.test(ref)
@@ -65,8 +76,9 @@ function syntaxHtml(m) {
     if (internal && !config.renderInternalProperties) return '';
     const k = key.trim();
     const cls = `property-inline ${internal ? 'property-internal' : 'property-normal'}`;
-    if (k.toLowerCase() === 'tag') {
-        return `<span class="${cls} property-tag"><span class="property-key">#</span><span class="property-value">${escapeHtml(value.trim())}</span></span>`;
+    if (k.toLowerCase() === 'tag' || k.toLowerCase() === 'tags') {
+        // Each tag links to the page of that name, which lists the note under its backlinks.
+        return splitList(value).map((tag) => `<span class="${cls} property-tag"><a href="${escapeHtml(pageUrl(tag))}" class="property-tag-link"><span class="property-key">#</span><span class="property-value">${escapeHtml(tag)}</span></a></span>`).join(' ');
     }
     // A date (as in {scheduled::2026-11-16} or {date::...}) links to that day's journal page.
     const v = value.trim();
@@ -131,7 +143,7 @@ export function sanitizeHtml(html) {
 }
 
 function bodyHtml(text) {
-    if (PLAIN_TEXT.test(text) && !HAS_LINK.test(text)) {
+    if (PLAIN_TEXT.test(text) && !HAS_LINK.test(text) && !text.includes('((')) {
         return `<p>${escapeHtml(text)}</p>`;
     }
     const { text: marked_, pieces } = protectSyntax(text);

@@ -4,9 +4,9 @@ weight: 70
 description: "What changed in each version."
 ---
 
-### November 2026: version 3.1, schema v4
+### November 2026: version 3.1, schema v5
 
-The database upgrades itself to v4 the first time it is opened.
+The database upgrades itself to v5 the first time it is opened (a copy is kept next to it).
 
 Writing
 - `Enter` splits a note at the caret and `Backspace` at the start of a note joins it with the one above, as in Logseq.
@@ -18,6 +18,13 @@ Writing
 Tasks
 - **Scheduled and due.** `{scheduled::2026-11-16}` and `{deadline::2026-11-20}` (`:s` and `:u` type them) put a note on that day's journal page, below the outline. Today's page also lists overdue open tasks; tick one to mark it done. A date in a property links to its journal page. API: `search.php?agenda=`.
 
+Links
+- **Tags link to their page.** `{tag::bug}` and `{tags::a, b}` make the note a backlink of the page "bug" (or "a" and "b"), like `[[bug]]`; renaming the page rewrites the tags. Each tag is indexed on its own.
+- **Aliases.** `{alias::JS, ECMAScript}` in a page's properties makes `[[JS]]` open the page, and links to an alias are backlinks of the page.
+- **Inline block references.** `((note-uuid))` shows the first line of that note in the sentence, linked to it. **Copy reference** in the note menu.
+- **Ready-made queries.** Type `/query` for queries such as open tasks on this page, due within a week, done this week, tagged. Templates can use `{{page}}` and `{{page_id}}`; `/` suggestions accept several words.
+- The Logseq importer keeps `((id))` references and alias links as they are, and turns `#tag` into `{tag::tag}`.
+
 Pages
 - ☆ star to add and remove favourites; rename (links and child pages follow) and delete from the page dialog.
 - Print (or save as PDF) shows just the outline, collapsed notes included.
@@ -28,8 +35,17 @@ Pages
 Extensions
 - The RSS handler imports items again: its duplicate check used columns that do not exist, so every item was skipped. Items are now stored with `{key::value}` properties, and `config.json` is read from the script's folder wherever it is run from.
 - The mail handler writes `{key::value}` properties (it wrote Logseq's `key:: value`) and reads notd's address from `api_url` in its `config.json` or its first argument.
+- The mail handler reads real-world mail: MIME multipart, `quoted-printable` and `base64`, any character set, encoded subjects and names, HTML-only messages (turned into Markdown), several recipients and `Cc`. Attachments are stored on the note; a message already added (same `Message-ID`) is skipped; exit status 75 makes the mail server retry when notd is down.
 - The Pomodoro timer reads `pageTemplate`, `noteTemplate` and `cycle` from its `config.json` (they were ignored, so sessions went to the journal page and there were no long breaks), and its work session is 25 minutes again (the shipped setting was 2).
 - The kanban board's **Back to Main App** works when notd is served from a sub-folder.
+- **Excalidraw works offline.** It is bundled in `assets/libs/excalidraw/` (about 5.6 MB, without the Mermaid converter and the CJK handwriting font) instead of loaded from a CDN. Saving now stores the PNG as well as the `.excalidraw` file (only the latter arrived before).
+- The Zen writer and the math notepad no longer overwrite changes made elsewhere: saving over a newer version asks first, a change made in notd is taken over when nothing is unsaved, and open notd tabs show a save at once. Closing with unsaved text asks. API: `edit` accepts `base_version` and answers `conflict`.
+
+- Kanban cards show the note's text without `{property}` syntax, its properties as labels, and a link to the note.
+- The attachment dashboard shows the note each file belongs to, lists files whose note was deleted (**Only files without a note**), and deletes files.
+
+Attachments
+- A file the note's text already shows (an image placed in the text, a link to a file) is no longer listed again below the note. Pasted images were shown twice.
 
 Documentation
 - A page for each extension, with screenshots; how to turn extensions on, and which ones appear in the note menu.

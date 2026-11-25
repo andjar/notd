@@ -10,6 +10,9 @@
  *   {{date}} {{time}} {{datetime}} {{year}} {{month}} {{day}} {{weekday}}
  *   {{timestamp}} {{random}} {{uuid}}
  * The date ones accept a PHP date format: {{date:d.m.Y}}.
+ * {{page}} and {{page_id}} are left alone here and filled in by the browser
+ * when a note template is inserted (ui/autocomplete.js); "Query ..." templates
+ * use them.
  */
 
 namespace App;

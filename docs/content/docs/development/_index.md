@@ -9,7 +9,7 @@ description: "How notd is put together, how saving works, and how to change it s
 The rules that keep notd small and long-lived:
 
 1. **No build step.** The repository is the application. PHP files are served as they are; the browser loads plain ES modules. Nothing is compiled, bundled or installed.
-2. **No runtime dependencies to fetch.** The handful of libraries (Alpine.js, marked, DOMPurify, Sortable, SJCL, Feather) are stored in `assets/libs/`. Nothing is loaded from the internet.
+2. **No runtime dependencies to fetch.** The handful of libraries (Alpine.js, marked, DOMPurify, Sortable, SJCL, Feather, and Excalidraw for its extension) are stored in `assets/libs/`. Nothing is loaded from the internet. Excalidraw is the one library that is a bundle; `assets/libs/excalidraw/README.md` says how it is made.
 3. **Boring technology.** PHP, SQLite, HTML, CSS and JavaScript as browsers and PHP ship them.
 4. **Content is the source of truth.** Properties, links and task states are parsed from note text. Derived tables can always be rebuilt from it.
 5. **GET and POST only**, so the app runs under minimal web servers such as phpdesktop.
@@ -129,6 +129,8 @@ No test needs a build step or a PHP package.
 node tests/js/model.test.mjs          # outline model and outbox (no server)
 node tests/js/ordering_parity.mjs     # JavaScript and PHP sort keys agree (needs php on PATH)
 php tests/php/logseq_import.test.php  # Logseq importer, on throw-away databases (no server)
+php tests/php/migration_v5.test.php   # schema upgrade from v4 (no server)
+php tests/php/mail_handler.test.php   # e-mail parsing, and the mail handler against its own server
 
 # the remaining suites talk to a running server, on a throw-away database:
 NOTD_DB_PATH=/tmp/notd-test.sqlite PHP_CLI_SERVER_WORKERS=4 \

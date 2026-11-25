@@ -30,4 +30,4 @@ What a line can contain:
 
 A line that cannot be calculated shows an error instead of a result, for example `Undefined variable: hotell`.
 
-Saving replaces the note's text, as in the [Zen writer]({{< relref "zen.md" >}}): reload the notd tab to see it there. The two share their editor and their themes (`defaultLightTheme` and `defaultDarkTheme` in `extensions/math_notepad/config.json`).
+Saving replaces the note's text and works exactly as in the [Zen writer]({{< relref "zen.md" >}}): open notd tabs update by themselves, and saving over a change made elsewhere asks first. The two share their editor and their themes (`defaultLightTheme` and `defaultDarkTheme` in `extensions/math_notepad/config.json`).

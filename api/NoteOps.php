@@ -14,6 +14,11 @@
  * falls strictly between the intended neighbours and otherwise computes a new
  * one from `after` (the id of the previous sibling, or null for "first").
  *
+ * An edit may carry `base_version`, the version of the note the client last
+ * saw; if the note has changed since, the edit is skipped with a "conflict"
+ * warning instead of overwriting the other change (the note editors in
+ * extensions/ use this; the outline merges edits itself).
+ *
  * Operations whose target has disappeared (e.g. deleted in another tab) are
  * skipped with a warning rather than failing the batch, so unrelated edits in
  * the same batch are never lost. Malformed operations throw
@@ -187,6 +192,16 @@ class NoteOps
             $this->warn($i, $op, 'missing', 'Note no longer exists; edit skipped.');
             return 'skipped';
         }
+        if (isset($op['base_version'])) {
+            if (!is_int($op['base_version']) && !(is_string($op['base_version']) && ctype_digit($op['base_version']))) {
+                throw new OpValidationException("op $i: base_version must be an integer");
+            }
+            if ((int)$op['base_version'] !== (int)$note['version']) {
+                $this->warn($i, $op, 'conflict', 'The note was changed since base_version; edit skipped.');
+                $this->touched[$id] = true; // the answer carries the current note
+                return 'skipped';
+            }
+        }
         $stmt = $this->pdo->prepare(
             "UPDATE Notes SET content = ?, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
         );
@@ -342,7 +357,7 @@ class NoteOps
 
     private function getNoteRow(string $id): ?array
     {
-        $stmt = $this->pdo->prepare("SELECT id, page_id, parent_note_id FROM Notes WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT id, page_id, parent_note_id, version FROM Notes WHERE id = ?");
         $stmt->execute([$id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
