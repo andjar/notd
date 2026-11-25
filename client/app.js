@@ -62,7 +62,7 @@ async function start() {
     const root = document.getElementById('page');
     root.replaceChildren();
     notd.screen = e.detail.journal ? new JournalScreen(root) : new PageScreen(root);
-    notd.screen.show(e.detail.title);
+    notd.screen.show(e.detail.title, e.detail.block);
   });
   document.addEventListener('notd:page', (e) => panels.refresh({ ...panels.context, page: e.detail.page }));
   document.addEventListener('notd:renamed', (e) => { forgetPages(); go(e.detail.to); });

@@ -11,6 +11,7 @@ import { OutlineView } from './outline-view.js';
 import { Editor } from './editor.js';
 import { renderText, forgetNodes } from './text.js';
 import { Autocomplete } from './autocomplete.js';
+import { Drag } from './drag.js';
 
 export const outbox = new Outbox({
   send: (ops) => api.ops(ops),
@@ -44,9 +45,10 @@ export class PageScreen {
     this.title = null;
   }
 
-  /** Shows the page with this title. */
-  async show(title) {
+  /** Shows the page with this title; with a block id, zoomed into that block. */
+  async show(title, block = null) {
     this.title = title;
+    this.zoom = block;
     let data;
     try {
       data = await api.page(title);
@@ -69,19 +71,38 @@ export class PageScreen {
     const host = document.createElement('div');
     this.root.append(host);
     if (this.announce) forgetNodes();
-    this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id), renderText });
+    const zoom = this.zoom && this.outline.model.has(this.zoom) ? this.zoom : null;
+    if (zoom) this.root.prepend(this.#crumbs(page, zoom));
+    else if (this.zoom) this.root.prepend(Object.assign(document.createElement('p'), { className: 'missing', textContent: 'That block is not on this page any more.' }));
+    this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id), renderText, zoom });
     this.view.render();
     this.editor = new Editor(this.view, this.outline);
     this.autocomplete?.close();
     this.autocomplete?.box.remove();
     this.autocomplete = new Autocomplete(this.editor);
+    new Drag(this.view, this.outline);
     const add = document.createElement('button');
     add.className = 'add-block';
     add.textContent = blocks.length ? '' : 'Click here to write';
+    add.hidden = !!zoom;
     add.setAttribute('aria-label', 'Add a block');
     add.addEventListener('click', () => this.#addAtEnd());
     this.root.append(add);
     if (this.announce) this.root.dispatchEvent(new CustomEvent('notd:page', { bubbles: true, detail: { page } }));
+  }
+
+  /** Page › ancestor › ... links above a zoomed block. */
+  #crumbs(page, id) {
+    const nav = document.createElement('nav');
+    nav.className = 'crumbs';
+    nav.setAttribute('aria-label', 'Where this block is');
+    const link = (text, href) => Object.assign(document.createElement('a'), { textContent: text, href });
+    const parts = [link(page.title, pageLink(page.title))];
+    const chain = [];
+    for (let n = this.outline.model.get(this.outline.model.get(id).parent); n; n = this.outline.model.get(n.parent)) chain.unshift(n);
+    for (const n of chain) parts.push(link(shortText(n.text), pageLink(page.title, n.id)));
+    for (const [i, a] of parts.entries()) { if (i) nav.append(' › '); nav.append(a); }
+    return nav;
   }
 
   /** A new block at the end of the page, unless the last one is still empty. */
@@ -108,3 +129,8 @@ export class PageScreen {
 }
 
 export { isJournal };
+
+function shortText(text) {
+  const line = text.replace(/^#{1,3} /, '').split('\n')[0];
+  return line.length > 40 ? line.slice(0, 39) + '…' : line || '(empty)';
+}

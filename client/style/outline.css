@@ -149,3 +149,15 @@
 .journal-day h2 a:hover { color: var(--accent); }
 .journal-more { min-height: 2rem; color: var(--fg-faint); font-size: 0.9rem; padding: 1rem 0; }
 .journal-day:not(.today) .add-block { min-height: 1.5rem; }
+
+/* Zoom. */
+.crumbs { font-size: 0.9rem; color: var(--fg-faint); margin-bottom: 0.75rem; overflow-wrap: anywhere; }
+.crumbs a { color: var(--fg-soft); text-decoration: none; }
+.crumbs a:hover { color: var(--accent); }
+.zoomed.collapsed > .children { display: block; }
+.zoomed > .row > .toggle { visibility: hidden; }
+
+/* Dragging a block by its bullet. */
+.dragging { opacity: 0.4; }
+.drop-line { position: fixed; height: 2px; background: var(--accent); border-radius: 1px; pointer-events: none; z-index: 40; }
+.bullet { touch-action: none; cursor: grab; }

@@ -9,8 +9,9 @@
 export const HEADING = /^(#{1,3}) /;
 
 export class OutlineView {
-  constructor(root, outline, { renderText = defaultText, link = (id) => '#' } = {}) {
+  constructor(root, outline, { renderText = defaultText, link = (id) => '#', zoom = null } = {}) {
     this.root = root;
+    this.zoom = zoom; // when set, only this block and what is under it are shown
     this.outline = outline;
     this.renderText = renderText;
     this.link = link;
@@ -25,8 +26,17 @@ export class OutlineView {
     const list = document.createElement('div');
     list.className = 'children outline';
     list.setAttribute('role', 'tree');
-    for (const n of this.model.children(this.model.pageId)) list.append(this.#block(n));
+    const top = this.zoom ? [this.model.get(this.zoom)].filter(Boolean) : this.model.children(this.model.pageId);
+    for (const n of top) list.append(this.#block(n));
     this.root.replaceChildren(list);
+    if (this.zoom) this.els.get(this.zoom)?.classList.add('zoomed');
+  }
+
+  /** The blocks that can be seen, in order (within the zoomed block when zoomed). */
+  visible() {
+    if (!this.zoom) return this.model.visible();
+    const root = this.model.get(this.zoom);
+    return root ? [root, ...this.model.visible(root.id)] : [];
   }
 
   /** Redraws what a change from the outline touched. */
@@ -78,6 +88,7 @@ export class OutlineView {
     bullet.tabIndex = -1;
     bullet.href = this.link(n.id);
     bullet.setAttribute('aria-label', 'Open this block');
+    bullet.draggable = false; // dragging is ours (ui/drag.js), not the browser's link drag
     const content = document.createElement('div');
     content.className = 'content';
     row.append(toggle, bullet, content);
@@ -126,7 +137,9 @@ export class OutlineView {
     const n = this.model.get(id);
     if (!n) return;
     const el = this.els.get(id) ?? this.#block(n);
-    const container = n.parent === this.model.pageId ? this.root.querySelector(':scope > .outline')
+    if (this.zoom && !this.model.isInSubtree(this.zoom, id)) { el.remove(); return; } // moved out of view
+    const container = id === this.zoom ? this.root.querySelector(':scope > .outline')
+      : n.parent === this.model.pageId ? (this.zoom ? null : this.root.querySelector(':scope > .outline'))
       : this.els.get(n.parent)?.querySelector(':scope > .children');
     if (!container) return;
     const next = this.model.nextSibling(id);

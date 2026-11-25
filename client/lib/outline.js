@@ -101,14 +101,14 @@ export class Outline {
   }
 
   /** Splits a block at a position: the text after it becomes a new block below. Returns the new id. */
-  split(id, at) {
+  split(id, at, asChild = false) {
     const n = this.model.get(id);
     if (!n) return null;
     const before = n.text.slice(0, at);
     const after = n.text.slice(at);
     this.edit(id, before, { undoable: true });
     // A block with visible children gets the new block as its first child, like every outliner.
-    if (this.model.hasChildren(id) && !n.collapsed) return this.create({ parent: id, after: null, text: after });
+    if (asChild || (this.model.hasChildren(id) && !n.collapsed)) return this.create({ parent: id, after: null, text: after });
     return this.create({ parent: n.parent, after: id, text: after });
   }
 

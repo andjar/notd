@@ -103,13 +103,15 @@ export class Editor {
     if (e.key === 'Enter' && !e.shiftKey && !mod && !e.altKey) {
       return go(() => {
         o.edit(id, text);
-        const created = o.split(id, caret);
+        const created = o.split(id, caret, id === this.view.zoom);  // the zoomed block gets a child, not a sibling out of view
         if (created) { this.#settle(id); this.edit(created, 'start'); }
       });
     }
     if (e.key === 'Tab') {
       return go(() => {
         o.edit(id, text);
+        if (id === this.view.zoom) return;            // the zoomed block stays where it is
+        if (e.shiftKey && this.model.get(id).parent === this.view.zoom) return;
         if (e.shiftKey ? o.outdent(id) : o.indent(id)) this.#refocus(id, caret);
       });
     }
@@ -125,6 +127,7 @@ export class Editor {
           this.edit(prev, 'end');
           return;
         }
+        if (!this.#neighbour(id, -1)) return;          // nothing above in view (the zoomed block itself)
         const r = o.mergeUp(id);
         if (r) { this.editing = null; this.#settle(r[0]); this.edit(r[0], r[1]); }
       });
@@ -168,7 +171,7 @@ export class Editor {
 
   /** The visible block before (-1) or after (+1). */
   #neighbour(id, dir) {
-    const vis = this.model.visible();
+    const vis = this.view.visible();
     const i = vis.findIndex((b) => b.id === id);
     return vis[i + dir]?.id ?? null;
   }
