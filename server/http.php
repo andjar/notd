@@ -102,6 +102,8 @@ final class Http
         if (!preg_match('#^/api/v1/([a-z][a-z0-9_-]*)$#', $path, $m)) {
             throw new HttpError(404, 'not_found', "No such path: $path");
         }
+        require_once __DIR__ . '/core.php';
+        Auth::check($method, $m[1]);
         $file = __DIR__ . '/api/' . $m[1] . '.php';
         if (!is_file($file)) {
             throw new HttpError(404, 'not_found', "No such endpoint: {$m[1]}");

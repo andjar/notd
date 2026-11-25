@@ -7,15 +7,23 @@ const NOTD_SCHEMA_VERSION = 1;
 
 final class Config
 {
-    /** The data folder: $NOTD_DATA_DIR, else data_dir in config.local.php, else data/ next to index.php. */
+    public static string $file = __DIR__ . '/../config.local.php';
+
+    /** A setting: $NOTD_<KEY> if set, else the key in config.local.php, else $default. */
+    public static function get(string $key, ?string $default = null): ?string
+    {
+        $env = getenv('NOTD_' . strtoupper($key));
+        if ($env !== false && $env !== '') {
+            return $env;
+        }
+        $config = is_file(self::$file) ? (require self::$file) : [];
+        return is_array($config) && isset($config[$key]) ? (string) $config[$key] : $default;
+    }
+
+    /** The data folder: data_dir, else data/ next to index.php. Created if missing. */
     public static function dataDir(): string
     {
-        $dir = getenv('NOTD_DATA_DIR');
-        if ($dir === false || $dir === '') {
-            $local = dirname(__DIR__) . '/config.local.php';
-            $config = is_file($local) ? (require $local) : [];
-            $dir = is_array($config) && isset($config['data_dir']) ? (string) $config['data_dir'] : dirname(__DIR__) . '/data';
-        }
+        $dir = (string) self::get('data_dir', dirname(__DIR__) . '/data');
         if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
             throw new RuntimeException("Cannot create the data folder $dir");
         }
