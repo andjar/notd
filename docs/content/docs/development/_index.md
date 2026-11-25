@@ -114,7 +114,7 @@ It also fails when core code imports or requires anything from `plugins/` direct
 
 ## Storage
 
-Everything notd keeps is in the data folder: `$NOTD_DATA_DIR` if set, else `data_dir` in `config.local.php` (copy `config.local.example.php`), else `data/` next to `index.php`. It holds `notd.sqlite` and the `files/` folder, where uploaded files are kept once per identical content. `php tools/verify.php` checks every stored file against its SHA-256 and reports contents that no node describes (`--clean` deletes those).
+Settings live in `config.local.php` (copy `config.local.example.php`); each can be overridden from the environment as `NOTD_<KEY>`. Everything notd keeps is in the data folder: `data_dir` (`$NOTD_DATA_DIR`), else `data/` next to `index.php`. To use notd from other devices, set a password with `php tools/password.php`; until then only the computer notd runs on gets an answer (see [login](../protocol/login/)). It holds `notd.sqlite` and the `files/` folder, where uploaded files are kept once per identical content. `php tools/verify.php` checks every stored file against its SHA-256 and reports contents that no node describes (`--clean` deletes those).
 
 The schema is `server/schema.sql`:
 

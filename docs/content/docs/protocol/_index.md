@@ -16,6 +16,8 @@ The browser app, plugins and scripts all talk to the notd server over this proto
 | Code | Status | Meaning |
 | --- | --- | --- |
 | `bad_json` | 400 | The request body is not a JSON object. |
+| `login_required` | 401 | A password is set and this request has no valid login cookie; see [login](login/). |
+| `password_required`, `cross_origin` | 403 | Another device before a password is set, or a POST from another site. |
 | `not_found` | 404 | No such endpoint, or no such thing. |
 | `method_not_allowed` | 405 | The endpoint exists but not with this method. |
 | `internal` | 500 | A bug or a broken installation; details are in the server log. |
