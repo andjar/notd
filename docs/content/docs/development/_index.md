@@ -168,6 +168,7 @@ client/
   ui/gate.js      the login screen
   ui/page.js      the page on screen: loads it, draws its outline, one outbox for the app
   ui/outline-view.js  draws the outline from the model and redraws only what a change touched
+  ui/editor.js    editing: one block at a time as plain text (contenteditable="plaintext-only"), the keys
   style/tokens.css  colours, sizes and fonts, light and dark
   style/app.css     the frame
   style/outline.css the outline's geometry
