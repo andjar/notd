@@ -119,7 +119,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Tests for the tools
+        run: node --test tools/*.test.mjs
       - name: Core size budget
-        run: |
-          if [ ! -f tools/budget.mjs ]; then echo "No budget script yet."; exit 0; fi
-          node tools/budget.mjs
+        run: node tools/budget.mjs

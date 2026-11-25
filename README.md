@@ -20,6 +20,7 @@ notd is a personal outliner and journal: one page per day, notes nested as deep 
 ```sh
 php tests/php/run.php                      # server unit tests
 node --test tests/conformance/*.test.mjs   # protocol tests (start their own server)
+node tools/budget.mjs                      # core size budget
 php -S 127.0.0.1:8080 index.php            # run notd
 ```
 

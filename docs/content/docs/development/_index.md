@@ -51,7 +51,7 @@ All work happens on the `next` branch through pull requests, one step of the pla
 | conformance | The protocol tests, and the request examples in the protocol docs, against a real server on a throw-away database. |
 | browser | End-to-end tests in Chromium with Playwright. |
 | docs | This site builds with Hugo, and every internal link points at a page or file that exists (`tools/check_links.mjs`). |
-| budget | The core stays within its line budget. |
+| budget | The core stays within its line budget, and never imports a plugin (`tools/budget.mjs`, with a table in the job summary). |
 
 ## Unit tests
 
@@ -95,3 +95,15 @@ To run notd yourself:
 ```sh
 php -S 127.0.0.1:8080 index.php    # data goes to data/, or to $NOTD_DATA_DIR
 ```
+
+## The size budget
+
+`node tools/budget.mjs` counts non-blank lines in the core, leaving out vendored libraries:
+
+| Core | Counted | Limit |
+| --- | --- | ---: |
+| PHP | `server/` and `index.php` | 2,500 |
+| JavaScript | `client/` | 5,000 |
+| CSS | `client/` | 2,000 |
+
+It also fails when core code imports or requires anything from `plugins/` directly. Going over a limit is a signal to move something into a plugin or simplify it, not to raise the limit; raising one needs an entry on the decisions page.
