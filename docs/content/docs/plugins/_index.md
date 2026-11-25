@@ -64,7 +64,7 @@ export function activate(notd) {
 | `go(title, block)` | Opens a page. |
 | `on(event, fn)` | Listens for `route`, `page`, `saving` and `renamed`. |
 
-Actions join the API in a later step.
+
 
 ## Server code
 
@@ -88,6 +88,32 @@ return function (PluginApi $notd): void {
 | `filter(string $key, fn(string $operator, string $value): array)` | Adds a query filter such as `task:open`: return `[sql, params]`, a condition on the nodes table `n`. |
 
 A tasks plugin, for example, can draw `TODO ` as a checkbox (`syntax`), index it as `{status::todo}` (`indexer`) and answer `task:open` (`filter`), all without the core knowing what a task is. Turned off, its blocks simply read `TODO buy milk` again.
+
+## Actions
+
+Behaviour that should happen when notes change is written as a small PHP file in `actions/` (your own, never committed with notd) or in a plugin's `actions/` folder. There is no rule language to learn; an action is a few lines of PHP:
+
+```php
+<?php
+// actions/movie-needs-rating.php: tag every movie that has no rating yet
+return [
+    'on' => 'saved',                          // saved (created or edited), created, edited or deleted
+    'match' => 'type:movie -has:rating',      // a query the block must answer (optional)
+    'do' => fn(array $node, Actions $notd) => $notd->addTag($node, 'needs-rating'),
+];
+```
+
+`do` runs inside the same transaction as the change: what it changes is saved, synced and exported with it, and if the change fails, so does the action's part. The block (`$node`) is in the protocol's shape (`id`, `text`, `page`, ...). `Actions` offers:
+
+| Method | Does |
+| --- | --- |
+| `addTag($node, 'tag')` | Adds `#tag` to the block's first line, unless it is already tagged. |
+| `setField($node, 'key', 'value')` | Sets `{key:: value}`, replacing an old value. |
+| `edit($id, $text)` | Replaces a block's text. |
+| `create($parentId, $text)` | Adds a block; returns its id. |
+| `query('...')`, `node($id)` | Reads, like the query endpoint. |
+
+Changes an action makes can set off actions again, at most three deep; a loop is stopped there and reported, and the change itself still goes in. An action that throws is reported (in the server's log) and skipped. No action runs in safe mode. Point `actions_dir` in `config.local.php` elsewhere to keep your actions with your notes.
 
 ## Safe mode
 

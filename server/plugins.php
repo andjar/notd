@@ -129,6 +129,12 @@ final class Plugins
         }
         self::$loaded = true;
         $off = self::disabled($pdo);
+        $actionDirs = ['actions' => (string) Config::get('actions_dir', dirname(__DIR__) . '/actions')];
+        foreach (self::all() as $name => $p) {
+            if ($p['problem'] === null && !in_array($name, $off, true) && is_dir($p['dir'] . '/actions')) {
+                $actionDirs[$name] = $p['dir'] . '/actions';
+            }
+        }
         foreach (self::all() as $name => $p) {
             if ($p['problem'] !== null || in_array($name, $off, true) || !isset($p['server'])) {
                 continue;
@@ -144,6 +150,7 @@ final class Plugins
                 error_log("notd: plugin $name: $e");
             }
         }
+        Actions::load(array_filter($actionDirs, 'is_dir'));
     }
 
     /** Serves a file from a plugin's folder (browser code, styles, pictures); never PHP or plugin.json. */

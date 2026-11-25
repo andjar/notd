@@ -15,6 +15,6 @@ if (!isset($argv[1]) || !is_dir($argv[1])) {
 $start = microtime(true);
 $s = Import::folder(Db::get(), $argv[1]);
 printf("%d pages, %d blocks, %d file links in %.1f s\n", $s['pages'], $s['blocks'], $s['files'], microtime(true) - $start);
-foreach ($s['warnings'] as $w) {
+foreach ([...$s['warnings'], ...array_map(fn($p) => "action $p", Actions::$problems)] as $w) {
     echo "  warning: $w\n";
 }

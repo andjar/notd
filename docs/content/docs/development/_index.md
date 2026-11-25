@@ -17,6 +17,7 @@ tests/
   conformance/  protocol tests: start a server on a throw-away database and talk HTTP to it
   browser/      end-to-end tests with Playwright
 tools/       scripts for development and CI
+actions/     your own actions (git-ignored, except its README)
 docs/        this site (Hugo); docs/content/docs/protocol/ is the protocol the conformance tests check
 .github/workflows/
   ci.yml       the checks every pull request must pass
