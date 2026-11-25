@@ -35,6 +35,7 @@ export class Editor {
       this.editing = id;
       this.startText = n.text;
       this.view.element(id).classList.add('editing');
+      content.classList.remove('md');
       content.contentEditable = 'plaintext-only';
       content.textContent = n.text;
       content.spellcheck = true;

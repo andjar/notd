@@ -98,3 +98,46 @@
   padding-left: 2.6rem;
   cursor: text;
 }
+
+/* Drawn text: Markdown inside a block keeps to the block's box. */
+.content.md { white-space: normal; }
+.content > :first-child { margin-top: 0; }
+.content > :last-child { margin-bottom: 0; }
+.content p { margin: 0 0 0.5em; }
+.content ul, .content ol { margin: 0.25em 0; padding-left: 1.5em; }  /* markers inside the text box, never over the bullet */
+.content pre {
+  margin: 0.25em 0;
+  padding: 0.5em 0.75em;
+  background: var(--bg-soft);
+  border-radius: var(--radius);
+  overflow: auto;
+  white-space: pre;
+}
+.content code { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg-soft); padding: 0 0.2em; border-radius: 3px; }
+.content pre code { background: none; padding: 0; }
+.content blockquote { margin: 0.25em 0; padding-left: 0.75em; border-left: 3px solid var(--border); color: var(--fg-soft); }
+.content img { max-width: 100%; height: auto; border-radius: var(--radius); vertical-align: middle; }
+.content table { border-collapse: collapse; margin: 0.25em 0; }
+.content th, .content td { border: 1px solid var(--border); padding: 0.2em 0.5em; }
+.content input[type=checkbox] { width: 1em; height: 1em; margin: 0 0.3em 0 0; vertical-align: -0.1em; }  /* no taller than the line */
+.content.editing, .block.editing > .row > .content { white-space: pre-wrap; }
+.page-ref, .tag, .block-ref { color: var(--accent); text-decoration: none; }
+.page-ref:hover, .tag:hover, .block-ref:hover { text-decoration: underline; }
+.page-ref::before { content: "[["; color: var(--fg-faint); }
+.page-ref::after { content: "]]"; color: var(--fg-faint); }
+.block-ref { border-bottom: 1px solid var(--accent-soft); }
+.block-ref.broken { color: var(--danger); }
+.field {
+  display: inline-flex;
+  gap: 0.3em;
+  align-items: baseline;
+  font-size: 0.85em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+}
+.field-key { color: var(--fg-soft); }
+.embed { display: block; margin: 0.25em 0; padding: 0.25em 0.75em; border-left: 3px solid var(--accent-soft); background: var(--bg-soft); border-radius: 0 var(--radius) var(--radius) 0; }
+.embed ul { margin: 0; padding-left: 1.25em; }
+.embed-title { font-weight: 600; color: var(--fg); }
