@@ -17,20 +17,31 @@ export const outbox = new Outbox({
   onStatus: (status, size) => document.dispatchEvent(new CustomEvent('notd:saving', {
     detail: { pending: size, offline: status === 'offline' || status === 'error' },
   })),
-  onRejected: (e) => { console.error('The server refused changes:', e.message); current?.reload(); },
+  onRejected: (e) => { console.error('The server refused changes:', e.message); for (const s of live) s.reload(); },
 });
 addEventListener('online', () => outbox.retryNow());
 
-let current = null;
+const live = new Set();
 
+/** One page: its outline, editor and link suggestions. announce: tell the app which page is shown. */
 export class PageScreen {
-  constructor(root) {
+  constructor(root, { announce = true } = {}) {
     this.root = root;
+    this.announce = announce;
     this.outline = new Outline({ outbox, onChange: (c) => this.view?.update(c) });
     this.view = null;
     this.page = null;
     this.title = null;
-    current = this;
+    live.add(this);
+  }
+
+  /** Stops using this screen (another page or the journal took its place). */
+  dispose() {
+    if (this.editor?.editing) this.editor.finish();
+    this.autocomplete?.close();
+    this.autocomplete?.box.remove();
+    live.delete(this);
+    this.title = null;
   }
 
   /** Shows the page with this title. */
@@ -57,7 +68,7 @@ export class PageScreen {
     this.root.replaceChildren();
     const host = document.createElement('div');
     this.root.append(host);
-    forgetNodes();
+    if (this.announce) forgetNodes();
     this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id), renderText });
     this.view.render();
     this.editor = new Editor(this.view, this.outline);
@@ -70,7 +81,7 @@ export class PageScreen {
     add.setAttribute('aria-label', 'Add a block');
     add.addEventListener('click', () => this.#addAtEnd());
     this.root.append(add);
-    this.root.dispatchEvent(new CustomEvent('notd:page', { bubbles: true, detail: { page } }));
+    if (this.announce) this.root.dispatchEvent(new CustomEvent('notd:page', { bubbles: true, detail: { page } }));
   }
 
   /** A new block at the end of the page, unless the last one is still empty. */

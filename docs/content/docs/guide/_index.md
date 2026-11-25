@@ -4,7 +4,9 @@ weight: 15
 description: "How to find your way around notd 4. Grows with every step that adds something you can use."
 ---
 
-notd opens on today's journal page. The address bar shows which page you are on: `#/page/<title>`.
+notd opens on the **journal**: today's page at the top, ready to write in, and below it the earlier days on which you wrote something, newest first. More days load as you scroll down, and every day can be edited right there. Click a day's date to open it on its own. Days you opened but never wrote in are left out.
+
+Any other page has an address of its own, `#/page/<title>`, shown in the address bar.
 
 ## Pages and blocks
 

@@ -39,7 +39,7 @@ export const api = {
   node: (id) => call('GET', 'node', { query: { id } }),
   backlinks: (id) => call('GET', 'backlinks', { query: { id } }),
   pages: () => call('GET', 'pages'),
-  journalDays: (month) => call('GET', 'journal-days', { query: { month } }),
+  journalDays: (q) => call('GET', 'journal-days', { query: typeof q === 'string' ? { month: q } : q }),
   search: (q, limit) => call('GET', 'search', { query: { q, limit } }),
   query: (q) => call('GET', 'query', { query: { q } }),
   changes: (since) => call('GET', 'changes', { query: { since } }),

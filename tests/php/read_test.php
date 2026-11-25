@@ -101,3 +101,16 @@ test('journal days are the days of a month whose journal has text', function () 
     eq(['2026-11-25'], Read::journalDays($pdo, '2026-11'));
     eq('bad_request', throws(fn() => Read::journalDays($pdo, '2026-13'), HttpError::class)->codeName);
 });
+
+test('journal days before a date, newest first, only days with text', function () {
+    $pdo = sample();
+    foreach (['2026-10-30', '2026-11-20', '2026-11-24', '2026-11-25'] as $day) {
+        $id = Read::page($pdo, $day)['page']['id'];
+        mk($pdo, ['op' => 'create', 'parent' => $id, 'text' => "on $day"]);
+    }
+    Read::page($pdo, '2026-11-23');                  // empty
+    eq(['2026-11-24', '2026-11-20'], Read::journalDaysBefore($pdo, '2026-11-25', 2));
+    eq(['2026-11-24', '2026-11-20', '2026-10-30'], Read::journalDaysBefore($pdo, '2026-11-25', 10));
+    eq([], Read::journalDaysBefore($pdo, '2026-10-30', 10));
+    eq('bad_request', throws(fn() => Read::journalDaysBefore($pdo, 'yesterday', 10), HttpError::class)->codeName);
+});

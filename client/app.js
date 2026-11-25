@@ -7,6 +7,7 @@ import { gate } from './ui/gate.js';
 import { route, pageLink } from './lib/route.js';
 import { searchPanel } from './panels/search.js';
 import { PageScreen } from './ui/page.js';
+import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
@@ -55,8 +56,14 @@ async function start() {
   setupFrame();
   app.hidden = false;
   for (const p of [searchPanel({ go }), headerPanel(), backlinksPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel()]) panels.register(p);
-  notd.page = new PageScreen(document.getElementById('page'));
-  document.addEventListener('notd:route', (e) => { forgetPages(); notd.page.show(e.detail.title); });
+  document.addEventListener('notd:route', (e) => {
+    forgetPages();
+    notd.screen?.dispose();
+    const root = document.getElementById('page');
+    root.replaceChildren();
+    notd.screen = e.detail.journal ? new JournalScreen(root) : new PageScreen(root);
+    notd.screen.show(e.detail.title);
+  });
   document.addEventListener('notd:page', (e) => panels.refresh({ ...panels.context, page: e.detail.page }));
   document.addEventListener('notd:renamed', (e) => { forgetPages(); go(e.detail.to); });
   addEventListener('hashchange', show);
