@@ -57,5 +57,30 @@ def switching_a_plugin_off_and_safe_mode():
         s.stop()
 
 
+@test
+def plugin_syntax_draws_and_its_buttons_run_commands():
+    s = Server(ENV)
+    try:
+        pid = '01900000-0000-7000-8000-0000000000a1'
+        s.ops({'op': 'create', 'kind': 'page', 'id': pid, 'title': 'Syntax'},
+              {'op': 'create', 'parent': pid, 'text': '!! call the plumber'},
+              {'op': 'create', 'parent': pid, 'text': 'as {{@knuth84}} says'})
+        with browser() as b:
+            errors = []
+            page = open_page(b, s.url + '#/page/Syntax', errors)
+            page.wait_for_selector('.cite')
+            assert page.inner_text('.cite') == 'knuth84'
+            assert page.locator('.content:has(.flag)').text_content().strip() == '!call the plumber'
+            page.click('.flag')
+            assert page.evaluate('document.body.dataset.greeted') == 'block', 'the button runs its command for its block'
+            assert page.locator('.content[contenteditable]').count() == 0, 'clicking it does not start editing'
+            page.goto(s.url + '?safe=1#/page/Syntax')
+            page.wait_for_selector('.content:has-text("knuth84")')
+            assert page.locator('.cite').count() == 0, 'safe mode shows the plain text'
+            assert [e for e in errors if 'broken on purpose' not in e] == [], errors
+    finally:
+        s.stop()
+
+
 if __name__ == '__main__':
     run()

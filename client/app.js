@@ -13,6 +13,7 @@ import { loadPlugins } from './lib/plugins.js';
 import { commands, installKeys } from './lib/commands.js';
 import { Palette, BlockMenu } from './ui/menus.js';
 import { registerCoreCommands } from './core-commands.js';
+import { addSyntax } from './lib/markdown.js';
 import { pluginsPanel, safeModePanel } from './panels/plugins.js';
 import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
@@ -30,6 +31,7 @@ export const notd = {
       api,
       panels: { register: (p) => panels.register({ ...p, id: `${name}:${p.id}` }), refresh: (slot) => panels.refresh(panels.context, slot) },
       go: (title, block) => notd.go(title, block),
+      syntax: { register: (spec) => addSyntax({ ...spec, name: `${name}_${spec.name}` }) },
       commands: {
         register: (c) => commands.register({ ...c, id: c.id.startsWith(name + '.') ? c.id : `${name}.${c.id}` }),
         run: (id, extra) => commands.run(id, extra),
