@@ -44,3 +44,15 @@ test('line breaks and Markdown lists', () => {
   assert.equal(html('a\nb'), '<p>a<br>b</p>');
   assert.match(html('- one\n- two'), /<ul>\n<li>one<\/li>\n<li>two<\/li>\n<\/ul>/);
 });
+
+test('plugin syntax: at the start of a block, and anywhere in it', async () => {
+  const { addSyntax, toHtml: html2, isPlain: plain2 } = await import('../../client/lib/markdown.js');
+  addSyntax({ name: 'task', at: 'start', pattern: /^(TODO|DONE) /, render: (m) => `<input type="checkbox" data-command="tasks.toggle"${m[1] === 'DONE' ? ' checked' : ''}>` });
+  addSyntax({ name: 'cite', pattern: /\{\{@([\w-]+)\}\}/, render: (m) => `<cite>${m[1]}</cite>` });
+  assert.equal(html2('TODO buy *milk*'), '<p><input type="checkbox" data-command="tasks.toggle">buy <em>milk</em></p>');
+  assert.equal(html2('DONE x'), '<p><input type="checkbox" data-command="tasks.toggle" checked>x</p>');
+  assert.equal(html2('not TODO here'), '<p>not TODO here</p>');
+  assert.equal(html2('as {{@knuth84}} says'), '<p>as <cite>knuth84</cite> says</p>');
+  assert.equal(plain2('as {{@knuth84}} says'), false);
+  assert.equal(html2('`{{@code}}`'), '<p><code>{{@code}}</code></p>', 'not inside code');
+});

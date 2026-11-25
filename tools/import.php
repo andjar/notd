@@ -6,6 +6,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/server/core.php';
+Plugins::load(Db::get());   // plugins' indexers and actions take part
 
 if (!isset($argv[1]) || !is_dir($argv[1])) {
     fwrite(STDERR, "Usage: php tools/import.php <folder>\n");

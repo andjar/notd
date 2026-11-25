@@ -55,3 +55,19 @@ test('a plugin can be switched off and on', async () => {
   assert.equal((await server.post('/api/v1/plugins', { name: 'nope', enabled: true })).status, 404);
   assert.equal((await server.post('/api/v1/plugins', { name: 'hello' })).status, 400);
 });
+
+test('a plugin indexer adds fields, and its filter answers queries', async () => {
+  const page = '01900000-0000-7000-8000-0000000000b1';
+  await server.post('/api/v1/ops', { ops: [
+    { op: 'create', kind: 'page', id: page, title: 'Urgent' },
+    { op: 'create', parent: page, text: 'call the plumber !!' },
+    { op: 'create', parent: page, text: 'water the plants' },
+  ] });
+  const urgent = await server.get('/api/v1/query?q=' + encodeURIComponent('urgent:yes page:urgent'));
+  assert.deepEqual(urgent.body.nodes.map((n) => n.text), ['call the plumber !!']);
+  assert.deepEqual(urgent.body.nodes[0].fields, { urgent: ['yes'] });
+  const calm = await server.get('/api/v1/query?q=' + encodeURIComponent('urgent:no page:urgent'));
+  assert.deepEqual(calm.body.nodes.map((n) => n.text), ['water the plants']);
+  const safe = await server.get('/api/v1/query?q=' + encodeURIComponent('urgent:yes page:urgent'), { 'X-Notd-Safe': '1' });
+  assert.deepEqual(safe.body.nodes.map((n) => n.text), ['call the plumber !!'], 'in safe mode "urgent:yes" is an ordinary field filter, and the indexed field is still there');
+});

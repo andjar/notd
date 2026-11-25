@@ -20,6 +20,18 @@ final class PluginApi
     {
     }
 
+    /** Fields read from a block's text, indexed like {key::value}: fn(string $text): list of [key, value]. */
+    public function indexer(callable $fn): void
+    {
+        Indexer::$extra[$this->name . ':' . count(Indexer::$extra)] = $fn;
+    }
+
+    /** A query filter, as in "task:open": fn(string $operator, string $value): [sql, params] on the nodes table n. */
+    public function filter(string $key, callable $fn): void
+    {
+        Query::$filters[strtolower($key)] = $fn;
+    }
+
     /** Called after every change: fn(PDO $pdo, string $op, string $nodeId). */
     public function onChange(callable $fn): void
     {

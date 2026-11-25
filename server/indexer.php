@@ -92,6 +92,9 @@ function split_list(string $value): array
 
 final class Indexer
 {
+    /** Plugins' indexers: fn(string $text, array $node): list of [key, value] fields to add. */
+    public static array $extra = [];
+
     /** Rebuilds the index rows of one node from its text (and a page's title is not indexed here). */
     public static function node(PDO $pdo, string $id): void
     {
@@ -104,6 +107,15 @@ final class Indexer
             return;
         }
         $parsed = parse_text($text);
+        foreach (self::$extra as $name => $fn) {
+            try {
+                foreach ($fn($text) as [$key, $value]) {
+                    $parsed['fields'][] = [strtolower((string) $key), (string) $value];
+                }
+            } catch (Throwable $e) {
+                error_log("notd: indexer $name: " . $e->getMessage());
+            }
+        }
         $field = $pdo->prepare('INSERT INTO fields (node_id, key, value, value_key, num) VALUES (?, ?, ?, ?, ?)');
         foreach ($parsed['fields'] as [$key, $value]) {
             $field->execute([$id, $key, $value, title_key($value), is_numeric($value) ? (float) $value : null]);

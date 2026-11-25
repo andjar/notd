@@ -89,12 +89,48 @@ const marked = new Marked({
   },
 });
 
+/**
+ * Syntax added by plugins. A pattern found anywhere in the text (at: 'inline', the default)
+ * becomes a marked extension; one that must open the block (at: 'start'), such as a task's
+ * TODO, is matched before Markdown and drawn in front of the rest.
+ *
+ *   addSyntax({ name: 'task', pattern: /^(TODO|DONE) /, at: 'start', render: (m) => '<input ...>' })
+ */
+const startSyntax = [];
+const inlineTriggers = [];
+
+export function addSyntax({ name, pattern, at = 'inline', render }) {
+  if (!name || !(pattern instanceof RegExp) || typeof render !== 'function') throw new Error('Syntax needs name, pattern and render().');
+  const anchored = new RegExp('^(?:' + pattern.source.replace(/^\^/, '') + ')', pattern.flags.replace('g', ''));
+  if (at === 'start') { startSyntax.push({ name, pattern: anchored, render }); return; }
+  const loose = new RegExp(pattern.source.replace(/^\^/, ''), pattern.flags.replace('g', ''));
+  inlineTriggers.push(loose);
+  marked.use({ extensions: [{
+    name, level: 'inline',
+    start: (src) => { const i = src.search(loose); return i < 0 ? undefined : i; },
+    tokenizer(src) { const m = src.match(anchored); if (m) return { type: name, raw: m[0], m }; },
+    renderer: (t) => String(render(t.m)),
+  }] });
+}
+
+/** The part of a block's text that start syntax claims, drawn as HTML, and the rest. */
+export function splitStart(text) {
+  for (const s of startSyntax) {
+    const m = text.match(s.pattern);
+    if (m) return { html: String(s.render(m, text)), rest: text.slice(m[0].length) };
+  }
+  return { html: '', rest: text };
+}
+
 /** Does the text need Markdown at all? Plain words are drawn as text, much faster. */
 export function isPlain(text) {
-  return !/[\\`*_~[\]()<>{}#!|&:]|^\s*([-+>]|\d+[.)])\s|^ {4}|\n/m.test(text);
+  return !/[\\`*_~[\]()<>{}#!|&:]|^\s*([-+>]|\d+[.)])\s|^ {4}|\n/m.test(text) && !inlineTriggers.some((p) => p.test(text));
 }
 
 /** A block's text as HTML (not yet sanitised). A leading heading marker is left to the row. */
 export function toHtml(text) {
-  return marked.parse(text.replace(HEADING, ''));
+  const { html, rest } = splitStart(text.replace(HEADING, ''));
+  const body = marked.parse(rest).trim();
+  if (!html) return body;
+  return body.startsWith('<p>') ? '<p>' + html + body.slice(3) : '<p>' + html + '</p>' + body;
 }

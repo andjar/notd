@@ -21,6 +21,9 @@ const QUERY_OPTIONS = ['sort', 'limit', 'group', 'view', 'columns'];
 
 final class Query
 {
+    /** Plugins' filters by key: fn(string $operator, string $value): [sql, params], on the nodes table aliased n. */
+    public static array $filters = [];
+
     /** Parses a query into ['where' => sql, 'params' => [], 'order' => sql, 'orderParams' => [], 'limit' => n, 'group' => ?key, 'options' => []]. */
     public static function compile(string $q): array
     {
@@ -126,6 +129,9 @@ final class Query
     private static function filter(string $key, string $opr, string $value): array
     {
         $exists = fn(string $extra, array $p) => ['n.id IN (SELECT f.node_id FROM fields f WHERE f.key = ?' . $extra . ')', $p];
+        if (isset(self::$filters[$key])) {
+            return (self::$filters[$key])($opr, $value);
+        }
         switch ($key) {
             case 'has':
                 return $exists('', [strtolower($value)]);

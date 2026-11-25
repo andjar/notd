@@ -54,10 +54,11 @@ export function activate(notd) {
 | `panels.refresh(slot)` | Draws the panels again. |
 | `commands.register({ id, title, run(ctx), key, slash, menu, when(ctx) })` | Adds a command (the id is prefixed with the plugin's name unless it already is). `key` like `"Mod+Enter"` (Ctrl, or Cmd on a Mac); `slash: true` puts it in the slash menu; `menu: 'block'` in a block's menu. `ctx` has `id` (the block), `outline`, `editor`, `page`, and in the slash menu `insert(text)`. |
 | `commands.run(id, extra)` | Runs a command. Any element with `data-command="id"` runs it when clicked, with `ctx.id` set to the block it is in. |
+| `syntax.register({ name, pattern, at, render(match) })` | Draws text that matches `pattern`. With `at: 'start'` it must open the block (a task's `TODO `) and is drawn in front of the rest; otherwise it may appear anywhere, but never inside code. `render` returns HTML, which is sanitised like everything else; give interactive parts a `data-command` so a click runs a command for that block. The text itself is never changed by drawing. |
 | `go(title, block)` | Opens a page. |
 | `on(event, fn)` | Listens for `route`, `page`, `saving` and `renamed`. |
 
-Syntax and actions join the API in the next steps.
+Actions join the API in a later step.
 
 ## Server code
 
@@ -71,6 +72,16 @@ return function (PluginApi $notd): void {
     });
 };
 ```
+
+`PluginApi` also has:
+
+| Method | Does |
+| --- | --- |
+| `onChange(fn(PDO $pdo, string $op, string $nodeId))` | Runs inside the transaction of every change. |
+| `indexer(fn(string $text): array)` | Reads fields out of a block's text: return `[[key, value], ...]`, indexed like `{key::value}`, so they can be queried. Rebuilt for every block by `php tools/reindex.php`. |
+| `filter(string $key, fn(string $operator, string $value): array)` | Adds a query filter such as `task:open`: return `[sql, params]`, a condition on the nodes table `n`. |
+
+A tasks plugin, for example, can draw `TODO ` as a checkbox (`syntax`), index it as `{status::todo}` (`indexer`) and answer `task:open` (`filter`), all without the core knowing what a task is. Turned off, its blocks simply read `TODO buy milk` again.
 
 ## Safe mode
 

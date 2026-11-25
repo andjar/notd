@@ -2,12 +2,12 @@
 // references and embeds filled in from the server (cached per page load).
 
 import DOMPurify from 'dompurify';
-import { toHtml, isPlain, HEADING, pageHref } from '../lib/markdown.js';
+import { toHtml, isPlain, splitStart, HEADING, pageHref } from '../lib/markdown.js';
 import { api } from '../lib/api.js';
 
 const PURIFY = {
-  ADD_ATTR: ['target', 'data-page', 'data-ref', 'data-key', 'data-embed-block', 'data-embed-page', 'loading'],
-  FORBID_TAGS: ['style', 'form', 'textarea', 'select', 'button'],
+  ADD_ATTR: ['target', 'data-page', 'data-ref', 'data-key', 'data-embed-block', 'data-embed-page', 'loading', 'data-command'],
+  FORBID_TAGS: ['style', 'form', 'textarea', 'select'],
   ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|#|api\/v1\/file\?id=|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
 };
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -24,7 +24,7 @@ function fetchNode(id) {
 
 /** Renders text into el. depth limits embeds inside embeds. */
 export function renderText(el, text, _node, depth = 0) {
-  if (isPlain(text)) {
+  if (isPlain(text) && !splitStart(text).html) {
     el.classList.remove('md');
     el.textContent = text;
     return;

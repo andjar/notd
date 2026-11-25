@@ -5,6 +5,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/server/core.php';
+Plugins::load(Db::get());   // plugins' indexers and actions take part
 
 $start = microtime(true);
 $count = Indexer::reindex(Db::get());
