@@ -35,3 +35,7 @@ config.local.php
 *.v[0-9]*-backup
 *.sqlite.v*-backup*
 staging-data/
+
+# Your own actions are yours, not notd's
+actions/*
+!actions/README.md
