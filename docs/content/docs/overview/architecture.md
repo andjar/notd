@@ -23,7 +23,7 @@ The server is thin: it stores, indexes, searches and exports. The browser builds
 
 ## Data model
 
-Everything is a **node** in one `nodes` table. A node's `kind` is `block`, `page`, `doc` *(later)* or `file`. A journal is a page whose title is a date. Blocks nest through `parent_id` and are ordered by fractional sort keys, so moving a block changes one row.
+Everything is a **node** in one `nodes` table. A node's `kind` is `block`, `page`, `doc` *(later)* or `file`. A journal is a page whose title is a date. Blocks nest through `parent_id` and are ordered by fractional sort keys: base-62 strings compared byte by byte, where a new key can always be made between two others (`a0` < `a0V` < `a1`). Moving a block therefore changes one row, and the browser can pick the key itself, with the same algorithm as the server.
 
 - **Text is the truth.** Fields are written inline as `{key::value}`, links as `[[Page]]`, tags as `#tag`. The `fields` and `links` tables are indexes built from the text and can always be rebuilt.
 - **User types are fields.** A movie review is a page with `{type::movie}`; no schema change is needed for new kinds of notes.

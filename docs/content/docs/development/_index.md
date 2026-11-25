@@ -12,6 +12,8 @@ client/      the browser app, served as written (HTML, CSS, ES modules); vendore
 plugins/     plugins that ship with notd; each folder is one plugin and uses only the public API
 tests/
   php/          unit tests for the server
+  js/           unit tests for browser modules, run in Node
+  fixtures/     shared test data, such as sort key cases both languages must agree on
   conformance/  protocol tests: start a server on a throw-away database and talk HTTP to it
   browser/      end-to-end tests with Playwright
 tools/       scripts for development and CI
@@ -48,7 +50,7 @@ All work happens on the `next` branch through pull requests, one step of the pla
 | --- | --- |
 | lint | Every PHP file parses (`php -l`) and every JavaScript module parses (`node --check`). |
 | php-unit | The server's unit tests, on PHP 8.1 (the oldest supported) and the newest PHP. |
-| conformance | The protocol tests, and the request examples in the protocol docs, against a real server on a throw-away database. |
+| conformance | Unit tests for browser modules (`tests/js/`), then the protocol tests and the request examples in the protocol docs against a real server on a throw-away database. |
 | browser | End-to-end tests in Chromium with Playwright. |
 | docs | This site builds with Hugo, and every internal link points at a page or file that exists (`tools/check_links.mjs`). |
 | budget | The core stays within its line budget, and never imports a plugin (`tools/budget.mjs`, with a table in the job summary). |
@@ -79,6 +81,8 @@ cases('sort keys', [
 ```
 
 A failure prints the test, the message and the line in the test file; the runner exits with 1 if anything failed.
+
+Browser modules that do not need a page (such as `client/lib/keys.js`) are tested in Node with `node --test tests/js/*.test.mjs`. Code that exists in both languages is checked against one shared fixture: `tests/fixtures/sort_keys.json` holds 2,100 sort key cases made by `tools/make_sort_key_cases.mjs`, and both the PHP and the JavaScript tests must give exactly those keys.
 
 ## Protocol tests
 
