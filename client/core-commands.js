@@ -21,6 +21,11 @@ export function registerCoreCommands({ palette, go }) {
     },
   });
 
+  // Undo and redo when no block is being edited (inside one, the editor handles the keys).
+  const outside = (ctx) => !!ctx.outline && !ctx.editor?.editing;
+  reg({ id: 'edit.undo', title: 'Undo', key: 'Mod+z', when: outside, run: (ctx) => ctx.outline.undo() });
+  reg({ id: 'edit.redo', title: 'Redo', key: 'Mod+Shift+z', when: outside, run: (ctx) => ctx.outline.redo() });
+
   // In a block, through the slash menu.
   for (const level of [1, 2, 3]) {
     reg({

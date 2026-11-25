@@ -145,12 +145,15 @@ export class SlashMenu {
   }
 
   /** The context a slash command runs in: insert(text) replaces the typed /word with text. */
-  #ctx(id, content, start, end) {
+  #ctx(id, content, start, end) {  // eslint-disable-line no-param-reassign: start moves if a space goes
     return {
       id,
       insert: (insert, caretAt = insert.length) => {
         const text = readText(content);
-        const next = text.slice(0, start) + insert + text.slice(end);
+        // Taking the /word out entirely also takes the space typed before it.
+        const from = insert === '' && start > 0 && text[start - 1] === ' ' && (end === text.length || text[end] === ' ') ? start - 1 : start;
+        const next = text.slice(0, from) + insert + text.slice(end);
+        start = from;
         content.textContent = next;
         setCaret(content, start + caretAt);
         this.editor.outline.edit(id, next);

@@ -1,0 +1,9 @@
+{
+  "name": "tasks",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "TODO, DOING, WAITING, DONE and CANCELLED blocks with a checkbox, start, scheduled, deadline and done times, and an agenda on journal pages.",
+  "browser": "main.js",
+  "server": "server.php",
+  "styles": ["tasks.css"]
+}
