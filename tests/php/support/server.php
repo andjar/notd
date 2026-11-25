@@ -6,6 +6,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 3) . '/server/http.php';
 require_once dirname(__DIR__, 3) . '/server/db.php';
 require_once dirname(__DIR__, 3) . '/server/nodes.php';
+require_once dirname(__DIR__, 3) . '/server/ops.php';
 
 /** A fresh database in a temporary folder; removed when the test process ends. */
 function fresh_db(): PDO
