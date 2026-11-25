@@ -28,6 +28,16 @@ final class Request
     {
     }
 
+    /** A required query parameter. */
+    public function string(string $name): string
+    {
+        $value = $this->query[$name] ?? null;
+        if (!is_string($value) || $value === '') {
+            throw new HttpError(400, 'bad_request', "\"$name\" is missing.");
+        }
+        return $value;
+    }
+
     /** The JSON request body as an array; an empty body is an empty array. */
     public function body(): array
     {
