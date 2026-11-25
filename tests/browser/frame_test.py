@@ -22,7 +22,8 @@ def loads_without_errors_and_shows_todays_journal_route():
             assert page.title().endswith('· notd')
             page.evaluate("location.hash = '#/page/' + encodeURIComponent('Østfold')")
             page.wait_for_function("document.title === 'Østfold · notd'")
-            assert errors == [], errors
+            page.wait_for_selector('.missing')
+            assert [e for e in errors if '404' not in e] == [], errors  # a page that does not exist yet answers 404
     finally:
         s.stop()
 

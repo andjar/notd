@@ -1,0 +1,85 @@
+/* The outline's geometry. One rule everything follows: the toggle and the
+   bullet live in boxes exactly as tall as the first line of the content, so the
+   bullet is on the middle of the first line for any text, headings included.
+   tests/browser/geometry_test.py measures this at four screen widths. */
+
+.outline { --toggle-w: 1.25rem; --bullet-w: 1.25rem; --guide-x: calc(var(--toggle-w) + var(--bullet-w) / 2); }
+
+.block { position: relative; }
+.row {
+  display: grid;
+  grid-template-columns: var(--toggle-w) var(--bullet-w) minmax(0, 1fr);
+  align-items: start;
+  --first: var(--row);              /* height of the first line */
+}
+.row.h1 { --first: calc(1.6rem * 1.3); }
+.row.h2 { --first: calc(1.35rem * 1.3); }
+.row.h3 { --first: calc(1.15rem * 1.3); }
+
+.toggle, .bullet {
+  height: var(--first);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.toggle {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--fg-faint);
+  cursor: pointer;
+  opacity: 0;
+  font-size: 0.7rem;
+}
+.toggle::before { content: "▼"; transition: transform 0.1s; }
+.collapsed > .row > .toggle::before { transform: rotate(-90deg); }
+.row:hover > .toggle, .collapsed > .row > .toggle { opacity: 1; }
+.toggle[hidden] { display: flex !important; visibility: hidden; }
+
+.bullet { text-decoration: none; }
+.bullet::before {
+  content: "";
+  width: var(--bullet);
+  height: var(--bullet);
+  border-radius: 50%;
+  background: var(--fg-soft);
+}
+.collapsed > .row > .bullet::before { box-shadow: 0 0 0 4px var(--border); }
+.bullet:hover::before { background: var(--accent); }
+
+.content {
+  min-height: var(--first);
+  line-height: var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  padding-left: 0.125rem;
+}
+.row.h1 > .content { font-size: 1.6rem; line-height: 1.3; font-weight: 650; }
+.row.h2 > .content { font-size: 1.35rem; line-height: 1.3; font-weight: 650; }
+.row.h3 > .content { font-size: 1.15rem; line-height: 1.3; font-weight: 650; }
+
+/* Children: one toggle width in, so a child's bullet sits under its parent's text, with the guide line down the middle of the parent's bullet. */
+.block > .children { margin-left: var(--toggle-w); position: relative; }   /* a child's toggle sits under its parent's bullet */
+.block > .children::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--bullet-w) / 2 - 0.5px);   /* under the middle of the parent's bullet */
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+.block > .children:empty::before { display: none; }
+.collapsed > .children { display: none; }
+.outline > .block { content-visibility: auto; contain-intrinsic-size: auto var(--row); }
+
+/* A page that does not exist yet. */
+.missing { color: var(--fg-soft); }
+.missing button {
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+}

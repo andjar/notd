@@ -166,12 +166,19 @@ client/
   panels/         the core panels: search (top bar), page title with the favourite star,
                   favourites, recent pages and calendar (left), save status (status line)
   ui/gate.js      the login screen
+  ui/page.js      the page on screen: loads it, draws its outline, one outbox for the app
+  ui/outline-view.js  draws the outline from the model and redraws only what a change touched
   style/tokens.css  colours, sizes and fonts, light and dark
   style/app.css     the frame
+  style/outline.css the outline's geometry
   vendor/         prebuilt libraries, rebuilt by tools/vendor.sh
 ```
 
 The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after` and `app.status`. The sidebars are grid columns, so they can never cover the page; under 900 px wide they become drawers. The page is sent with a strict Content-Security-Policy: scripts only from notd itself (the inline import map is allowed by its hash), no plugins, no framing.
+
+### The outline's geometry
+
+Every block is a row of three boxes: the fold toggle, the bullet and the text. The toggle and bullet boxes are exactly as tall as the first line of the text (taller for a `#`, `##` or `###` heading), so the bullet sits on the middle of the first line whatever the text is; this fixes the notd 3 bullets that sat low beside headings. A child is indented one toggle width, so its bullet sits under its parent's text, and the guide line runs down the middle of the parent's bullet. `tests/browser/geometry_test.py` measures all of this at 375, 768, 1100 and 1440 px wide, and checks that a page of 3,000 blocks is drawn in under 0.8 s.
 
 ### How an edit travels
 
