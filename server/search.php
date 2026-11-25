@@ -15,21 +15,23 @@ final class Search
     public static function onChange(PDO $pdo, string $op, string $id): void
     {
         if ($op === 'create' || $op === 'edit' || $op === 'delete') {
-            self::index($pdo, $id);
+            self::index($pdo, $id, $op);
         }
     }
 
-    public static function index(PDO $pdo, string $id): void
+    public static function index(PDO $pdo, string $id, string $op = 'edit'): void
     {
-        $pdo->prepare('DELETE FROM search WHERE node_id = ?')->execute([$id]);
-        $pdo->prepare("INSERT INTO search (node_id, title, text) SELECT id, COALESCE(title, ''), text FROM nodes
-            WHERE id = ? AND (text <> '' OR title IS NOT NULL)")->execute([$id]);
+        $pdo->prepare('DELETE FROM search WHERE rowid = (SELECT n FROM nodes WHERE id = ?)')->execute([$id]);
+        if ($op !== 'delete') {
+            $pdo->prepare("INSERT INTO search (rowid, node_id, title, text) SELECT n, id, COALESCE(title, ''), text FROM nodes
+                WHERE id = ? AND (text <> '' OR title IS NOT NULL)")->execute([$id]);
+        }
     }
 
     public static function rebuild(PDO $pdo): void
     {
         $pdo->exec('DELETE FROM search');
-        $pdo->exec("INSERT INTO search (node_id, title, text) SELECT id, COALESCE(title, ''), text FROM nodes WHERE text <> '' OR title IS NOT NULL");
+        $pdo->exec("INSERT INTO search (rowid, node_id, title, text) SELECT n, id, COALESCE(title, ''), text FROM nodes WHERE text <> '' OR title IS NOT NULL");
     }
 
     /** Turns what a person typed into an FTS5 query; null when nothing is left to search for. */

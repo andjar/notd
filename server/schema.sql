@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 
 CREATE TABLE IF NOT EXISTS nodes (
-  id         TEXT PRIMARY KEY,                 -- UUIDv7, sortable by creation time
+  n          INTEGER PRIMARY KEY,              -- a stable row number; the search index is keyed by it
+  id         TEXT NOT NULL UNIQUE,             -- UUIDv7, sortable by creation time
   kind       TEXT NOT NULL CHECK (kind IN ('block', 'page', 'doc', 'file')),
   parent_id  TEXT REFERENCES nodes(id),        -- NULL for pages; the parent block or page for blocks
   page_id    TEXT,                             -- the page a block belongs to; a page's own id
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS fields (
   value_key TEXT NOT NULL,                     -- the value folded like a title, for comparisons
   num     REAL                                 -- the value as a number, when it is one
 );
-CREATE INDEX IF NOT EXISTS fields_node ON fields (node_id);
+CREATE INDEX IF NOT EXISTS fields_node ON fields (node_id, key);
 CREATE INDEX IF NOT EXISTS fields_key_value ON fields (key, value_key);
 CREATE INDEX IF NOT EXISTS fields_key_num ON fields (key, num);
 

@@ -125,7 +125,7 @@ final class Query
     /** [sql, params] for one filter. */
     private static function filter(string $key, string $opr, string $value): array
     {
-        $exists = fn(string $extra, array $p) => ['EXISTS (SELECT 1 FROM fields f WHERE f.node_id = n.id AND f.key = ?' . $extra . ')', $p];
+        $exists = fn(string $extra, array $p) => ['n.id IN (SELECT f.node_id FROM fields f WHERE f.key = ?' . $extra . ')', $p];
         switch ($key) {
             case 'has':
                 return $exists('', [strtolower($value)]);
@@ -139,7 +139,7 @@ final class Query
             case 'links':
                 self::onlyColon($key, $opr);
                 $kinds = $key === 'tag' ? "'tag'" : "'link', 'tag'";
-                return ["EXISTS (SELECT 1 FROM links l WHERE l.from_id = n.id AND l.kind IN ($kinds) AND l.target = ?)", [title_key(ltrim($value, '#'))]];
+                return ["n.id IN (SELECT l.from_id FROM links l WHERE l.kind IN ($kinds) AND l.target = ?)", [title_key(ltrim($value, '#'))]];
             case 'created':
             case 'updated':
                 $ms = strtotime($value . (strlen($value) === 10 ? ' 00:00:00' : ''));
@@ -181,8 +181,8 @@ final class Query
         if ($key === 'title' || $key === 'text') {
             return ["COALESCE(n.title_key, n.text) COLLATE NOCASE $dir", []];
         }
-        $num = '(SELECT MIN(num) FROM fields WHERE node_id = n.id AND key = ?)';
-        $txt = '(SELECT MIN(value_key) FROM fields WHERE node_id = n.id AND key = ?)';
+        $num = '(SELECT MIN(num) FROM fields WHERE node_id = n.id AND +key = ?)';
+        $txt = '(SELECT MIN(value_key) FROM fields WHERE node_id = n.id AND +key = ?)';
         return ["$txt IS NULL, $num $dir, $txt $dir", [$key, $key, $key]];
     }
 

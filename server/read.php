@@ -55,7 +55,7 @@ final class Read
               SELECT id, sort_key || char(1) || id FROM nodes WHERE parent_id = ?
               UNION ALL
               SELECT n.id, down.path || char(2) || n.sort_key || char(1) || n.id FROM nodes n JOIN down ON n.parent_id = down.id)
-            SELECT n.* FROM down JOIN nodes n ON n.id = down.id ORDER BY down.path');
+            SELECT n.* FROM down CROSS JOIN nodes n ON n.id = down.id ORDER BY down.path');
         $st->execute([$id]);
         return array_map([Nodes::class, 'shape'], $st->fetchAll());
     }
