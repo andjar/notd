@@ -15,6 +15,9 @@ Writing
 - `[[` page suggestions and `/` templates share one popup with keyboard navigation; typing a closing bracket steps over the automatic one.
 - Rendered notes support `!{{id}}` transclusion and `SQL{...}` queries as read-only embedded outlines.
 
+Tasks
+- **Scheduled and due.** `{scheduled::2026-11-16}` and `{deadline::2026-11-20}` (`:s` and `:u` type them) put a note on that day's journal page, below the outline. Today's page also lists overdue open tasks; tick one to mark it done. A date in a property links to its journal page. API: `search.php?agenda=`.
+
 Pages
 - ☆ star to add and remove favourites; rename (links and child pages follow) and delete from the page dialog.
 - Print (or save as PDF) shows just the outline, collapsed notes included.

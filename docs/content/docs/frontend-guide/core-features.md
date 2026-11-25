@@ -41,6 +41,8 @@ Properties make notes findable: by [search]({{< relref "search-navigation.md" >}
 | `:t` + space | `{tag::}` |
 | `:k` + space | `{keyword::}` |
 | `:d` + space | `{date::2026-11-10}` (today) |
+| `:s` + space | `{scheduled::2026-11-10}` (today; see [Scheduled and due]({{< relref "journal-tasks.md#scheduled-and-due" >}})) |
+| `:u` + space | `{deadline::2026-11-10}` (today) |
 | `:r` + space | `{timestamp::...}` (now) |
 
 Page-level properties are edited with the gear icon next to the page title.

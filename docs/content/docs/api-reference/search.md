@@ -44,6 +44,12 @@ The Search endpoint also supports other modes:
 *   **Description**: Finds all notes with a `{status::TODO}` or `{status::DONE}` etc. property. `status` can be `TODO`, `DONE`, ..., or `ALL`. Supports pagination and `include_parent_properties`.
 *   **(Response structure similar to `q` search but `content_snippet` will highlight the status property)**
 
+### `GET /api/v1/search.php?agenda={YYYY-MM-DD}`
+*   **Description**: Notes with `{scheduled::...}` or `{deadline::...}` on that day, as on a journal page's "Scheduled and due" list. Add `&overdue=1` to also get open tasks dated earlier. Tasks that are `DONE` or `CANCELLED` are left out; notes that are not tasks are returned for their own day only. Supports pagination.
+*   **Result fields** (besides `note_id`, `content`, `page_id`, `page_name`, `properties`): `status` (the task keyword, or `null`), `scheduled` and `deadline` (the property values, or `null`), `date` (the earliest of the two), `overdue`.
+*   **Order**: overdue first, then by date, deadlines before scheduled notes on the same day.
+*   **Example**: `GET /api/v1/search.php?agenda=2026-11-16&overdue=1`
+
 ### `GET /api/v1/search.php?favorites=true`
 *   **Description**: Finds all pages that have a `{favorite::true}` property. Supports pagination. (`include_parent_properties` is not applicable here as it returns pages, not notes).
 *   **Response (200 OK)**:

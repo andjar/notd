@@ -111,7 +111,7 @@ It reads `logseq/config.edn` for the journal and file name formats and converts 
 | `key:: value` (page or block) | `{key::value}` |
 | `id::` on a block, `((id))`, `{{embed ((id))}}` | the note keeps the id; references become `!{{id}}` |
 | `LATER` `NOW` `WAIT` `CANCELED`, `[#A]` | `TODO` `DOING` `WAITING` `CANCELLED`, `{priority::A}` |
-| `SCHEDULED:` / `DEADLINE: <2023-11-14 Tue>` | `{scheduled::2023-11-14}` / `{deadline::...}` |
+| `SCHEDULED:` / `DEADLINE: <2023-11-14 Tue>` | `{scheduled::2023-11-14}` / `{deadline::...}`, listed under [Scheduled and due]({{< relref "../frontend-guide/journal-tasks.md#scheduled-and-due" >}}) |
 | `#tag`, `#[[a tag]]` | `[[tag]]`, `[[a tag]]` (in Logseq a tag is a link) |
 | `[[alias]]` | `[[Page]]`, when the alias has no page of its own |
 | `collapsed:: true`, `heading:: 2`, `#+BEGIN_QUOTE` | collapsed note, `## `, a Markdown quote |

@@ -6,6 +6,8 @@
  *   ?backlinks_for_page_name=Name  notes that link to a page
  *   ?tasks=TODO|DONE|...|ALL       notes that currently are tasks in that state
  *   ?favorites=1                   pages marked {favorite::true}
+ *   ?agenda=YYYY-MM-DD             notes scheduled or due that day ({scheduled::...}, {deadline::...});
+ *                                  with &overdue=1 also open tasks dated earlier
  *
  * Common: ?page, ?per_page (max 100), ?include_parent_properties=1
  */
@@ -127,13 +129,63 @@ if (isset($_GET['q'])) {
         $result['content_snippet'] = notd_snippet((string)$result['content'], (string)$result['status']);
     }
     unset($result);
+} elseif (isset($_GET['agenda'])) {
+    $day = (string)$_GET['agenda'];
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) || !checkdate((int)substr($day, 5, 2), (int)substr($day, 8, 2), (int)substr($day, 0, 4))) {
+        ApiResponse::error('agenda must be a date (YYYY-MM-DD).', 400);
+        return;
+    }
+    $overdue = notd_query_flag('overdue');
+    // Open tasks show on their day and, with overdue, every day after it until
+    // they are done. Notes that are not tasks show on their day only.
+    $closed = ['DONE', 'CANCELLED', 'NLR'];
+    $stmt = $pdo->prepare(
+        "SELECT N.id AS note_id, N.content, N.page_id, Pg.name AS page_name, Pr.name AS kind, SUBSTR(Pr.value, 1, 10) AS day, Pr.value AS value
+           FROM Properties Pr JOIN Notes N ON N.id = Pr.note_id JOIN Pages Pg ON Pg.id = N.page_id
+          WHERE Pr.name IN ('scheduled', 'deadline') AND Pr.active = 1 AND N.active = 1
+            AND SUBSTR(Pr.value, 1, 10) GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+            AND SUBSTR(Pr.value, 1, 10) " . ($overdue ? '<=' : '=') . " ?
+          ORDER BY day, N.id"
+    );
+    $stmt->execute([$day]);
+    $statePattern = '/^(' . implode('|', array_map('preg_quote', array_unique(array_merge(TASK_STATES, $closed)))) . ')\s/m';
+    $byNote = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $status = preg_match($statePattern, (string)$row['content'], $m) ? $m[1] : null;
+        if ($status !== null && in_array($status, $closed, true)) {
+            continue; // done
+        }
+        if ($status === null && $row['day'] !== $day) {
+            continue; // not a task: only on its own day
+        }
+        $id = (string)$row['note_id'];
+        if (!isset($byNote[$id])) {
+            $byNote[$id] = [
+                'note_id' => $id, 'content' => $row['content'], 'page_id' => $row['page_id'], 'page_name' => $row['page_name'],
+                'status' => $status, 'scheduled' => null, 'deadline' => null, 'date' => $row['day'], 'overdue' => false,
+            ];
+        }
+        $byNote[$id][$row['kind']] = $row['value'];
+        $byNote[$id]['date'] = min($byNote[$id]['date'], $row['day']);
+        if ($row['day'] < $day) {
+            $byNote[$id]['overdue'] = true;
+        }
+    }
+    // Overdue first, then by date; deadlines before scheduled items on the same day.
+    $all = array_values($byNote);
+    usort($all, static function ($a, $b) {
+        return [$a['overdue'] ? 0 : 1, $a['date'], $a['deadline'] === null ? 1 : 0, $a['note_id']]
+            <=> [$b['overdue'] ? 0 : 1, $b['date'], $b['deadline'] === null ? 1 : 0, $b['note_id']];
+    });
+    $total = count($all);
+    $results = array_slice($all, $offset, $perPage);
 } elseif (isset($_GET['favorites'])) {
     $total = $dataManager->countFavoritePages();
     foreach ($dataManager->getFavoritePages($perPage, $offset) as $favorite) {
         $results[] = ['page_id' => $favorite['id'], 'page_name' => $favorite['name']];
     }
 } else {
-    ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, tasks, or favorites', 400);
+    ApiResponse::error('Missing search parameter. Use q, backlinks_for_page_name, tasks, agenda, or favorites', 400);
     return;
 }
 
