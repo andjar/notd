@@ -30,7 +30,7 @@ All work happens on the `next` branch through pull requests, one step of the pla
 - it does one step and nothing else;
 - every new behaviour has a test, and all checks in `ci.yml` pass;
 - the documentation that the change affects is updated in the same pull request;
-- a choice that someone would later ask "why?" about has a short note in the decisions page.
+- a choice that someone would later ask "why?" about has a short entry on the [decisions](../overview/decisions/) page.
 
 ## Rules that keep the core small
 
