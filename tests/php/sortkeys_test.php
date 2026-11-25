@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/support/server.php';
-require_once dirname(__DIR__, 2) . '/server/sortkeys.php';
 
 $fixture = json_decode((string) file_get_contents(dirname(__DIR__) . '/fixtures/sort_keys.json'), true);
 

@@ -129,4 +129,6 @@ The schema is `server/schema.sql`:
 
 The database runs in WAL mode, so reading never waits for writing. All writes go through `Db::write()`, which takes the write lock up front (`BEGIN IMMEDIATE`), retries with a growing pause when another writer holds it, and rolls everything back on an exception. There are no migrations: a database with a different schema version is refused, and moves over through Markdown export and import. Until notd 4 reaches daily use the schema version stays 1 and the schema changes freely; throw-away databases are all there is.
 
-All changes to notes go through `Ops::apply()` (`server/ops.php`), the code behind [`POST /api/v1/ops`](../protocol/operations/). It stamps each changed node with the next hybrid logical clock and appends to the change feed; other parts (the indexer, later plugins' actions) hook in through `Ops::$listeners`.
+All changes to notes go through `Ops::apply()` (`server/ops.php`), the code behind [`POST /api/v1/ops`](../protocol/operations/). It stamps each changed node with the next hybrid logical clock and appends to the change feed; other parts (the indexer, later plugins' actions) hook in through `Ops::$listeners`, wired in `server/core.php`.
+
+The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables from the text of every node.
