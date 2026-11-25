@@ -12,6 +12,23 @@ A page is an outline of **blocks**: each bullet is one block, and blocks nest un
 
 A link to a page that does not exist yet shows “There is no page called … yet” with a button to create it. Journal pages (titles like `2026-11-25`) are created the moment you open them.
 
+## Writing
+
+Click a block's text to edit it; you then see and edit its raw text (a heading shows its `#`). Click below the last block, or on “Click here to write” on an empty page, to add a block at the end. Changes are saved as you type.
+
+| Key | Does |
+| --- | --- |
+| Enter | Splits the block at the caret: the text after it becomes a new block below. |
+| Shift+Enter | A new line inside the block. |
+| Tab / Shift+Tab | Indents the block under the one above / moves it back out. |
+| Backspace at the start | Joins the block onto the one above (an empty block is removed). |
+| Delete at the end | Joins the block below onto this one. |
+| ↑ / ↓ on the first / last line | Moves to the block above / below. |
+| Alt+Shift+↑ / ↓ | Moves the block, with its children, up or down. |
+| Ctrl+↑ / ↓ (Cmd on a Mac) | Folds / unfolds the block's children. The triangle left of the bullet does the same. |
+| Escape | Stops editing. |
+| Ctrl+Z / Ctrl+Shift+Z (Cmd on a Mac) | Undoes / redoes the last action: a split, an indent, a move, a join. Text you typed in the block you are editing is undone first. |
+
 ## Around the page
 
 - **Search** sits in the top bar. Type a few letters of any words, in any order; titles come first, then notes, with the matching words marked. Arrow keys move, Enter opens. If no page has that exact title, the last entry creates it and opens it. Quotes search for a phrase and `-word` leaves out notes with that word.

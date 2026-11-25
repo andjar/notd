@@ -124,6 +124,11 @@ export class Outbox {
     w.forEach((x) => x.reject(error));
   }
 
+  /** Sends waiting operations now instead of after the edit pause (a block was left). */
+  flushSoon() {
+    if (this.queue.length && !this.retryDelay) this.#schedule(0);
+  }
+
   /** Try again now (the browser came back online). */
   retryNow() {
     if (!this.queue.length || this.inFlight) return;

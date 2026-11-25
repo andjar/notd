@@ -8,6 +8,7 @@ import { Outline } from '../lib/outline.js';
 import { newId } from '../lib/keys.js';
 import { pageLink, isJournal } from '../lib/route.js';
 import { OutlineView } from './outline-view.js';
+import { Editor } from './editor.js';
 
 export const outbox = new Outbox({
   send: (ops) => api.ops(ops),
@@ -56,7 +57,24 @@ export class PageScreen {
     this.root.append(host);
     this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id) });
     this.view.render();
+    this.editor = new Editor(this.view, this.outline);
+    const add = document.createElement('button');
+    add.className = 'add-block';
+    add.textContent = blocks.length ? '' : 'Click here to write';
+    add.setAttribute('aria-label', 'Add a block');
+    add.addEventListener('click', () => this.#addAtEnd());
+    this.root.append(add);
     this.root.dispatchEvent(new CustomEvent('notd:page', { bubbles: true, detail: { page } }));
+  }
+
+  /** A new block at the end of the page, unless the last one is still empty. */
+  #addAtEnd() {
+    const top = this.outline.model.children(this.page.id);
+    const last = top.at(-1);
+    const id = last && last.text === '' && !this.outline.model.hasChildren(last.id) ? last.id
+      : this.outline.create({ parent: this.page.id, after: last?.id ?? null });
+    this.root.querySelector('.add-block').textContent = '';
+    this.editor.edit(id, 'end');
   }
 
   #missing(title) {
