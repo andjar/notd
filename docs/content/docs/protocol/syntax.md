@@ -15,6 +15,7 @@ A note's text is Markdown. The core reads a few more things out of it and keeps 
 | `#tag`, `#[[two words]]` | A tag: a link that also says what the note is about. Letters, digits, `_`, `-` and `/`; not after a letter, `&` or `/`, so `C#`, `&#39;` and URL anchors are not tags. | a `tag` to the page's title key |
 | `((id))` | A reference to a block, by its id. | a `ref` to the block id |
 | `{{embed ((id))}}`, `{{embed [[Page]]}}` | Shows a block or a page in place. | an `embed` to the block id or page title key |
+| `![name](file:id)`, `[name](file:id)` | Shows or links a stored [file](../files/). | a `file` link to the file node's id |
 
 Nothing inside inline code (`` `...` ``) or fenced code blocks counts.
 

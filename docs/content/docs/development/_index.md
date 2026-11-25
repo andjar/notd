@@ -114,7 +114,7 @@ It also fails when core code imports or requires anything from `plugins/` direct
 
 ## Storage
 
-Everything notd keeps is in the data folder: `$NOTD_DATA_DIR` if set, else `data_dir` in `config.local.php` (copy `config.local.example.php`), else `data/` next to `index.php`. It holds `notd.sqlite` and, later, the `files/` folder.
+Everything notd keeps is in the data folder: `$NOTD_DATA_DIR` if set, else `data_dir` in `config.local.php` (copy `config.local.example.php`), else `data/` next to `index.php`. It holds `notd.sqlite` and the `files/` folder, where uploaded files are kept once per identical content. `php tools/verify.php` checks every stored file against its SHA-256 and reports contents that no node describes (`--clean` deletes those).
 
 The schema is `server/schema.sql`:
 
@@ -125,6 +125,7 @@ The schema is `server/schema.sql`:
 | `links` | Index of links, tags, block references and embeds, by source and target. |
 | `changes` | The change feed: one row per change, numbered. |
 | `search` | The FTS5 full-text index of titles and text (diacritics kept). |
+| `files` | For each file node: SHA-256, size, content type and where the content is stored. |
 | `applied_ops` | Operation ids already applied, so a retried batch is not applied twice. |
 | `meta` | The schema version, the last clock, and other facts about the notebook. |
 

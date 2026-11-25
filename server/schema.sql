@@ -62,3 +62,11 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
   text,
   tokenize = "unicode61 remove_diacritics 0"     -- case-insensitive, but å and a stay different
 );
+
+CREATE TABLE IF NOT EXISTS files (
+  node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
+  sha256  TEXT NOT NULL UNIQUE,                -- one stored copy per identical file
+  size    INTEGER NOT NULL,
+  mime    TEXT NOT NULL,
+  path    TEXT NOT NULL                        -- relative to the data folder: files/YYYY/MM/<sha256>.<ext>
+);

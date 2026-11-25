@@ -8,6 +8,7 @@
 //   #tag  #[[two words]]  a tag, which is also a link to the page of that name
 //   ((id))                a reference to a block
 //   {{embed ((id))}}      an embedded block; {{embed [[Page]]}} an embedded page
+//   ![name](file:id)      a stored file, shown or linked (also [name](file:id))
 //
 // Nothing inside `code` or ``` fenced code ``` counts.
 
@@ -23,7 +24,7 @@ function parse_text(string $text): array
     $fields = [];
     $links = [];
     $add = function (string $kind, string $target) use (&$links): void {
-        $target = $kind === 'ref' || $kind === 'embed-block' ? strtolower($target) : title_key($target);
+        $target = in_array($kind, ['ref', 'embed-block', 'file'], true) ? strtolower($target) : title_key($target);
         if ($target !== '') {
             $links[$kind . "\0" . $target] = [$kind === 'embed-block' ? 'embed' : $kind, $target];
         }
@@ -60,6 +61,10 @@ function parse_text(string $text): array
     preg_match_all('/(?<!#)\[\[([^\]\n]+)\]\]/u', $text, $m);
     foreach ($m[1] as $title) {
         $add('link', $title);
+    }
+    preg_match_all('/\]\(file:(' . UUID_RE . ')\)/i', $text, $m);
+    foreach ($m[1] as $id) {
+        $add('file', $id);
     }
     preg_match_all('/\(\((' . UUID_RE . ')\)\)/i', $text, $m);
     foreach ($m[1] as $id) {
