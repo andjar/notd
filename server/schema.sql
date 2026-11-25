@@ -28,10 +28,11 @@ CREATE TABLE IF NOT EXISTS fields (
   node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   key     TEXT NOT NULL,                       -- lower case
   value   TEXT NOT NULL,
+  value_key TEXT NOT NULL,                     -- the value folded like a title, for comparisons
   num     REAL                                 -- the value as a number, when it is one
 );
 CREATE INDEX IF NOT EXISTS fields_node ON fields (node_id);
-CREATE INDEX IF NOT EXISTS fields_key_value ON fields (key, value);
+CREATE INDEX IF NOT EXISTS fields_key_value ON fields (key, value_key);
 CREATE INDEX IF NOT EXISTS fields_key_num ON fields (key, num);
 
 CREATE TABLE IF NOT EXISTS links (
