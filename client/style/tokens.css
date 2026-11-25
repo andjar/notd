@@ -1,0 +1,62 @@
+/* Design tokens: every colour, size and font the interface uses. Light by default,
+   dark when the system asks for it, either one when data-theme says so. */
+
+:root {
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --text-size: 16px;
+  --line: 1.6;                         /* line height of note text */
+  --row: calc(var(--text-size) * var(--line));
+  --indent: 1.5rem;                    /* one outline level */
+  --bullet: 6px;
+  --gap: 0.5rem;
+  --radius: 6px;
+  --left-w: 16rem;
+  --right-w: 20rem;
+  --page-w: 46rem;
+
+  --bg: #ffffff;
+  --bg-soft: #f6f6f4;
+  --bg-hover: #efefec;
+  --fg: #1f2328;
+  --fg-soft: #5d636b;
+  --fg-faint: #9aa0a6;
+  --border: #e3e3df;
+  --accent: #2f6fde;
+  --accent-soft: #e6eefc;
+  --danger: #c4314b;
+  --mark: #fff1a8;
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #18191b;
+    --bg-soft: #202124;
+    --bg-hover: #2a2b2f;
+    --fg: #e6e6e3;
+    --fg-soft: #a9adb3;
+    --fg-faint: #6f747b;
+    --border: #33353a;
+    --accent: #7aa7ff;
+    --accent-soft: #23324f;
+    --danger: #ff7a8f;
+    --mark: #5a4d10;
+    --shadow: 0 6px 24px rgb(0 0 0 / 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #18191b;
+  --bg-soft: #202124;
+  --bg-hover: #2a2b2f;
+  --fg: #e6e6e3;
+  --fg-soft: #a9adb3;
+  --fg-faint: #6f747b;
+  --border: #33353a;
+  --accent: #7aa7ff;
+  --accent-soft: #23324f;
+  --danger: #ff7a8f;
+  --mark: #5a4d10;
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.5);
+}

@@ -21,7 +21,8 @@ notd is a personal outliner and journal: one page per day, notes nested as deep 
 php tests/php/run.php                      # server unit tests
 node --test tests/conformance/*.test.mjs   # protocol tests (start their own server)
 node tools/budget.mjs                      # core size budget
-php -S 127.0.0.1:8080 index.php            # run notd
+php -S 127.0.0.1:8080 index.php            # run notd, then open http://127.0.0.1:8080/
+python3 tests/browser/frame_test.py        # a browser test (needs Playwright)
 ```
 
 Every pull request runs the checks in GitHub Actions (`.github/workflows/ci.yml`).

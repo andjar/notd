@@ -45,3 +45,7 @@ The first plan tried to build every framework (exports, templates, layout from n
 ## 10. Plain HTTP and JSON, GET and POST only (2026-11-25)
 
 The protocol is `/api/v1/<name>`, GET for reads and POST with a JSON body for writes, errors as `{"error": {"code", "message"}}`. Minimal web servers such as phpdesktop handle only GET and POST, and plain JSON over HTTP is the most likely to still be understood by tools in twenty years.
+
+## 11. Pages addressed in the fragment, and a strict Content-Security-Policy (2026-11-25)
+
+The browser app addresses pages as `#/page/<title>`. Unlike paths, fragments never reach the server, so notd runs from any folder of any web server (Apache, phpdesktop, `php -S`) without rewrite rules, and every relative URL keeps working. The app page allows scripts only from notd itself; the import map, the one inline script, is allowed by its hash, which the server computes when it sends the page.
