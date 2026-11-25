@@ -17,6 +17,10 @@ notd is a personal outliner and journal: one page per day, notes nested as deep 
 
 ## Checks
 
+```sh
+php tests/php/run.php   # server unit tests
+```
+
 Every pull request runs the checks in GitHub Actions (`.github/workflows/ci.yml`).
 
 ## Licence
