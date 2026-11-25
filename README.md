@@ -2,7 +2,7 @@
 
 notd is a personal outliner and journal: one page per day, notes nested as deep as you like, links and backlinks, and small plugins for everything else. It is made of plain PHP, plain JavaScript and one SQLite file, with no build step, so it can be read, run and changed for decades.
 
-> **This is the `next` branch: notd 4, a clean rewrite in progress.** The working version, notd 3, is on [`main`](https://github.com/andjar/notd/tree/main). The [overview](docs/content/docs/overview/_index.md), [architecture](docs/content/docs/overview/architecture.md) and [decisions](docs/content/docs/overview/decisions.md) say what notd 4 is and why.
+> **This is the `next` branch: notd 4, a clean rewrite, ready for daily use.** The working version, notd 3, is on [`main`](https://github.com/andjar/notd/tree/main). The [overview](docs/content/docs/overview/_index.md), [architecture](docs/content/docs/overview/architecture.md) and [decisions](docs/content/docs/overview/decisions.md) say what notd 4 is and why.
 
 ## What is where
 
@@ -14,6 +14,10 @@ notd is a personal outliner and journal: one page per day, notes nested as deep 
 | `tests/` | `php/` unit tests, `conformance/` protocol tests against a running server, `browser/` end-to-end tests. |
 | `tools/` | Scripts for development and CI, such as the core size budget. |
 | `docs/` | The documentation site (Hugo), including the protocol that the conformance tests check. |
+
+## Getting started
+
+See [Switching from notd 3](docs/content/docs/guide/switching.md) for importing your notes and serving notd 4 (Apache `.htaccess` included).
 
 ## Checks
 
