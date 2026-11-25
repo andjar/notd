@@ -28,7 +28,9 @@ export class Autocomplete {
     const root = editor.view.root;
     root.addEventListener('input', () => this.#update());
     root.addEventListener('keydown', (e) => this.#key(e), true); // before the editor's keys
-    root.addEventListener('focusout', () => setTimeout(() => this.close(), 150));
+    root.addEventListener('focusout', () => setTimeout(() => {
+      if (!document.activeElement?.matches?.('.content[contenteditable]')) this.close(); // only when editing really ended
+    }, 150));
     this.box.addEventListener('mousedown', (e) => {
       const li = e.target.closest('li');
       if (li) { e.preventDefault(); this.#pick(Number(li.dataset.i)); }

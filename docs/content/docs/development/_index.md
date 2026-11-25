@@ -176,6 +176,7 @@ client/
   ui/autocomplete.js  link suggestions at the caret
   panels/backlinks.js linked references under the page
   ui/drag.js      moving blocks by dragging their bullet (pointer events, so touch works too)
+  ui/toolbar.js   the editing toolbar on phones; its buttons send the editor the same keys a keyboard would
   ui/editor.js    editing: one block at a time as plain text (contenteditable="plaintext-only"), the keys
   style/tokens.css  colours, sizes and fonts, light and dark
   style/app.css     the frame

@@ -161,3 +161,13 @@
 .dragging { opacity: 0.4; }
 .drop-line { position: fixed; height: 2px; background: var(--accent); border-radius: 1px; pointer-events: none; z-index: 40; }
 .bullet { touch-action: none; cursor: grab; }
+
+/* Touch: no hover, so fold toggles of blocks with children always show, and bullets are easier to hit. */
+@media (hover: none) {
+  .has-children > .row > .toggle { opacity: 1; }
+}
+@media (pointer: coarse) {
+  .bullet { position: relative; }
+  .bullet::after { content: ""; position: absolute; inset: -0.4rem; }
+}
+.content pre, .content table { max-width: 100%; overflow-x: auto; display: block; }
