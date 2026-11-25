@@ -1,6 +1,6 @@
 +++
-description = "A lightweight, long-lived alternative to Logseq: an outliner for notes, journals and tasks made of plain PHP, plain JavaScript and one SQLite file that you own. No build step, no cloud, works offline."
-title = "notd: a simple outliner"
+description = "A personal outliner and journal made of plain PHP, plain JavaScript and one SQLite file. notd 4 is being rewritten around a small core and plugins."
+title = "notd"
 draft = false
 
 +++

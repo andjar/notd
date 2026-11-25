@@ -1,2 +1,0 @@
-﻿- BOM and CRLF file
-	- child with CRLF
