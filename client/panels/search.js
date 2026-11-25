@@ -3,6 +3,7 @@
 
 import { html, render } from 'lit-html';
 import { api } from '../lib/api.js';
+import { newId } from '../lib/keys.js';
 import { unsafeHTML } from 'lit-html/directives/unsafe-html.js';
 
 export function searchPanel({ go }) {
@@ -47,8 +48,13 @@ export function searchPanel({ go }) {
     else if (e.key === 'Escape') { close(); e.target.blur(); }
   }
 
-  function open(item) {
+  async function open(item) {
     close();
+    if (item.create) {
+      try { await api.ops([{ op: 'create', kind: 'page', id: newId(), title: item.title }]); } catch (e) {
+        if (e.code !== 'title_taken') { console.warn('create page:', e.message); return; }
+      }
+    }
     go(item.title, item.block);
   }
 

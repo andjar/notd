@@ -6,6 +6,7 @@ import { panels } from './lib/panels.js';
 import { gate } from './ui/gate.js';
 import { route, pageLink } from './lib/route.js';
 import { searchPanel } from './panels/search.js';
+import { PageScreen } from './ui/page.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
 
 export const notd = { api, panels };
@@ -52,6 +53,8 @@ async function start() {
   setupFrame();
   app.hidden = false;
   for (const p of [searchPanel({ go }), headerPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel()]) panels.register(p);
+  notd.page = new PageScreen(document.getElementById('page'));
+  document.addEventListener('notd:route', (e) => notd.page.show(e.detail.title));
   addEventListener('hashchange', show);
   document.addEventListener('notd:favourites', () => panels.refresh(panels.context, 'app.left'));
   await show();
