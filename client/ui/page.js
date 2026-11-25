@@ -1,7 +1,7 @@
 // The page on screen: loads it, draws its outline, and keeps one outbox for the
 // whole app so unsent changes survive moving between pages.
 
-import { html, render } from 'lit-html';
+import { html, render } from '../lib/html.js';
 import { api, ApiError } from '../lib/api.js';
 import { Outbox } from '../lib/outbox.js';
 import { Outline } from '../lib/outline.js';

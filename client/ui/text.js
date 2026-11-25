@@ -1,7 +1,7 @@
 // Draws a block's text into the page: Markdown through DOMPurify, then block
 // references and embeds filled in from the server (cached per page load).
 
-import DOMPurify from 'dompurify';
+import DOMPurify from '../vendor/dompurify/purify.js';
 import { toHtml, isPlain, splitStart, HEADING, pageHref } from '../lib/markdown.js';
 import { api } from '../lib/api.js';
 

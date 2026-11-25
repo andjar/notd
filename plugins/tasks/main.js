@@ -1,7 +1,7 @@
 // The tasks plugin in the browser: draws the keyword as a checkbox and a word,
 // adds commands and an agenda on journal pages.
 
-import { html, render } from 'lit-html';
+import { html, render } from '../../client/lib/html.js';
 import { LEAD, toggle, cycle, nextState, setKeyword, setField, keyword, stamp } from './lib/tasks.js';
 
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);

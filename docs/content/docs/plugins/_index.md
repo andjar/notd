@@ -41,7 +41,7 @@ plugins/hello/
 
 ## Browser code
 
-`main.js` is an ES module, served as written, with an `activate` function. It may import its own files with relative paths, and `lit-html` through the import map.
+`main.js` is an ES module, served as written, with an `activate` function. It imports by relative path only: its own files, and lit-html as `import { html, render } from '../../client/lib/html.js'` (that module also has `nothing`, `svg`, `unsafeHTML`, `repeat`, `classMap` and `live`). The path is relative to the file doing the import, and a plugin's files are always served under `/plugins/<name>/`, wherever its folder is. There is no import map, so a bare name such as `'lit-html'` does not resolve.
 
 ```js
 export function activate(notd) {

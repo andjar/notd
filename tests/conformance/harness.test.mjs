@@ -63,15 +63,16 @@ test('server files and the data folder are never served as files', async () => {
   }
 });
 
-test('the app page is sent with a CSP that allows exactly its import map', async () => {
-  const { createHash } = await import('node:crypto');
+test('the app page is sent as it is, with a CSP that allows only scripts from notd itself', async () => {
+  const { readFileSync } = await import('node:fs');
   const res = await fetch(server.url + '/');
-  const html = await res.text();
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type'), /text\/html/);
-  const map = html.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1];
-  const hash = createHash('sha256').update(map).digest('base64');
-  const csp = res.headers.get('content-security-policy');
-  assert.match(csp, new RegExp(`script-src 'self' 'sha256-${hash.replace(/[+/=]/g, '\\$&')}';`));
-  assert.match(csp, /frame-ancestors 'none'/);
+  assert.equal(await res.text(), readFileSync(new URL('../../client/index.html', import.meta.url), 'utf8'));
+  const csp = Object.fromEntries(res.headers.get('content-security-policy').split(';')
+    .map((d) => d.trim().split(/\s+/)).map(([name, ...values]) => [name, values.join(' ')]));
+  assert.equal(csp['script-src'], "'self'");            // no hashes, no 'unsafe-inline', no eval
+  assert.equal(csp['default-src'], "'self'");
+  assert.equal(csp['object-src'], "'none'");
+  assert.equal(csp['frame-ancestors'], "'none'");
 });

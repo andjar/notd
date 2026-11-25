@@ -19,23 +19,38 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 
 class Server:
-    def __init__(self, env=None):
+    """notd under PHP's built-in server, on a free port and a throw-away data folder.
+    root is the copy of notd to serve (this checkout unless a test passes another).
+
+    One server process, deliberately: PHP's multi-worker mode (PHP_CLI_SERVER_WORKERS)
+    is experimental and drops requests under the burst of module requests a page
+    load makes. The server's output goes to a file, never to a pipe nobody reads:
+    a full pipe blocks PHP in the middle of a request (see self.log()).
+    """
+
+    def __init__(self, env=None, root=ROOT):
         self.data = tempfile.mkdtemp(prefix='notd-browser-')
         with socket.socket() as s:
             s.bind(('127.0.0.1', 0))
             self.port = s.getsockname()[1]
         self.url = f'http://127.0.0.1:{self.port}/'
+        self.log_file = tempfile.NamedTemporaryFile(prefix='notd-server-', suffix='.log', delete=False)
         self.proc = subprocess.Popen(
-            ['php', '-S', f'127.0.0.1:{self.port}', 'index.php'], cwd=ROOT,
-            env={**os.environ, 'NOTD_DATA_DIR': self.data, 'PHP_CLI_SERVER_WORKERS': '4', **(env or {})},
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            ['php', '-S', f'127.0.0.1:{self.port}', 'index.php'], cwd=root,
+            env={**{k: v for k, v in os.environ.items() if k != 'PHP_CLI_SERVER_WORKERS'}, 'NOTD_DATA_DIR': self.data, **(env or {})},
+            stdout=self.log_file, stderr=subprocess.STDOUT)
         for _ in range(100):
             try:
                 urllib.request.urlopen(self.url + 'api/v1/ping', timeout=1)
                 return
             except Exception:
                 time.sleep(0.05)
-        raise RuntimeError('notd did not start')
+        raise RuntimeError('notd did not start:\n' + self.log())
+
+    def log(self):
+        """What the server has printed so far (its access log and PHP's errors)."""
+        with open(self.log_file.name, encoding='utf-8', errors='replace') as f:
+            return f.read()
 
     def api(self, method, name, body=None):
         req = urllib.request.Request(self.url + 'api/v1/' + name, method=method,
@@ -50,6 +65,8 @@ class Server:
     def stop(self):
         self.proc.terminate()
         self.proc.wait()
+        self.log_file.close()
+        os.unlink(self.log_file.name)
         shutil.rmtree(self.data, ignore_errors=True)
 
 
@@ -64,9 +81,12 @@ def browser(**context):
             b.close()
 
 
-def open_page(b, url, errors, width=1280, height=900, **kw):
-    # bypass_csp: Playwright's string predicates need eval, which notd's CSP rightly forbids
-    page = b.new_page(viewport={'width': width, 'height': height}, bypass_csp=True, **kw)
+def open_page(b, url, errors, width=1280, height=900, csp=False, **kw):
+    """A page that collects console errors. Tests normally run with notd's
+    Content-Security-Policy bypassed, because Playwright's string predicates need
+    eval; a test that checks the app under its real policy passes csp=True and
+    waits with selectors only."""
+    page = b.new_page(viewport={'width': width, 'height': height}, bypass_csp=not csp, **kw)
     page.on('console', lambda m: m.type == 'error' and errors.append(m.text))
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.goto(url)

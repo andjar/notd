@@ -1,6 +1,6 @@
 // The screen shown before the app: the login form, or why there is none.
 
-import { html, render } from 'lit-html';
+import { html, render } from '../lib/html.js';
 import { api, ApiError } from '../lib/api.js';
 
 /** Shows the gate until the user is in; resolves when the app may start. */

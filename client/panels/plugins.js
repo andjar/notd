@@ -1,6 +1,6 @@
 // The plugins panel: what is installed, switched on or off, and what failed.
 
-import { html, render } from 'lit-html';
+import { html, render } from '../lib/html.js';
 import { api } from '../lib/api.js';
 import { host, SAFE } from '../lib/plugins.js';
 

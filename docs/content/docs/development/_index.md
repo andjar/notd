@@ -152,12 +152,13 @@ The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) 
 
 ## The browser app
 
-`client/index.html` is the whole page: the frame, an import map, the styles and `client/app.js`. The server sends it for `/`; everything under `client/` is served as written. Pages are addressed in the fragment (`#/page/Østfold`; empty means the journal), so notd works from any folder of a web server without rewrite rules.
+`client/index.html` is the whole page: the frame, the styles and `client/app.js`, with no inline script. The server sends it for `/`; everything under `client/` is served as written. Pages are addressed in the fragment (`#/page/Østfold`; empty means the journal), so notd works from any folder of a web server without rewrite rules.
 
 ```text
 client/
-  index.html      the frame and the import map ("lit-html", "notd/")
+  index.html      the frame, the styles and app.js (no inline script)
   app.js          start-up: ping, the login gate, the frame, the route
+  lib/html.js     lit-html (and its directives) for the core and for plugins
   lib/api.js      one function per endpoint; errors as ApiError(status, code, message)
   lib/panels.js   the panel registry: panels.register({ id, slot, order, render(el, ctx), when(ctx) })
   lib/keys.js     sort keys and ids
@@ -191,7 +192,9 @@ client/
   vendor/         prebuilt libraries, rebuilt by tools/vendor.sh
 ```
 
-The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after` and `app.status`. The sidebars are grid columns, so they can never cover the page; under 900 px wide they become drawers. The page is sent with a strict Content-Security-Policy: scripts only from notd itself (the inline import map is allowed by its hash), no plugins, no framing.
+The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after` and `app.status`. The sidebars are grid columns, so they can never cover the page; under 900 px wide they become drawers. The page is sent with a strict Content-Security-Policy: `script-src 'self'` (scripts only from notd itself, no inline script, no `eval`), no plugins, no framing.
+
+There is no import map ([decision 14](../overview/decisions/)). Every module, core, vendored or plugin, imports by relative path to a `.js` file: lit-html through `client/lib/html.js`, marked and DOMPurify by their paths under `client/vendor/`. `tests/js/modules.test.mjs` fails on a bare name such as `'lit-html'`, on a `.mjs` file, on an import of a file that does not exist and on any inline script in `client/index.html`. Text files are checked out with LF line endings on every system (`.gitattributes`), so the files notd serves are the same bytes everywhere.
 
 ### The outline's geometry
 
@@ -201,7 +204,7 @@ Every block is a row of three boxes: the fold toggle, the bullet and the text. T
 
 A block's text is drawn in three steps. Text with no Markdown or syntax characters at all is set as plain text, which keeps big pages fast. Anything else goes through `client/lib/markdown.js`: marked, with notd's syntax (`[[links]]`, `#tags`, `((references))`, `{{embed}}`, `{key::value}` fields, `file:` links) as marked inline extensions, so nothing inside code counts. The HTML then goes through DOMPurify, which removes scripts, event handlers, forms and unsafe URLs, before it reaches the page. Last, references and embeds are filled in from the server, each block fetched once per page load.
 
-marked and DOMPurify are vendored by `tools/vendor.sh` like lit-html; `markdown.js` imports marked by relative path so the Node tests can load it too.
+marked and DOMPurify are vendored by `tools/vendor.sh` like lit-html. The script saves DOMPurify as `purify.js` (some servers send `.mjs` with a MIME type the browser refuses for a module), drops the comments that point to source maps that are not vendored, and stops if a vendored file imports anything by a bare name. Because everything is imported by relative path, the Node tests load client modules such as `markdown.js` directly.
 
 ### How an edit travels
 
@@ -218,4 +221,6 @@ pip install playwright && python3 -m playwright install chromium
 python3 tests/browser/frame_test.py
 ```
 
-Test pages are opened with Playwright's `bypass_csp`, because its string predicates need `eval`; that the CSP is sent, and allows exactly the import map, is checked by a conformance test instead. `support.py` provides `Server` (with `ops()` to set up notes through the API), `browser()`, `open_page()` (which collects console errors so a test can require none) and the `@test` runner.
+Test pages are normally opened with Playwright's `bypass_csp`, because its string predicates need `eval`. `frame_test.py` also runs the app under its real policy (`open_page(..., csp=True)`, waiting with selectors only), once from this checkout and once from a copy with Windows (CRLF) line endings, and requires no console error, so a refused script shows up there; a conformance test checks the policy itself. `support.py` provides `Server` (with `ops()` to set up notes through the API, `log()` for what the server printed, and `root` to serve another copy of notd), `browser()`, `open_page()` (which collects console errors so a test can require none) and the `@test` runner.
+
+`Server` runs one PHP process, deliberately: PHP's multi-worker mode (`PHP_CLI_SERVER_WORKERS`) is experimental and drops requests when a page load asks for many modules at once. Its output goes to a log file, never to a pipe that nobody reads: once a pipe is full, PHP stops in the middle of a request and the test hangs.

@@ -2,7 +2,7 @@
 // status. Favourites live in the notebook, as links on the page
 // "notd/favourites", so every device sees the same; recent pages are per device.
 
-import { html, render } from 'lit-html';
+import { html, render } from '../lib/html.js';
 import { api } from '../lib/api.js';
 import { newId } from '../lib/keys.js';
 import { pageLink, today } from '../lib/route.js';

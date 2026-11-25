@@ -48,7 +48,7 @@ The protocol is `/api/v1/<name>`, GET for reads and POST with a JSON body for wr
 
 ## 11. Pages addressed in the fragment, and a strict Content-Security-Policy (2026-11-25)
 
-The browser app addresses pages as `#/page/<title>`. Unlike paths, fragments never reach the server, so notd runs from any folder of any web server (Apache, phpdesktop, `php -S`) without rewrite rules, and every relative URL keeps working. The app page allows scripts only from notd itself; the import map, the one inline script, is allowed by its hash, which the server computes when it sends the page.
+The browser app addresses pages as `#/page/<title>`. Unlike paths, fragments never reach the server, so notd runs from any folder of any web server (Apache, phpdesktop, `php -S`) without rewrite rules, and every relative URL keeps working. The app page allows scripts only from notd itself (`script-src 'self'`), and has no inline script ([decision 14](#14-no-import-map-relative-imports-and-lf-line-endings-2026-11-25)).
 
 ## 12. Import is a tool, not part of the core (2026-11-25)
 
@@ -57,3 +57,9 @@ Reading a Logseq graph or a notd 3 export is done once, from the command line, s
 ## 13. Outside effects run as jobs after the change (2026-11-25)
 
 Actions may run programs, but only through a job queue written in the same transaction as the change and run after the answer, with a time limit, a log, retries and keys that coalesce repeated jobs. A program never runs inside a change, never through a shell, and never for a change that did not happen.
+
+## 14. No import map: relative imports and LF line endings (2026-11-25)
+
+The first version had an inline import map, so modules could import `lit-html` by name, and the page's CSP allowed it by its hash, computed by the server from the file. On a Windows checkout with CRLF line endings the server hashed the bytes on disk, while the browser hashes the script after its parser has turned CRLF into LF. The hashes never matched, the browser refused the import map, and every module that imported `lit-html` by name failed, so notd did not start. An import map in a file of its own (`<script type="importmap" src>`) would need no hash, but browsers do not load one.
+
+So there is no import map and no inline script. Every module, core, vendored or plugin, imports by relative path to a `.js` file (lit-html through `client/lib/html.js`), and the CSP is plain `script-src 'self'`. `.gitattributes` checks text files out with LF line endings everywhere, so notd serves the same bytes on every system. A Node test rejects bare names, `.mjs` files and inline scripts, and a browser test runs the app under its real CSP from a copy with CRLF line endings. The cost: a plugin imports lit-html as `../../client/lib/html.js` rather than as `lit-html`.
