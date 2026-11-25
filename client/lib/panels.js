@@ -34,6 +34,7 @@ function mountSlot(slot) {
   if (!host) return;
   const list = [...registry.values()].filter((p) => p.slot === slot).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   const keep = new Set();
+  let index = 0;
   for (const p of list) {
     let visible = true;
     try { visible = p.when ? p.when(context) !== false : true; } catch { visible = false; }
@@ -44,7 +45,8 @@ function mountSlot(slot) {
       el.className = 'panel';
       el.dataset.panel = p.id;
     }
-    host.append(el); // keeps the order
+    if (host.children[index] !== el) host.insertBefore(el, host.children[index] ?? null); // moving a focused element would blur it
+    index++;
     keep.add(el);
     try {
       p.render(el, context);

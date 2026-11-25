@@ -4,26 +4,14 @@
 import { api } from './lib/api.js';
 import { panels } from './lib/panels.js';
 import { gate } from './ui/gate.js';
+import { route, pageLink } from './lib/route.js';
+import { searchPanel } from './panels/search.js';
+import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
 
 export const notd = { api, panels };
 window.notd = notd;
 
 const app = document.getElementById('app');
-
-/** Today as YYYY-MM-DD in local time: the title of today's journal page. */
-export function today(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** The route in the address: { title } of the page to show. */
-export function route() {
-  const m = location.hash.match(/^#\/page\/(.+)$/);
-  return { title: m ? decodeURIComponent(m[1]) : today() };
-}
-
-export function pageLink(title) {
-  return '#/page/' + encodeURIComponent(title);
-}
 
 function setupFrame() {
   for (const button of app.querySelectorAll('[data-toggle]')) {
@@ -45,23 +33,27 @@ function setupFrame() {
 }
 
 async function show() {
-  const { title } = route();
+  const r = route();
   app.classList.remove('show-left', 'show-right');
-  document.title = `${title} · notd`;
-  panels.refresh({ ...panels.context, route: { title } });
-  document.dispatchEvent(new CustomEvent('notd:route', { detail: { title } }));
+  document.title = `${r.title} · notd`;
+  panels.refresh({ ...panels.context, route: r });
+  document.dispatchEvent(new CustomEvent('notd:route', { detail: r }));
 }
+
+/** Opens a page (and a block on it). */
+export function go(title, block = null) {
+  location.hash = pageLink(title, block);
+}
+notd.go = go;
 
 async function start() {
   const status = await api.ping();
   if (!status.authenticated) await gate(status);
   setupFrame();
   app.hidden = false;
-  panels.register({
-    id: 'connection', slot: 'app.status', order: 100,
-    render(el) { el.textContent = 'Connected'; el.className = 'status-item'; },
-  });
+  for (const p of [searchPanel({ go }), headerPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel()]) panels.register(p);
   addEventListener('hashchange', show);
+  document.addEventListener('notd:favourites', () => panels.refresh(panels.context, 'app.left'));
   await show();
 }
 

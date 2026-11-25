@@ -13,6 +13,11 @@ relativeURLs = false
     weight = 10
 
 [[menu.main]]
+    name = "Using notd"
+    url = "/docs/guide/"
+    weight = 15
+
+[[menu.main]]
     name = "Protocol"
     url = "/docs/protocol/"
     weight = 20

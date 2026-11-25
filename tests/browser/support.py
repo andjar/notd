@@ -65,7 +65,8 @@ def browser(**context):
 
 
 def open_page(b, url, errors, width=1280, height=900, **kw):
-    page = b.new_page(viewport={'width': width, 'height': height}, **kw)
+    # bypass_csp: Playwright's string predicates need eval, which notd's CSP rightly forbids
+    page = b.new_page(viewport={'width': width, 'height': height}, bypass_csp=True, **kw)
     page.on('console', lambda m: m.type == 'error' and errors.append(m.text))
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.goto(url)
