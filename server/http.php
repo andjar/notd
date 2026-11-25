@@ -120,7 +120,7 @@ final class Http
             }
             $data = self::dispatch($method, $path, new Request($method, $_GET, (string) file_get_contents('php://input'), $_FILES, $_POST));
             $data instanceof FileResponse ? $data->send() : self::send(200, $data);
-            if (class_exists(Jobs::class, false) && Jobs::queuedNow()) {
+            if (class_exists(Jobs::class, false) && (Jobs::queuedNow() || Jobs::due(Db::get()))) {
                 self::finishResponse();
                 Jobs::work(Db::get());                  // outside effects run once the answer is out
             }
@@ -134,17 +134,17 @@ final class Http
 
     public static function dispatch(string $method, string $path, Request $request): mixed
     {
-        if (!preg_match('#^/api/v1/([a-z][a-z0-9_-]*)$#', $path, $m)) {
+        if (!preg_match('#^/api/v1/([a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)?)$#', $path, $m)) {
             throw new HttpError(404, 'not_found', "No such path: $path");
         }
         require_once __DIR__ . '/core.php';
         Auth::check($method, $m[1]);
         Plugins::load(Db::get());
         $file = __DIR__ . '/api/' . $m[1] . '.php';
-        if (!is_file($file)) {
+        $handlers = str_contains($m[1], '.') ? (Plugins::$endpoints[$m[1]] ?? null) : (is_file($file) ? require $file : null);
+        if ($handlers === null) {
             throw new HttpError(404, 'not_found', "No such endpoint: {$m[1]}");
         }
-        $handlers = require $file;
         if (!isset($handlers[$method])) {
             throw new HttpError(405, 'method_not_allowed', "$method is not allowed here; use " . implode(' or ', array_keys($handlers)) . '.');
         }

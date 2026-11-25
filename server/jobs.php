@@ -27,17 +27,25 @@ final class Jobs
         self::queue($pdo, 'run', ['argv' => array_map('strval', $argv), 'timeout' => $timeout, 'cwd' => $cwd], $key);
     }
 
-    /** Queues a job for a plugin's handler. */
-    public static function queue(PDO $pdo, string $kind, array $payload, ?string $key = null): void
+    /** Queues a job for a plugin's handler; with $delay, not before that many seconds of quiet. */
+    public static function queue(PDO $pdo, string $kind, array $payload, ?string $key = null, int $delay = 0): void
     {
-        Db::write($pdo, function (PDO $pdo) use ($kind, $payload, $key): void {
+        Db::write($pdo, function (PDO $pdo) use ($kind, $payload, $key, $delay): void {
             if ($key !== null) {
                 $pdo->prepare("DELETE FROM jobs WHERE key = ? AND status = 'waiting'")->execute([$key]);
             }
-            $pdo->prepare('INSERT INTO jobs (key, kind, payload, created) VALUES (?, ?, ?, ?)')
-                ->execute([$key, $kind, json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), now_ms()]);
+            $pdo->prepare('INSERT INTO jobs (key, kind, payload, created, run_after) VALUES (?, ?, ?, ?, ?)')
+                ->execute([$key, $kind, json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), now_ms(), now_ms() + $delay * 1000]);
         });
-        self::$queued = true;
+        self::$queued = $delay === 0 || self::$queued;
+    }
+
+    /** Is a waiting job due? Checked after each answer, so delayed jobs run on a later request. */
+    public static function due(PDO $pdo): bool
+    {
+        $st = $pdo->prepare("SELECT 1 FROM jobs WHERE status = 'waiting' AND run_after <= ? LIMIT 1");
+        $st->execute([now_ms()]);
+        return (bool) $st->fetchColumn();
     }
 
     /** True when this request queued a job (so the server runs the queue once it has answered). */
@@ -53,7 +61,9 @@ final class Jobs
         $ran = 0;
         while (microtime(true) < $until) {
             $job = Db::write($pdo, function (PDO $pdo): ?array {
-                $job = $pdo->query("SELECT * FROM jobs WHERE status = 'waiting' ORDER BY id LIMIT 1")->fetch();
+                $st = $pdo->prepare("SELECT * FROM jobs WHERE status = 'waiting' AND run_after <= ? ORDER BY id LIMIT 1");
+                $st->execute([now_ms()]);
+                $job = $st->fetch();
                 if (!$job) {
                     return null;
                 }

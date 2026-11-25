@@ -32,6 +32,9 @@ async function call(method, name, { query, body } = {}) {
 }
 
 export const api = {
+  /** Any endpoint, such as a plugin's: api.get('git.history', { page }) and api.post('git.restore', { ... }). */
+  get: (name, query) => call('GET', name, { query }),
+  post: (name, body = {}) => call('POST', name, { body }),
   ping: () => call('GET', 'ping'),
   login: (password) => call('POST', 'login', { body: { password } }),
   logout: () => call('POST', 'logout', { body: {} }),

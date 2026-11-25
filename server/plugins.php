@@ -38,6 +38,12 @@ final class PluginApi
         Jobs::$handlers[$kind] = $fn;
     }
 
+    /** An endpoint at /api/v1/<plugin>.<name>: ['GET' => fn(Request $r): array, 'POST' => ...]. */
+    public function endpoint(string $name, array $handlers): void
+    {
+        Plugins::$endpoints[$this->name . '.' . $name] = $handlers;
+    }
+
     /** Called after every change: fn(PDO $pdo, string $op, string $nodeId). */
     public function onChange(callable $fn): void
     {
@@ -48,6 +54,9 @@ final class PluginApi
 
 final class Plugins
 {
+    /** Endpoints plugins added, by "plugin.name": ['GET' => fn(Request $r), ...]. */
+    public static array $endpoints = [];
+
     /** @var array<string, string> name => failure message, for plugins whose server code failed to load */
     public static array $failed = [];
     private static bool $loaded = false;

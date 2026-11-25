@@ -10,6 +10,7 @@ Everything beyond notes, links, search, queries, files and export is a plugin, i
 
 | Plugin | Does |
 | --- | --- |
+| `git` | Version history: a minute after you stop typing (`git_delay`), the Markdown export is committed to a git repository (`git_dir`, default `history/` in the data folder). A History section under each page lists its versions; look at one and restore it. Needs the `git` program on the server. |
 | `tasks` | TODO/DOING/WAITING/DONE/CANCELLED with a checkbox, start, scheduled, deadline and done times, the `task:` query filter and an agenda on journal pages. Read `plugins/tasks/` as an example: it uses syntax, commands, a panel, an indexer and a filter. |
 
 ## A plugin is a folder
@@ -84,6 +85,7 @@ return function (PluginApi $notd): void {
 | Method | Does |
 | --- | --- |
 | `onChange(fn(PDO $pdo, string $op, string $nodeId))` | Runs inside the transaction of every change. |
+| `endpoint('name', ['GET' => fn(Request $r): array, 'POST' => ...])` | Adds an endpoint at `/api/v1/<plugin>.<name>`; the browser calls it with `notd.api.get('<plugin>.<name>', query)` or `notd.api.post(...)`. |
 | `indexer(fn(string $text): array)` | Reads fields out of a block's text: return `[[key, value], ...]`, indexed like `{key::value}`, so they can be queried. Rebuilt for every block by `php tools/reindex.php`. |
 | `filter(string $key, fn(string $operator, string $value): array)` | Adds a query filter such as `task:open`: return `[sql, params]`, a condition on the nodes table `n`. |
 
@@ -133,7 +135,7 @@ return ['on' => 'edited', 'match' => 'task:done',
         'do' => fn(array $node, Actions $notd) => $notd->run(['/home/me/bin/task-done', $node['text']])];
 ```
 
-A plugin handles its own kinds of job with `$notd->jobHandler('git.commit', fn(array $payload): string => ...)`; the returned string is logged.
+A job can wait for quiet: `Jobs::queue($pdo, 'git.commit', [], 'git.commit', 60)` runs only after 60 seconds without a newer job of that key, on whichever request comes then. A plugin handles its own kinds of job with `$notd->jobHandler('git.commit', fn(array $payload): string => ...)`; the returned string is logged.
 
 ## Safe mode
 

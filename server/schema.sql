@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   status   TEXT NOT NULL DEFAULT 'waiting',    -- waiting, running, done, failed
   attempts INTEGER NOT NULL DEFAULT 0,
   created  INTEGER NOT NULL,
+  run_after INTEGER NOT NULL DEFAULT 0,        -- not before this time (ms); a replaced job's wait starts again
   started  INTEGER,
   finished INTEGER,
   output   TEXT NOT NULL DEFAULT ''            -- the end of what it printed, or why it failed

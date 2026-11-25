@@ -162,9 +162,9 @@ final class Actions
         Jobs::run($this->pdo, $argv, $key, $timeout, $cwd);
     }
 
-    /** Queues a job for a plugin's handler, after the change is saved. */
-    public function queue(string $kind, array $payload = [], ?string $key = null): void
+    /** Queues a job for a plugin's handler, after the change is saved (and $delay seconds of quiet). */
+    public function queue(string $kind, array $payload = [], ?string $key = null, int $delay = 0): void
     {
-        Jobs::queue($this->pdo, $kind, $payload, $key);
+        Jobs::queue($this->pdo, $kind, $payload, $key, $delay);
     }
 }

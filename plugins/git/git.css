@@ -1,0 +1,20 @@
+.git-versions { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.git-versions button, .git-restore {
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  border-radius: var(--radius);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.git-versions button.active { background: var(--accent-soft); border-color: var(--accent); }
+.git-version pre {
+  max-height: 20rem;
+  overflow: auto;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-soft);
+  border-radius: var(--radius);
+  font: 0.85rem/1.5 var(--font-mono);
+  white-space: pre-wrap;
+}
+.git-error { color: var(--danger); }
