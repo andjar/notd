@@ -63,4 +63,8 @@ Under every page, **linked references** list the blocks on other pages that link
 - **The status line** at the bottom says whether your changes are saved.
 - The **☰** and **◧** buttons hide and show the sidebars. On a phone they open the sidebars as drawers; tap the page to close them.
 
+## Several devices
+
+Open notd on another computer or your phone and it shows the same notebook. Changes made on one device appear on the others within about ten seconds, and at once when you switch back to a tab. A block you are typing in is never overwritten: what you type wins until it is saved. A block you have open but have not changed takes the new text.
+
 notd follows your system's light or dark setting.

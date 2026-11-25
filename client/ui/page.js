@@ -24,12 +24,15 @@ addEventListener('online', () => outbox.retryNow());
 
 const live = new Set();
 
+/** The page screens on show (one page, or the days of the journal). */
+export function liveScreens() { return [...live]; }
+
 /** One page: its outline, editor and link suggestions. announce: tell the app which page is shown. */
 export class PageScreen {
   constructor(root, { announce = true } = {}) {
     this.root = root;
     this.announce = announce;
-    this.outline = new Outline({ outbox, onChange: (c) => this.view?.update(c) });
+    this.outline = new Outline({ outbox, onChange: (c) => { this.view?.update(c); this.editor?.external(c); } });
     this.view = null;
     this.page = null;
     this.title = null;
@@ -62,7 +65,23 @@ export class PageScreen {
     this.#draw(data);
   }
 
-  reload() { if (this.title) this.show(this.title); }
+  reload() { if (this.title) this.show(this.title, this.zoom); }
+
+  /** Changes from the feed: blocks of this page are merged; is this page itself renamed or deleted? */
+  fromFeed(changes) {
+    if (!this.page) return null;
+    let event = null;
+    for (const c of changes) {
+      if (c.id === this.page.id) {
+        if (!c.node) event = { deleted: true };
+        else if (c.node.title !== this.page.title) event = { renamed: c.node.title };
+        continue;
+      }
+      if (!c.node) this.outline.fromServer({ id: c.id }, true);
+      else if (c.node.kind === 'block' && (c.node.page === this.page.id || this.outline.model.has(c.id))) this.outline.fromServer(c.node);
+    }
+    return event;
+  }
 
   #draw({ page, blocks }) {
     this.page = page;
