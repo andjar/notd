@@ -196,3 +196,35 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .ref-block .bullet { height: var(--row); }
 .page-title h1[contenteditable] { outline: 2px solid var(--accent-soft); border-radius: 4px; }
 .page-title + .error { color: var(--danger); margin: 0.25rem 0 0; font-size: 0.9rem; }
+
+/* Phones and tablets. */
+.topbar { padding-top: max(0.25rem, env(safe-area-inset-top)); padding-left: max(0.5rem, env(safe-area-inset-left)); padding-right: max(0.5rem, env(safe-area-inset-right)); }
+.status { padding-bottom: max(0.125rem, env(safe-area-inset-bottom)); }
+.toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-around;
+  gap: 0.25rem;
+  padding: 0.25rem max(0.25rem, env(safe-area-inset-right)) max(0.25rem, env(safe-area-inset-bottom)) max(0.25rem, env(safe-area-inset-left));
+  background: var(--bg-soft);
+  border-top: 1px solid var(--border);
+}
+.toolbar button {
+  flex: 1;
+  max-width: 3.5rem;
+  min-height: 2.75rem;            /* a finger's width */
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  font-size: 1.1rem;
+  color: var(--fg);
+}
+.toolbar button:active { background: var(--bg-hover); }
+body.has-toolbar .main { padding-bottom: 50vh; }
+@media (pointer: coarse) {
+  .icon { width: 2.75rem; height: 2.75rem; }
+  .links a, .calendar a { padding-block: 0.4rem; }
+}

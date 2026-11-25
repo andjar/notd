@@ -63,6 +63,10 @@ Under every page, **linked references** list the blocks on other pages that link
 - **The status line** at the bottom says whether your changes are saved.
 - The **☰** and **◧** buttons hide and show the sidebars. On a phone they open the sidebars as drawers; tap the page to close them.
 
+## On a phone
+
+notd works in the phone's browser. While you edit a block, a toolbar sits just above the keyboard: ⇤ outdent, ⇥ indent, ↑ and ↓ move the block, `[[` starts a link, ↶ and ↷ undo and redo, ✓ stops editing. Drag a bullet with your finger to move a block. The sidebars open as drawers from the ☰ and ◧ buttons. Long words, code and tables never make the page wider than the screen; code and tables scroll inside their own box.
+
 ## Several devices
 
 Open notd on another computer or your phone and it shows the same notebook. Changes made on one device appear on the others within about ten seconds, and at once when you switch back to a tab. A block you are typing in is never overwritten: what you type wins until it is saved. A block you have open but have not changed takes the new text.

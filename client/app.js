@@ -8,6 +8,7 @@ import { route, pageLink } from './lib/route.js';
 import { searchPanel } from './panels/search.js';
 import { PageScreen, liveScreens } from './ui/page.js';
 import { Feed } from './lib/feed.js';
+import { Toolbar } from './ui/toolbar.js';
 import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
@@ -77,6 +78,7 @@ async function start() {
     panels.refresh(panels.context, 'app.left');
   } });
   notd.feed.start();
+  notd.toolbar = new Toolbar();
   addEventListener('hashchange', show);
   document.addEventListener('notd:favourites', () => panels.refresh(panels.context, 'app.left'));
   await show();
