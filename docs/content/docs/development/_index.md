@@ -160,6 +160,9 @@ client/
   lib/panels.js   the panel registry: panels.register({ id, slot, order, render(el, ctx), when(ctx) })
   lib/keys.js     sort keys and ids
   lib/route.js    addresses: #/page/<title>[/<block id>], today's journal when empty
+  lib/model.js    the blocks of the page on screen, in memory (no DOM)
+  lib/outbox.js   operations waiting for the server: in order, kept in localStorage, retried
+  lib/outline.js  the one place blocks change: model + undo/redo + outbox, and change events for the view
   panels/         the core panels: search (top bar), page title with the favourite star,
                   favourites, recent pages and calendar (left), save status (status line)
   ui/gate.js      the login screen
@@ -169,6 +172,12 @@ client/
 ```
 
 The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after` and `app.status`. The sidebars are grid columns, so they can never cover the page; under 900 px wide they become drawers. The page is sent with a strict Content-Security-Policy: scripts only from notd itself (the inline import map is allowed by its hash), no plugins, no framing.
+
+### How an edit travels
+
+A key press calls the outline controller (`client/lib/outline.js`): for example `split(id, caret)`. The controller works out how to undo the action, applies it to the model, queues the operation in the outbox, and tells the view what changed, which redraws only that. The outbox sends operations in order, in batches, with an `opId` each; edits to one block that are still waiting are folded into one. If the server cannot be reached, the queue is kept in `localStorage` and retried with a growing pause, and nothing on screen is rolled back; after a reload the waiting operations are applied again on top of what the server sends. Changes from other devices arrive through the change feed and are merged into the model, except for parts of a block that still have unsent changes here.
+
+Undo works on actions, not keystrokes: everything one key press does (a split, an indent, a merge with its moved children) is one step, and redo replays it with the same ids. Typing inside a block is left to the browser's own undo while the block is being edited. This code is ported from notd 3, where it had proved itself, and is tested in Node by `tests/js/outline.test.mjs`.
 
 ## Browser tests
 
