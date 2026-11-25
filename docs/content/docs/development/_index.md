@@ -52,3 +52,30 @@ All work happens on the `next` branch through pull requests, one step of the pla
 | browser | End-to-end tests in Chromium with Playwright. |
 | docs | This site builds with Hugo, and every internal link points at a page or file that exists (`tools/check_links.mjs`). |
 | budget | The core stays within its line budget. |
+
+## Unit tests
+
+Server unit tests are PHP files named `*_test.php` under `tests/php/` (and, for a plugin, under `plugins/<name>/tests/`). They need nothing but PHP:
+
+```sh
+php tests/php/run.php              # everything
+php tests/php/run.php ordering     # files or tests whose name contains "ordering"
+```
+
+A test file registers tests with `test()` and table-driven tests with `cases()`, and checks with `eq()` (strict `===`), `ok()` and `throws()`:
+
+```php
+<?php
+test('titles ignore case', function () {
+    eq(title_key('Østfold'), title_key('østfold'));
+});
+
+cases('sort keys', [
+    'between two keys' => ['a0', 'a2', 'a1'],
+    'at the start'     => [null, 'a0', 'Zz'],
+], function (?string $before, ?string $after, string $expected) {
+    eq($expected, key_between($before, $after));
+});
+```
+
+A failure prints the test, the message and the line in the test file; the runner exits with 1 if anything failed.
