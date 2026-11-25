@@ -49,3 +49,8 @@ CREATE TABLE IF NOT EXISTS changes (
   clock   TEXT NOT NULL,
   at      INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS applied_ops (
+  op_id TEXT PRIMARY KEY,                      -- a client's operation id, so a retried batch is not applied twice
+  at    INTEGER NOT NULL
+);
