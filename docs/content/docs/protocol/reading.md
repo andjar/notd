@@ -13,6 +13,7 @@ All reads are `GET`. Lists of blocks are flat and in **outline order**: depth fi
 | `backlinks?id=...` | For a page: blocks on other pages that link to it, tag it or embed it, also through its aliases. For a block: blocks that reference or embed it. Grouped by page: `[{"page": {"id", "title"}, "blocks": [...]}]`. |
 | `pages` | Every page and document: `id`, `kind`, `title`, `updated`, `aliases`, ordered by title. |
 | `journal-days?month=YYYY-MM` | The dates in that month whose journal page has some text. |
+| `journal-days?before=YYYY-MM-DD&limit=10` | The latest dates before that day whose journal page has some text, newest first (at most 100). |
 
 ## Examples
 
@@ -87,6 +88,15 @@ GET /api/v1/pages
 
 ```request
 GET /api/v1/journal-days?month=2026-11
+```
+
+```response
+200
+["2026-11-20"]
+```
+
+```request
+GET /api/v1/journal-days?before=2026-11-25&limit=5
 ```
 
 ```response

@@ -118,9 +118,24 @@ final class Read
         if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month)) {
             throw new HttpError(400, 'bad_request', '"month" must look like 2026-11.');
         }
-        $st = $pdo->prepare("SELECT p.title FROM nodes p WHERE p.kind = 'page' AND p.title_key LIKE ?
-            AND EXISTS (SELECT 1 FROM nodes b WHERE b.page_id = p.id AND b.kind = 'block' AND trim(b.text) <> '') ORDER BY p.title_key");
-        $st->execute([$month . '-__']);
+        return self::days($pdo, 'p.title_key LIKE ?', [$month . '-__'], 'ASC', 31);
+    }
+
+    /** The latest days before a date ('YYYY-MM-DD') whose journal page has some text, newest first. */
+    public static function journalDaysBefore(PDO $pdo, string $before, int $limit): array
+    {
+        if (!self::isJournalTitle($before)) {
+            throw new HttpError(400, 'bad_request', '"before" must be a date like 2026-11-25.');
+        }
+        return self::days($pdo, "p.title_key < ? AND p.title_key GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'", [$before], 'DESC', max(1, min($limit, 100)));
+    }
+
+    private static function days(PDO $pdo, string $where, array $params, string $dir, int $limit): array
+    {
+        $st = $pdo->prepare("SELECT p.title FROM nodes p WHERE p.kind = 'page' AND $where
+            AND EXISTS (SELECT 1 FROM nodes b WHERE b.page_id = p.id AND b.kind = 'block' AND trim(b.text) <> '')
+            ORDER BY p.title_key $dir LIMIT $limit");
+        $st->execute($params);
         return array_values(array_filter($st->fetchAll(PDO::FETCH_COLUMN), [self::class, 'isJournalTitle']));
     }
 

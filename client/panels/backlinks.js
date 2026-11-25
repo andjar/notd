@@ -9,7 +9,7 @@ export function backlinksPanel() {
   let asked = null;
   return {
     id: 'backlinks', slot: 'page.after', order: 10,
-    when: (ctx) => !!ctx.page,
+    when: (ctx) => !!ctx.page && !ctx.route?.journal,
     async render(el, ctx) {
       const page = ctx.page;
       asked = page.id;

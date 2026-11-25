@@ -150,7 +150,7 @@ The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) 
 
 ## The browser app
 
-`client/index.html` is the whole page: the frame, an import map, the styles and `client/app.js`. The server sends it for `/`; everything under `client/` is served as written. Pages are addressed in the fragment (`#/page/Østfold`; empty means today's journal), so notd works from any folder of a web server without rewrite rules.
+`client/index.html` is the whole page: the frame, an import map, the styles and `client/app.js`. The server sends it for `/`; everything under `client/` is served as written. Pages are addressed in the fragment (`#/page/Østfold`; empty means the journal), so notd works from any folder of a web server without rewrite rules.
 
 ```text
 client/
@@ -168,7 +168,8 @@ client/
   panels/         the core panels: search (top bar), page title with the favourite star,
                   favourites, recent pages and calendar (left), save status (status line)
   ui/gate.js      the login screen
-  ui/page.js      the page on screen: loads it, draws its outline, one outbox for the app
+  ui/page.js      one page on screen: loads it, draws its outline, one outbox for the app
+  ui/journal.js   the journal: today's page, then earlier days with notes, loaded as you scroll
   ui/outline-view.js  draws the outline from the model and redraws only what a change touched
   ui/text.js      draws a block's text: Markdown through DOMPurify, then references and embeds filled in
   ui/autocomplete.js  link suggestions at the caret

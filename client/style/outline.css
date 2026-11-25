@@ -141,3 +141,11 @@
 .embed { display: block; margin: 0.25em 0; padding: 0.25em 0.75em; border-left: 3px solid var(--accent-soft); background: var(--bg-soft); border-radius: 0 var(--radius) var(--radius) 0; }
 .embed ul { margin: 0; padding-left: 1.25em; }
 .embed-title { font-weight: 600; color: var(--fg); }
+
+/* The journal. */
+.journal-day + .journal-day { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.journal-day h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.journal-day h2 a { color: var(--fg); text-decoration: none; }
+.journal-day h2 a:hover { color: var(--accent); }
+.journal-more { min-height: 2rem; color: var(--fg-faint); font-size: 0.9rem; padding: 1rem 0; }
+.journal-day:not(.today) .add-block { min-height: 1.5rem; }
