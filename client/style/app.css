@@ -228,3 +228,12 @@ body.has-toolbar .main { padding-bottom: 50vh; }
   .icon { width: 2.75rem; height: 2.75rem; }
   .links a, .calendar a { padding-block: 0.4rem; }
 }
+
+/* Plugins. */
+.panel details > summary { list-style: none; cursor: pointer; }
+.panel details > summary::-webkit-details-marker { display: none; }
+.panel details > summary h2 { display: inline; }
+.plugins { list-style: none; margin: 0; padding: 0; font-size: 0.9rem; }
+.plugins li { display: grid; padding: 0.1rem 0; }
+.plugin-problem { color: var(--danger); font-size: 0.8rem; }
+.status .warn, .status a.warn { color: var(--danger); text-decoration: none; }
