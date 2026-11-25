@@ -111,7 +111,7 @@ It reads `logseq/config.edn` for the journal and file name formats and converts 
 | `key:: value` (page or block) | `{key::value}` |
 | `id::` on a block, `((id))`, `{{embed ((id))}}` | the note keeps the id; `((id))` stays an [inline reference]({{< relref "../frontend-guide/core-features.md#block-references" >}}), the embed becomes `!{{id}}` |
 | `LATER` `NOW` `WAIT` `CANCELED`, `[#A]` | `TODO` `DOING` `WAITING` `CANCELLED`, `{priority::A}` |
-| `SCHEDULED:` / `DEADLINE: <2023-11-14 Tue>` | `{scheduled::2023-11-14}` / `{deadline::...}` |
+| `SCHEDULED:` / `DEADLINE: <2023-11-14 Tue>` | `{scheduled::2023-11-14}` / `{deadline::...}`, listed under [Scheduled and due]({{< relref "../frontend-guide/journal-tasks.md#scheduled-and-due" >}}) |
 | `#tag`, `#[[a tag]]` | `{tag::tag}`, `{tag::a tag}`: a [tag]({{< relref "../frontend-guide/core-features.md#tags" >}}), which links to its page (`--tags-as-links` makes `[[tag]]` instead) |
 | `alias:: A, B` | `{alias::A, B}`: `[[A]]` opens the page |
 | `collapsed:: true`, `heading:: 2`, `#+BEGIN_QUOTE` | collapsed note, `## `, a Markdown quote |

@@ -15,6 +15,9 @@ Writing
 - `[[` page suggestions and `/` templates share one popup with keyboard navigation; typing a closing bracket steps over the automatic one.
 - Rendered notes support `!{{id}}` transclusion and `SQL{...}` queries as read-only embedded outlines.
 
+Tasks
+- **Scheduled and due.** `{scheduled::2026-11-16}` and `{deadline::2026-11-20}` (`:s` and `:u` type them) put a note on that day's journal page, below the outline. Today's page also lists overdue open tasks; tick one to mark it done. A date in a property links to its journal page. API: `search.php?agenda=`.
+
 Links
 - **Tags link to their page.** `{tag::bug}` and `{tags::a, b}` make the note a backlink of the page "bug" (or "a" and "b"), like `[[bug]]`; renaming the page rewrites the tags. Each tag is indexed on its own.
 - **Aliases.** `{alias::JS, ECMAScript}` in a page's properties makes `[[JS]]` open the page, and links to an alias are backlinks of the page.

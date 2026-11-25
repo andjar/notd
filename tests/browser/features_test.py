@@ -268,6 +268,31 @@ def test_excalidraw_works_offline(ctx):
     context.close()
 
 
+def test_agenda_on_journal_page(ctx):
+    import datetime
+    today = datetime.date.today()
+    yesterday = today - datetime.timedelta(days=1)
+    seed(f'F-agenda-{RUN}', [f'TODO pay {RUN} {{deadline::{yesterday}}}', f'TODO call {RUN} {{scheduled::{today}}}',
+                             f'DONE paid {RUN} {{scheduled::{today}}}'])
+    page = ctx.open(today.isoformat())
+    page.wait_for_selector('#agenda:not([hidden]) .agenda-item', timeout=8000)
+    items = page.locator('#agenda .agenda-item', has_text=RUN)
+    texts = items.all_inner_texts()
+    check('agenda lists the open tasks of today and the overdue one', len(texts) == 2 and 'pay' in texts[0] and 'call' in texts[1], str(texts))
+    check('the overdue task is marked', 'overdue' in (items.first.get_attribute('class') or '') and '1 day overdue' in texts[0], texts[0] if texts else '')
+    check('the date pills are not repeated in the item', 'deadline::' not in ''.join(texts), ''.join(texts)[:200])
+    call = page.locator('#agenda .agenda-item', has_text=f'call {RUN}')
+    note_id = call.get_attribute('data-note-id')
+    call.locator('.task-checkbox').click()
+    page.wait_for_timeout(1500)
+    content = api(f'notes.php?id={note_id}')['content']
+    check('ticking the checkbox marks the task done where it lives', content.startswith('DONE call'), content)
+    check('the done task leaves the agenda', page.locator('#agenda .agenda-item', has_text=f'call {RUN}').count() == 0)
+    other = ctx.open((today - datetime.timedelta(days=3)).isoformat())
+    other.wait_for_timeout(1500)
+    check('an earlier journal page has no overdue items', other.locator('#agenda .agenda-item', has_text=RUN).count() == 0)
+
+
 def main():
     only = sys.argv[1] if len(sys.argv) > 1 else ''
     tests = [(n, f) for n, f in globals().items() if n.startswith('test_') and only in n]

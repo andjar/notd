@@ -80,7 +80,11 @@ function syntaxHtml(m) {
         // Each tag links to the page of that name, which lists the note under its backlinks.
         return splitList(value).map((tag) => `<span class="${cls} property-tag"><a href="${escapeHtml(pageUrl(tag))}" class="property-tag-link"><span class="property-key">#</span><span class="property-value">${escapeHtml(tag)}</span></a></span>`).join(' ');
     }
-    return `<span class="${cls}"><span class="property-key">${escapeHtml(k)}</span><span class="property-separator">${colons}</span><span class="property-value">${escapeHtml(value.trim())}</span></span>`;
+    // A date (as in {scheduled::2026-11-16} or {date::...}) links to that day's journal page.
+    const v = value.trim();
+    const day = /^(\d{4}-\d{2}-\d{2})(?: \d{1,2}:\d{2})?$/.exec(v);
+    const shown = day ? `<a href="${escapeHtml(pageUrl(day[1]))}" class="page-link property-date">${escapeHtml(v)}</a>` : escapeHtml(v);
+    return `<span class="${cls}"><span class="property-key">${escapeHtml(k)}</span><span class="property-separator">${colons}</span><span class="property-value">${shown}</span></span>`;
 }
 
 /** Replaces notd syntax outside code with markers; returns the text and the HTML each marker stands for. */
