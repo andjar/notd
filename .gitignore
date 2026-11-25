@@ -34,3 +34,4 @@ node_modules/
 config.local.php
 *.v[0-9]*-backup
 *.sqlite.v*-backup*
+staging-data/
