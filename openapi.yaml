@@ -497,7 +497,7 @@ paths:
   /search.php:
     get:
       summary: Search notes and pages
-      description: 'Perform various types of searches including full-text search, backlinks, tasks, and favorites.
+      description: 'Perform various types of searches including full-text search, backlinks, tasks, the agenda of a day, and favorites.
 
         '
       parameters:
@@ -527,6 +527,19 @@ paths:
           - WAITING
           - CANCELLED
           - ALL
+      - name: agenda
+        in: query
+        description: Notes with {scheduled::...} or {deadline::...} on this day; DONE and CANCELLED tasks are left out
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: overdue
+        in: query
+        description: With agenda, also open tasks dated before that day
+        required: false
+        schema:
+          type: boolean
       - name: favorites
         in: query
         description: Find pages marked as favorites
