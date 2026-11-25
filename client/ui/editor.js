@@ -45,6 +45,22 @@ export class Editor {
     content.scrollIntoView({ block: 'nearest' });
   }
 
+  /**
+   * A change from elsewhere: if it is to the block being edited and nothing has been
+   * typed in it here, show the new text and keep the caret where it was.
+   */
+  external(change) {
+    const id = this.editing;
+    if (!id || change.id !== id || (change.kind !== 'merge' && change.kind !== 'edit')) return;
+    const content = this.view.contentOf(id);
+    const n = this.model.get(id);
+    if (!content || !n || readText(content) !== this.startText || n.text === this.startText) return;
+    const caret = getCaret(content);
+    content.textContent = n.text;
+    this.startText = n.text;
+    setCaret(content, Math.min(caret, n.text.length));
+  }
+
   /** Stops editing and draws the block's text again. */
   finish() {
     const id = this.editing;

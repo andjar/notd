@@ -6,7 +6,8 @@ import { panels } from './lib/panels.js';
 import { gate } from './ui/gate.js';
 import { route, pageLink } from './lib/route.js';
 import { searchPanel } from './panels/search.js';
-import { PageScreen } from './ui/page.js';
+import { PageScreen, liveScreens } from './ui/page.js';
+import { Feed } from './lib/feed.js';
 import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
@@ -66,6 +67,16 @@ async function start() {
   });
   document.addEventListener('notd:page', (e) => panels.refresh({ ...panels.context, page: e.detail.page }));
   document.addEventListener('notd:renamed', (e) => { forgetPages(); go(e.detail.to); });
+  notd.feed = new Feed({ onChanges: (changes) => {
+    for (const screen of liveScreens()) {
+      const event = screen.fromFeed(changes);
+      if (event?.renamed && screen.announce) go(event.renamed);
+      if (event?.deleted && screen.announce) screen.reload();
+    }
+    panels.refresh(panels.context, 'page.after');
+    panels.refresh(panels.context, 'app.left');
+  } });
+  notd.feed.start();
   addEventListener('hashchange', show);
   document.addEventListener('notd:favourites', () => panels.refresh(panels.context, 'app.left'));
   await show();

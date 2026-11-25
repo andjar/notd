@@ -161,6 +161,7 @@ client/
   lib/keys.js     sort keys and ids
   lib/markdown.js note text to HTML: marked plus notd's syntax as marked extensions (no DOM)
   lib/links.js    what is being typed after [[ or #, suggestions, rewriting links on rename (no DOM)
+  lib/feed.js     live updates: polls the change feed every 10 s and when the tab is shown again
   lib/route.js    addresses: #/page/<title>[/<block id>], today's journal when empty
   lib/model.js    the blocks of the page on screen, in memory (no DOM)
   lib/outbox.js   operations waiting for the server: in order, kept in localStorage, retried
