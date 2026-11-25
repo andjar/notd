@@ -24,7 +24,8 @@ final class Request
 {
     private ?array $body = null;
 
-    public function __construct(public readonly string $method, public readonly array $query, private readonly string $raw)
+    public function __construct(public readonly string $method, public readonly array $query, private readonly string $raw,
+        public readonly array $files = [], public readonly array $form = [])
     {
     }
 
@@ -55,14 +56,39 @@ final class Request
     }
 }
 
+/** A file to stream instead of JSON. */
+final class FileResponse
+{
+    public function __construct(public readonly string $path, public readonly string $mime, public readonly string $name, public readonly string $etag)
+    {
+    }
+
+    public function send(): void
+    {
+        $inline = preg_match('#^(image/(png|jpeg|gif|webp|avif)|application/pdf|text/plain|audio/|video/)#', $this->mime) === 1;
+        if (trim($_SERVER['HTTP_IF_NONE_MATCH'] ?? '', '"') === $this->etag) {
+            http_response_code(304);
+            return;
+        }
+        header('Content-Type: ' . $this->mime);
+        header('Content-Length: ' . filesize($this->path));
+        header('ETag: "' . $this->etag . '"');
+        header('Cache-Control: private, max-age=31536000, immutable');
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox");
+        header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . "; filename*=UTF-8''" . rawurlencode($this->name));
+        readfile($this->path);
+    }
+}
+
 final class Http
 {
     public static function handle(string $method, string $uri): void
     {
         $path = (string) parse_url($uri, PHP_URL_PATH);
         try {
-            $data = self::dispatch($method, $path, new Request($method, $_GET, (string) file_get_contents('php://input')));
-            self::send(200, $data);
+            $data = self::dispatch($method, $path, new Request($method, $_GET, (string) file_get_contents('php://input'), $_FILES, $_POST));
+            $data instanceof FileResponse ? $data->send() : self::send(200, $data);
         } catch (HttpError $e) {
             self::send($e->status, ['error' => ['code' => $e->codeName, 'message' => $e->getMessage()]]);
         } catch (Throwable $e) {

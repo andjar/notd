@@ -198,7 +198,7 @@ final class Ops
     }
 
     /** Stamps the node with the next clock and appends to the change feed. */
-    private static function changed(PDO $pdo, string $op, string $id, bool $stamp = true): void
+    public static function changed(PDO $pdo, string $op, string $id, bool $stamp = true): void
     {
         $clock = Clock::next($pdo);
         $now = now_ms();

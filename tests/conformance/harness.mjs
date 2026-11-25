@@ -42,12 +42,16 @@ export async function startServer({ env = {} } = {}) {
 
   async function request(method, path, body, headers = {}) {
     const init = { method, headers: { ...headers } };
-    if (body !== undefined) {
+    if (body instanceof FormData) {
+      init.body = body; // fetch sets the multipart content type
+    } else if (body !== undefined) {
       init.body = typeof body === 'string' ? body : JSON.stringify(body);
       init.headers['Content-Type'] ??= 'application/json';
     }
     const res = await fetch(base + path, init);
-    const text = await res.text();
+    const isJson = (res.headers.get('content-type') || '').includes('application/json');
+    const text = isJson || res.status >= 300 ? await res.text() : null;
+    if (text === null) return { status: res.status, headers: res.headers, body: Buffer.from(await res.arrayBuffer()) };
     let parsed = text;
     try { parsed = text === '' ? null : JSON.parse(text); } catch { /* not JSON: keep the text */ }
     return { status: res.status, headers: res.headers, body: parsed };
