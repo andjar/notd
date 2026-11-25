@@ -86,7 +86,7 @@ final class Read
         $k = implode(',', array_fill(0, count($kinds), '?'));
         $st = $pdo->prepare("SELECT DISTINCT n.*, p.title AS page_title FROM links l JOIN nodes n ON n.id = l.from_id
             JOIN nodes p ON p.id = n.page_id WHERE l.target IN ($t) AND l.kind IN ($k) AND n.page_id <> ?
-            ORDER BY p.title_key, n.page_id, n.created");
+            ORDER BY p.title_key, n.page_id, n.created, n.id");
         $st->execute([...$targets, ...$kinds, $node['page']]);
         $groups = [];
         foreach ($st->fetchAll() as $row) {
