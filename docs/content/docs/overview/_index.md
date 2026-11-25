@@ -8,7 +8,7 @@ notd is a personal outliner and journal for one person, used for decades. It ope
 
 ## Status
 
-notd 4 is a clean rewrite on the [`next`](https://github.com/andjar/notd/tree/next) branch. The working version, notd 3, stays on `main` until notd 4 reaches its first milestone: **daily use**. The work is split into about 40 small pull requests in four phases:
+notd 4 is a clean rewrite on the [`next`](https://github.com/andjar/notd/tree/next) branch. All four phases below are built: notd 4 has reached its first milestone, **daily use**, and is ready to replace notd 3, which stays on `main` until the switch ([Switching from notd 3](../guide/switching/)). The work was done in about 40 small pull requests:
 
 | Phase | What it gives |
 | --- | --- |

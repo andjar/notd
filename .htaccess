@@ -1,0 +1,20 @@
+# notd on Apache: everything goes through index.php except the app's own files
+# under client/. Nothing else in this folder (the data, server code, tools,
+# tests, config.local.php) is ever served as a file.
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^client/ - [L]
+  RewriteRule ^index\.php$ - [L]
+  RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+  # Without mod_rewrite, at least refuse what must never be served.
+  <FilesMatch "^(config\.local\.php|.*\.sqlite.*|secret)$">
+    Require all denied
+  </FilesMatch>
+  RedirectMatch 404 ^/(data|server|tools|tests|plugins/.+\.php|actions|staging-data)(/|$)
+</IfModule>
