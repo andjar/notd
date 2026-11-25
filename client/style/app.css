@@ -1,0 +1,111 @@
+/* The frame: a top bar, two sidebars around the page, and a status line.
+   The sidebars are grid columns, never overlays, so they cannot cover the page;
+   on narrow screens they become drawers. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font: var(--text-size)/var(--line) var(--font);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+button { font: inherit; color: inherit; }
+a { color: var(--accent); }
+[hidden] { display: none !important; }
+
+.app {
+  display: grid;
+  height: 100dvh;
+  grid-template-columns: var(--left-w) minmax(0, 1fr) var(--right-w);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "top top top" "left main right" "status status status";
+}
+.app.no-left { grid-template-columns: 0 minmax(0, 1fr) var(--right-w); }
+.app:has(> .right:empty), .app.no-right { grid-template-columns: var(--left-w) minmax(0, 1fr) 0; }
+.app.no-left:has(> .right:empty), .app.no-left.no-right { grid-template-columns: 0 minmax(0, 1fr) 0; }
+.app.no-left > .left, .app.no-right > .right, .app > .right:empty { visibility: hidden; }
+
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  min-height: 2.75rem;
+}
+.topbar-slot { flex: 1; display: flex; align-items: center; gap: var(--gap); min-width: 0; }
+.left, .right { overflow: auto; background: var(--bg-soft); min-width: 0; }
+.left { grid-area: left; border-right: 1px solid var(--border); }
+.right { grid-area: right; border-left: 1px solid var(--border); }
+.main { grid-area: main; overflow: auto; padding: 1.5rem 1.5rem 30vh; min-width: 0; }
+.main > * { max-width: var(--page-w); margin-inline: auto; }
+.status {
+  grid-area: status;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 0.125rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--fg-soft);
+  border-top: 1px solid var(--border);
+}
+
+.icon {
+  border: 0;
+  background: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--fg-soft);
+}
+.icon:hover { background: var(--bg-hover); color: var(--fg); }
+
+.panel { padding: 0.75rem; }
+.panel + .panel { border-top: 1px solid var(--border); }
+.panel h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-soft); margin: 0 0 0.5rem; }
+.panel-error { color: var(--danger); font-size: 0.85rem; }
+
+/* Narrow screens: the sidebars slide in over the page and close again. */
+@media (max-width: 899px) {
+  .app { grid-template-columns: 0 minmax(0, 1fr) 0 !important; }  /* over the :has() rules above */
+  .app > .left, .app > .right {
+    position: fixed;
+    top: 2.75rem;
+    bottom: 0;
+    width: min(85vw, 20rem);
+    z-index: 10;
+    visibility: hidden;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease, visibility 0.2s;
+  }
+  .app > .left { left: 0; transform: translateX(-100%); }
+  .app > .right { right: 0; transform: translateX(100%); }
+  .app.show-left > .left, .app.show-right > .right:not(:empty) { visibility: visible; transform: none; }
+  .main { padding: 1rem 1rem 40vh; }
+}
+
+/* The login screen. */
+.gate { display: grid; place-items: center; min-height: 100dvh; padding: 1rem; }
+.gate form { display: grid; gap: 0.75rem; width: min(100%, 20rem); }
+.gate h1 { margin: 0; font-size: 1.5rem; }
+.gate input {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+}
+.gate button {
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+.gate .error { color: var(--danger); margin: 0; }
+.gate code { font-family: var(--font-mono); background: var(--bg-soft); padding: 0 0.25em; border-radius: 3px; }

@@ -86,6 +86,24 @@ final class Http
     public static function handle(string $method, string $uri): void
     {
         $path = (string) parse_url($uri, PHP_URL_PATH);
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+        if ($base !== '' && str_starts_with($path, $base . '/')) {
+            $path = substr($path, strlen($base));       // notd installed in a sub-folder
+        }
+        if ($method === 'GET' && ($path === '/' || $path === '')) {
+            header('Content-Type: text/html; charset=utf-8');
+            header('Cache-Control: no-cache');
+            $html = (string) file_get_contents(dirname(__DIR__) . '/client/index.html');
+            $hashes = '';                                   // the inline import map is allowed by its hash
+            preg_match_all('#<script type="importmap">(.*?)</script>#s', $html, $m);
+            foreach ($m[1] as $js) {
+                $hashes .= " 'sha256-" . base64_encode(hash('sha256', $js, true)) . "'";
+            }
+            header("Content-Security-Policy: default-src 'self'; script-src 'self'$hashes; img-src 'self' data: blob:; "
+                . "style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+            echo $html;
+            return;
+        }
         try {
             $data = self::dispatch($method, $path, new Request($method, $_GET, (string) file_get_contents('php://input'), $_FILES, $_POST));
             $data instanceof FileResponse ? $data->send() : self::send(200, $data);

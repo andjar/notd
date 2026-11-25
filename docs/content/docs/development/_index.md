@@ -147,3 +147,33 @@ The database runs in WAL mode, so reading never waits for writing. All writes go
 All changes to notes go through `Ops::apply()` (`server/ops.php`), the code behind [`POST /api/v1/ops`](../protocol/operations/). It stamps each changed node with the next hybrid logical clock and appends to the change feed; other parts (the indexer, later plugins' actions) hook in through `Ops::$listeners`, wired in `server/core.php`.
 
 The indexer (`server/indexer.php`) reads the [text syntax](../protocol/syntax/) into the `fields` and `links` tables after every create and edit. `php tools/reindex.php` rebuilds both tables, and the search index, from the text of every node. `php tools/export.php` and `php tools/import.php <folder>` write and read [Markdown](../protocol/export/); the import is tested against a sample Logseq graph in `tests/fixtures/logseq-graph/`.
+
+## The browser app
+
+`client/index.html` is the whole page: the frame, an import map, the styles and `client/app.js`. The server sends it for `/`; everything under `client/` is served as written. Pages are addressed in the fragment (`#/page/Østfold`; empty means today's journal), so notd works from any folder of a web server without rewrite rules.
+
+```text
+client/
+  index.html      the frame and the import map ("lit-html", "notd/")
+  app.js          start-up: ping, the login gate, the frame, the route
+  lib/api.js      one function per endpoint; errors as ApiError(status, code, message)
+  lib/panels.js   the panel registry: panels.register({ id, slot, order, render(el, ctx), when(ctx) })
+  lib/keys.js     sort keys and ids
+  ui/gate.js      the login screen
+  style/tokens.css  colours, sizes and fonts, light and dark
+  style/app.css     the frame
+  vendor/         prebuilt libraries, rebuilt by tools/vendor.sh
+```
+
+The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after` and `app.status`. The sidebars are grid columns, so they can never cover the page; under 900 px wide they become drawers. The page is sent with a strict Content-Security-Policy: scripts only from notd itself (the inline import map is allowed by its hash), no plugins, no framing.
+
+## Browser tests
+
+`tests/browser/*_test.py` drive Chromium with Playwright against a server on a throw-away data folder. Each file runs on its own:
+
+```sh
+pip install playwright && python3 -m playwright install chromium
+python3 tests/browser/frame_test.py
+```
+
+`support.py` provides `Server` (with `ops()` to set up notes through the API), `browser()`, `open_page()` (which collects console errors so a test can require none) and the `@test` runner.
