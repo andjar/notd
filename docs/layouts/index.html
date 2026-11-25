@@ -9,45 +9,21 @@
     <p>{{.Description}}</p>
   </div>
   <div id="action-buttons">
-    <a class="button primary big" href="{{ "/docs/overview/quick-start/" | relURL }}">Get started</a> <a class="button outline big" href="https://github.com/andjar/notd">View on GitHub</a>
-    <p><a href="https://github.com/andjar/notd/archive/refs/heads/main.zip">Download as zip</a></p>
+    <a class="button primary big" href="{{ "/docs/overview/" | relURL }}">Read the overview</a> <a class="button outline big" href="https://github.com/andjar/notd">View on GitHub</a>
   </div>
   <div id="kube-features">
     <div class="row gutters">
       <div class="col col-4 item">
-        <figure>
-          <img alt="The notd outline with a journal page" src="{{ "/images/frontpage.png" | relURL }}">
-        </figure>
-        <h3>Minimal</h3>
-        <p>An outline, a journal page for every day, and Markdown. Enter, Tab, Backspace and Ctrl+Z work the way an outliner should, and a page of thousands of notes opens in under a second.</p>
+        <h4>Outliner first</h4>
+        <p>A journal page for every day, notes nested as deep as you like, links and backlinks. Enter, Tab and Backspace work the way an outliner should.</p>
       </div>
       <div class="col col-4 item">
-        <figure>
-          <img alt="Markdown, properties and tasks in notes" src="{{ "/images/markdown.png" | relURL }}">
-        </figure>
-        <h3>Organised</h3>
-        <p>Links and backlinks, tasks, properties, embedded notes, live queries over your notes, namespaces, attachments, favourites and password-locked pages.</p>
+        <h4>Small core, plugins for the rest</h4>
+        <p>The core does notes, links, search, queries, files and export. Tasks, git history and everything else are plugins written against the same public API.</p>
       </div>
-      <div class="col col-4 item">
-        <figure>
-          <img alt="The kanban board extension" src="{{ "/images/kanban.png" | relURL }}">
-        </figure>
-        <h3>Extendable</h3>
-        <p>Everything the interface does is available over an HTTP API. Included extensions: kanban board, pomodoro timer, attachment dashboard, zen editor and more.</p>
-      </div>
-    </div>
-    <div class="row gutters">
       <div class="col col-4 item">
         <h4>Built to last</h4>
-        <p>PHP, SQLite and plain JavaScript. No build step, no package manager, no framework to keep up with. If PHP runs, notd runs.</p>
-      </div>
-      <div class="col col-4 item">
-        <h4>Yours, offline</h4>
-        <p>Notes are plain text in one SQLite file on your machine, and export to Markdown files in Logseq's layout at any time. Nothing is loaded from the internet; edits made offline are sent when the server is back.</p>
-      </div>
-      <div class="col col-4 item">
-        <h4>Free</h4>
-        <p>notd is open source under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL&nbsp;3</a>, free for personal and commercial use.</p>
+        <p>PHP, SQLite and plain JavaScript, with no build step and no framework to keep up with. A documented protocol and its test suite let either side be replaced.</p>
       </div>
     </div>
   </div>

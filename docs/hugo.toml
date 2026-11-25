@@ -13,39 +13,14 @@ relativeURLs = false
     weight = 10
 
 [[menu.main]]
-    name = "User Guide"
-    url = "/docs/frontend-guide/"
-    weight = 15
-
-[[menu.main]]
-    name = "API Reference"
-    url = "/docs/api-reference/"
-    weight = 20
-
-[[menu.main]]
-    name = "Extensions"
-    url = "/docs/extensions/"
-    weight = 25
-
-[[menu.main]]
     name = "Development"
     url = "/docs/development/"
     weight = 30
 
-[[menu.main]]
-    name = "OpenAPI"
-    url = "/docs/openapi/"
-    weight = 35
-
-[[menu.main]]
-    name = "FAQ"
-    url = "/faq/"
-    weight = 40
-
 # Parameters
 [params]
     author = "Anders Hagen Jarmund"
-    description = "notd: a simple outliner built to last"
+    description = "notd: a personal outliner built to last"
     
     # Control what gets indexed
     noindex_kinds = [

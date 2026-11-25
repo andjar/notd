@@ -1,1 +1,0 @@
-SQL{SELECT DISTINCT N.id FROM Notes N JOIN Properties P ON N.id = P.note_id WHERE P.name = 'deadline' AND P.value <= date('now', '+7 days') AND N.content NOT LIKE 'DONE %' AND N.content NOT LIKE 'CANCELLED %' ORDER BY P.value}

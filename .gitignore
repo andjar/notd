@@ -4,10 +4,6 @@
 *.sqlite3
 *.db-journal
 
-# Uploads directory
-uploads/*
-!uploads/.gitkeep
-
 # Logs
 logs/*
 !logs/.gitkeep
@@ -23,14 +19,16 @@ docs/.hugo_cache/
 # Temporary files
 docs/.DS_Store
 docs/Thumbs.db
-tests/js/ordering_cases.json
-api/v1/php_error.log
 *.log
 *.sqlite-shm
 *.sqlite-wal
-db/*.lock
-tests/browser/latency.txt
 __pycache__/
+
+# Notebook data (database and files)
+data/
+
+# Test tools
+node_modules/
 
 # Local settings
 config.local.php

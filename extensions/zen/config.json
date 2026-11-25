@@ -1,8 +1,0 @@
-{
-    "featherIcon": "edit-3",
-    "name": "Zen Writer",
-    "entrypoint": "index.html",
-    "defaultLightTheme": "duotone-light",
-    "defaultDarkTheme": "zenburn"
-  }
-  
