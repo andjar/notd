@@ -10,6 +10,7 @@ export class ApiError extends Error {
 }
 
 const BASE = new URL('api/v1/', document.baseURI);
+const SAFE = new URLSearchParams(location.search).get('safe') === '1'; // no plugin code runs on the server either
 
 async function call(method, name, { query, body } = {}) {
   const url = new URL(name, BASE);
@@ -19,7 +20,7 @@ async function call(method, name, { query, body } = {}) {
     res = await fetch(url, {
       method,
       credentials: 'same-origin',
-      headers: body !== undefined && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {},
+      headers: { ...(body !== undefined && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...(SAFE ? { 'X-Notd-Safe': '1' } : {}) },
       body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (e) {
@@ -44,5 +45,7 @@ export const api = {
   query: (q) => call('GET', 'query', { query: { q } }),
   changes: (since) => call('GET', 'changes', { query: { since } }),
   ops: (ops) => call('POST', 'ops', { body: { ops } }),
+  plugins: () => call('GET', 'plugins'),
+  setPlugin: (name, enabled) => call('POST', 'plugins', { body: { name, enabled } }),
   upload: (file) => { const f = new FormData(); f.append('file', file); return call('POST', 'files', { body: f }); },
 };

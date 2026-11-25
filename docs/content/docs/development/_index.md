@@ -162,10 +162,12 @@ client/
   lib/markdown.js note text to HTML: marked plus notd's syntax as marked extensions (no DOM)
   lib/links.js    what is being typed after [[ or #, suggestions, rewriting links on rename (no DOM)
   lib/feed.js     live updates: polls the change feed every 10 s and when the tab is shown again
+  lib/plugins.js  loads plugins' browser code and calls activate(notd); safe mode
   lib/route.js    addresses: #/page/<title>[/<block id>], today's journal when empty
   lib/model.js    the blocks of the page on screen, in memory (no DOM)
   lib/outbox.js   operations waiting for the server: in order, kept in localStorage, retried
   lib/outline.js  the one place blocks change: model + undo/redo + outbox, and change events for the view
+  panels/plugins.js  the plugins panel and the safe-mode notice
   panels/         the core panels: search (top bar), page title with the favourite star,
                   favourites, recent pages and calendar (left), save status (status line)
   ui/gate.js      the login screen

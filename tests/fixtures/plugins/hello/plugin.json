@@ -1,0 +1,2 @@
+{ "name": "hello", "version": "1.0.0", "api": 1, "description": "A test plugin: a panel, a style and a change counter.",
+  "browser": "main.js", "server": "server.php", "styles": ["hello.css"] }

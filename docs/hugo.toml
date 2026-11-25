@@ -23,6 +23,11 @@ relativeURLs = false
     weight = 20
 
 [[menu.main]]
+    name = "Plugins"
+    url = "/docs/plugins/"
+    weight = 25
+
+[[menu.main]]
     name = "Development"
     url = "/docs/development/"
     weight = 30

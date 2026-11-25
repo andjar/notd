@@ -9,12 +9,28 @@ import { searchPanel } from './panels/search.js';
 import { PageScreen, liveScreens } from './ui/page.js';
 import { Feed } from './lib/feed.js';
 import { Toolbar } from './ui/toolbar.js';
+import { loadPlugins } from './lib/plugins.js';
+import { pluginsPanel, safeModePanel } from './panels/plugins.js';
 import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
 
-export const notd = { api, panels };
+export const notd = {
+  api,
+  panels,
+  /** The plugin API (version 1) as one plugin sees it. */
+  forPlugin(name) {
+    return Object.freeze({
+      version: 1,
+      plugin: name,
+      api,
+      panels: { register: (p) => panels.register({ ...p, id: `${name}:${p.id}` }), refresh: (slot) => panels.refresh(panels.context, slot) },
+      go: (title, block) => notd.go(title, block),
+      on: (event, fn) => document.addEventListener('notd:' + event, (e) => fn(e.detail)),
+    });
+  },
+};
 window.notd = notd;
 
 const app = document.getElementById('app');
@@ -57,7 +73,7 @@ async function start() {
   if (!status.authenticated) await gate(status);
   setupFrame();
   app.hidden = false;
-  for (const p of [searchPanel({ go }), headerPanel(), backlinksPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel()]) panels.register(p);
+  for (const p of [searchPanel({ go }), headerPanel(), backlinksPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel(), pluginsPanel(), safeModePanel()]) panels.register(p);
   document.addEventListener('notd:route', (e) => {
     forgetPages();
     notd.screen?.dispose();
@@ -79,6 +95,8 @@ async function start() {
   } });
   notd.feed.start();
   notd.toolbar = new Toolbar();
+  await loadPlugins(notd);
+  panels.refresh(panels.context, 'app.left');
   addEventListener('hashchange', show);
   document.addEventListener('notd:favourites', () => panels.refresh(panels.context, 'app.left'));
   await show();
