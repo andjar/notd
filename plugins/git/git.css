@@ -1,20 +1,25 @@
-.git-versions { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.git-versions { list-style: none; margin: 0 0 0 var(--inset); padding: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .git-versions button, .git-restore {
-  border: 1px solid var(--border);
+  border: 0;
   background: var(--bg-soft);
   border-radius: var(--radius);
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.6rem;
   font-size: 0.85rem;
+  color: var(--fg-soft);
   cursor: pointer;
 }
-.git-versions button.active { background: var(--accent-soft); border-color: var(--accent); }
+.git-versions button:hover, .git-restore:hover { background: var(--bg-hover); color: var(--fg); }
+.git-versions button.active { background: var(--accent-soft); color: var(--accent); }
+.git-version { margin: 0.6rem 0 0 var(--inset); }
 .git-version pre {
   max-height: 20rem;
   overflow: auto;
-  padding: 0.5rem 0.75rem;
+  margin: 0 0 0.5rem;
+  padding: 0.6rem 0.85rem;
   background: var(--bg-soft);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   font: 0.85rem/1.5 var(--font-mono);
   white-space: pre-wrap;
 }
-.git-error { color: var(--danger); }
+.git-error { color: var(--danger); margin-left: var(--inset); }
+[data-panel="git:history"] .hint { padding-left: var(--inset); }

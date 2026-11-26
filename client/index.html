@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>notd</title>
+<link rel="preload" href="client/vendor/newsreader/newsreader-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="client/style/tokens.css">
 <link rel="stylesheet" href="client/style/app.css">
 <link rel="stylesheet" href="client/style/outline.css">
@@ -12,12 +13,20 @@
 </head>
 <body>
 <div class="app" id="app" hidden>
+  <aside class="left" aria-label="Sidebar">
+    <a class="brand" href="#/" title="Today's journal">notd</a>
+    <div class="left-panels" data-slot="app.left"></div>
+  </aside>
   <header class="topbar">
-    <button class="icon" data-toggle="left" aria-label="Show the sidebar" title="Sidebar">☰</button>
+    <button class="icon" data-toggle="left" aria-label="Show the sidebar" title="Sidebar">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.75" y="3.75" width="14.5" height="12.5" rx="2.5"/><path d="M7.75 4v12"/></svg>
+    </button>
     <div class="topbar-slot" data-slot="app.top"></div>
-    <button class="icon" data-toggle="right" aria-label="Show the right sidebar" title="Right sidebar">◧</button>
+    <div class="status" data-slot="app.status"></div>
+    <button class="icon" data-toggle="right" aria-label="Show the right sidebar" title="Right sidebar">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.75" y="3.75" width="14.5" height="12.5" rx="2.5"/><path d="M12.25 4v12"/></svg>
+    </button>
   </header>
-  <aside class="left" data-slot="app.left" aria-label="Sidebar"></aside>
   <main class="main">
     <div data-slot="page.header"></div>
     <div data-slot="page.before"></div>
@@ -25,7 +34,6 @@
     <div data-slot="page.after"></div>
   </main>
   <aside class="right" data-slot="app.right" aria-label="Right sidebar"></aside>
-  <footer class="status" data-slot="app.status"></footer>
 </div>
 <div class="gate" id="gate" hidden></div>
 <noscript>notd needs JavaScript.</noscript>

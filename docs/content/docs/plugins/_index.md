@@ -139,4 +139,4 @@ A job can wait for quiet: `Jobs::queue($pdo, 'git.commit', [], 'git.commit', 60)
 
 ## Safe mode
 
-Open notd with `?safe=1` in the address (`http://…/?safe=1`) and no plugin runs, in the browser or on the server; the status line says so. Use it when a plugin breaks notd, then switch that plugin off. `safe_mode` set to `'1'` in `config.local.php` does the same for every request.
+Open notd with `?safe=1` in the address (`http://…/?safe=1`) and no plugin runs, in the browser or on the server; the save status in the bar says so. Use it when a plugin breaks notd, then switch that plugin off. `safe_mode` set to `'1'` in `config.local.php` does the same for every request.

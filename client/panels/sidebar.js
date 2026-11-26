@@ -2,11 +2,11 @@
 // status. Favourites live in the notebook, as links on the page
 // "notd/favourites", so every device sees the same; recent pages are per device.
 
-import { html, render } from '../lib/html.js';
+import { html, render, nothing } from '../lib/html.js';
 import { api } from '../lib/api.js';
 import { cached, forgetCached } from '../lib/cache.js';
 import { newId } from '../lib/keys.js';
-import { pageLink, today } from '../lib/route.js';
+import { pageLink, today, dayLabel } from '../lib/route.js';
 import { rewriteLinks } from '../lib/links.js';
 
 export const FAVOURITES = 'notd/favourites';
@@ -42,12 +42,16 @@ export async function toggleFavourite(title) {
   }
 }
 
+/** A list of pages to go to, the one on screen marked; days are shown as dates. */
+const pageList = (titles, current) => html`<ul class="links">${titles.map((t) => html`<li><a href=${pageLink(t)} title=${t}
+  aria-current=${t.toLowerCase() === current?.toLowerCase() ? 'page' : 'false'}>${dayLabel(t, { short: true })}</a></li>`)}</ul>`;
+
 export function favouritesPanel() {
   return {
     id: 'favourites', slot: 'app.left', order: 10,
-    async render(el) {
+    async render(el, ctx) {
       const { items } = await favourites().catch(() => ({ items: [] }));
-      render(html`<h2>Favourites</h2>${items.length ? html`<ul class="links">${items.map((i) => html`<li><a href=${pageLink(i.title)}>${i.title}</a></li>`)}</ul>`
+      render(html`<h2>Favourites</h2>${items.length ? pageList(items.map((i) => i.title), ctx.route?.title)
         : html`<p class="hint">Star a page to keep it here.</p>`}`, el);
     },
   };
@@ -63,7 +67,7 @@ export function recentPanel() {
         recent = [title, ...recent.filter((t) => t.toLowerCase() !== title.toLowerCase())].slice(0, 12);
         store.set('notd.recent', recent);
       }
-      render(html`<h2>Recent</h2><ul class="links">${recent.map((t) => html`<li><a href=${pageLink(t)}>${t}</a></li>`)}</ul>`, el);
+      render(html`<h2>Recent</h2>${pageList(recent, title)}`, el);
     },
   };
 }
@@ -97,9 +101,11 @@ export function calendarPanel() {
     const now = today();
     render(html`
       <div class="calendar-head">
-        <button class="icon" @click=${() => move(-1)} aria-label="Previous month">‹</button>
         <h2>${shown.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h2>
-        <button class="icon" @click=${() => move(1)} aria-label="Next month">›</button>
+        <button class="icon" @click=${() => move(-1)} aria-label="Previous month" title="Previous month">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg></button>
+        <button class="icon" @click=${() => move(1)} aria-label="Next month" title="Next month">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg></button>
       </div>
       <div class="calendar" role="grid">
         ${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => html`<span class="dow">${d}</span>`)}
@@ -147,14 +153,15 @@ export function headerPanel() {
       const title = ctx.page?.title ?? ctx.route?.title ?? '';
       const page = ctx.page;
       const draw = () => el.querySelector('h1[contenteditable]') ? null : render(html`<div class="page-title">
-          <h1 title=${page ? 'Click to rename' : ''} @click=${(e) => page && startRename(e.target)}
-            @keydown=${keys} @blur=${(e) => finishRename(e.target)}>${title}</h1>
+          <h1 data-title=${title} title=${page ? 'Click to rename' : ''} @click=${(e) => page && startRename(e.target)}
+            @keydown=${keys} @blur=${(e) => finishRename(e.target)}>${dayLabel(title)}</h1>
           <button class="icon star ${fav ? 'on' : ''}" aria-pressed=${fav} title=${fav ? 'Remove from favourites' : 'Add to favourites'}
-            @click=${async () => { await toggleFavourite(title); fav = !fav; draw(); document.dispatchEvent(new CustomEvent('notd:favourites')); }}>${fav ? '★' : '☆'}</button>
+            @click=${async () => { await toggleFavourite(title); fav = !fav; draw(); document.dispatchEvent(new CustomEvent('notd:favourites')); }}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2.9 2.1 4.4 4.8.6-3.5 3.3.9 4.8L10 13.7 5.7 16l.9-4.8-3.5-3.3 4.8-.6Z"/></svg></button>
         </div>${error ? html`<p class="error" role="alert">${error}</p>` : ''}`, el);
       const startRename = (h) => {
         if (h.isContentEditable) return;
         error = '';
+        h.textContent = title;                // a day is shown as a date, but renamed by its title
         h.contentEditable = 'plaintext-only';
         h.focus();
         getSelection().selectAllChildren(h);
@@ -167,13 +174,14 @@ export function headerPanel() {
         if (!h.isContentEditable) return;
         h.removeAttribute('contenteditable');
         const next = h.textContent.trim().replace(/\s+/g, ' ');
-        if (!next || next === title) { h.textContent = title; return; }
+        render(nothing, el);                  // typing replaced lit-html's text in the title: draw it afresh
+        draw();
+        if (!next || next === title) return;
         try {
           await renamePage(page, next);
           document.dispatchEvent(new CustomEvent('notd:renamed', { detail: { from: title, to: next } }));
         } catch (e) {
           error = e.code === 'title_taken' ? `There is already a page called “${next}”.` : e.message;
-          h.textContent = title;
           draw();
         }
       };

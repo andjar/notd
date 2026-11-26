@@ -177,8 +177,8 @@ client/
   lib/outbox.js   operations waiting for the server: in order, kept in localStorage, retried
   lib/outline.js  the one place blocks change: model + undo/redo + outbox, and change events for the view
   panels/plugins.js  the plugins panel and the safe-mode notice
-  panels/         the core panels: search (top bar), page title with the favourite star,
-                  favourites, recent pages and calendar (left), save status (status line)
+  panels/         the core panels: search and save status (the bar), page title with the favourite star,
+                  favourites, recent pages and calendar (left)
   ui/gate.js      the login screen
   ui/page.js      one page on screen: loads it, draws its outline, one outbox for the app
   ui/journal.js   the journal: today's page, then earlier days with notes, loaded as you scroll
@@ -189,13 +189,15 @@ client/
   ui/drag.js      moving blocks by dragging their bullet (pointer events, so touch works too)
   ui/toolbar.js   the editing toolbar on phones; its buttons send the editor the same keys a keyboard would
   ui/editor.js    editing: one block at a time as plain text (contenteditable="plaintext-only"), the keys
-  style/tokens.css  colours, sizes and fonts, light and dark
-  style/app.css     the frame
-  style/outline.css the outline's geometry
+  style/tokens.css  colours, sizes and fonts, light and dark; the look is described at the top
+  style/app.css     the frame, panels, menus
+  style/outline.css the outline's geometry and the text inside blocks
   vendor/         prebuilt libraries, rebuilt by tools/vendor.sh
 ```
 
-The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after` and `app.status`. The sidebars are grid columns, so they can never cover the page; under 900 px wide they become drawers. The page is sent with a strict Content-Security-Policy: `script-src 'self'` (scripts only from notd itself, no inline script, no `eval`), no plugins, no framing.
+The frame's slots are `app.top`, `app.left`, `app.right`, `page.header`, `page.before`, `page.after` and `app.status`. The sidebars run the full height of the window; the bar above the page holds `app.top` (search) and `app.status` (the save status). The sidebars are grid columns, so they can never cover the page; under 900 px wide they become drawers.
+
+The look ([decision 15](../overview/decisions/)) comes from `style/tokens.css`: the system's sans-serif for note text, Newsreader (vendored, OFL) for titles and headings, warm greys with an ink-blue accent, light and dark. Every title, heading and box under the page lines up with the note text, at `--inset` from the page's left edge, with bullets and fold toggles hanging to its left; a plugin that adds something under the page uses the same variable. Small labels are in sentence case, and space or a tinted background separates things before a line does. `dayLabel()` in `lib/route.js` shows a journal page's title as a date in the reader's language; the title itself stays `YYYY-MM-DD`. `tests/js/tokens.test.mjs` checks that every text colour reads at 4.5:1 on the page and the sidebars, in light and dark. The page is sent with a strict Content-Security-Policy: `script-src 'self'` (scripts only from notd itself, no inline script, no `eval`), no plugins, no framing.
 
 There is no import map ([decision 14](../overview/decisions/)). Every module, core, vendored or plugin, imports by relative path to a `.js` file: lit-html through `client/lib/html.js`, marked and DOMPurify by their paths under `client/vendor/`. `tests/js/modules.test.mjs` fails on a bare name such as `'lit-html'`, on a `.mjs` file, on an import of a file that does not exist and on any inline script in `client/index.html`. Text files are checked out with LF line endings on every system (`.gitattributes`), so the files notd serves are the same bytes everywhere.
 
@@ -207,7 +209,7 @@ Every block is a row of three boxes: the fold toggle, the bullet and the text. T
 
 A block's text is drawn in three steps. Text with no Markdown or syntax characters at all is set as plain text, which keeps big pages fast. Anything else goes through `client/lib/markdown.js`: marked, with notd's syntax (`[[links]]`, `#tags`, `((references))`, `{{embed}}`, `{key::value}` fields, `file:` links) as marked inline extensions, so nothing inside code counts. The HTML then goes through DOMPurify, which removes scripts, event handlers, forms and unsafe URLs, before it reaches the page. Last, references and embeds are filled in from the server, each block fetched once per page load.
 
-marked and DOMPurify are vendored by `tools/vendor.sh` like lit-html. The script saves DOMPurify as `purify.js` (some servers send `.mjs` with a MIME type the browser refuses for a module), drops the comments that point to source maps that are not vendored, and stops if a vendored file imports anything by a bare name. Because everything is imported by relative path, the Node tests load client modules such as `markdown.js` directly.
+marked, DOMPurify and the Newsreader font are vendored by `tools/vendor.sh` like lit-html. The script saves DOMPurify as `purify.js` (some servers send `.mjs` with a MIME type the browser refuses for a module), drops the comments that point to source maps that are not vendored, and stops if a vendored file imports anything by a bare name. Because everything is imported by relative path, the Node tests load client modules such as `markdown.js` directly.
 
 ### How an edit travels
 

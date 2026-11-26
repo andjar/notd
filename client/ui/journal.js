@@ -3,7 +3,7 @@
 // page, edited in place.
 
 import { api } from '../lib/api.js';
-import { today, pageLink } from '../lib/route.js';
+import { today, pageLink, dayLabel } from '../lib/route.js';
 import { PageScreen } from './page.js';
 import { forgetNodes } from './text.js';
 
@@ -58,7 +58,7 @@ export class JournalScreen {
       const h = document.createElement('h2');
       const a = document.createElement('a');
       a.href = pageLink(title);
-      a.textContent = new Date(title + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      a.textContent = dayLabel(title);
       h.append(a);
       section.append(h);
     }

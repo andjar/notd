@@ -19,3 +19,14 @@ export function pageLink(title, block = null) {
 export function isJournal(title) {
   return /^\d{4}-\d{2}-\d{2}$/.test(title);
 }
+
+/** How a page's title is shown: a day as a date in the reader's language ("Friday 27 November",
+    with the year when it is not this year; short: "Fri 27 Nov"), any other title as it is. */
+export function dayLabel(title, { short = false } = {}) {
+  if (!isJournal(title)) return title;
+  const d = new Date(title + 'T00:00');
+  if (Number.isNaN(d.getTime())) return title;
+  const year = d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' };
+  return d.toLocaleDateString(undefined, short ? { weekday: 'short', day: 'numeric', month: 'short', ...year }
+    : { weekday: 'long', day: 'numeric', month: 'long', ...year });
+}

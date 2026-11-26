@@ -26,7 +26,12 @@ def today_first_then_earlier_days_with_notes():
             page.wait_for_selector('.journal-day:nth-of-type(4)')
             days = page.eval_on_selector_all('.journal-day', 'els => els.map((e) => e.dataset.day)')
             assert days == [day(0), day(1), day(3), day(40)], days
-            assert page.inner_text('.page-title h1') == day(0)
+            assert page.get_attribute('.page-title h1', 'data-title') == day(0)
+            label = page.inner_text('.page-title h1')                     # today, as a date in the reader's language
+            assert label != day(0) and str(int(day(0)[8:])) in label, label
+            assert page.inner_text('.journal-day:nth-of-type(2) h2') == page.evaluate(
+                f"new Date('{day(1)}T00:00').toLocaleDateString(undefined, {{ weekday: 'long', day: 'numeric', month: 'long'"
+                f"{'' if day(1)[:4] == day(0)[:4] else ', year: "numeric"'} }})")
             assert page.locator('[data-panel=backlinks]').count() == 0
             assert page.locator('.journal-day.today .add-block').inner_text() == 'Click here to write'
             page.click('.journal-day.today .add-block')

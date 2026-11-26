@@ -1,62 +1,108 @@
 /* Design tokens: every colour, size and font the interface uses. Light by default,
-   dark when the system asks for it, either one when data-theme says so. */
+   dark when the system asks for it, either one when data-theme says so.
+
+   The look: a quiet page. The note text is set in the system's own sans-serif, and
+   titles and headings in Newsreader, a serif made for reading on screens. Text colours
+   are warm greys with an ink-blue accent. Space and a tinted sidebar separate things
+   more often than lines do. Small labels are in sentence case, never in capitals. */
+
+@font-face {
+  font-family: "Newsreader";
+  src: url("../vendor/newsreader/newsreader-latin-opsz-normal.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("../vendor/newsreader/newsreader-latin-ext-opsz-normal.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+    U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 :root {
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-title: "Newsreader", "Iowan Old Style", Charter, Cambria, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   --text-size: 16px;
-  --line: 1.6;                         /* line height of note text */
+  --line: 1.55;                        /* line height of note text */
   --row: calc(var(--text-size) * var(--line));
+  --toggle-w: 1.25rem;                 /* the outline's fold toggle ... */
+  --bullet-w: 1.25rem;                 /* ... and bullet columns */
+  --inset: calc(var(--toggle-w) + var(--bullet-w) + 0.125rem);   /* where note text starts: titles line up with it */
   --indent: 1.5rem;                    /* one outline level */
   --bullet: 6px;
   --gap: 0.5rem;
-  --radius: 6px;
+  --radius: 6px;                       /* small controls */
+  --radius-lg: 10px;                   /* menus, boxes */
   --left-w: 16rem;
   --right-w: 20rem;
-  --page-w: 46rem;
+  --page-w: 44rem;                     /* about 75 characters of note text per line */
+  --bar-h: 3rem;
 
-  --bg: #ffffff;
-  --bg-soft: #f6f6f4;
-  --bg-hover: #efefec;
-  --fg: #1f2328;
-  --fg-soft: #5d636b;
-  --fg-faint: #9aa0a6;
-  --border: #e3e3df;
-  --accent: #2f6fde;
-  --accent-soft: #e6eefc;
-  --danger: #c4314b;
-  --mark: #fff1a8;
-  --shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+  --bg: #fdfcfa;                       /* the page */
+  --bg-soft: #f4f2ee;                  /* sidebars, code, boxes */
+  --bg-hover: #ebe8e2;
+  --fg: #23262b;
+  --fg-soft: #5c6168;
+  --fg-faint: #676c73;                 /* still 4.5:1 on the page and the sidebar */
+  --bullet-c: #8f949b;
+  --border: #e6e2db;
+  --accent: #2c4ea8;                   /* ink blue */
+  --accent-soft: #e8ecf7;
+  --danger: #b3243f;
+  --warn-bg: #f8ebcf;
+  --warn-fg: #7a4f00;
+  --mark: #fbe9a0;
+  --star: #c98a00;
+  --shadow: 0 1px 2px rgb(40 30 20 / 0.06), 0 10px 30px rgb(40 30 20 / 0.12);
+  --scrim: rgb(30 25 20 / 0.18);
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #18191b;
-    --bg-soft: #202124;
+    --bg-soft: #1f2023;
     --bg-hover: #2a2b2f;
-    --fg: #e6e6e3;
-    --fg-soft: #a9adb3;
-    --fg-faint: #6f747b;
-    --border: #33353a;
-    --accent: #7aa7ff;
-    --accent-soft: #23324f;
-    --danger: #ff7a8f;
-    --mark: #5a4d10;
-    --shadow: 0 6px 24px rgb(0 0 0 / 0.5);
+    --fg: #e8e6e1;
+    --fg-soft: #a9acb2;
+    --fg-faint: #868a91;
+    --bullet-c: #666a71;
+    --border: #303237;
+    --accent: #9fb6ff;
+    --accent-soft: #252e48;
+    --danger: #ff8a9c;
+    --warn-bg: #3d3014;
+    --warn-fg: #f0c674;
+    --mark: #5c4f12;
+    --star: #f0b429;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px rgb(0 0 0 / 0.5);
+    --scrim: rgb(0 0 0 / 0.4);
+    color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
   --bg: #18191b;
-  --bg-soft: #202124;
+  --bg-soft: #1f2023;
   --bg-hover: #2a2b2f;
-  --fg: #e6e6e3;
-  --fg-soft: #a9adb3;
-  --fg-faint: #6f747b;
-  --border: #33353a;
-  --accent: #7aa7ff;
-  --accent-soft: #23324f;
-  --danger: #ff7a8f;
-  --mark: #5a4d10;
-  --shadow: 0 6px 24px rgb(0 0 0 / 0.5);
+  --fg: #e8e6e1;
+  --fg-soft: #a9acb2;
+  --fg-faint: #868a91;
+  --bullet-c: #666a71;
+  --border: #303237;
+  --accent: #9fb6ff;
+  --accent-soft: #252e48;
+  --danger: #ff8a9c;
+  --warn-bg: #3d3014;
+  --warn-fg: #f0c674;
+  --mark: #5c4f12;
+  --star: #f0b429;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px rgb(0 0 0 / 0.5);
+  --scrim: rgb(0 0 0 / 0.4);
+  color-scheme: dark;
 }

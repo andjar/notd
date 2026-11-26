@@ -1,23 +1,30 @@
-/* Tasks: the checkbox is no taller than a line, and the keyword is a small word after it. */
-.task-box { width: 1em; height: 1em; margin: 0 0.35em 0 0; vertical-align: -0.12em; cursor: pointer; }
+/* Tasks: the checkbox is the core's (no taller than a line), and the keyword is a small word after it. */
+.task-box { margin-right: 0.4em; }
+.task-box:disabled { opacity: 0.5; cursor: default; }
 .task-keyword {
   border: 0;
-  padding: 0 0.3em;
-  margin-right: 0.15em;
-  border-radius: 3px;
-  font: 600 0.72em var(--font);
-  letter-spacing: 0.03em;
-  vertical-align: 0.1em;
+  padding: 0.18em 0.4em;
+  margin-right: 0.2em;
+  border-radius: 4px;
+  font: 600 0.68em/1 var(--font);
+  letter-spacing: 0.04em;
+  vertical-align: 0.14em;
   cursor: pointer;
   background: var(--bg-soft);
   color: var(--fg-soft);
 }
+.task-keyword:hover { color: var(--fg); }
 .task-doing { background: var(--accent-soft); color: var(--accent); }
-.task-waiting { background: #fbeccf; color: #8a5a00; }
+.task-waiting { background: var(--warn-bg); color: var(--warn-fg); }
 .content:has(> p > .task-done) , .content:has(> p > .task-cancelled) { color: var(--fg-faint); }
 .content:has(> p > .task-done) > p { text-decoration: line-through; text-decoration-color: var(--fg-faint); }
 .content:has(> p > .task-cancelled) > p { text-decoration: line-through; }
-.agenda h2 { margin: 0.5rem 0 0.25rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-soft); }
+
+/* The agenda on a journal page: a soft box in line with the notes, only when it has something to show. */
+[data-panel="tasks:agenda"] { margin: 0 0 1.75rem var(--inset); padding: 0.75rem 1rem 0.85rem; background: var(--bg-soft); border-radius: var(--radius-lg); }
+[data-panel="tasks:agenda"]:not(:has(li)) { display: none; }
+.agenda h2 { margin: 0 0 0.2rem; padding: 0; font-size: 0.8rem; font-weight: 600; color: var(--fg-soft); }
+.agenda ul + h2 { margin-top: 0.6rem; }
 .agenda ul { list-style: none; margin: 0; padding: 0; }
 .agenda li { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.1rem 0; flex-wrap: wrap; }
 .agenda a { color: var(--fg); text-decoration: none; }
@@ -25,4 +32,3 @@
 .agenda li span { font-size: 0.8rem; color: var(--fg-soft); }
 .agenda .overdue { color: var(--danger); }
 .agenda .agenda-page { color: var(--fg-faint); }
-[data-panel="tasks:agenda"] { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1rem; }
