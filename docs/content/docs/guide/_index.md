@@ -80,16 +80,17 @@ Under every page, **linked references** list the blocks on other pages that link
 
 ## Around the page
 
-- **Search** sits in the top bar. Type a few letters of any words, in any order; titles come first, then notes, with the matching words marked. Arrow keys move, Enter opens. If no page has that exact title, the last entry creates it and opens it. Quotes search for a phrase and `-word` leaves out notes with that word.
+- **Search** sits in the bar above the page. Type a few letters of any words, in any order; titles come first, then notes, with the matching words marked. Arrow keys move, Enter opens. If no page has that exact title, the last entry creates it and opens it. Quotes search for a phrase and `-word` leaves out notes with that word.
 - **The star** next to a page's title adds it to your **favourites** in the left sidebar. Favourites are stored in the notebook itself, as links on the page `notd/favourites`, so every device shows the same list and you can reorder them by editing that page.
 - **Recent** lists the pages you opened last on this device.
-- **The calendar** shows the month of the journal page you are on; a dot marks days you wrote something. Click a day to open it, or the arrows to change month.
-- **The status line** at the bottom says whether your changes are saved.
-- The **☰** and **◧** buttons hide and show the sidebars. On a phone they open the sidebars as drawers; tap the page to close them.
+- **The calendar** shows the month of the journal page you are on; a dot marks days you wrote something. Click a day to open it, or the arrows to change month. Journal pages are titled with their date (`2026-11-27`) but shown as dates in your browser's language, such as "Friday 27 November".
+- **The save status**, at the right end of the bar above the page, says whether your changes are saved.
+- **notd**, at the top of the left sidebar, goes to today's journal.
+- The two **sidebar** buttons at the ends of the bar hide and show the sidebars. On a phone they open the sidebars as drawers; tap the page to close them.
 
 ## On a phone
 
-notd works in the phone's browser. While you edit a block, a toolbar sits just above the keyboard: ⇤ outdent, ⇥ indent, ↑ and ↓ move the block, `[[` starts a link, ↶ and ↷ undo and redo, ✓ stops editing. Drag a bullet with your finger to move a block. The sidebars open as drawers from the ☰ and ◧ buttons. Long words, code and tables never make the page wider than the screen; code and tables scroll inside their own box.
+notd works in the phone's browser. While you edit a block, a toolbar sits just above the keyboard: ⇤ outdent, ⇥ indent, ↑ and ↓ move the block, `[[` starts a link, ↶ and ↷ undo and redo, ✓ stops editing. Drag a bullet with your finger to move a block. The sidebars open as drawers from the sidebar buttons at the ends of the bar. Long words, code and tables never make the page wider than the screen; code and tables scroll inside their own box.
 
 ## Several devices
 

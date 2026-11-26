@@ -4,6 +4,7 @@
 import { html, render } from '../lib/html.js';
 import { api } from '../lib/api.js';
 import { newId } from '../lib/keys.js';
+import { dayLabel } from '../lib/route.js';
 import { unsafeHTML } from '../lib/html.js';
 
 export function searchPanel({ go }) {
@@ -27,7 +28,7 @@ export function searchPanel({ go }) {
           ${items.map((it, i) => html`<li role="option" aria-selected=${i === active} class=${i === active ? 'active' : ''}
               @mousedown=${(e) => { e.preventDefault(); open(it); }}>
             ${it.create ? html`<span class="create">Create page <b>${it.title}</b></span>`
-              : html`<b class="result-title">${it.title}</b>${it.block ? html`<span class="snippet">${unsafeHTML(it.snippet)}</span>` : ''}`}
+              : html`<b class="result-title">${dayLabel(it.title)}</b>${it.block ? html`<span class="snippet">${unsafeHTML(it.snippet)}</span>` : ''}`}
           </li>`)}
         </ul>` : ''}
       </div>`, host);

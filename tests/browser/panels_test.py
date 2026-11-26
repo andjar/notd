@@ -95,8 +95,10 @@ def recent_pages_and_the_calendar():
             assert 'October 2026' in page.text_content('.calendar-head h2')     # ... and the month browsed to stays
             page.evaluate("location.hash = '#/page/Kitchen%20renovation'")
             page.wait_for_selector('[data-panel=recent] li:first-child a:text("Kitchen renovation")')
-            recent = page.locator('[data-panel=recent] a').all_inner_texts()
-            assert recent[:3] == ['Kitchen renovation', '2026-11-10', '2026-11-03'], recent
+            recent = page.eval_on_selector_all('[data-panel=recent] a', 'els => els.map((a) => [a.title, a.textContent])')
+            assert [t for t, _ in recent[:3]] == ['Kitchen renovation', '2026-11-10', '2026-11-03'], recent
+            assert recent[1][1] != '2026-11-10' and '10' in recent[1][1], recent      # a day is shown as a date
+            assert page.get_attribute('[data-panel=recent] a >> nth=0', 'aria-current') == 'page'
             assert page.inner_text('[data-panel=status]') == 'Saved'
             assert errors == [], errors
     finally:

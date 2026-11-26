@@ -2,7 +2,7 @@
 // page or tags it (also through its aliases), grouped by the page it is on.
 
 import { api } from '../lib/api.js';
-import { pageLink } from '../lib/route.js';
+import { pageLink, dayLabel } from '../lib/route.js';
 import { renderText } from '../ui/text.js';
 
 export function backlinksPanel() {
@@ -27,7 +27,7 @@ export function backlinksPanel() {
         const a = document.createElement('a');
         a.className = 'ref-page';
         a.href = pageLink(g.page.title);
-        a.textContent = g.page.title;
+        a.textContent = dayLabel(g.page.title);
         section.append(a);
         for (const b of g.blocks) {
           const item = document.createElement('div');

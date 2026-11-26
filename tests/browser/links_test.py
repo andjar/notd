@@ -95,5 +95,31 @@ def renaming_a_page_rewrites_the_links_to_it():
         s.stop()
 
 
+@test
+def a_day_is_shown_as_a_date_and_renamed_by_its_title():
+    """A day's title is drawn as a date; editing it shows the real title, and leaving
+    the edit, or another page, always draws the right title again."""
+    s = Server()
+    setup(s)
+    s.ops({'op': 'create', 'kind': 'page', 'title': '2026-11-02'})
+    try:
+        with browser() as b:
+            errors = []
+            page = open_page(b, s.url + '#/page/2026-11-02', errors)
+            page.wait_for_selector('.page-title h1[data-title="2026-11-02"]')
+            label = page.inner_text('.page-title h1')
+            assert label != '2026-11-02' and '2' in label, label
+            page.click('.page-title h1')
+            assert page.inner_text('.page-title h1') == '2026-11-02'
+            page.keyboard.press('Escape')
+            page.wait_for_selector('.page-title h1:not([contenteditable])')
+            assert page.inner_text('.page-title h1') == label
+            page.evaluate("location.hash = '#/page/Trips'")
+            page.wait_for_selector('.page-title h1:text("Trips")')
+            assert errors == [], errors
+    finally:
+        s.stop()
+
+
 if __name__ == '__main__':
     run()

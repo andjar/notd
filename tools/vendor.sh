@@ -34,6 +34,16 @@ rm -rf "$dst" && mkdir -p "$dst"
 cp "$tmp/dompurify/package/dist/purify.es.mjs" "$dst/purify.js"
 cp "$tmp/dompurify/package/LICENSE" "$dst/"
 
+# Newsreader: the serif for titles and headings (SIL Open Font License 1.1). The
+# variable font with optical sizes, in two parts: Latin (with Norwegian), and the
+# rest of Latin, which the browser only loads when a title needs it.
+fetch @fontsource-variable/newsreader@5.3.0 newsreader
+dst=client/vendor/newsreader
+rm -rf "$dst" && mkdir -p "$dst"
+cp "$tmp/newsreader/package/files/newsreader-latin-opsz-normal.woff2" \
+   "$tmp/newsreader/package/files/newsreader-latin-ext-opsz-normal.woff2" \
+   "$tmp/newsreader/package/LICENSE" "$dst/"
+
 # The source maps are not vendored, so drop the comments that point to them (DevTools
 # would ask the server for each one and log a 404).
 find client/vendor -name '*.js' | while read -r f; do
