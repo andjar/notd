@@ -20,6 +20,7 @@ import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
 import { forgetCached } from './lib/cache.js';
 import { notice } from './lib/notice.js';
+import { addFileHandler } from './ui/attach.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
 
 export const notd = {
@@ -40,6 +41,7 @@ export const notd = {
       },
       on: (event, fn) => document.addEventListener('notd:' + event, (e) => fn(e.detail)),
       notice: (text, options) => notice(text, options),
+      files: { register: (handler) => addFileHandler(handler) },
     });
   },
 };

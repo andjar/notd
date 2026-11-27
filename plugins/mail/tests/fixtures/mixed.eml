@@ -1,0 +1,42 @@
+From: Signe <signe@example.no>
+To: anders@example.no
+Subject: Biobank list
+Date: Fri, 27 Nov 2026 09:30:00 +0100
+Message-ID: <list-7@example.no>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+This is a multi-part message.
+--outer
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=utf-8
+
+Here is the list, and a chart.
+--alt
+Content-Type: text/html; charset=utf-8
+
+<p>Here is the <b>list</b>, and a chart.</p>
+--alt--
+--outer
+Content-Type: application/pdf; name="biobank list.pdf"
+Content-Disposition: attachment; filename*=UTF-8''biobank%20list.pdf
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKMSAwIG9iajw8Pj5lbmRvYmoKdHJhaWxlcjw8Pj4KJSVFT0YK
+--outer
+Content-Type: image/png; name="chart.png"
+Content-Disposition: inline; filename="chart.png"
+Content-ID: <chart1>
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9
+awAAAABJRU5ErkJggg==
+--outer
+Content-Type: application/octet-stream; name="tool.exe"
+Content-Disposition: attachment; filename="tool.exe"
+Content-Transfer-Encoding: base64
+
+TVogbm90IGEgcHJvZ3JhbQ==
+--outer--

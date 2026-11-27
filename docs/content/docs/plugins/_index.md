@@ -11,6 +11,7 @@ Everything beyond notes, links, search, queries, files and export is a plugin, i
 | Plugin | Does |
 | --- | --- |
 | `git` | Version history: a minute after you stop typing (`git_delay`), the Markdown export is committed to a git repository (`git_dir`, default `history/` in the data folder). A History section under each page lists its versions; look at one and restore it. Needs the `git` program on the server. |
+| `mail` | E-mail into notes: an `.eml` file dropped onto notd, picked with **Add an e-mail**, or piped in by a mail server becomes a folded note on today's journal, with its attachments stored. See [Mail](mail/). |
 | `tasks` | TODO/DOING/WAITING/DONE/CANCELLED with a checkbox, start, scheduled, deadline and done times, the `task:` query filter and an agenda on journal pages. Read `plugins/tasks/` as an example: it uses syntax, commands, a panel, an indexer and a filter. |
 
 ## A plugin is a folder
@@ -65,6 +66,7 @@ export function activate(notd) {
 | `go(title, block)` | Opens a page. |
 | `on(event, fn)` | Listens for `route`, `page`, `saving` and `renamed`. |
 | `notice(text, { error, sticky })` | Shows a short message in the bar above the page for a few seconds (an error a little longer, a sticky one until the next message). |
+| `files.register({ accept(file), handle(file, { block }) })` | Takes files of a kind of its own when they are pasted, dropped or picked, instead of having them stored: `handle` returns the text to put in the block (`block` is null when the file was dropped onto the page), or `''`. The mail plugin takes `.eml` files this way. |
 
 
 
