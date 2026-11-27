@@ -87,6 +87,6 @@ export function installKeys() {
     if (!el) return;
     e.preventDefault();
     e.stopPropagation();
-    commands.run(el.dataset.command, { id: el.closest('.block')?.dataset.id ?? el.dataset.id ?? null, element: el });
+    commands.run(el.dataset.command, { id: el.closest('[data-node], .block')?.dataset.node ?? el.closest('.block')?.dataset.id ?? el.dataset.id ?? null, element: el });
   }, true);
 }

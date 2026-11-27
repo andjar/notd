@@ -44,6 +44,7 @@ Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`,
 | `((block id))` | The text of another block, linked to it. |
 | `{{embed ((block id))}}`, `{{embed [[Page]]}}` | A block with its children, or a whole page, shown in place. |
 | `{rating:: 5}` | A field, shown as a small label; fields can be queried. |
+| `{{query tag:book rating>=4}}` | The notes a query finds, listed in place and kept up to date (see *Queries* below). |
 | `![name](file:id)` | A stored image (or `[name](file:id)` for a link to a file). You rarely type these: see *Files and images* below. |
 
 ## Commands
@@ -52,6 +53,22 @@ Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`,
 - **/** in a block opens the slash menu: headings, today's date, a link, a code block, and whatever plugins add. Keep typing to narrow it, Enter or Tab picks.
 - **Right-click a bullet** (or long-press it on a phone) for the block's menu: copy a reference to it, zoom in, fold or unfold everything under it, attach a file, delete it.
 - **Ctrl+/** goes to search.
+
+## Queries
+
+`{{query ...}}` in a block lists the notes that a query finds, right there, and keeps the list up to date as notes change, here or on another device. The block holding the query is never in its own list.
+
+```text
+{{query tag:project task:open}}               open tasks tagged #project
+{{query type:book sort:-rating}}              books, best first
+{{query type:book view:table columns:rating,author}}   the same as a table
+{{query task:open group:priority}}            open tasks under a heading per priority
+{{query links:"Kitchen renovation"}}          everything that links to a page
+```
+
+The language (fields, tags, links, pages, dates, words, `OR`, `-` for not, `sort:`, `limit:`, `group:`) is described under [Queries](../protocol/queries/). A task in the results can be ticked where it is shown; the note itself changes, wherever it lives. Click a result's page name to go there; click the query's grey heading to change the query.
+
+**/query** in a block offers ready-made ones: an empty query, *tagged …*, *what links here*, *changed today*, and from the tasks plugin *open tasks*, *open tasks on this page*, *due within a week* and *done this week*.
 
 ## Files and images
 

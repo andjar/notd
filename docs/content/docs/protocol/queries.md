@@ -4,7 +4,7 @@ weight: 30
 description: "GET /api/v1/query: the query language and its results."
 ---
 
-`GET /api/v1/query?q=...` runs a query over all nodes. The same language is used inside notes as `{{query ...}}` (later, in the browser app).
+`GET /api/v1/query?q=...` runs a query over all nodes. The same language is used inside notes as `{{query ...}}`: the browser app shows the results in place (see the [guide](../../guide/#queries)).
 
 ## The language
 

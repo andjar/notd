@@ -94,6 +94,7 @@ export class Editor {
     }
     const content = e.target.closest('.content');
     if (!content || e.target.closest('a, button, input')) return;
+    if (e.target.closest('.widget') && !e.target.closest('.widget-edit')) return;   // a query's results: their own clicks
     const id = content.closest('.block').dataset.id;
     if (this.editing === id) return;
     this.edit(id, clickOffset(e, content, this.model.get(id).text));

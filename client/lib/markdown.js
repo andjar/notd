@@ -6,7 +6,11 @@
 // will add theirs through the same list (step 3.3).
 //
 //   [[Page]]  #tag  #[[two words]]  ((block id))  {{embed ((id))}}  {{embed [[Page]]}}
-//   {key::value}  ![name](file:id)  [name](file:id)
+//   {key::value}  ![name](file:id)  [name](file:id)  {{query ...}}
+//
+// Syntax that shows something live (a query's results, a plugin's board) is drawn as an
+// empty widget element, <span class="widget" data-widget="name" data-match="[...]">, which
+// ui/text.js fills once the text is on the page (see widgets below).
 
 import { Marked } from '../vendor/marked/marked.esm.js';
 
@@ -16,8 +20,21 @@ export const HEADING = /^(#{1,3}) /;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const pageHref = (title) => '#/page/' + encodeURIComponent(title);
 
+/** Live parts of a block, by name: mount(el, match, { block, depth }) fills el. */
+export const widgets = new Map();
+const widget = (name, m) => `<span class="widget" data-widget="${esc(name)}" data-match="${esc(JSON.stringify([...m]))}"></span>`;
+
 /** The core syntax, as marked inline extensions. */
 export const syntax = [
+  {
+    name: 'query', level: 'inline',
+    start: (src) => src.indexOf('{{query'),
+    tokenizer(src) {
+      const m = src.match(/^\{\{query(?:\s+([^\n]*?))?\s*\}\}/);
+      if (m) return { type: 'query', raw: m[0], m: [m[0], (m[1] ?? '').trim()] };
+    },
+    renderer: (t) => widget('query', t.m),
+  },
   {
     name: 'embed', level: 'inline',
     start: (src) => src.indexOf('{{embed'),
@@ -99,8 +116,12 @@ const marked = new Marked({
 const startSyntax = [];
 const inlineTriggers = [];
 
-export function addSyntax({ name, pattern, at = 'inline', render }) {
-  if (!name || !(pattern instanceof RegExp) || typeof render !== 'function') throw new Error('Syntax needs name, pattern and render().');
+export function addSyntax({ name, pattern, at = 'inline', render, mount }) {
+  if (!name || !(pattern instanceof RegExp) || (typeof render !== 'function' && typeof mount !== 'function')) throw new Error('Syntax needs name, pattern and render() or mount().');
+  if (mount) {                                   // live: drawn as a widget that mount() fills on the page
+    widgets.set(name, mount);
+    render = (m) => widget(name, m);
+  }
   const anchored = new RegExp('^(?:' + pattern.source.replace(/^\^/, '') + ')', pattern.flags.replace('g', ''));
   if (at === 'start') { startSyntax.push({ name, pattern: anchored, render }); return; }
   const loose = new RegExp(pattern.source.replace(/^\^/, ''), pattern.flags.replace('g', ''));

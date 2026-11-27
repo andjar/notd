@@ -2,11 +2,14 @@
 // references and embeds filled in from the server (cached per page load).
 
 import DOMPurify from '../vendor/dompurify/purify.js';
-import { toHtml, isPlain, splitStart, HEADING, pageHref } from '../lib/markdown.js';
+import { toHtml, isPlain, splitStart, HEADING, pageHref, widgets } from '../lib/markdown.js';
 import { api } from '../lib/api.js';
+import { mountQuery } from './query.js';
+
+widgets.set('query', mountQuery);
 
 const PURIFY = {
-  ADD_ATTR: ['target', 'data-page', 'data-ref', 'data-key', 'data-embed-block', 'data-embed-page', 'loading', 'data-command'],
+  ADD_ATTR: ['target', 'data-page', 'data-ref', 'data-key', 'data-embed-block', 'data-embed-page', 'loading', 'data-command', 'data-widget', 'data-match'],
   FORBID_TAGS: ['style', 'form', 'textarea', 'select'],
   ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|#|api\/v1\/file\?id=|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
 };
@@ -22,8 +25,8 @@ function fetchNode(id) {
   return nodeCache.get(id);
 }
 
-/** Renders text into el. depth limits embeds inside embeds. */
-export function renderText(el, text, _node, depth = 0) {
+/** Renders text into el. depth limits embeds inside embeds (and queries inside queries). */
+export function renderText(el, text, node, depth = 0) {
   if (isPlain(text) && !splitStart(text).html) {
     el.classList.remove('md');
     el.textContent = text;
@@ -33,6 +36,20 @@ export function renderText(el, text, _node, depth = 0) {
   el.innerHTML = DOMPurify.sanitize(toHtml(text).trim(), PURIFY);
   for (const a of el.querySelectorAll('a.block-ref[data-ref]')) fillRef(a);
   for (const e of el.querySelectorAll('.embed')) fillEmbed(e, depth);
+  for (const w of el.querySelectorAll('.widget[data-widget]')) mountWidget(w, node, depth);
+}
+
+/** A live part of the text (a query, a plugin's board): its mount() fills the element. */
+function mountWidget(w, node, depth) {
+  const mount = widgets.get(w.dataset.widget);
+  let match;
+  try { match = JSON.parse(w.dataset.match); } catch { return; }
+  if (!mount) return;
+  try {
+    mount(w, match, { block: node ?? null, depth, renderText });
+  } catch (e) {
+    w.textContent = `(${w.dataset.widget}: ${e.message})`;
+  }
 }
 
 async function fillRef(a) {

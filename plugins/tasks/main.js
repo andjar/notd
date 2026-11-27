@@ -37,6 +37,23 @@ export function activate(notd) {
   notd.commands.register({ id: 'scheduled', title: 'Scheduled for today', slash: true, slashOnly: true, run: (ctx) => { ctx.insert(''); change(ctx, (t) => setField(keyword(t) ? t : `TODO ${t}`, 'scheduled', today())); } });
   notd.commands.register({ id: 'deadline', title: 'Deadline today', slash: true, slashOnly: true, run: (ctx) => { ctx.insert(''); change(ctx, (t) => setField(keyword(t) ? t : `TODO ${t}`, 'deadline', today())); } });
 
+  // Ready-made task queries for the slash menu.
+  const days = (n) => {                     // today + n days, by the local calendar
+    const d = new Date();
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const quote = (t) => (/[\s"]/.test(t) ? `"${t.replace(/"/g, '')}"` : t);
+  const queries = [
+    ['open', 'Query: open tasks', () => 'task:open sort:-updated'],
+    ['open-here', 'Query: open tasks on this page', (ctx) => `task:open page:${quote(ctx.page?.title ?? '')}`],
+    ['due', 'Query: due within a week', () => `task:open deadline<=${days(7)} sort:deadline`],
+    ['done', 'Query: done this week', () => `task:done done>=${days(-7)} sort:-done`],
+  ];
+  for (const [id, title, q] of queries) {
+    notd.commands.register({ id: `query-${id}`, title, slash: true, slashOnly: true, run: (ctx) => ctx.insert(`{{query ${q(ctx)}}}`) });
+  }
+
   notd.panels.register({ id: 'agenda', slot: 'page.before', order: 10, when: (ctx) => !!ctx.page && /^\d{4}-\d{2}-\d{2}$/.test(ctx.page.title), render: (el, ctx) => agenda(notd, el, ctx.page.title) });
 }
 

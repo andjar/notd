@@ -19,6 +19,7 @@ import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
 import { forgetCached } from './lib/cache.js';
+import { remote } from './lib/remote.js';
 import { notice } from './lib/notice.js';
 import { addFileHandler } from './ui/attach.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
@@ -100,6 +101,7 @@ async function start() {
   document.addEventListener('notd:renamed', (e) => { forgetPages(); forgetCached(); go(e.detail.to); });
   notd.feed = new Feed({ onChanges: (changes) => {
     forgetCached();                         // cached reads (favourites, calendar days) may be stale now
+    document.dispatchEvent(new CustomEvent('notd:changes', { detail: { changes } }));   // queries on screen run again
     for (const screen of liveScreens()) {
       const event = screen.fromFeed(changes);
       if (event?.renamed && screen.announce) go(event.renamed);
@@ -113,7 +115,9 @@ async function start() {
   notd.commands = commands;
   commands.setContext((id) => {
     const screens = liveScreens();
-    const s = (id ? screens.find((x) => x.outline.model.has(id)) : screens.find((x) => x.editor?.editing)) ?? screens.find((x) => x.announce) ?? screens[0];
+    const own = id ? screens.find((x) => x.outline.model.has(id)) : screens.find((x) => x.editor?.editing);
+    if (id && !own && remote.model.has(id)) return { id, outline: remote, editor: null, page: null };   // in a query's results
+    const s = own ?? screens.find((x) => x.announce) ?? screens[0];
     return { id: id ?? s?.editor?.editing ?? null, outline: s?.outline, editor: s?.editor, page: s?.page };
   });
   registerCoreCommands({ palette: new Palette(), go });
