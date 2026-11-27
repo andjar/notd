@@ -30,3 +30,12 @@ function db_file(PDO $pdo): string
 {
     return $pdo->query('PRAGMA database_list')->fetch()['file'];
 }
+
+function copy_tree(string $from, string $to): void
+{
+    mkdir($to, 0777, true);
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($from, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST) as $f) {
+        $target = $to . substr($f->getPathname(), strlen($from));
+        $f->isDir() ? mkdir($target) : copy($f->getPathname(), $target);
+    }
+}

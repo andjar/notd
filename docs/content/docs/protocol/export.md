@@ -47,13 +47,20 @@ POST /api/v1/export
 
 `php tools/import.php <folder>` reads a folder of Markdown back in, through the same operations as any edit, so imported notes are indexed and searchable at once. Importing an export into an empty notebook and exporting again gives the same files. Pages that already exist get the imported blocks added at the end.
 
+**Importing again is safe.** Every block keeps its `id::`, or gets an id worked out from its file, its parent and its text. A block whose id is already in the notebook is left as it is, with any edits made in notd since. So a second import of the same folder adds nothing, and an import of a graph you kept writing in adds only the new blocks. A block whose text changed in the meantime counts as new.
+
+In phpdesktop on Windows, run the tool with phpdesktop's own PHP, from its folder: `php\php.exe www\tools\import.php "C:\path\to\graph"`.
+
 It also reads **Logseq graphs** (and so notd 3 exports, which use Logseq's layout):
 
-- `journals/2026_11_25.md` becomes the journal page `2026-11-25`; `pages/A___B.md` becomes `A/B`; `%3A` and the like in file names are decoded; `title::` wins over the file name.
-- `key:: value` lines become `{key:: value}` fields; a first block made only of properties becomes the page's text. `id::` and `collapsed::` are kept; `heading:: 2` becomes `## `; `created-at::` and `updated-at::` are dropped.
-- Task words `LATER`, `NOW`, `WAIT`, `CANCELED` become `TODO`, `DOING`, `WAITING`, `CANCELLED`; `SCHEDULED: <date>` and `DEADLINE: <date>` become `{scheduled:: date}` and `{deadline:: date}`; `:LOGBOOK:` drawers are dropped.
-- Links to journal days such as `[[Nov 13th, 2023]]` become `[[2023-11-13]]`. Titles with square brackets get round ones instead, and links to them are changed to match.
-- Images and other files linked from a note (`../assets/...`) are stored as notd files and relinked; links to missing files stay as they were.
-- `logseq/`, `whiteboards/` and `draws/` are skipped; `.org` files are reported and skipped.
+- `journals/2026_11_25.md` becomes the journal page `2026-11-25` (any `:journal/file-name-format` in `logseq/config.edn` is understood); `pages/A___B.md` becomes `A/B`, and so does `A.B.md` in an older graph whose `config.edn` uses the legacy file names; `%3A` and the like are decoded; `title::` wins over the file name.
+- `key:: value` lines become `{key:: value}` fields; a first block made only of properties becomes the page's text. `id::` and `collapsed::` are kept; `heading:: 2` becomes `## `; `created-at::`, `updated-at::`, `public::`, `filters::`, `background-color::` and `logseq.…::` are dropped.
+- Task words `LATER`, `NOW`, `WAIT`, `CANCELED` become `TODO`, `DOING`, `WAITING`, `CANCELLED`; a priority `[#A]` becomes `{priority:: A}`; `SCHEDULED: <date>` and `DEADLINE: <date>` become `{scheduled:: date}` and `{deadline:: date}`; `:LOGBOOK:` drawers are dropped.
+- `#+BEGIN_QUOTE` blocks become quotes, `#+BEGIN_SRC lang` and `#+BEGIN_EXAMPLE` fenced code, and `#+BEGIN_NOTE`, `_TIP`, `_WARNING` and the like quotes that start with **Note:**, **Tip:** and so on.
+- Links to journal days in the graph's own title format (`:journal/page-title-format`, by default `[[Nov 13th, 2023]]`) become `[[2023-11-13]]`. Titles with square brackets get round ones instead, and links to them are changed to match.
+- The pages in `:favorites` in `logseq/config.edn` are added to notd's favourites, once.
+- Images and other files linked from a note (`../assets/...`) are stored as notd files and relinked; links to missing files, and to anything outside the graph's folder, stay as they were. Drawings (`[[draws/….excalidraw]]`) are stored and linked the same way when the Excalidraw plugin is on.
+- Logseq queries (`{{query …}}`) use a language of their own, so they are kept as code and reported; write them again as [notd queries](../queries/).
+- `logseq/`, `whiteboards/` and `draws/` are not read as pages; `.org` files are reported and skipped.
 
 **Plain Markdown** works too: text before the first bullet becomes the page's text, and `-`, `*` and `+` bullets become blocks.
