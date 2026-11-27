@@ -12,6 +12,11 @@ L = '01900000-0000-7000-8000-0000000000d3'
 EDITOR = '.drawing-editor .excalidraw'
 
 
+def problems(errors):
+    """Console errors, without the one newer Chrome logs because Excalidraw listens for "unload" (harmless)."""
+    return [e for e in errors if 'unload is not allowed' not in e]
+
+
 def text(s, id, unlike=None):
     """The block's text on the server, once it is no longer `unlike` (edits reach the server a moment later)."""
     for _ in range(100):
@@ -84,7 +89,7 @@ def draw_save_open_again_and_undo():
             page.keyboard.press('Control+z')                                       # the old picture is back
             page.wait_for_function(f"""() => fetch('api/v1/page?title=Sketches').then((r) => r.json())
                 .then((p) => p.blocks[0].text === {json.dumps(first)})""")
-            assert errors == [], errors
+            assert problems(errors) == [], errors
     finally:
         s.stop()
 
@@ -109,7 +114,7 @@ def a_logseq_drawing_opens_and_becomes_a_picture():
             after = text(s, L, unlike=f"Drawing [old.excalidraw](file:{node['id']})")
             assert after.startswith('Drawing ![old.excalidraw.svg](file:') and node['id'] not in after, after
             page.wait_for_selector(f'.block[data-id="{L}"] img[alt="old.excalidraw.svg"]')
-            assert errors == [], errors
+            assert problems(errors) == [], errors
     finally:
         s.stop()
 
