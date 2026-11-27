@@ -1,0 +1,8 @@
+{
+  "name": "kanban",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "{{kanban}} in a block: tasks, or any notes a query finds, as cards in columns by state or by a field. Drag a card to move it.",
+  "browser": "main.js",
+  "styles": ["kanban.css"]
+}
