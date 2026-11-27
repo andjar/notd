@@ -20,6 +20,7 @@ import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
 import { forgetCached } from './lib/cache.js';
 import { remote } from './lib/remote.js';
+import { syncTemplates, PREFIX as TEMPLATES } from './ui/templates.js';
 import { notice } from './lib/notice.js';
 import { addFileHandler } from './ui/attach.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
@@ -102,6 +103,7 @@ async function start() {
   notd.feed = new Feed({ onChanges: (changes) => {
     forgetCached();                         // cached reads (favourites, calendar days) may be stale now
     document.dispatchEvent(new CustomEvent('notd:changes', { detail: { changes } }));   // queries on screen run again
+    if (changes.some((c) => !c.node || (c.node.kind === 'page' && c.node.title?.toLowerCase().startsWith(TEMPLATES)))) syncTemplates();
     for (const screen of liveScreens()) {
       const event = screen.fromFeed(changes);
       if (event?.renamed && screen.announce) go(event.renamed);
@@ -121,6 +123,7 @@ async function start() {
     return { id: id ?? s?.editor?.editing ?? null, outline: s?.outline, editor: s?.editor, page: s?.page };
   });
   registerCoreCommands({ palette: new Palette(), go });
+  syncTemplates();
   new BlockMenu();
   installKeys();
   await loadPlugins(notd);

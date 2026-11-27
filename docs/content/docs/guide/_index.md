@@ -70,6 +70,21 @@ The language (fields, tags, links, pages, dates, words, `OR`, `-` for not, `sort
 
 **/query** in a block offers ready-made ones: an empty query, *tagged …*, *what links here*, *changed today*, and from the tasks plugin *open tasks*, *open tasks on this page*, *due within a week* and *done this week*.
 
+## Templates
+
+A template is a page whose title starts with `notd/templates/`, such as `notd/templates/Meeting`: its blocks are what the template puts in. Every template is in the slash menu: type **/template** and a few letters of its name. In an empty block, the template's first block takes its place, children and all, and the rest follow; in a block with text, the whole template goes in after it. One **Ctrl+Z** takes it all back.
+
+These placeholders are filled in as the template goes in:
+
+| Write | Becomes |
+| --- | --- |
+| `{{date}}`, `{{time}}`, `{{datetime}}` | `2026-11-27`, `14:05`, `2026-11-27 14:05` |
+| `{{year}}`, `{{month}}`, `{{day}}`, `{{weekday}}` | `2026`, `11`, `27`, `Friday` |
+| `{{page}}` | the title of the page it goes into, so `{{query task:open page:"{{page}}"}}` lists that page's tasks |
+| `{{cursor}}` | nothing; the caret is put there |
+
+To make one, write it on a page of that name, or right-click a block's bullet and choose **Save as a template**: the block and its children become a template named after its first line.
+
 ## Files and images
 
 - **Paste** a screenshot or a copied image while you write in a block: it is stored and shows in place. A pasted screenshot gets a name with the date and time.
