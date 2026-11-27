@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>A notebook</title>
+  <link href="https://example.net/"/>
+  <entry>
+    <title type="html">Fractional &lt;em&gt;keys&lt;/em&gt;</title>
+    <link rel="alternate" href="https://example.net/keys"/>
+    <link rel="replies" href="https://example.net/keys#comments"/>
+    <id>tag:example.net,2026:keys</id>
+    <updated>2026-11-26T10:00:00Z</updated>
+    <summary>How sort keys work.</summary>
+  </entry>
+</feed>

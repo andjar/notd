@@ -1,0 +1,8 @@
+{
+  "name": "rss",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Feeds in notes: a block with {feed:: https://...} gets the feed's new items under it, newest first, each once, read every hour.",
+  "browser": "main.js",
+  "server": "server.php"
+}

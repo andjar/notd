@@ -20,6 +20,7 @@ GET /api/v1/plugins
   {"name": "git", "enabled": true, "problem": null, "browser": "plugins/git/main.js"},
   {"name": "kanban", "enabled": true, "problem": null, "browser": "plugins/kanban/main.js"},
   {"name": "mail", "enabled": true, "problem": null, "browser": "plugins/mail/main.js"},
+  {"name": "rss", "enabled": true, "problem": null, "browser": "plugins/rss/main.js"},
   {"name": "tasks", "enabled": true, "problem": null, "browser": "plugins/tasks/main.js"}
 ]}
 ```
