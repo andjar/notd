@@ -86,7 +86,7 @@ def loads_without_errors_and_shows_todays_journal_route():
             assert page.locator('[data-slot="app.status"]').inner_text().strip() == 'Saved'
             for slot in ['app.left', 'app.right', 'page.header', 'page.before', 'page.after', 'app.status']:
                 assert page.locator(f'[data-slot="{slot}"]').count() == 1, slot
-            assert page.title().endswith('· notd')
+            page.wait_for_function("document.title.endsWith('· notd')")   # set once plugins have loaded and the route is shown
             page.evaluate("location.hash = '#/page/' + encodeURIComponent('Østfold')")
             page.wait_for_function("document.title === 'Østfold · notd'")
             page.wait_for_selector('.missing')
