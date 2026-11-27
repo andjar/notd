@@ -70,7 +70,7 @@ final class Import
                     $text = preg_replace('/(?<!`)(\{\{query\s[^\n]*?\}\})(?!`)/i', '`$1`', $text) ?? $text;
                 }
                 $text = preg_replace_callback('/\[\[(draws\/[^\]\n]+\.excalidraw)\]\]/', function ($m) use ($dir, $pdo, $p, &$stats) {
-                    return self::store($pdo, $dir, $m[1], '![{basename}](file:{id})', $p['file'], $stats) ?? $m[0];
+                    return self::store($pdo, $dir, $m[1], '[{basename}](file:{id})', $p['file'], $stats) ?? $m[0];
                 }, $text) ?? $text;
                 return preg_replace_callback('/(!?\[[^\]]*\])\((?!https?:|file:|#)([^)\s]+)\)(\{[^}\n]*\})?/', function ($m) use ($dir, $p, $pdo, &$stats) {
                     return self::store($pdo, $dir, dirname($p['file']) . '/' . rawurldecode($m[2]), $m[1] . '(file:{id})', $p['file'], $stats) ?? $m[0];

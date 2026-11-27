@@ -27,16 +27,18 @@ function specifiers(source) {
   return found;
 }
 
-function* files(dir) {
+function* files(dir, skip = ['tests', 'node_modules']) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
-    if (statSync(path).isDirectory()) { if (name !== 'tests' && name !== 'node_modules') yield* files(path); }
+    if (statSync(path).isDirectory()) { if (!skip.includes(name)) yield* files(path, skip); }
     else if (/\.m?js$/.test(name)) yield path;
   }
 }
 
-/** Browser modules: the client (vendored libraries included) and each plugin's browser code. */
-const browserFiles = () => [...files(join(ROOT, 'client')), ...files(join(ROOT, 'plugins'))];
+/** Browser modules: the client (vendored libraries included) and each plugin's browser code. A plugin's
+    vendor/ folder holds prebuilt libraries it loads as classic scripts (a <script> element, as the
+    excalidraw plugin does with Excalidraw and React), which are not modules, so it is left out. */
+const browserFiles = () => [...files(join(ROOT, 'client')), ...files(join(ROOT, 'plugins'), ['tests', 'node_modules', 'vendor'])];
 
 test('the specifier finder sees every form of import', () => {
   assert.deepEqual(specifiers(`

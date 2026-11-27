@@ -1,0 +1,19 @@
+/* Drawings in notes: a picture you can open. */
+img[alt$=".excalidraw.svg" i] { display: block; margin: 0.35rem 0; cursor: pointer; border-radius: var(--radius); }
+img[alt$=".excalidraw.svg" i]:hover { box-shadow: 0 0 0 2px var(--accent-soft); }
+/* In the dark, a drawing on a plain background is turned to light lines on the dark page, as Excalidraw does. */
+:root[data-theme="dark"] img[alt$=".excalidraw.svg" i] { filter: invert(0.93) hue-rotate(180deg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) img[alt$=".excalidraw.svg" i] { filter: invert(0.93) hue-rotate(180deg); } }
+
+/* The editor covers the window; notd's bar on top, Excalidraw below it. */
+.drawing-editor { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: var(--bg); }
+.drawing-bar { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.75rem; border-bottom: 1px solid var(--border); }
+.drawing-title { font: 600 1.05rem/1.2 var(--font-title); color: var(--fg); margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawing-status { font-size: 0.85rem; color: var(--fg-soft); }
+.drawing-bar button { font: 500 0.9rem/1 var(--font); padding: 0.45rem 0.85rem; border-radius: var(--radius); border: 0; cursor: pointer; background: var(--bg-soft); color: var(--fg); }
+.drawing-bar button:hover { background: var(--bg-hover); }
+.drawing-bar .drawing-save { background: var(--accent); color: var(--bg); }
+.drawing-bar .drawing-save:hover { filter: brightness(1.08); background: var(--accent); }
+.drawing-bar button:disabled { opacity: 0.6; cursor: default; }
+.drawing-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.drawing-canvas { flex: 1; min-height: 0; position: relative; }
