@@ -14,6 +14,8 @@ A page is an outline of **blocks**: each bullet is one block, and blocks nest un
 
 **Moving with the mouse or a finger:** drag a block by its bullet. A line shows where it will go: above or below the block under the pointer, or, further to the right, as its first child. Its children move with it.
 
+**Pages inside pages:** a slash in a title puts the page under another one. `Projects/Alpha/Notes` is under `Projects/Alpha`, which is under `Projects`. Above its title, links lead up to the pages it is under; under a page, the pages directly under it are listed, with how many pages are under each of those in turn. A page only has to exist for its own title: `Projects` lists `Gamma` as soon as `Projects/Gamma/Plan` exists.
+
 A link to a page that does not exist yet shows “There is no page called … yet” with a button to create it. Journal pages (titles like `2026-11-25`) are created the moment you open them.
 
 ## Writing

@@ -348,3 +348,13 @@ body.has-toolbar .main { padding-bottom: 50vh; }
   outline: none;
 }
 .menu.palette input::placeholder { color: var(--fg-faint); }
+
+/* Pages inside pages: the way up above the title, the pages under it below the page. */
+.parents { padding-left: var(--inset); margin-bottom: 0.15rem; font-size: 0.875rem; color: var(--fg-faint); }
+.parents a { color: var(--fg-soft); text-decoration: none; }
+.parents a:hover { color: var(--accent); }
+.child-pages { list-style: none; margin: 0 0 0 var(--inset); padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.child-pages li { display: flex; align-items: baseline; gap: 0.3rem; padding: 0.2rem 0.6rem; background: var(--bg-soft); border-radius: var(--radius); }
+.child-pages a { color: var(--fg); text-decoration: none; font-family: var(--font-title); font-weight: 600; }
+.child-pages a:hover { color: var(--accent); }
+.child-pages .hint { padding: 0; font-size: 0.75rem; }

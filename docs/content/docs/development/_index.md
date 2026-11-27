@@ -192,6 +192,8 @@ client/
   lib/remote.js   blocks shown but not on a page on screen (query results): changed through the server
   lib/notice.js   short messages in the bar (what an upload does, why a file was refused)
   panels/backlinks.js linked references under the page
+  panels/namespace.js pages inside pages: the pages a title is under (above it) and the pages under it
+  lib/namespace.js    which titles sit directly under a title
   ui/drag.js      moving blocks by dragging their bullet (pointer events, so touch works too)
   ui/toolbar.js   the editing toolbar on phones; its buttons send the editor the same keys a keyboard would
   ui/editor.js    editing: one block at a time as plain text (contenteditable="plaintext-only"), the keys

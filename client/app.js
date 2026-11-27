@@ -17,6 +17,7 @@ import { addSyntax } from './lib/markdown.js';
 import { pluginsPanel, safeModePanel } from './panels/plugins.js';
 import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
+import { parentsPanel, childrenPanel } from './panels/namespace.js';
 import { forgetPages } from './ui/autocomplete.js';
 import { forgetCached } from './lib/cache.js';
 import { remote } from './lib/remote.js';
@@ -89,7 +90,8 @@ async function start() {
   if (!status.authenticated) await gate(status);
   setupFrame();
   app.hidden = false;
-  for (const p of [searchPanel({ go }), headerPanel(), backlinksPanel(), favouritesPanel(), recentPanel(), calendarPanel(), statusPanel(), pluginsPanel(), safeModePanel()]) panels.register(p);
+  for (const p of [searchPanel({ go }), headerPanel(), parentsPanel(), childrenPanel(), backlinksPanel(), favouritesPanel(), recentPanel(), calendarPanel(),
+    statusPanel(), pluginsPanel(), safeModePanel()]) panels.register(p);
   document.addEventListener('notd:route', (e) => {
     forgetPages();
     notd.screen?.dispose();
