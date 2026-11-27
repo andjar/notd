@@ -176,7 +176,7 @@ final class Plugins
             'svg' => 'image/svg+xml', 'png' => 'image/png', 'woff2' => 'font/woff2'];
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         $abs = $p ? realpath($p['dir'] . '/' . $path) : false;
-        if (!$p || !isset($types[$ext]) || $path === 'plugin.json' || $abs === false || !str_starts_with($abs, realpath($p['dir']) . '/') || !is_file($abs)) {
+        if (!$p || !isset($types[$ext]) || $path === 'plugin.json' || $abs === false || !str_starts_with($abs, realpath($p['dir']) . DIRECTORY_SEPARATOR) || !is_file($abs)) {
             throw new HttpError(404, 'not_found', "No such file: plugins/$name/$path");
         }
         return new FileResponse($abs, $types[$ext], basename($abs), md5_file($abs), true);

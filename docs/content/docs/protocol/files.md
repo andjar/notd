@@ -14,7 +14,7 @@ A note refers to a file with a Markdown link or image to `file:<id>`: `![holiday
 
 ## Accepted files
 
-At most 50 MB. The extension must be one of: `png jpg jpeg gif webp avif svg pdf txt md csv json mp3 m4a wav ogg mp4 webm zip docx xlsx pptx odt`, and the content must match it (checked with PHP's `finfo`; plain text must be UTF-8). Anything else is refused with `415 bad_type`; a file that is too large with `413 too_large`.
+At most 50 MB. The extension must be one of: `png jpg jpeg gif webp avif svg pdf txt md csv json excalidraw mp3 m4a wav ogg mp4 webm zip docx xlsx pptx odt`, and the content must match it (checked with PHP's `finfo`; plain text must be UTF-8). Anything else is refused with `415 bad_type`; a file that is too large with `413 too_large`.
 
 ## Deleting
 

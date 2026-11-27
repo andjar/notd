@@ -74,6 +74,7 @@ test('Logseq journals: task words, schedules, logbooks, ids, collapsed, journal 
     eq(substr($j[5]['text'], -37), substr($j[6]['text'], -37), 'the same image is one file');
     ok(str_contains($j[7]['text'], '](file:') && !str_contains($j[7]['text'], 'assets/'), $j[7]['text']);
     ok(str_contains($j[8]['text'], '../assets/nope.png'), 'a missing file keeps its link');
+    ok(preg_match('/^Drawing \[2023-11-01-10-00-00\.excalidraw\]\(file:[0-9a-f-]{36}\)$/', $j[9]['text']) === 1, $j[9]['text']);
     $links = end($j);
     $prev = $j[count($j) - 3];
     eq('Link to yesterday [[2023-11-13]] and a page with brackets [[Weird (x) name]]', $prev['text']);

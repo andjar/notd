@@ -71,7 +71,8 @@ export function keyLabel(spec) {
 
 export function installKeys() {
   addEventListener('keydown', (e) => {
-    if (e.defaultPrevented || e.isComposing) return;
+    // While something with data-own-keys is open (a plugin's full-screen editor), its keys are its own.
+    if (e.defaultPrevented || e.isComposing || document.querySelector('[data-own-keys]')) return;
     for (const c of registry.values()) {
       if (c.key && matches(e, c.key)) {
         const ctx = contextFor();

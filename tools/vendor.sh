@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rebuilds client/vendor/ from the npm registry. The vendored files are committed;
+# Rebuilds client/vendor/ (and plugins/excalidraw/vendor/) from the npm registry. The vendored files are committed;
 # run this only to upgrade a library on purpose, then run all the tests.
 # Usage: sh tools/vendor.sh
 set -eu
@@ -44,6 +44,30 @@ cp "$tmp/newsreader/package/files/newsreader-latin-opsz-normal.woff2" \
    "$tmp/newsreader/package/files/newsreader-latin-ext-opsz-normal.woff2" \
    "$tmp/newsreader/package/LICENSE" "$dst/"
 
+# Excalidraw: the drawing editor of the excalidraw plugin (MIT), with React 18 (MIT),
+# which it needs. Excalidraw 0.17 is the last release with a build that runs as a
+# plain script (no bundler, no import map); it and React are loaded only when a
+# drawing is opened. Its fonts, translations and the chunk for Mermaid diagrams and
+# image resizing come too; the development builds do not.
+fetch @excalidraw/excalidraw@0.17.6 excalidraw
+fetch react@18.3.1 react
+fetch react-dom@18.3.1 react-dom
+dst=plugins/excalidraw/vendor
+rm -rf "$dst" && mkdir -p "$dst"
+cp "$tmp/react/package/umd/react.production.min.js" "$dst/react.js"
+cp "$tmp/react-dom/package/umd/react-dom.production.min.js" "$dst/react-dom.js"
+cp "$tmp/react/package/LICENSE" "$dst/LICENSE-react"
+cp "$tmp/excalidraw/package/dist/excalidraw.production.min.js" "$dst/excalidraw.js"
+cp "$tmp/excalidraw/package/dist/excalidraw.production.min.js.LICENSE.txt" "$dst/excalidraw.js.LICENSE.txt"
+cp -R "$tmp/excalidraw/package/dist/excalidraw-assets" "$dst/excalidraw-assets"
+printf '%s\n' "excalidraw.js and excalidraw-assets/: @excalidraw/excalidraw 0.17.6, MIT License," \
+  "Copyright (c) 2020 Excalidraw (https://github.com/excalidraw/excalidraw); the licenses of the" \
+  "libraries bundled in it are in excalidraw.js.LICENSE.txt. react.js and react-dom.js: React 18.3.1," \
+  "MIT License (LICENSE-react)." > "$dst/NOTICE"
+find plugins/excalidraw/vendor -name '*.js' | while read -r f; do
+  grep -v '^//# sourceMappingURL=' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+done
+
 # The source maps are not vendored, so drop the comments that point to them (DevTools
 # would ask the server for each one and log a 404).
 find client/vendor -name '*.js' | while read -r f; do
@@ -56,4 +80,4 @@ if grep -rlE "(from|import)[[:space:]]*['\"][^./'\"]" client/vendor --include='*
   echo "a vendored file imports by a bare name (above); notd has no import map" >&2; exit 1
 fi
 
-echo "client/vendor rebuilt:"; du -sh client/vendor/*
+echo "client/vendor rebuilt:"; du -sh client/vendor/* plugins/excalidraw/vendor

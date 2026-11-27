@@ -17,6 +17,7 @@ GET /api/v1/plugins
 ```response
 200
 {"safe": false, "api": 1, "plugins": [
+  {"name": "excalidraw", "enabled": true, "problem": null, "browser": "plugins/excalidraw/main.js"},
   {"name": "git", "enabled": true, "problem": null, "browser": "plugins/git/main.js"},
   {"name": "kanban", "enabled": true, "problem": null, "browser": "plugins/kanban/main.js"},
   {"name": "mail", "enabled": true, "problem": null, "browser": "plugins/mail/main.js"},

@@ -59,7 +59,7 @@ It also reads **Logseq graphs** (and so notd 3 exports, which use Logseq's layou
 - `#+BEGIN_QUOTE` blocks become quotes, `#+BEGIN_SRC lang` and `#+BEGIN_EXAMPLE` fenced code, and `#+BEGIN_NOTE`, `_TIP`, `_WARNING` and the like quotes that start with **Note:**, **Tip:** and so on.
 - Links to journal days in the graph's own title format (`:journal/page-title-format`, by default `[[Nov 13th, 2023]]`) become `[[2023-11-13]]`. Titles with square brackets get round ones instead, and links to them are changed to match.
 - The pages in `:favorites` in `logseq/config.edn` are added to notd's favourites, once.
-- Images and other files linked from a note (`../assets/...`) are stored as notd files and relinked; links to missing files, and to anything outside the graph's folder, stay as they were. Drawings (`[[draws/….excalidraw]]`) are stored and linked the same way when the Excalidraw plugin is on.
+- Images and other files linked from a note (`../assets/...`) are stored as notd files and relinked; links to missing files, and to anything outside the graph's folder, stay as they were. Drawings (`[[draws/….excalidraw]]`) are stored the same way and linked as files, `[name.excalidraw](file:…)`; with the excalidraw plugin, clicking one opens it, and saving turns it into a picture.
 - Logseq queries (`{{query …}}`) use a language of their own, so they are kept as code and reported; write them again as [notd queries](../queries/).
 - `logseq/`, `whiteboards/` and `draws/` are not read as pages; `.org` files are reported and skipped.
 

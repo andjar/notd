@@ -9,7 +9,7 @@ const FILE_TYPES = [
     'png' => ['image/png'], 'jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'gif' => ['image/gif'],
     'webp' => ['image/webp'], 'avif' => ['image/avif'], 'svg' => ['image/svg+xml', 'text/xml', 'text/plain'],
     'pdf' => ['application/pdf'], 'txt' => ['text/plain'], 'md' => ['text/plain', 'text/markdown'],
-    'csv' => ['text/csv', 'text/plain', 'application/csv'], 'json' => ['application/json', 'text/plain'],
+    'csv' => ['text/csv', 'text/plain', 'application/csv'], 'json' => ['application/json', 'text/plain'], 'excalidraw' => ['application/json', 'text/plain'],
     'mp3' => ['audio/mpeg'], 'm4a' => ['audio/mp4', 'audio/x-m4a'], 'wav' => ['audio/x-wav', 'audio/wav'],
     'ogg' => ['audio/ogg', 'video/ogg'], 'mp4' => ['video/mp4'], 'webm' => ['video/webm'],
     'zip' => ['application/zip'], 'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],

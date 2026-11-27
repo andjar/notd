@@ -1,0 +1,8 @@
+{
+  "name": "excalidraw",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "Drawings in notes: /Drawing opens Excalidraw; a drawing is saved as an SVG picture that opens again for editing with a click.",
+  "browser": "main.js",
+  "styles": ["excalidraw.css"]
+}
