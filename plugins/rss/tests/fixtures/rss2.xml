@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Garden &amp; Kitchen</title>
+    <link>https://example.org/</link>
+    <atom:link href="https://example.org/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Sowing [peas] in November</title>
+      <link>https://example.org/peas</link>
+      <guid isPermaLink="false">post-3</guid>
+      <pubDate>Wed, 25 Nov 2026 08:00:00 +0000</pubDate>
+      <description><![CDATA[<p>Peas can go in <b>now</b>, under glass.</p><script>alert(1)</script>]]></description>
+    </item>
+    <item>
+      <title>Blåbærsyltetøy</title>
+      <link>https://example.org/jam</link>
+      <guid>post-2</guid>
+      <pubDate>Mon, 23 Nov 2026 08:00:00 +0000</pubDate>
+      <content:encoded><![CDATA[<p>Jam with {curly} bits.</p>]]></content:encoded>
+    </item>
+    <item>
+      <title>Older</title>
+      <link>https://example.org/older</link>
+      <guid>post-1</guid>
+      <pubDate>Fri, 20 Nov 2026 08:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

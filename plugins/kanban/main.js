@@ -45,7 +45,7 @@ export function activate(notd) {
     },
   });
 
-  notd.commands.register({ id: 'new', title: 'Kanban board of tasks', slash: true, slashOnly: true, run: (ctx) => ctx.insert('{{kanban }}') });
+  notd.commands.register({ id: 'new', title: 'Kanban board of tasks', slash: true, slashOnly: true, run: (ctx) => ctx.insert('{{kanban }}', 9) });
   notd.commands.register({
     id: 'here', title: 'Kanban board of tasks on this page', slash: true, slashOnly: true,
     run: (ctx) => {
