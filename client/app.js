@@ -19,6 +19,7 @@ import { JournalScreen } from './ui/journal.js';
 import { backlinksPanel } from './panels/backlinks.js';
 import { forgetPages } from './ui/autocomplete.js';
 import { forgetCached } from './lib/cache.js';
+import { notice } from './lib/notice.js';
 import { favouritesPanel, recentPanel, calendarPanel, statusPanel, headerPanel } from './panels/sidebar.js';
 
 export const notd = {
@@ -38,6 +39,7 @@ export const notd = {
         run: (id, extra) => commands.run(id, extra),
       },
       on: (event, fn) => document.addEventListener('notd:' + event, (e) => fn(e.detail)),
+      notice: (text, options) => notice(text, options),
     });
   },
 };

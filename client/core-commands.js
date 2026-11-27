@@ -2,6 +2,7 @@
 
 import { commands } from './lib/commands.js';
 import { today, pageLink } from './lib/route.js';
+import { pickFiles, upload, insertIntoBlock } from './ui/attach.js';
 
 export function registerCoreCommands({ palette, go }) {
   const reg = (c) => commands.register(c);
@@ -40,6 +41,12 @@ export function registerCoreCommands({ palette, go }) {
   reg({ id: 'block.today', title: "Today's date", slash: true, slashOnly: true, run: (ctx) => ctx.insert(`[[${today()}]]`) });
   reg({ id: 'block.link', title: 'Link to a page', slash: true, slashOnly: true, run: (ctx) => ctx.insert('[[', 2) });
   reg({ id: 'block.code', title: 'Code block', slash: true, slashOnly: true, run: (ctx) => ctx.insert('```\n\n```', 4) });
+  const attach = async (ctx) => {
+    const files = await pickFiles();
+    const links = files.length ? await upload(files) : [];
+    if (links.length && ctx.editor) insertIntoBlock(ctx.editor, ctx.id, links.join(' '));
+  };
+  reg({ id: 'block.file', title: 'File or image', slash: true, slashOnly: true, run: (ctx) => { ctx.insert(''); return attach(ctx); } });
 
   // On a block, through its menu.
   reg({
@@ -58,5 +65,6 @@ export function registerCoreCommands({ palette, go }) {
     id: 'block.expand-all', title: 'Unfold everything under it', menu: 'block',
     run(ctx) { for (const id of ctx.outline.model.subtreeIds(ctx.id)) ctx.outline.setCollapsed(id, false); },
   });
+  reg({ id: 'block.attach', title: 'Attach a file', menu: 'block', run: attach });
   reg({ id: 'block.delete', title: 'Delete block', menu: 'block', run: (ctx) => ctx.outline.remove(ctx.id) });
 }

@@ -134,8 +134,17 @@ export function calendarPanel() {
 export function statusPanel() {
   let state = { pending: 0, offline: false };
   let host = null;
+  let message = null;                       // a notice (lib/notice.js) shown instead, for a while
+  let timer = 0;
   document.addEventListener('notd:saving', (e) => { state = e.detail; if (host) draw(); });
+  document.addEventListener('notd:notice', (e) => {
+    message = e.detail;
+    clearTimeout(timer);
+    if (!message.sticky) timer = setTimeout(() => { message = null; if (host) draw(); }, message.error ? 8000 : 4000);
+    if (host) draw();
+  });
   function draw() {
+    if (message) { render(html`<span class=${message.error ? 'warn' : ''} title=${message.text} role=${message.error ? 'alert' : 'status'}>${message.text}</span>`, host); return; }
     const text = state.offline ? `Offline · ${state.pending} change${state.pending === 1 ? '' : 's'} waiting`
       : state.pending ? 'Saving…' : 'Saved';
     render(html`<span class=${state.offline ? 'warn' : ''} role="status">${text}</span>`, host);

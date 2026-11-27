@@ -66,6 +66,7 @@ svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; strok
 /* The save status sits in the bar, quiet until something needs attention. */
 .status { display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; color: var(--fg-faint); white-space: nowrap; }
 .status > .panel { padding: 0; }
+.status span { display: block; max-width: min(40vw, 30rem); overflow: hidden; text-overflow: ellipsis; }
 .status .warn, .status a.warn { color: var(--danger); text-decoration: none; }
 
 .icon {
