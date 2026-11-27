@@ -43,7 +43,7 @@ export function registerCoreCommands({ palette, go }) {
   reg({ id: 'block.code', title: 'Code block', slash: true, slashOnly: true, run: (ctx) => ctx.insert('```\n\n```', 4) });
   const attach = async (ctx) => {
     const files = await pickFiles();
-    const links = files.length ? await upload(files) : [];
+    const links = files.length ? await upload(files, { block: ctx.id }) : [];
     if (links.length && ctx.editor) insertIntoBlock(ctx.editor, ctx.id, links.join(' '));
   };
   reg({ id: 'block.file', title: 'File or image', slash: true, slashOnly: true, run: (ctx) => { ctx.insert(''); return attach(ctx); } });

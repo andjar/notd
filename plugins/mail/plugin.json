@@ -1,0 +1,8 @@
+{
+  "name": "mail",
+  "version": "1.0.0",
+  "api": 1,
+  "description": "E-mail into notes: an .eml file, dropped onto notd, picked with \"Add an e-mail\", or piped in by a mail server, becomes a note on today's journal with its attachments.",
+  "browser": "main.js",
+  "server": "server.php"
+}

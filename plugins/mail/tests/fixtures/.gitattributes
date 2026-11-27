@@ -1,0 +1,2 @@
+# Real messages: CRLF line endings, kept as they are.
+*.eml -text

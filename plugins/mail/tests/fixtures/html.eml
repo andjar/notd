@@ -1,0 +1,8 @@
+From: news@example.com
+To: anders@example.no
+Subject: Monthly update
+Date: Fri, 27 Nov 2026 08:00:00 +0000
+Message-ID: <news-42@example.com>
+Content-Type: text/html; charset=iso-8859-1
+
+<html><head><style>p{}</style></head><body><h1>Update</h1><p>Read <a href="https://example.com/a">the article</a> about <b>blåbær</b>.</p><ul><li>One</li><li>Two</li></ul></body></html>

@@ -11,6 +11,18 @@ import { readText, getCaret } from './editor.js';
 
 export const MAX_BYTES = 50 * 1024 * 1024;           // the server's limit (see docs/protocol/files.md)
 
+/**
+ * Plugins can take files of their own kind instead of having them stored (the mail plugin takes
+ * .eml files): { accept(file) -> bool, handle(file, { block }) -> Promise<string> }, where block is
+ * the block the file goes into (null when it was dropped onto the page) and the string is the text
+ * to put there ('' for none).
+ */
+const handlers = [];
+export function addFileHandler(h) {
+  if (typeof h?.accept !== 'function' || typeof h?.handle !== 'function') throw new Error('A file handler needs accept() and handle().');
+  handlers.push(h);
+}
+
 /** The Markdown that links an uploaded file node, under the name it was uploaded with (the same content may have come before under another). */
 export function fileLink(node, name = node.title) {
   name = String(name || 'file').replace(/[[\]\n]/g, '');
@@ -27,10 +39,21 @@ function named(file) {
 }
 
 /** Uploads files one at a time; returns the links of those the server took. Says what happens in the status. */
-export async function upload(files) {
+export async function upload(files, { block = null } = {}) {
   const links = [];
   for (const raw of files) {
     const file = named(raw);
+    const handler = handlers.find((h) => { try { return h.accept(file); } catch { return false; } });
+    if (handler) {
+      try {
+        const text = await handler.handle(file, { block });
+        if (text) links.push(text);
+      } catch (e) {
+        notice(`${file.name}: ${e.message}`, { error: true });
+      }
+      window.notd?.feed?.poll();             // whatever the plugin added shows now, not at the next poll
+      continue;
+    }
     if (file.size > MAX_BYTES) { notice(`${file.name} is larger than 50 MB, so it was not attached.`, { error: true }); continue; }
     notice(`Uploading ${file.name}…`, { sticky: true });
     try {
@@ -84,7 +107,7 @@ export function acceptFiles(screen) {
     const files = [...(e.clipboardData?.files ?? [])];
     if (!id || !files.length || e.clipboardData.getData('text/plain')) return;   // text wins: copying from Word gives both
     e.preventDefault();
-    const links = await upload(files);
+    const links = await upload(files, { block: id });
     if (links.length) insertIntoBlock(screen.editor, id, links.join(' '));
   });
   root.addEventListener('dragover', (e) => {
@@ -100,7 +123,7 @@ export function acceptFiles(screen) {
     mark(null);
     const files = [...e.dataTransfer.files];
     const target = e.target.closest('.block')?.dataset.id;
-    const links = await upload(files);
+    const links = await upload(files, { block: target ?? null });
     if (!links.length) return;
     if (target && screen.outline.model.has(target)) { insertIntoBlock(screen.editor, target, links.join(' ')); return; }
     const last = screen.outline.model.children(screen.page.id).at(-1);
