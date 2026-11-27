@@ -1,0 +1,26 @@
+/* A board: columns on a tinted ground, cards on the page's own colour lifted a little. */
+.kanban { display: block; margin: 0.15rem 0 0.5rem; }
+.kanban-columns { display: flex; gap: 0.6rem; overflow-x: auto; padding-bottom: 0.25rem; align-items: flex-start; }
+.kanban-column {
+  flex: 1 1 0; min-width: 8.5rem; max-width: 18rem; min-height: 4.5rem;
+  background: var(--bg-soft); border-radius: var(--radius-lg); padding: 0.5rem 0.45rem 0.45rem;
+  transition: box-shadow 0.12s;
+}
+.kanban-column.kanban-over { box-shadow: inset 0 0 0 2px var(--accent-soft); background: var(--bg-hover); }
+.kanban-column h4 { display: flex; justify-content: space-between; gap: 0.5rem; margin: 0 0.3rem 0.4rem; font: 600 0.8rem/1.3 var(--font); color: var(--fg-soft); }
+.kanban-count { font-weight: 400; color: var(--fg-faint); }
+.kanban .kanban-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.kanban-card {
+  background: var(--bg); border-radius: var(--radius); padding: 0.4rem 0.55rem 0.35rem;
+  box-shadow: 0 1px 2px rgb(40 30 20 / 0.08); cursor: grab; font-size: 0.92rem; line-height: 1.4;
+  overflow-wrap: anywhere; user-select: none; -webkit-touch-callout: none;
+}
+.kanban-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.kanban-card.kanban-held { box-shadow: 0 0 0 2px var(--accent-soft); }
+.kanban-card.kanban-dragging { position: relative; z-index: 5; cursor: grabbing; pointer-events: none; box-shadow: var(--shadow); }
+.kanban-text p { margin: 0; }
+.kanban-where { display: block; margin-top: 0.15rem; font-size: 0.75rem; color: var(--fg-faint); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kanban-where:hover { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .kanban-column { transition: none; } .kanban-card.kanban-dragging { transform: none; } }
+.kanban-column[data-value='"DONE"'] .kanban-text, .kanban-column[data-value='"CANCELLED"'] .kanban-text { color: var(--fg-soft); }
+@media (max-width: 600px) { .kanban-columns { scroll-snap-type: x proximity; } .kanban-column { scroll-snap-align: start; flex-basis: 70%; } }
