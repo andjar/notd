@@ -44,14 +44,22 @@ Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`,
 | `((block id))` | The text of another block, linked to it. |
 | `{{embed ((block id))}}`, `{{embed [[Page]]}}` | A block with its children, or a whole page, shown in place. |
 | `{rating:: 5}` | A field, shown as a small label; fields can be queried. |
-| `![name](file:id)` | A stored image (or `[name](file:id)` for a link to a file). |
+| `![name](file:id)` | A stored image (or `[name](file:id)` for a link to a file). You rarely type these: see *Files and images* below. |
 
 ## Commands
 
 - **Ctrl+K** (Cmd+K on a Mac) opens the command palette: type a few letters of what you want, Enter runs it. Every command, including those plugins add, is there, with its key if it has one.
 - **/** in a block opens the slash menu: headings, today's date, a link, a code block, and whatever plugins add. Keep typing to narrow it, Enter or Tab picks.
-- **Right-click a bullet** (or long-press it on a phone) for the block's menu: copy a reference to it, zoom in, fold or unfold everything under it, delete it.
+- **Right-click a bullet** (or long-press it on a phone) for the block's menu: copy a reference to it, zoom in, fold or unfold everything under it, attach a file, delete it.
 - **Ctrl+/** goes to search.
+
+## Files and images
+
+- **Paste** a screenshot or a copied image while you write in a block: it is stored and shows in place. A pasted screenshot gets a name with the date and time.
+- **Drop** files from your computer onto a block to add them to it, or onto the page (not on a block) for a new block with them.
+- **/file** in a block, or **Attach a file** in its menu, opens your computer's (or phone's) file picker.
+
+Images show in the note; other files are links with a paper clip. Anything up to 50 MB of the usual kinds is accepted: images, PDF, text and CSV, audio and video, Office and OpenDocument files, zip (the full list is under [Files](../protocol/files/#accepted-files)). Storing the same file twice keeps one copy. The bar above the page says what is being uploaded, and why a file was refused.
 
 ## Tasks
 

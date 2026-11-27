@@ -64,6 +64,7 @@ export function activate(notd) {
 | `syntax.register({ name, pattern, at, render(match) })` | Draws text that matches `pattern`. With `at: 'start'` it must open the block (a task's `TODO `) and is drawn in front of the rest; otherwise it may appear anywhere, but never inside code. `render` returns HTML, which is sanitised like everything else; give interactive parts a `data-command` so a click runs a command for that block. The text itself is never changed by drawing. |
 | `go(title, block)` | Opens a page. |
 | `on(event, fn)` | Listens for `route`, `page`, `saving` and `renamed`. |
+| `notice(text, { error, sticky })` | Shows a short message in the bar above the page for a few seconds (an error a little longer, a sticky one until the next message). |
 
 
 

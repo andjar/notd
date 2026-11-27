@@ -13,6 +13,7 @@ import { renderText, forgetNodes } from './text.js';
 import { Autocomplete } from './autocomplete.js';
 import { Drag } from './drag.js';
 import { SlashMenu } from './menus.js';
+import { acceptFiles } from './attach.js';
 
 export const outbox = new Outbox({
   send: (ops) => api.ops(ops),
@@ -38,6 +39,7 @@ export class PageScreen {
     this.page = null;
     this.title = null;
     live.add(this);
+    acceptFiles(this);                      // files pasted into, or dropped onto, this page
   }
 
   /** Stops using this screen (another page or the journal took its place). */
