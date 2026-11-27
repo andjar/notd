@@ -186,6 +186,8 @@ client/
   ui/text.js      draws a block's text: Markdown through DOMPurify, then references and embeds filled in
   ui/autocomplete.js  link suggestions at the caret
   ui/attach.js    files pasted, dropped or picked: uploaded and linked in the block's text
+  ui/query.js     {{query ...}}: results in place (list, table, groups), run again on changes
+  lib/remote.js   blocks shown but not on a page on screen (query results): changed through the server
   lib/notice.js   short messages in the bar (what an upload does, why a file was refused)
   panels/backlinks.js linked references under the page
   ui/drag.js      moving blocks by dragging their bullet (pointer events, so touch works too)

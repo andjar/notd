@@ -60,7 +60,8 @@ def the_slash_menu_in_a_block():
             page.keyboard.press('End')
             page.keyboard.type(' /tod')
             page.wait_for_selector('.menu.slash:not([hidden]) li')
-            assert page.locator('.menu.slash li').all_inner_texts() == ["Today's date"]
+            assert page.locator('.menu.slash li').all_inner_texts() == ["Today's date", 'Query: changed today']
+            assert page.locator('.menu.slash li.active').inner_text() == "Today's date"
             page.keyboard.press('Enter')
             page.keyboard.type(' /head')
             page.wait_for_selector('.menu.slash li:has-text("Heading 2")')

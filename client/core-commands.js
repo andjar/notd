@@ -41,6 +41,13 @@ export function registerCoreCommands({ palette, go }) {
   reg({ id: 'block.today', title: "Today's date", slash: true, slashOnly: true, run: (ctx) => ctx.insert(`[[${today()}]]`) });
   reg({ id: 'block.link', title: 'Link to a page', slash: true, slashOnly: true, run: (ctx) => ctx.insert('[[', 2) });
   reg({ id: 'block.code', title: 'Code block', slash: true, slashOnly: true, run: (ctx) => ctx.insert('```\n\n```', 4) });
+  // Queries: an empty one to fill in, and some ready-made (the tasks plugin adds task queries).
+  const quote = (t) => (/[\s"]/.test(t) ? `"${t.replace(/"/g, '')}"` : t);
+  reg({ id: 'query.new', title: 'Query', slash: true, slashOnly: true, run: (ctx) => ctx.insert('{{query }}', 8) });
+  reg({ id: 'query.tagged', title: 'Query: tagged …', slash: true, slashOnly: true, run: (ctx) => ctx.insert('{{query tag:}}', 12) });
+  reg({ id: 'query.links', title: 'Query: what links here', slash: true, slashOnly: true, when: (ctx) => !!ctx.page,
+    run: (ctx) => ctx.insert(`{{query links:${quote(ctx.page.title)}}}`) });
+  reg({ id: 'query.today', title: 'Query: changed today', slash: true, slashOnly: true, run: (ctx) => ctx.insert(`{{query updated:${today()}}}`) });
   const attach = async (ctx) => {
     const files = await pickFiles();
     const links = files.length ? await upload(files, { block: ctx.id }) : [];

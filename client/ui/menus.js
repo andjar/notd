@@ -84,7 +84,11 @@ class List {
   get open() { return !this.el.hidden; }
 }
 
-const match = (q) => (c) => !q || fold(c.title).includes(fold(q)) || fold(c.id).includes(fold(q));
+/** Every word typed is somewhere in the command's title (or id): "query open" finds "Query: open tasks". */
+const match = (q) => {
+  const words = fold(q ?? '').split(/\s+/).filter(Boolean);
+  return (c) => { const t = fold(c.title) + ' ' + fold(c.id); return words.every((w) => t.includes(w)); };
+};
 
 /** The command palette: every available command, filtered as you type. */
 export class Palette {

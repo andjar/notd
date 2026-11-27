@@ -56,3 +56,10 @@ test('plugin syntax: at the start of a block, and anywhere in it', async () => {
   assert.equal(plain2('as {{@knuth84}} says'), false);
   assert.equal(html2('`{{@code}}`'), '<p><code>{{@code}}</code></p>', 'not inside code');
 });
+
+test('{{query ...}} becomes an empty widget for the browser to fill; code keeps it as text', () => {
+  const html = toHtml('Books: {{query type:book sort:-rating}}');
+  assert.match(html, /<span class="widget" data-widget="query" data-match="\[&quot;\{\{query type:book sort:-rating\}\}&quot;,&quot;type:book sort:-rating&quot;\]"><\/span>/);
+  assert.doesNotMatch(toHtml('`{{query type:book}}`'), /widget/);
+  assert.match(toHtml('{{query}}'), /data-match="\[&quot;\{\{query\}\}&quot;,&quot;&quot;\]"/);
+});
