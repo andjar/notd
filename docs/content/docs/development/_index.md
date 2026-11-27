@@ -187,6 +187,8 @@ client/
   ui/autocomplete.js  link suggestions at the caret
   ui/attach.js    files pasted, dropped or picked: uploaded and linked in the block's text
   ui/query.js     {{query ...}}: results in place (list, table, groups), run again on changes
+  ui/templates.js templates (pages under notd/templates/) in the slash menu, and "Save as a template"
+  lib/placeholders.js  {{date}}, {{page}}, {{cursor}} and the rest, filled in when a template goes in
   lib/remote.js   blocks shown but not on a page on screen (query results): changed through the server
   lib/notice.js   short messages in the bar (what an upload does, why a file was refused)
   panels/backlinks.js linked references under the page

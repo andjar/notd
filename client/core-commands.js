@@ -3,6 +3,7 @@
 import { commands } from './lib/commands.js';
 import { today, pageLink } from './lib/route.js';
 import { pickFiles, upload, insertIntoBlock } from './ui/attach.js';
+import { saveAsTemplate } from './ui/templates.js';
 
 export function registerCoreCommands({ palette, go }) {
   const reg = (c) => commands.register(c);
@@ -73,5 +74,6 @@ export function registerCoreCommands({ palette, go }) {
     run(ctx) { for (const id of ctx.outline.model.subtreeIds(ctx.id)) ctx.outline.setCollapsed(id, false); },
   });
   reg({ id: 'block.attach', title: 'Attach a file', menu: 'block', run: attach });
+  reg({ id: 'block.template', title: 'Save as a template', menu: 'block', run: saveAsTemplate });
   reg({ id: 'block.delete', title: 'Delete block', menu: 'block', run: (ctx) => ctx.outline.remove(ctx.id) });
 }

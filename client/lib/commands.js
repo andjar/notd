@@ -16,6 +16,7 @@ export const commands = {
     if (!cmd.id || typeof cmd.run !== 'function') throw new Error('A command needs id and run().');
     registry.set(cmd.id, { title: cmd.id, ...cmd });
   },
+  unregister(id) { registry.delete(id); },
   get: (id) => registry.get(id) ?? null,
   all: () => [...registry.values()],
 
