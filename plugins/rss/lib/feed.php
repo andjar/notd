@@ -59,7 +59,7 @@ final class FeedReader
         return $status;
     }
 
-    /** ['title' => string, 'items' => list of ['id', 'title', 'link', 'date' (Y-m-d or ''), 'summary'] in the feed's order]. */
+    /** ['title' => string, 'items' => list of ['id', 'title', 'link', 'published' (Y-m-d H:i on this server's clock, or ''), 'summary'] in the feed's order]. */
     public static function parse(string $xml): array
     {
         $doc = new DOMDocument();
@@ -96,12 +96,12 @@ final class FeedReader
                 break;
             }
         }
-        $date = '';
+        $published = '';
         foreach (['pubDate', 'published', 'updated', 'date', 'issued'] as $name) {
             $t = self::text(self::child($el, $name));
             $ts = $t === '' ? false : strtotime($t);
             if ($ts !== false) {
-                $date = date('Y-m-d', $ts);
+                $published = date('Y-m-d H:i', $ts);
                 break;
             }
         }
@@ -114,7 +114,7 @@ final class FeedReader
         }
         $title = self::plain(self::child($el, 'title')?->textContent ?? '');
         $guid = self::text(self::child($el, 'guid')) ?: self::text(self::child($el, 'id')) ?: $link ?: $el->getAttributeNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'about');
-        return ['id' => $guid ?: ($title !== '' ? sha1($title . $date) : ''), 'title' => $title, 'link' => $link, 'date' => $date, 'summary' => $summary];
+        return ['id' => $guid ?: ($title !== '' ? sha1($title . $published) : ''), 'title' => $title, 'link' => $link, 'published' => $published, 'summary' => $summary];
     }
 
     /** HTML or text as one line of plain text. */

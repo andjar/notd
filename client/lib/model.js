@@ -10,6 +10,12 @@ export function compareNodes(a, b) {
   return a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
+/** The view a block shows its children through ({view:: group:published:day}), or null for the tree. */
+export function viewOf(text) {
+  const m = /\{view::([^}\n]*)\}/i.exec(text ?? '');
+  return m ? m[1].trim() : null;
+}
+
 export class OutlineModel {
   constructor() {
     this.pageId = null;
@@ -92,10 +98,10 @@ export class OutlineModel {
     return out;
   }
 
-  /** Blocks that can be seen: children of collapsed blocks left out. */
+  /** Blocks that can be seen: children of collapsed blocks, and of blocks that show them through a view, left out. */
   visible(parent = this.pageId) {
     const out = [];
-    const walk = (p) => { for (const c of this.children(p)) { out.push(c); if (!c.collapsed) walk(c.id); } };
+    const walk = (p) => { for (const c of this.children(p)) { out.push(c); if (!c.collapsed && viewOf(c.text) === null) walk(c.id); } };
     walk(parent);
     return out;
   }

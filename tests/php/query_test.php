@@ -86,6 +86,26 @@ test('group puts nodes under each value, with nodes lacking it last', function (
     eq(['view' => 'table'], (array) $r['options']);
 });
 
+test('group by a time: by day, hour, month or year of a date and time, in the order of the sort', function () {
+    $pdo = fresh_db();
+    $p = new_id();
+    $feed = new_id();
+    $ops = [['op' => 'create', 'kind' => 'page', 'id' => $p, 'title' => 'Feeds'], ['op' => 'create', 'id' => $feed, 'parent' => $p, 'text' => 'Feed']];
+    foreach (['a 2026-11-27 09:15', 'b 2026-11-28 14:05', 'c 2026-11-28 14:40', 'd 2026-11-28 16:00', 'e 2025-12-31 23:59'] as $t) {
+        [$name, $when] = explode(' ', $t, 2);
+        $ops[] = ['op' => 'create', 'parent' => $feed, 'text' => "$name {published:: $when}"];
+    }
+    $ops[] = ['op' => 'create', 'parent' => $p, 'text' => 'not under the feed {published:: 2026-11-28 15:00}'];
+    Ops::apply($pdo, $ops);
+    $groups = fn(string $q) => array_map(fn($g) => [$g['value'], implode('', array_map(fn($n) => $n['text'][0], $g['nodes']))], Query::run($pdo, $q)['groups']);
+    eq([['2026-11-28', 'dcb'], ['2026-11-27', 'a'], ['2025-12-31', 'e']], $groups("parent:$feed group:published:day sort:-published"));
+    eq([['2026-11-28 16', 'd'], ['2026-11-28 14', 'cb'], ['2026-11-27 09', 'a'], ['2025-12-31 23', 'e']], $groups("parent:(($feed)) group:published:hour sort:-published"));
+    eq([['2025-12', 'e'], ['2026-11', 'abcd']], $groups("parent:$feed group:published:month sort:published"));
+    eq([['2025', 'e'], ['2026', 'abcd']], $groups("parent:$feed group:published:year sort:published"));
+    eq(6, count(Query::run($pdo, 'has:published')['nodes']));
+    eq(5, count(Query::run($pdo, "parent:$feed")['nodes']), 'parent: takes the children only');
+});
+
 cases('bad queries are refused with a reason', [
     'empty'          => [''],
     'only options'   => ['sort:title'],

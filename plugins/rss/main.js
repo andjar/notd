@@ -1,6 +1,9 @@
 // The RSS plugin, browser side. Feeds are read on the server, every hour; these
 // commands read them now and say what came in.
 
+// How a new feed shows its items: by day, newest first. {view:: group:published:hour …} splits the days into hours.
+const VIEW = '{view:: group:published:day sort:-published}';
+
 export function activate(notd) {
   const read = async (id) => {
     let r;
@@ -28,5 +31,5 @@ export function activate(notd) {
     when: (ctx) => /\{feed::/i.test(ctx.outline?.model.get(ctx.id)?.text ?? ''),
     run: (ctx) => read(ctx.id),
   });
-  notd.commands.register({ id: 'new', title: 'RSS feed', slash: true, slashOnly: true, run: (ctx) => ctx.insert('{feed:: }', 8) });
+  notd.commands.register({ id: 'new', title: 'RSS feed', slash: true, slashOnly: true, run: (ctx) => ctx.insert(`{feed:: } ${VIEW}`, 8) });
 }

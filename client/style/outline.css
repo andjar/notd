@@ -228,6 +228,18 @@
 .query-where:hover { color: var(--accent); }
 .query-page { color: var(--accent); text-decoration: none; }
 .query section h4 { margin: 0.5rem 0 0.15rem; font: 600 0.85rem/1.3 var(--font); color: var(--fg-soft); }
+.query section h5 { margin: 0.3rem 0 0.1rem; font: 500 0.8rem/1.3 var(--font); color: var(--fg-faint); }
+.query h4.query-day { margin: 0.6rem 0 0; font: 600 0.85rem/1.3 var(--font); color: var(--fg-soft); }
+/* A block's children through its {view:: …}: in the children's place, without the query line or page names. */
+.query-text p { margin: 0 0 0.25em; }
+.query-text p:last-child { margin-bottom: 0; }
+/* A block's children through its {view:: …}: headings where the children's bullets would be, notes where their text would be. */
+.child-view > .query.as-view { margin: 0 0 0.4rem; padding-left: var(--toggle-w); }
+.as-view .query-items { border-left: 0; padding-left: var(--bullet-w); }
+.as-view .query-item { padding: 0.12rem 0; }
+.as-view section h5 { margin-left: var(--bullet-w); }
+.as-view .query-where { display: none; }
+.as-view > section:first-child h4, .as-view > h4.query-day:first-child { margin-top: 0.15rem; }
 .query-table { overflow-x: auto; }
 .query-table table { border-collapse: collapse; font-size: 0.9rem; width: 100%; }
 .query-table th { text-align: left; font-weight: 600; color: var(--fg-soft); font-size: 0.8rem; border-bottom: 1px solid var(--border); padding: 0.25rem 0.6rem 0.25rem 0; }
