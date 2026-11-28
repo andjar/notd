@@ -1,11 +1,11 @@
 <?php
 // Adds e-mail messages to notd from the command line, or from a mail server.
 //
-//   php plugins/mail/mail.php message.eml [more.eml | a folder of them ...]
+//   php plugins/mail/mail.php message.eml [more.eml | message.msg | a folder of them ...]
 //   php plugins/mail/mail.php < message.eml          (what a mail server does)
 //   php plugins/mail/mail.php --page "Inbox" message.eml
 //
-// Each becomes a note on today's journal page (or --page), once: a message that
+// An .eml or an Outlook .msg. Each becomes a note on today's journal page (or --page), once: a message that
 // is there already is left alone. The exit status is what mail servers expect:
 //   0   added, or there already
 //   65  not an e-mail message (EX_DATAERR)
@@ -28,7 +28,8 @@ if (($i = array_search('--page', $args, true)) !== false) {
 $messages = [];
 foreach ($args as $arg) {
     if (is_dir($arg)) {
-        $messages = [...$messages, ...(glob(rtrim($arg, '/\\') . '/*.eml') ?: [])];
+        $dir = rtrim($arg, '/\\');
+        $messages = [...$messages, ...array_map(fn($f) => "$dir/$f", array_values(preg_grep('/\.(eml|msg)$/i', scandir($dir) ?: [])))];
     } elseif (is_file($arg)) {
         $messages[] = $arg;
     } else {

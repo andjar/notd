@@ -12,3 +12,6 @@
 *.pdf binary
 *.zip binary
 *.sqlite binary
+*.msg binary
+*.pst binary
+*.woff2 binary

@@ -13,15 +13,20 @@ export const MAX_BYTES = 50 * 1024 * 1024;           // the server's limit (see 
 
 /**
  * Plugins can take files of their own kind instead of having them stored (the mail plugin takes
- * .eml files): { accept(file) -> bool, handle(file, { block }) -> Promise<string> }, where block is
- * the block the file goes into (null when it was dropped onto the page) and the string is the text
- * to put there ('' for none).
+ * .eml and .msg files): { accept(file) -> bool, handle(file, { block }) -> Promise<string> }, where
+ * block is the block the file goes into (null when it was dropped onto the page) and the string is
+ * the text to put there ('' for none). They can also take pasted text of their kind (a raw e-mail):
+ * { acceptText(text) -> bool, handleText(text, { block }) -> Promise<string> }.
  */
 const handlers = [];
 export function addFileHandler(h) {
-  if (typeof h?.accept !== 'function' || typeof h?.handle !== 'function') throw new Error('A file handler needs accept() and handle().');
+  const files = typeof h?.accept === 'function' && typeof h?.handle === 'function';
+  const text = typeof h?.acceptText === 'function' && typeof h?.handleText === 'function';
+  if (!files && !text) throw new Error('A file handler needs accept() and handle(), or acceptText() and handleText().');
   handlers.push(h);
 }
+
+const takes = (h, method, value) => { try { return typeof h[method] === 'function' && h[method](value); } catch { return false; } };
 
 /** The Markdown that links an uploaded file node, under the name it was uploaded with (the same content may have come before under another). */
 export function fileLink(node, name = node.title) {
@@ -43,7 +48,7 @@ export async function upload(files, { block = null } = {}) {
   const links = [];
   for (const raw of files) {
     const file = named(raw);
-    const handler = handlers.find((h) => { try { return h.accept(file); } catch { return false; } });
+    const handler = handlers.find((h) => takes(h, 'accept', file));
     if (handler) {
       try {
         const text = await handler.handle(file, { block });
@@ -105,7 +110,20 @@ export function acceptFiles(screen) {
   root.addEventListener('paste', async (e) => {
     const id = screen.editor?.editing;
     const files = [...(e.clipboardData?.files ?? [])];
-    if (!id || !files.length || e.clipboardData.getData('text/plain')) return;   // text wins: copying from Word gives both
+    const text = e.clipboardData?.getData('text/plain') ?? '';
+    const taker = !files.length && text ? handlers.find((h) => takes(h, 'acceptText', text)) : null;
+    if (id && taker) {                                // pasted text a plugin takes (a raw e-mail): not typed in
+      e.preventDefault();
+      try {
+        const put = await taker.handleText(text, { block: id });
+        if (put) insertIntoBlock(screen.editor, id, put);
+      } catch (err) {
+        notice(err.message, { error: true });
+      }
+      window.notd?.feed?.poll();
+      return;
+    }
+    if (!id || !files.length || text) return;   // text wins: copying from Word gives both
     e.preventDefault();
     const links = await upload(files, { block: id });
     if (links.length) insertIntoBlock(screen.editor, id, links.join(' '));

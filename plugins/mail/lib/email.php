@@ -27,6 +27,12 @@ final class MailMessage
         return preg_match('/^[A-Za-z0-9-]+:/', $raw) ? [$raw, ''] : ['', $raw];
     }
 
+    /** A block of headers (such as those an Outlook message kept) => [lower-case name => [values in order]]. */
+    public static function headersOf(string $block): array
+    {
+        return trim($block) === '' ? [] : self::headers(str_replace("\r\n", "\n", trim($block, "\r\n")));
+    }
+
     /** Header block => [lower-case name => [values in order]], continuation lines unfolded. */
     private static function headers(string $block): array
     {

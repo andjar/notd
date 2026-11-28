@@ -1,0 +1,9 @@
+The .msg files here are test data from msgreader (https://github.com/HiraokaHyperTools/msgreader),
+Apache License 2.0, copied unchanged under other names:
+
+  attachments.msg      test/attachmentFiles.msg
+  cp932.msg            test/nonUnicodeCP932.msg
+  attached-email.msg   test/Attach sample eml received.msg
+  damaged.msg          test3/cyclicFatRing.msg
+
+A copy of the license: https://www.apache.org/licenses/LICENSE-2.0
