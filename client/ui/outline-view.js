@@ -16,7 +16,8 @@ export const HEADING = /^(#{1,3}) /;
 
 export class OutlineView {
   constructor(root, outline, { renderText = defaultText, link = (id) => '#', zoom = null, view = null } = {}) {
-    this.view = view; // (element, node, view) draws a block's children through its view
+    this.view = view; // (element, node, view) draws a block's children through its view; returns a function that runs it again
+    this.again = new Map(); // id -> timer: a view runs again once for a batch of changes
     this.root = root;
     this.zoom = zoom; // when set, only this block and what is under it are shown
     this.outline = outline;
@@ -130,14 +131,17 @@ export class OutlineView {
     }
     el.dataset.view = view;
     kids.replaceChildren();
-    this.view(kids, n, view);
+    el.runView = this.view(kids, n, view);
   }
 
-  /** Draws a block's view again, after its children changed. */
+  /** Runs a block's view again, in place, after its children changed (once for a batch of changes). */
   #refreshView(id) {
     const el = this.els.get(id);
-    const n = this.model.get(id);
-    if (el?.dataset.view !== undefined && n) this.#fillChildren(el, n);
+    if (el?.dataset.view === undefined || this.again.has(id)) return;
+    this.again.set(id, setTimeout(() => {
+      this.again.delete(id);
+      if (el.isConnected) el.runView?.();
+    }, 100));
   }
 
   #fillContent(el, n) {

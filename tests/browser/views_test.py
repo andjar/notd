@@ -59,7 +59,7 @@ def children_show_through_the_view():
 
             s.ops({'op': 'create', 'parent': V, 'text': 'Epsilon {published:: 2026-11-28 17:30}'})   # from elsewhere
             page.evaluate('window.notd.feed.poll()')
-            page.wait_for_function(f"document.querySelector('.block[data-id=\"{V}\"] .query section h5').textContent === '17:00'")
+            page.wait_for_function(f"document.querySelector('.block[data-id=\"{V}\"] .query section h5')?.textContent === '17:00'")
             assert errors == [], errors
     finally:
         s.stop()

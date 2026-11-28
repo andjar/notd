@@ -33,7 +33,7 @@ const el = (tag, props = {}, ...children) => {
   return e;
 };
 
-/** Fills a widget element with the results of query q. ctx: { block, depth, renderText, asView }. */
+/** Fills a widget element with the results of query q, and returns a function that runs it again. ctx: { block, depth, renderText, asView }. */
 export function mountQuery(host, [, q], { block, depth = 0, renderText, asView = false }) {
   host.classList.add('query');
   if (depth > 1) { host.textContent = '(a query inside a query is not run)'; return; }
@@ -41,6 +41,7 @@ export function mountQuery(host, [, q], { block, depth = 0, renderText, asView =
   const w = { el: host, run: () => run(host, q, block, depth, renderText, asView) };
   live.add(w);
   w.run();
+  return w.run;
 }
 
 async function run(host, q, block, depth, renderText, asView) {
