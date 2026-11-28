@@ -13,7 +13,7 @@ Everything beyond notes, links, search, queries, files and export is a plugin, i
 | `excalidraw` | Drawings: **/Drawing** opens [Excalidraw](https://excalidraw.com) over the page; the drawing is saved as an SVG picture with the drawing inside it, so it shows in notes and the export like any image, and a click opens it again. Logseq drawings (`.excalidraw` files) open the same way. See [Excalidraw](excalidraw/). |
 | `git` | Version history: a minute after you stop typing (`git_delay`), the Markdown export is committed to a git repository (`git_dir`, default `history/` in the data folder). A History section under each page lists its versions; look at one and restore it. Needs the `git` program on the server. |
 | `kanban` | Boards: `{{kanban}}` in a block shows tasks as cards in columns by state, or any notes a query finds by a field (`group:stage`). Drag a card to another column to change its keyword or field. Needs `tasks` for boards of tasks. See [Kanban](kanban/). |
-| `mail` | E-mail into notes: an `.eml` file dropped onto notd, picked with **Add an e-mail**, or piped in by a mail server becomes a folded note on today's journal, with its attachments stored. See [Mail](mail/). |
+| `mail` | E-mail into notes: a message dragged from Outlook (`.msg`), an `.eml` file (Gmail, the new Outlook, Thunderbird…), a raw message pasted from Gmail's "Show original", or one piped in by a mail server becomes a folded note on today's journal, with its attachments stored. See [Mail](mail/). |
 | `rss` | Feeds in notes: a block with `{feed:: https://…}` gets the feed's new items under it, newest first, each once. Feeds are read every hour (`rss_every`, in minutes) and straight away when the address is written. See [RSS](rss/). |
 | `tasks` | TODO/DOING/WAITING/DONE/CANCELLED with a checkbox, start, scheduled, deadline and done times, the `task:` query filter and an agenda on journal pages. Read `plugins/tasks/` as an example: it uses syntax, commands, a panel, an indexer and a filter. |
 
@@ -70,7 +70,7 @@ export function activate(notd) {
 | `go(title, block)` | Opens a page. |
 | `on(event, fn)` | Listens for `route`, `page`, `saving` and `renamed`. |
 | `notice(text, { error, sticky })` | Shows a short message in the bar above the page for a few seconds (an error a little longer, a sticky one until the next message). |
-| `files.register({ accept(file), handle(file, { block }) })` | Takes files of a kind of its own when they are pasted, dropped or picked, instead of having them stored: `handle` returns the text to put in the block (`block` is null when the file was dropped onto the page), or `''`. The mail plugin takes `.eml` files this way. |
+| `files.register({ accept(file), handle(file, { block }) })` | Takes files of a kind of its own when they are pasted, dropped or picked, instead of having them stored: `handle` returns the text to put in the block (`block` is null when the file was dropped onto the page), or `''`. With `acceptText(text)` and `handleText(text, { block })` it takes pasted text of its kind too, instead of having it typed in. The mail plugin takes `.eml` and `.msg` files, and pasted raw messages, this way. |
 
 
 

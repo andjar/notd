@@ -3,6 +3,7 @@ require_once dirname(__DIR__, 3) . '/tests/php/support/server.php';
 require_once dirname(__DIR__) . '/lib/mail.php';
 
 const MAIL = __DIR__ . '/fixtures';
+date_default_timezone_set('Europe/Oslo');     // times are shown on the notebook's clock
 
 test('the parser reads encoded words, quoted-printable, several recipients and names with commas', function () {
     $m = MailMessage::parse(file_get_contents(MAIL . '/plain.eml'));
@@ -27,7 +28,7 @@ test('a message becomes a folded note on today\'s journal, with its attachments 
     eq([true, date('Y-m-d'), 'Biobank list'], [$r['added'], $r['page'], $r['subject']]);
     eq(['tool.exe: Files of type .exe are not accepted.'], $r['warnings']);
     $blocks = Read::page($pdo, date('Y-m-d'))['blocks'];
-    eq("Email: Biobank list #mail\n{from:: signe@example.no} {date:: 2026-11-27}", $blocks[0]['text']);
+    eq("Email: Biobank list #mail\n{from:: signe@example.no} {date:: 2026-11-27 09:30}", $blocks[0]['text']);
     ok($blocks[0]['collapsed'], 'folded');
     eq("**From:** Signe <signe@example.no>\n**To:** <anders@example.no>\n**Date:** 2026-11-27 09:30\n\nHere is the list, and a chart.", $blocks[1]['text']);
     eq(1, preg_match('/^\[biobank list\.pdf\]\(file:[0-9a-f-]{36}\) !\[chart\.png\]\(file:[0-9a-f-]{36}\)\nNot stored: tool\.exe: /', $blocks[2]['text']), $blocks[2]['text']);
@@ -47,6 +48,41 @@ test('another page can be given; something that is not mail is refused', functio
     eq(2, count(Read::page($pdo, 'Inbox')['blocks']));
     $e = throws(fn() => Mail::add($pdo, file_get_contents(MAIL . '/not-mail.eml')), HttpError::class);
     eq([422, 'not_mail'], [$e->status, $e->codeName]);
+});
+
+test('Outlook .msg files: sender, recipients, time, text and attachments', function () {
+    $m = Mail::read(file_get_contents(MAIL . '/attachments.msg'));
+    eq(['IPM.Note', 'attachmentFiles', ['name' => 'hmailuser', 'email' => 'hmailuser@hmailserver.test']], [$m['class'], $m['subject'], $m['from']]);
+    eq(['hmailuser@hmailserver.test'], array_column($m['to'], 'email'));
+    eq(['Wed, 1 Nov 2023 09:48:31 +0900', '000001da0c5d$22ab1460$68013d20$@hmailserver.test', 'attachmentFiles'], [$m['date'], $m['message_id'], $m['text']]);
+    eq(['jpg.jpg', 'png.png', 'tif.tif'], array_column($m['attachments'], 'name'));
+    eq([726, 134, 664], array_map(fn($a) => strlen($a['data']), $m['attachments']));
+    eq("\x89PNG", substr($m['attachments'][1]['data'], 0, 4));
+
+    $j = Mail::read(file_get_contents(MAIL . '/cp932.msg'));                  // 8-bit strings in the locale's code page
+    eq(['日本語 Non Unicode タイトル', '日本語 Non Unicode 本文'], [$j['subject'], $j['text']]);
+    eq('2021-11-05', substr((new DateTimeImmutable($j['date']))->format('Y-m-d'), 0, 10));
+
+    $e = throws(fn() => Mail::read(file_get_contents(MAIL . '/damaged.msg')), HttpError::class);
+    eq([422, 'not_mail'], [$e->status, $e->codeName]);
+    ok(str_contains($e->getMessage(), 'damaged'), $e->getMessage());
+});
+
+test('a .msg becomes a note like an .eml; an attached e-mail becomes a note under it', function () {
+    $pdo = fresh_db();
+    $r = Mail::add($pdo, file_get_contents(MAIL . '/attachments.msg'), 'Inbox');
+    $blocks = Read::page($pdo, 'Inbox')['blocks'];
+    eq("Email: attachmentFiles #mail\n{from:: hmailuser@hmailserver.test} {date:: 2023-11-01 01:48}", $blocks[0]['text']);
+    eq("**From:** hmailuser <hmailuser@hmailserver.test>\n**To:** <hmailuser@hmailserver.test>\n**Date:** 2023-11-01 01:48\n\nattachmentFiles", $blocks[1]['text']);
+    eq(1, preg_match('/^!\[jpg\.jpg\]\(file:[0-9a-f-]{36}\) !\[png\.png\]\(file:[0-9a-f-]{36}\)\nNot stored: tif\.tif: /', $blocks[2]['text']), $blocks[2]['text']);
+    eq(['tif.tif: Files of type .tif are not accepted.'], $r['warnings']);
+    eq(false, Mail::add($pdo, file_get_contents(MAIL . '/attachments.msg'), 'Inbox')['added'], 'once');
+
+    $outer = Mail::add($pdo, file_get_contents(MAIL . '/attached-email.msg'), 'Inbox');
+    $inner = array_values(array_filter(Read::page($pdo, 'Inbox')['blocks'], fn($b) => $b['parent'] === $outer['id'] && str_starts_with($b['text'], 'Attached')));
+    eq(1, count($inner));
+    eq("Attached e-mail: sample\n{from:: hmailuser@hmailserver.test} {date:: 2025-12-04 05:36}", $inner[0]['text']);
+    eq(2, count(Query::run($pdo, 'tag:mail')['nodes']), 'only the top messages are tagged');
 });
 
 test('the command line tool: exit codes a mail server understands', function () {
