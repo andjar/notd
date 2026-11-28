@@ -65,12 +65,32 @@ Text is Markdown: `**bold**`, `*italic*`, `` `code` ``, `[a link](https://…)`,
 {{query type:book sort:-rating}}              books, best first
 {{query type:book view:table columns:rating,author}}   the same as a table
 {{query task:open group:priority}}            open tasks under a heading per priority
+{{query has:published group:published:day}}   notes by the day in their published field
 {{query links:"Kitchen renovation"}}          everything that links to a page
 ```
 
 The language (fields, tags, links, pages, dates, words, `OR`, `-` for not, `sort:`, `limit:`, `group:`) is described under [Queries](../protocol/queries/). A task in the results can be ticked where it is shown; the note itself changes, wherever it lives. Click a result's page name to go there; click the query's grey heading to change the query.
 
 **/query** in a block offers ready-made ones: an empty query, *tagged …*, *what links here*, *changed today*, and from the tasks plugin *open tasks*, *open tasks on this page*, *due within a week* and *done this week*.
+
+## Views: showing a block's children another way
+
+The outline is one way to show notes, not the only one. A block with a `view` field shows its children through a query instead of as the tree: grouped, sorted, or as a table. The children stay where they are. Only how they are shown changes.
+
+```text
+Garden blog {feed:: …} {view:: group:published:day sort:-published}      by day, newest first
+Garden blog {feed:: …} {view:: group:published:hour sort:-published}     by day, then by hour
+Reading list {view:: group:status sort:title}                          a heading per status
+Films {view:: view:table columns:rating,year sort:-rating}             a table
+```
+
+Anything a query can say goes in a view; the view only ever shows the block's own children (it adds `parent:` and the block's id). `group:field:day` groups by the day of a date or date and time, `:hour` by the hour (under a heading per day), `:month` and `:year` likewise; a time-grouped view leaves the grouped field out of each note, since the heading shows it. A view shows the first 100 notes; add `limit:300` for more.
+
+- **The tree is one click away.** Click the block's bullet: zoomed into it, its children are shown as blocks again, to edit, move or delete.
+- **Keys go past it.** Arrow keys skip the children, and Enter at the end of the block makes a new block after it, not a hidden child.
+- **Take it out** by deleting the `{view:: …}` field: the children are shown as the tree again.
+
+Times and days are read on the server's clock. If notd runs somewhere set to another time zone than yours, set `timezone` in `config.local.php`, such as `'timezone' => 'Europe/Oslo'`.
 
 ## Templates
 

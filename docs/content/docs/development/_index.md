@@ -182,11 +182,11 @@ client/
   ui/gate.js      the login screen
   ui/page.js      one page on screen: loads it, draws its outline, one outbox for the app
   ui/journal.js   the journal: today's page, then earlier days with notes, loaded as you scroll
-  ui/outline-view.js  draws the outline from the model and redraws only what a change touched
+  ui/outline-view.js  draws the outline from the model and redraws only what a change touched; a block's {view:: …} draws its children through ui/query.js instead
   ui/text.js      draws a block's text: Markdown through DOMPurify, then references and embeds filled in
   ui/autocomplete.js  link suggestions at the caret
   ui/attach.js    files pasted, dropped or picked: uploaded and linked in the block's text
-  ui/query.js     {{query ...}}: results in place (list, table, groups), run again on changes
+  ui/query.js     {{query ...}} and views: results in place (list, table, groups, groups by day and hour), run again on changes
   ui/templates.js templates (pages under notd/templates/) in the slash menu, and "Save as a template"
   lib/placeholders.js  {{date}}, {{page}}, {{cursor}} and the rest, filled in when a template goes in
   lib/remote.js   blocks shown but not on a page on screen (query results): changed through the server

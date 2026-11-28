@@ -25,5 +25,6 @@ require_once __DIR__ . '/plugins.php';
 require_once __DIR__ . '/actions.php';
 require_once __DIR__ . '/jobs.php';
 
+@date_default_timezone_set(Config::get('timezone') ?? date_default_timezone_get());   // the clock days and hours are read by
 Ops::$listeners['index'] = [Indexer::class, 'onChange'];
 Ops::$listeners['search'] = [Search::class, 'onChange'];

@@ -14,6 +14,7 @@ import { Autocomplete } from './autocomplete.js';
 import { Drag } from './drag.js';
 import { SlashMenu } from './menus.js';
 import { acceptFiles } from './attach.js';
+import { mountQuery } from './query.js';
 
 export const outbox = new Outbox({
   send: (ops) => api.ops(ops),
@@ -97,7 +98,8 @@ export class PageScreen {
     const zoom = this.zoom && this.outline.model.has(this.zoom) ? this.zoom : null;
     if (zoom) this.root.prepend(this.#crumbs(page, zoom));
     else if (this.zoom) this.root.prepend(Object.assign(document.createElement('p'), { className: 'missing', textContent: 'That block is not on this page any more.' }));
-    this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id), renderText, zoom });
+    const view = (el, n, q) => mountQuery(el.appendChild(document.createElement('div')), [null, `parent:${n.id} ${q}`], { block: n, renderText, asView: true });
+    this.view = new OutlineView(host, this.outline, { link: (id) => pageLink(page.title, id), renderText, zoom, view });
     this.view.render();
     this.editor = new Editor(this.view, this.outline);
     this.autocomplete?.close();

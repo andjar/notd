@@ -5,11 +5,18 @@
 // for a heading), so the bullet sits on the middle of the first line whatever
 // the text is. Children are indented by one --indent, and the guide line runs
 // down the middle of the parent's bullet.
+//
+// A block with {view:: …} shows its children through that view (a query of
+// them, drawn by the view option) instead of as the tree; zoomed into, it shows
+// the tree again, to edit them. The tree is one way to show notes, not the only one.
+
+import { viewOf } from '../lib/model.js';
 
 export const HEADING = /^(#{1,3}) /;
 
 export class OutlineView {
-  constructor(root, outline, { renderText = defaultText, link = (id) => '#', zoom = null } = {}) {
+  constructor(root, outline, { renderText = defaultText, link = (id) => '#', zoom = null, view = null } = {}) {
+    this.view = view; // (element, node, view) draws a block's children through its view
     this.root = root;
     this.zoom = zoom; // when set, only this block and what is under it are shown
     this.outline = outline;
@@ -67,6 +74,8 @@ export class OutlineView {
         break;
     }
     if (m.has(change.id)) this.#refreshFold(m.get(change.id).parent);
+    const parent = m.get(change.id)?.parent ?? change.oldParent;
+    if (change.kind === 'edit' || change.kind === 'delete' || change.kind === 'merge') this.#refreshView(parent);
   }
 
   element(id) { return this.els.get(id) ?? null; }
@@ -98,9 +107,37 @@ export class OutlineView {
     el.append(row, kids);
     this.els.set(n.id, el);
     this.#fillContent(el, n);
-    for (const c of this.model.children(n.id)) kids.append(this.#block(c));
+    this.#fillChildren(el, n);
     this.#fold(el, n);
     return el;
+  }
+
+  /** The view a block's children are shown through here, or null for the tree. */
+  #viewFor(n) {
+    return this.view && n.id !== this.zoom ? viewOf(n.text) : null;
+  }
+
+  /** The children as blocks, or through the block's view. */
+  #fillChildren(el, n) {
+    const kids = el.querySelector(':scope > .children');
+    const view = this.#viewFor(n);
+    for (const id of this.model.subtreeIds(n.id).slice(1)) this.els.delete(id);
+    kids.classList.toggle('child-view', view !== null);
+    if (view === null) {
+      delete el.dataset.view;
+      kids.replaceChildren(...this.model.children(n.id).map((c) => this.#block(c)));
+      return;
+    }
+    el.dataset.view = view;
+    kids.replaceChildren();
+    this.view(kids, n, view);
+  }
+
+  /** Draws a block's view again, after its children changed. */
+  #refreshView(id) {
+    const el = this.els.get(id);
+    const n = this.model.get(id);
+    if (el?.dataset.view !== undefined && n) this.#fillChildren(el, n);
   }
 
   #fillContent(el, n) {
@@ -123,7 +160,9 @@ export class OutlineView {
   #refreshContent(id) {
     const el = this.els.get(id);
     const n = this.model.get(id);
-    if (el && n && !el.classList.contains('editing')) this.#fillContent(el, n);
+    if (!el || !n || el.classList.contains('editing')) return;
+    this.#fillContent(el, n);
+    if ((el.dataset.view ?? null) !== this.#viewFor(n)) this.#fillChildren(el, n);   // a view put in or taken out
   }
 
   #refreshFold(id) {
@@ -138,6 +177,7 @@ export class OutlineView {
     if (!n) return;
     const el = this.els.get(id) ?? this.#block(n);
     if (this.zoom && !this.model.isInSubtree(this.zoom, id)) { el.remove(); return; } // moved out of view
+    if (this.els.get(n.parent)?.dataset.view !== undefined) { el.remove(); this.#refreshView(n.parent); return; }
     const container = id === this.zoom ? this.root.querySelector(':scope > .outline')
       : n.parent === this.model.pageId ? (this.zoom ? null : this.root.querySelector(':scope > .outline'))
       : this.els.get(n.parent)?.querySelector(':scope > .children');

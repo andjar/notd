@@ -5,6 +5,10 @@ return [
     // Where the database and files live. $NOTD_DATA_DIR overrides it.
     'data_dir' => __DIR__ . '/data',
 
+    // The time zone days and hours are read in (journal days, feed items, e-mails). Without it, PHP's
+    // date.timezone, often UTC.
+    // 'timezone' => 'Europe/Oslo',
+
     // The password other devices log in with, as a hash. Set it with: php tools/password.php
     // 'password_hash' => '$2y$10$...',
 ];

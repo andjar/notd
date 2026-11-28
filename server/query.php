@@ -10,7 +10,8 @@
 // "phrases" search the text. A leading - negates a filter; OR joins the filters
 // on either side of it. Options: sort:key or sort:-key (repeatable; also title,
 // text, created, updated), limit:N,
-// group:key; view: and columns: are passed back untouched for whoever shows the result.
+// group:key (or group:key:day, :hour, :month, :year for dates and times);
+// view: and columns: are passed back untouched for whoever shows the result.
 
 declare(strict_types=1);
 
@@ -107,16 +108,18 @@ final class Query
         if ($c['group'] === null) {
             return ['nodes' => $nodes, 'options' => (object) $c['options']];
         }
+        [$field, $by] = explode(':', $c['group'] . ':');      // group:published:day groups by the first 10 characters
+        $cut = ['year' => 4, 'month' => 7, 'day' => 10, 'hour' => 13][$by] ?? null;
         $groups = [];
         foreach ($nodes as $node) {
-            $values = is_array($node['fields']) ? ($node['fields'][$c['group']] ?? ['']) : [''];
+            $values = is_array($node['fields']) ? ($node['fields'][$field] ?? ['']) : [''];
             foreach ($values as $v) {
-                $k = title_key($v);
+                $k = title_key($v = $cut ? substr($v, 0, $cut) : $v);
                 $groups[$k] ??= ['value' => $v === '' ? null : $v, 'nodes' => []];
                 $groups[$k]['nodes'][] = $node;
             }
         }
-        ksort($groups, SORT_NATURAL | SORT_FLAG_CASE);
+        $cut || ksort($groups, SORT_NATURAL | SORT_FLAG_CASE);    // time buckets keep the order of the sort
         if (isset($groups[''])) {
             $none = $groups[''];
             unset($groups['']);
@@ -138,6 +141,9 @@ final class Query
             case 'kind':
                 self::onlyColon($key, $opr);
                 return ['n.kind = ?', [strtolower($value)]];
+            case 'parent':
+                self::onlyColon($key, $opr);
+                return ['n.parent_id = ?', [strtolower(trim($value, '()'))]];
             case 'page':
                 self::onlyColon($key, $opr);
                 return ["n.kind <> 'page' AND n.page_id IN (SELECT id FROM nodes WHERE title_key = ?)", [title_key($value)]];

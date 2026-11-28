@@ -19,6 +19,7 @@ A query is a list of filters, all of which must hold, plus options.
 | `tag:scifi` | tagged `#scifi` (or with `{tags:: scifi}`) |
 | `links:Page` | that link to or tag the page |
 | `page:Title` | on that page (its blocks, not the page itself) |
+| `parent:0190…` | the children of that block (its id, or `((id))`); a block's `{view:: …}` uses this |
 | `kind:page`, `kind:block` | of that kind |
 | `created:2026-11-25`, `updated>=2026-11-01` | changed on, after or before a date |
 | `kitchen`, `"space opera"` | whose text contains the words (as prefixes) or the phrase, as in [search](../search/) |
@@ -29,7 +30,8 @@ A leading `-` negates a filter: `-tag:scifi`, `-has:rating`. `OR` joins the two 
 | --- | --- |
 | `sort:rating`, `sort:-rating` | Sorts by a field, ascending or (with `-`) descending; nodes without the field come last. Also `title`, `text`, `created`, `updated`. Can be repeated. Without it, the most recently changed come first. |
 | `limit:20` | At most this many results (default 100, at most 1,000). |
-| `group:type` | Groups the results by a field's value. |
+| `group:type` | Groups the results by a field's value, in alphabetical order. |
+| `group:published:day` | Groups by the start of a date or date-and-time value: `:day` (`2026-11-28`), `:hour` (`2026-11-28 14`), `:month` (`2026-11`) or `:year`. These groups keep the order of the sort, so with `sort:-published` the newest come first. |
 | `view:...`, `columns:...` | Passed back untouched in `options`, for whoever shows the result. |
 
 The words `sort`, `limit`, `group`, `view` and `columns` are therefore not usable as field names in a filter.

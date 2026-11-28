@@ -3,6 +3,10 @@
 // items are added under it, newest first, each once. What has been seen is
 // kept per feed in the notebook (meta "rss:<block id>"), so an item you delete
 // does not come back. The first read adds only the newest few.
+//
+// Each item says when it was published ({published:: 2026-11-28 14:05}), so it
+// can be shown by day or by hour: that is how the feed is shown (a {view:: …}
+// on the feed block, see the guide), not how the items are kept.
 
 declare(strict_types=1);
 
@@ -71,7 +75,7 @@ final class Rss
                 $new[$id] = $item;
             }
         }
-        uasort($new, fn($a, $b) => strcmp($b['date'], $a['date']));     // stable: undated items keep the feed's order
+        uasort($new, fn($a, $b) => strcmp($b['published'], $a['published']));     // stable: undated items keep the feed's order
         $new = array_slice($new, 0, $first ? self::FIRST : self::MAX, true);
         $new = array_filter($new, fn($id) => Nodes::get($pdo, $id) === null, ARRAY_FILTER_USE_KEY);
         if ($new) {
@@ -90,14 +94,12 @@ final class Rss
         return count($new);
     }
 
-    /** An item as a block: "[Title](link) {date:: 2026-11-27}", then the start of its text. */
+    /** An item as a block: "[Title](link) {published:: 2026-11-27 14:05}" (when read, for an item without a date), then the start of its text. */
     public static function text(array $item): string
     {
         $title = trim(str_replace(['[', ']', '{', '}'], ['(', ')', '(', ')'], $item['title'])) ?: $item['link'] ?: '(no title)';
         $line = $item['link'] !== '' ? '[' . $title . '](' . str_replace([' ', '(', ')'], ['%20', '%28', '%29'], $item['link']) . ')' : "Item: $title";
-        if ($item['date'] !== '') {
-            $line .= " {date:: {$item['date']}}";
-        }
+        $line .= ' {published:: ' . ($item['published'] ?: date('Y-m-d H:i')) . '}';
         $summary = str_replace(['{', '}'], ['(', ')'], $item['summary']);
         if ($summary !== '' && $summary !== $item['title']) {
             if (mb_strlen($summary) > self::SUMMARY) {

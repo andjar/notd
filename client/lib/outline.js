@@ -11,7 +11,7 @@
 // is one undo step; everything one key press does is one step. Typing inside a
 // block is not recorded here: the browser undoes text while a block is edited.
 
-import { OutlineModel } from './model.js';
+import { OutlineModel, viewOf } from './model.js';
 import { newId } from './keys.js';
 
 const UNDO_LIMIT = 200;
@@ -108,7 +108,7 @@ export class Outline {
     const after = n.text.slice(at);
     this.edit(id, before, { undoable: true });
     // A block with visible children gets the new block as its first child, like every outliner.
-    if (asChild || (this.model.hasChildren(id) && !n.collapsed)) return this.create({ parent: id, after: null, text: after });
+    if (asChild || (this.model.hasChildren(id) && !n.collapsed && viewOf(n.text) === null)) return this.create({ parent: id, after: null, text: after });
     return this.create({ parent: n.parent, after: id, text: after });
   }
 
